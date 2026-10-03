@@ -71,7 +71,7 @@ def window(qapp):
 def _sky_chips(window):
     # @return: the sky chips currently in the Tonight header
     from PySide6.QtWidgets import QLabel
-    return window.tonight.findChildren(QLabel, "ns_skyevent_chip")
+    return window.findChildren(QLabel, "ns_skyevent_chip")
 
 
 def test_chips_big_first_and_one_per_family(window):
@@ -86,10 +86,12 @@ def test_chips_big_first_and_one_per_family(window):
         _ev("perigee", NOW_JD + 1, ["moon"], dist_km=357000),
     ]
     picks = window._skyevent_chips(evs)
-    assert [p["kind"] for p in picks] == ["lunar_eclipse", "opposition",
-                                          "moon_conjunction"]
+    # Interfaz 1.6: the bar shares the row with the navigation and with the
+    # Moon, so it carries TWO chips, not three (a third was pushed off the
+    # right edge at 1360 px). The rest is one click away in the calendar.
+    assert [p["kind"] for p in picks] == ["lunar_eclipse", "opposition"]
     chips = _sky_chips(window)
-    assert len(chips) == 3
+    assert len(chips) == 2
     assert "eclipse" in chips[0].text().lower() or "eclipse" \
         in chips[0].text()
 
@@ -126,6 +128,20 @@ def test_no_events_means_no_chips(window):
     picks = window._skyevent_chips([])
     assert picks == []
     assert _sky_chips(window) == []
+
+
+def test_sky_chips_live_in_the_navigation_bar(window):
+    # Interfaz 1.6: the chips moved from a band on Home to the navigation
+    # sky bar, which is visible from every view and does NOT hide when
+    # there are no events (its Moon and its darkness window stay).
+    assert window._sky_bar is not None
+    window._skyevent_chips([_ev("opposition", NOW_JD + 5, ["saturn"],
+                                mag=0.6)])
+    assert len(_sky_chips(window)) == 1
+    assert not window._sky_bar.isHidden()
+    window._skyevent_chips([])
+    assert _sky_chips(window) == []
+    assert not window._sky_bar.isHidden()
 
 
 def test_real_list_chips_today(window):

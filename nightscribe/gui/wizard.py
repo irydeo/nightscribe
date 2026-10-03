@@ -30,17 +30,19 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import QT_TRANSLATE_NOOP, QFile, QCoreApplication
+from PySide6.QtCore import (QT_TRANSLATE_NOOP, QFile, QCoreApplication, Qt,
+                            Signal)
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QFrame, QHBoxLayout, QLabel, QWizard,
-    QVBoxLayout,
+    QApplication, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
+    QWizard, QVBoxLayout,
 )
 
 from ..config import config
 from ..version import base_version
 from ..core import kinds
-from .theme import C_ACCENT, C_TEXT_DIM, C_WARN
+from .theme import (C_ACCENT, C_GOOD, C_TEXT, C_TEXT_DIM, C_WARN, KIND_COLORS,
+                    kind_card_style)
 
 UI_DIR = Path(__file__).parent / "ui"
 
@@ -54,8 +56,8 @@ S_FOUND = QT_TRANSLATE_NOOP("NSWizard",
     "Location found: {name} ({lat}, {lon}). Adjust the numbers if they "
     "are off.")
 S_OFFLINE = QT_TRANSLATE_NOOP("NSWizard",
-    "The location service did not answer (offline?). No problem: type "
-    "the coordinates by hand, or use your MPC code.")
+    "The location service did not answer. Type the coordinates, use your "
+    "MPC code, or pick the point on the map.")
 S_RESOLVED = QT_TRANSLATE_NOOP("NSWizard",
     "MPC code {code} resolved to {name} ({lat}, {lon}).")
 S_CODE_BAD = QT_TRANSLATE_NOOP("NSWizard",
@@ -221,10 +223,22 @@ def _detect(wizard):
     wizard.spn_site_lat.setValue(lat)
     wizard.spn_site_lon.setValue(lon)
     name = place.get("name") or ""
-    if not wizard.edt_site_name.text().strip():
+    # Written every time, like the MPC resolve below: clicking "find my
+    # location" is an explicit statement of where the site is, and the city
+    # it resolved is what the observer expects to see named (Interfaz 1.5).
+    if name:
         wizard.edt_site_name.setText(name)
-    # best effort: the terrain height, when the service answers
-    height = geo.elevation(lat, lon, force=True)
+    # Best effort, and strictly optional: the terrain height is a finishing
+    # touch on a site we have already located. It goes LAST and inside a
+    # try because a failure here must never undo the detection: the old
+    # code let an exception escape the button's slot, which left the status
+    # line stuck on "Finding your observatory..." with the coordinates
+    # already on screen (seen 2026-10-02).
+    try:
+        height = geo.elevation(lat, lon, force=True)
+    except Exception as exc:
+        logger.info("detect: elevation lookup failed (%s)", exc)
+        height = None
     if height is not None:
         wizard.spn_site_height.setValue(int(height))
     wizard.lbl_site_status.setText(tr(S_FOUND, name=name, lat=lat, lon=lon))
@@ -251,22 +265,73 @@ def _resolve_site(wizard):
     lat, lon = round(site["lat"], 5), round(site["lon"], 5)
     wizard.spn_site_lat.setValue(lat)
     wizard.spn_site_lon.setValue(lon)
-    name = site.get("name") or ""
-    if not wizard.edt_site_name.text().strip():
+    name = (site.get("name") or "").strip()
+    # The MPC code IS the site's identity and resolving it is an explicit
+    # action, so the official name replaces whatever was typed (Interfaz
+    # 1.5). The status line below names it, so the change is never silent.
+    if name:
         wizard.edt_site_name.setText(name)
     wizard.lbl_site_status.setText(
         tr(S_RESOLVED, code=code, name=name, lat=lat, lon=lon))
 
 
-def _setup_kinds(wizard):
-    # Builds the checkbox rows: the label (with a "new" badge when the
-    # kind arrived after the user's last version), the plain-language
-    # description and the data source line. The checks are prefilled from
-    # the settings whitelist; the new kinds are always on.
-    # @args: wizard - the loaded wizard
+_CARD_BLURB_CHARS = 96
+
+
+def _card_blurb(text):
+    # @args: text - a kind's full blurb
+    # @return: a one-glance version for the Welcome card, cut at a word
+    #          boundary. The full paragraph and the data source travel in
+    #          the tooltip: eight full paragraphs on one screen is exactly
+    #          the wall of text this redesign removes, but the detail is
+    #          one hover away for whoever wants it.
+    cut = text.find(". ")
+    short = text[:cut + 1] if 0 < cut + 1 <= _CARD_BLURB_CHARS else text
+    if len(short) <= _CARD_BLURB_CHARS:
+        return short
+    head = short[:_CARD_BLURB_CHARS]
+    space = head.rfind(" ")
+    return (head[:space] if space > 40 else head).rstrip(" ,;:") + "…"
+
+
+class _ClickableCard(QFrame):
+    """A kind card that toggles when clicked anywhere on it.
+
+    The QCheckBox inside keeps its own clicks (it accepts the press, so the
+    event never bubbles up): clicking the box toggles once and clicking the
+    card toggles once, with no flicker from the two paths fighting. The
+    labels are made transparent to the mouse for the same reason: a blurb
+    that swallowed the click would leave most of the card dead.
+    """
+
+    clicked = Signal()
+
+    def mouseReleaseEvent(self, event):
+        # Release, not press: a press that drags away (the user changed
+        # their mind) must not toggle the kind.
+        if (event.button() == Qt.LeftButton
+                and self.rect().contains(event.position().toPoint())):
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
+def _setup_kinds(wizard, card=False):
+    # Builds the rows: the label (with a "new" badge when the kind arrived
+    # after the user's last version), the plain-language description and the
+    # data source line. The checks are prefilled from the settings whitelist;
+    # the new kinds are always on.
+    #
+    # card=True is the Welcome look (Interfaz 1.4): every kind becomes a card
+    # with a spine in its KIND_COLORS hue, laid out in a two-column grid, and
+    # the whole card is the click target. The RETURN is identical either way
+    # ({kind_id: QCheckBox}), so _apply_kinds and the Next gate do not care
+    # which look is on screen.
+    # @args: wizard - the loaded wizard (or the Welcome husk);
+    #        card - True for the Welcome grid, False for the wizard rows
     # @return: {kind_id: QCheckBox}, in catalogue order
     container = wizard.kinds_container
     layout = container.layout()
+    is_grid = isinstance(layout, QGridLayout)
     while layout.count():
         item = layout.takeAt(0)
         widget = item.widget()
@@ -277,9 +342,13 @@ def _setup_kinds(wizard):
     if not isinstance(saved, list) or not saved:
         saved = list(kinds.ids())
     last = (config.get("app_version") or "").strip()
-    for kind in kinds.KINDS:
+    for i, kind in enumerate(kinds.KINDS):
         box = QCheckBox(kinds.tr_text(kind["label"]))
-        row = QFrame()
+        accent = KIND_COLORS.get(kind["id"], C_ACCENT)
+        row = _ClickableCard() if card else QFrame()
+        if card:
+            row.setObjectName("kindCard")
+            row.setCursor(Qt.PointingHandCursor)
         body = QVBoxLayout(row)
         body.setContentsMargins(12, 8, 12, 8)
         head = QHBoxLayout()
@@ -291,20 +360,52 @@ def _setup_kinds(wizard):
         head.addStretch(1)
         body.addLayout(head)
 
-        blurb = QLabel(kinds.tr_text(kind["blurb"]))
+        # On a card the blurb is the first sentence only, with the full
+        # paragraph on the tooltip: eight three-sentence paragraphs in one
+        # screen is the wall of text this redesign set out to kill, and the
+        # observer who wants the detail just hovers.
+        full_blurb = kinds.tr_text(kind["blurb"])
+        source = tr(S_SOURCE, source=kinds.tr_text(kind["source"]))
+        short_blurb = _card_blurb(full_blurb) if card else full_blurb
+        blurb = QLabel(short_blurb)
         blurb.setWordWrap(True)
         blurb.setStyleSheet(f"color: {C_TEXT_DIM};")
         body.addWidget(blurb)
 
-        src = QLabel(tr(S_SOURCE, source=kinds.tr_text(kind["source"])))
+        src = QLabel(source)
         src.setWordWrap(True)
         src.setStyleSheet(f"color: {C_TEXT_DIM}; font-size: 9pt;")
         body.addWidget(src)
+        if card:
+            # the card is the glance; the tooltip is the dossier
+            detail = f"{full_blurb}\n\n{source}"
+            for w in (blurb, src):
+                w.setToolTip(detail)
 
         boxes[kind["id"]] = box
         box.setChecked(kind["id"] in saved or kinds.is_new(kind["id"], last))
-        layout.addWidget(row)
-    layout.addStretch(1)
+
+        if card:
+            for w in (blurb, src):
+                w.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+            # the card repaints itself in the kind's hue when it is on
+            def _skin(_on, c=row, a=accent):
+                c.setStyleSheet(kind_card_style(a, _on))
+            box.toggled.connect(_skin)
+            row.clicked.connect(lambda b=box: b.setChecked(not b.isChecked()))
+            _skin(box.isChecked())
+            layout.addWidget(row, i // 2, i % 2)
+        else:
+            layout.addWidget(row)
+
+    if card and is_grid:
+        layout.setColumnStretch(0, 1)
+        layout.setColumnStretch(1, 1)
+        # the last row absorbs the leftover height: without it the grid
+        # floats its rows in the middle of the scroll area
+        layout.setRowStretch((len(kinds.KINDS) + 1) // 2, 1)
+    else:
+        layout.addStretch(1)
     return boxes
 
 
@@ -326,35 +427,56 @@ def _setup_data(wizard, snapshot):
         if widget is not None:
             widget.deleteLater()
 
-    def add(text, warn=False):
+    def add(text, level="info"):
+        # One line of the receipt: a coloured mark plus the plain-language
+        # sentence. The mark is what lets the eye find the one line that
+        # matters (the verified backup) in a paragraph of format talk.
+        # @args: text - the already-translated sentence; level - "info",
+        #        "ok" (a check, green) or "warn" (a triangle, orange)
+        row = QFrame()
+        rl = QHBoxLayout(row)
+        rl.setContentsMargins(0, 0, 0, 0)
+        rl.setSpacing(8)
+        mark = QLabel({"ok": "✓", "warn": "⚠"}.get(level, "•"))
+        mark.setFixedWidth(16)
+        mark.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
+        mark.setStyleSheet("color: %s; font-weight: bold;" % {
+            "ok": C_GOOD, "warn": C_WARN}.get(level, C_TEXT_DIM))
+        rl.addWidget(mark)
         label = QLabel(text)
         label.setWordWrap(True)
-        label.setStyleSheet(f"color: {C_WARN if warn else C_TEXT_DIM};")
-        layout.addWidget(label)
+        label.setStyleSheet("color: %s;" % (
+            C_TEXT if level != "info" else C_TEXT_DIM))
+        rl.addWidget(label, 1)
+        layout.addWidget(row)
 
     add(tr(S_VERSION, version=_display_version()))
 
     if snapshot is None:
         add(tr(S_NO_DB, path=str(paths.db_path())))
-        add(tr(S_MIG_OK))
+        add(tr(S_MIG_OK), level="ok")
     else:
         if snapshot["integrity"] == "ok":
             add(tr(S_BACKUP_OK, file=snapshot["file"].name,
-                   size=_human(snapshot["size"])))
+                   size=_human(snapshot["size"])), level="ok")
         else:
-            add(tr(S_BACKUP_BAD, file=snapshot["file"].name), warn=True)
+            add(tr(S_BACKUP_BAD, file=snapshot["file"].name), level="warn")
         old = snapshot["schema_version"]
         new = max(coredb.MIGRATION_NOTES)
         if old >= new:
-            add(tr(S_MIG_OK))
+            add(tr(S_MIG_OK), level="ok")
         elif old > new:
-            add(tr(S_MIG_NEWER, old=old, new=new), warn=True)
+            add(tr(S_MIG_NEWER, old=old, new=new), level="warn")
         else:
             add(tr(S_MIG_RUN, old=old, new=new))
             for v in range(old + 1, new + 1):
                 note = coredb.MIGRATION_NOTES.get(v)
                 if note:
-                    add("  " + tr(S_MIG_STEP, v=v, note=coredb.tr_note(note)))
+                    add(tr(S_MIG_STEP, v=v, note=coredb.tr_note(note)))
+    # The slack goes to the BOTTOM. Without this stretch the QVBoxLayout
+    # spreads it across the rows and a one-line sentence ends up in a 72 px
+    # box, which reads as a broken layout (seen 2026-10-02).
+    layout.addStretch(1)
 
 
 def _display_version():

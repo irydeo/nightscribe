@@ -29,6 +29,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import Qt  # noqa: E402
 
+from nightscribe.gui.widgets.passive_wheel import PassiveList  # noqa: E402
+
 
 @pytest.fixture(scope="module")
 def qapp():
@@ -231,9 +233,9 @@ def test_no_measurement_block_for_non_curve_kinds(qapp, tmp_path):
     vp = VisitsPanel(db, lang="en", curve_kind=False)
     vp.set_project(p["id"])
     vp.btn_new.click()
-    assert vp._win.findChild(type(vp.lst), "vp_measurements") is None
+    assert vp._win.findChild(PassiveList, "vp_measurements") is None
     # resources and notes remain for every kind
-    assert vp._win.findChild(type(vp.lst), "vp_resources") is not None
+    assert vp._win.findChild(PassiveList, "vp_resources") is not None
     vp.close_visit_window()
     vp.deleteLater()
     db.close()

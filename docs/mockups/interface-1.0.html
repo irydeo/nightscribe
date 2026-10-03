@@ -1,0 +1,952 @@
+<!doctype html>
+<!--
+  NightScribe · Interfaz 1.0 — mockup navegable para validación.
+  Fichero único, autocontenido, sin dependencias. NO es código de la app:
+  reproduce la paleta real de gui/theme.py para validar el flujo y el aspecto
+  antes de tocar main_window.py / ufe_dialog.py.
+
+  Estados: Bienvenida · Home · Nuevo proyecto (drawer cerrado/abierto) ·
+           Detalle · UFE embebido.
+  Paleta: C_BG #0f121c · C_BASE #12141f · C_PANEL #171a26 · C_LINE #232736 ·
+          C_EDGE #3a4156 · C_SEL #2f4d80 · C_TEXT #e8eaf2 · C_TEXT_DIM #8a90a6 ·
+          C_ACCENT #6ab0ff · C_WARN #f76808 · C_GOOD #46a758
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe · Interfaz 1.0 (mockup)</title>
+<style>
+  :root{
+    --bg:#0f121c; --base:#12141f; --panel:#171a26; --line:#232736; --edge:#3a4156;
+    --sel:#2f4d80; --text:#e8eaf2; --dim:#8a90a6; --accent:#6ab0ff;
+    --warn:#f76808; --good:#46a758; --hover:#212739; --row-hover:#1a1f30;
+    --sn:#e5484d; --variable:#65cf30; --comet:#46a758; --neo:#4484ef;
+    --transit:#a06ee0; --hads:#e0549e; --pccp:#39c5cf; --alert:#f76808;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;cursor:pointer}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--edge)}
+
+  /* ---- barra de mockup (solo validación, no existe en la app) ---- */
+  .mockbar{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:6px 12px;background:#07080d;border-bottom:1px dashed #3a4156;
+    font-size:11px;color:var(--dim);
+  }
+  .mockbar b{color:var(--warn);letter-spacing:.08em}
+  .mockbar button{
+    background:var(--panel);border:1px solid var(--edge);border-radius:4px;
+    padding:3px 10px;font-size:11px;color:var(--text);
+  }
+  .mockbar button:hover{background:var(--hover)}
+  .mockbar button.on{border-color:var(--accent);color:var(--accent)}
+
+  /* ---- app shell ---- */
+  .app{display:flex;flex-direction:column;height:calc(100vh - 34px);min-height:560px}
+
+  /* Barra de título (nativa en la app: icono + "NightScribe <versión>") */
+  .titlebar{display:flex;align-items:center;gap:8px;height:30px;flex:0 0 30px;
+    background:var(--panel);border-bottom:1px solid var(--line);padding:0 10px;font-size:12px}
+  .titlebar .logo{width:18px;height:18px;border-radius:4px;
+    background:linear-gradient(180deg,#1b2134,#0e1119);
+    display:flex;align-items:center;justify-content:center}
+  .titlebar .logo::after{content:"✦";color:#ecc15f;font-size:11px;line-height:1}
+  .titlebar .title{color:var(--text);font-weight:600}
+  .titlebar .title span{color:var(--dim);font-weight:400}
+  .titlebar .win{margin-left:auto;display:flex;gap:14px;color:var(--dim)}
+  .titlebar .win span{width:12px;text-align:center;cursor:default}
+
+  /* Barra de menú nativa (File · Tools · Help) con los ítems reales */
+  .menubar{display:flex;align-items:center;gap:4px;height:26px;flex:0 0 26px;
+    background:var(--panel);border-bottom:1px solid var(--line);padding:0 8px;font-size:12px;color:var(--text)}
+  .menubar .m{position:relative;padding:4px 10px;border-radius:4px;cursor:default}
+  .menubar .m:hover{background:var(--hover);color:var(--accent)}
+  .menubar .dd{display:none;position:absolute;top:24px;left:0;min-width:250px;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 0;
+    box-shadow:0 10px 28px rgba(0,0,0,.45);z-index:60}
+  .menubar .m:hover .dd{display:block}
+  .menubar .dd span{display:block;padding:5px 14px;color:var(--text)}
+  .menubar .dd span:hover{background:var(--hover)}
+  .menubar .dd .hr{height:1px;background:var(--line);margin:5px 0;padding:0}
+
+  /* Barra de navegación: atrás/adelante/home + migas + contexto */
+  .navbar{display:flex;align-items:center;gap:8px;height:34px;flex:0 0 34px;
+    background:var(--base);border-bottom:1px solid var(--line);padding:0 10px;font-size:12px}
+  .navbar .navbtn{background:var(--panel);border:1px solid var(--edge);border-radius:5px;
+    padding:3px 9px;color:var(--text);font-size:12px}
+  .navbar .navbtn:hover{background:var(--hover)}
+  .navbar .navbtn.off{color:var(--line)}
+  .navbar .crumbs{display:flex;align-items:center;gap:6px;margin-left:6px;color:var(--dim)}
+  .navbar .crumbs a{color:var(--accent);text-decoration:none;cursor:pointer}
+  .navbar .crumbs a:hover{text-decoration:underline}
+  .navbar .crumbs .sep{color:var(--line)}
+  .navbar .crumbs .here{color:var(--text);font-weight:600}
+  .navbar .ctx{margin-left:auto;color:var(--dim)}
+
+  .shell{display:flex;flex:1;position:relative;overflow:hidden}
+
+  /* pestaña vertical flotante */
+  .vtab{
+    flex:0 0 28px;width:28px;border:0;border-right:1px solid var(--line);
+    background:var(--panel);color:var(--dim);
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    letter-spacing:.22em;font-size:11px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .vtab:hover{color:var(--accent);background:var(--hover)}
+  .vtab .chev{transform:rotate(90deg);font-size:10px}
+
+  /* drawer superpuesto */
+  .scrim{
+    position:absolute;inset:0;background:rgba(7,8,13,.55);
+    opacity:0;pointer-events:none;transition:opacity .18s;z-index:15;
+  }
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{
+    position:absolute;top:0;bottom:0;left:28px;width:430px;z-index:20;
+    background:var(--base);border-right:1px solid var(--line);
+    transform:translateX(-105%);transition:transform .18s ease;
+    display:flex;flex-direction:column;
+  }
+  .drawer.on{transform:translateX(0)}
+  .drawer-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .drawer-head h3{margin:0;font-size:13px;flex:1}
+  .x{background:transparent;border:0;color:var(--dim);font-size:15px;padding:2px 6px;border-radius:4px}
+  .x:hover{background:var(--hover);color:var(--text)}
+  .drawer-body{padding:10px 12px;overflow:auto;flex:1}
+
+  /* El contenido llena TODO el área disponible (a la derecha de la pestaña
+     vertical). Cada vista estira a lo alto y lo ancho; las que tienen más
+     contenido que la ventana hacen scroll dentro, sin márgenes muertos. */
+  .content{flex:1;overflow:hidden;position:relative;display:flex}
+  .view{display:none;flex:1;min-width:0;padding:16px 20px;overflow:auto}
+  .view.on{display:flex;flex-direction:column}
+  /* Cada vista llena también el ALTO: el bloque principal (lista de proyectos,
+     sugerencias, contenido de la pestaña) absorbe el espacio sobrante y hace
+     scroll dentro; lo demás queda fijo arriba/abajo. Nada de height fijos. */
+  #view-home .plist{flex:1;min-height:0;overflow:auto}
+  #view-new .sugg{flex:1;min-height:0;overflow:auto}
+  #view-detail .placeholder{flex:1;display:flex;align-items:center;justify-content:center}
+  /* flex:1 0 auto: el hero crece si sobra alto pero nunca se encoge por debajo
+     de su contenido (la página de Bienvenida es larga). align-items:center para
+     que el CTA NO se estire a lo ancho (se veía a ancho completo, horrible). */
+  #view-welcome .hero{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+  /* ---- piezas comunes ---- */
+  .row{display:flex;align-items:center;gap:10px}
+  .spacer{flex:1}
+  .muted{color:var(--dim)}
+  .h1{font-size:19px;font-weight:700}
+  .h2{font-size:15px;font-weight:700;margin:0 0 8px}
+  .small{font-size:11px}
+  .cta{
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);border:1px solid #4d86e0;
+    border-radius:8px;padding:10px 16px;font-weight:700;color:#fff;
+    box-shadow:0 6px 18px rgba(47,111,208,.25);
+  }
+  .cta:hover{filter:brightness(1.08)}
+  .ghost{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:6px 14px}
+  .ghost:hover{background:var(--hover)}
+  .chip{
+    display:inline-block;background:var(--panel);border:1px solid var(--line);
+    border-radius:999px;padding:2px 9px;font-size:11px;color:var(--dim);
+  }
+  .chip.k{border-color:transparent;color:#11141d;font-weight:700}
+  .badge{border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .card{background:var(--base);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .search{
+    flex:1;display:flex;align-items:center;gap:8px;background:var(--base);
+    border:1px solid var(--edge);border-radius:6px;padding:8px 12px;color:var(--dim);
+  }
+  .search input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:inherit}
+
+  /* ---- bienvenida ---- */
+  .hero{
+    background:
+      radial-gradient(900px 260px at 50% -40px,rgba(106,176,255,.14),transparent 70%),
+      var(--base);
+    border:1px solid var(--line);border-radius:14px;padding:34px 32px;text-align:center;
+  }
+  .hero .wordmark{font-size:26px;font-weight:800;letter-spacing:.32em;margin:0 0 6px}
+  .hero .wordmark span{color:var(--accent)}
+  .hero .tag{color:var(--dim);margin:0 0 18px}
+  .hero p.lead{max-width:640px;margin:0 auto 22px;color:#c7cbd9}
+  .bigcta{
+    display:inline-flex;flex-direction:column;gap:2px;align-items:center;
+    align-self:center;width:fit-content;
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);
+    border:1px solid #4d86e0;border-radius:12px;padding:16px 34px;color:#fff;
+    box-shadow:0 10px 28px rgba(47,111,208,.30);
+  }
+  .bigcta b{font-size:15px;letter-spacing:.04em}
+  .bigcta small{color:#d7e5ff}
+  .bigcta:hover{filter:brightness(1.08)}
+  .infogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+  .infogrid h4{margin:0 0 8px;font-size:13px;color:var(--text)}
+  .infogrid ul{margin:0;padding-left:16px;color:#c7cbd9}
+  .infogrid li{margin:3px 0}
+  .link{color:var(--accent);text-decoration:none;background:none;border:0;padding:0;font-size:12px}
+  .link:hover{text-decoration:underline}
+  .steps{display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap}
+  .step{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;color:var(--dim)}
+  .step b{color:var(--accent)}
+
+  /* Stepper de Bienvenida: Observatorio -> Objetivos -> Datos. Reemplaza al
+     QWizard modal; el paso Datos es el único bloqueante (una vez por versión). */
+  .stepper{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:0 0 16px}
+  .st{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+      border-radius:999px;padding:5px 14px;color:var(--dim);font-size:12px;cursor:pointer}
+  .st .n{width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text);
+         display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .st.on{border-color:var(--accent);color:var(--text)}
+  .st.on .n{background:var(--accent);color:#11141d}
+  .st.done .n{background:var(--good);color:#0d1a10}
+  .st-arrow{color:var(--line)}
+  .setup{border:1px solid var(--line);border-radius:10px;background:var(--base);padding:16px 18px;text-align:left}
+  .setup .sh{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+  .setup .sh b{font-size:14px}
+  .setup .sub{color:var(--dim);font-size:12px;margin-bottom:14px}
+  .setup .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .setup .grid.two{grid-template-columns:repeat(2,1fr)}
+  .setup label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+  .setup input,.setup select{background:var(--bg);border:1px solid var(--edge);border-radius:4px;padding:6px 8px;color:var(--text);font:inherit;font-size:12px}
+  .setup .statusline{color:var(--dim);font-size:11px;margin-top:10px}
+  .kindrow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+  .kindrow:last-child{border-bottom:0}
+  .kindrow input[type=checkbox]{margin-top:3px}
+  .kindrow .kb{flex:1}
+  .kindrow .kt{font-weight:700}
+  .kindrow .kd{color:#c7cbd9;font-size:12px}
+  .kindrow .ks{color:var(--dim);font-size:11px}
+  .newbadge{background:var(--accent);color:#11141d;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px}
+  .datareport{display:flex;flex-direction:column;gap:6px;color:var(--dim);font-size:12px}
+  .datareport .warn{color:var(--warn)}
+  .gate{margin-top:14px;display:flex;align-items:center;gap:10px}
+  .setup-panel{display:none}
+  .setup-panel.on{display:block}
+  .welc-cta{margin-top:18px;display:flex;justify-content:center}
+
+  /* ---- home ---- */
+  .home-head{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .newtile{
+    display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);border:1px solid #4d86e0;
+    border-radius:10px;padding:9px 18px;color:#fff;box-shadow:0 6px 18px rgba(47,111,208,.25);
+  }
+  .newtile b{font-size:13px;letter-spacing:.05em}
+  .newtile small{color:#d7e5ff;font-size:10px}
+  .newtile:hover{filter:brightness(1.08)}
+  .attention{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;background:var(--base);padding:8px 12px;margin-bottom:12px}
+  .attention .h{font-size:11px;letter-spacing:.06em;color:var(--warn);font-weight:700;text-transform:uppercase;margin-bottom:6px}
+  .att-row{display:flex;align-items:center;gap:10px;padding:4px 0}
+  .att-row .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:0 0 7px}
+  /* Banda de eventos del cielo (los chips que hoy caen al fondo de Tonight):
+     aquí tienen un hogar propio, bajo la cabecera de Home, siempre visible. */
+  .skyband{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--base);padding:8px 12px;margin-bottom:12px}
+  .skyband .h{font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:6px}
+  .skyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .filters{display:flex;gap:8px;align-items:center;margin:0 0 12px}
+  .filters .search{max-width:320px;flex:0 0 320px}
+  .select{background:var(--base);border:1px solid var(--edge);border-radius:4px;padding:6px 10px;color:var(--text)}
+  .plist{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .prow{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--base);border-bottom:1px solid var(--line);cursor:pointer}
+  .prow:last-child{border-bottom:0}
+  .prow:hover{background:var(--row-hover)}
+  .prow .fav{color:var(--dim);font-size:14px;width:16px;text-align:center}
+  .prow .fav.on{color:#f0c040}
+  .prow .kind{width:6px;height:34px;border-radius:3px;flex:0 0 6px}
+  .prow .name{font-weight:700}
+  .prow .meta{color:var(--dim);font-size:12px}
+  .prow .score{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .spark{width:64px;height:22px}
+  .pct{font-weight:700;font-size:13px;min-width:34px;text-align:right}
+  .pact{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:5px 12px;font-size:12px}
+  .pact:hover{background:var(--hover)}
+  .campstrip{margin-top:14px;display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12px}
+  .campill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;color:var(--text)}
+
+  /* ---- nuevo proyecto / tonight ---- */
+  .ctx{display:flex;align-items:center;gap:12px;color:var(--dim);margin:6px 0 16px}
+  .manual{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px;margin-bottom:18px}
+  .manual .search{border-color:var(--accent)}
+  .manual .hint{color:var(--dim);font-size:11px;margin-top:7px}
+  /* Formulario de creación manual: se despliega en la propia vista (nada de
+     ventana emergente) cuando el buscador no localiza el objeto. */
+  .manualform{border:1px solid var(--accent);border-radius:8px;background:var(--base);padding:14px;margin-bottom:18px}
+  .manualform[hidden]{display:none}
+  .mf-head{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+  .mf-grid,.mf-type{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .mf-grid label,.mf-type label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+  .mf-grid input,.mf-grid select,.mf-type input,.mf-type select{
+    background:var(--bg);border:1px solid var(--edge);border-radius:4px;
+    padding:6px 8px;color:var(--text);font:inherit;font-size:12px}
+  .mf-grid input:focus,.mf-type input:focus{outline:0;border-color:var(--accent)}
+  .mf-type{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .mf-type.on{display:grid}
+  .mf-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+  .mf-toggle{margin-top:9px}
+  .sugg{display:flex;flex-direction:column;gap:10px}
+  .scard{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px 14px}
+  .scard:hover{border-color:var(--edge)}
+  .scard .top{display:flex;align-items:center;gap:10px}
+  .scard .rank{color:var(--dim);font-weight:700;width:18px}
+  .scard .why{color:#c7cbd9;font-style:italic}
+  .scard .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .scard .go{margin-left:auto}
+  .expand{margin:10px 0;color:var(--accent);background:none;border:0;padding:4px 0;font-size:12px}
+  .events{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--dim);font-size:12px;flex-wrap:wrap}
+  .ev{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--text)}
+
+  /* ---- detalle ---- */
+  .mast{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .mast .home{background:transparent;border:1px solid var(--edge);border-radius:4px;padding:4px 9px;color:var(--dim)}
+  .mast .home:hover{color:var(--text);background:var(--hover)}
+  .mast .name{font-size:16px;font-weight:700}
+  .tabbar{display:flex;align-items:center;gap:8px;margin:12px 0 14px;color:var(--dim)}
+  .tabbar .t{background:transparent;border:0;border-bottom:2px solid transparent;padding:5px 2px;color:var(--dim);font-size:13px}
+  .tabbar .t.on{color:var(--text);border-bottom-color:var(--accent);font-weight:700}
+  .tabbar .arrow{color:var(--dim);font-size:12px}
+  .next{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--base);padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .next b{font-weight:700}
+  .placeholder{border:1px dashed var(--line);border-radius:8px;padding:40px;text-align:center;color:var(--dim)}
+
+  /* ---- UFE ---- */
+  .ufe-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .ufe-tabs{display:flex;gap:6px;align-items:center;margin-bottom:12px;color:var(--dim)}
+  .ufe-tabs .t{background:transparent;border:1px solid transparent;border-radius:5px;padding:5px 12px;color:var(--dim)}
+  .ufe-tabs .t.on{background:var(--panel);border-color:var(--edge);color:var(--text);font-weight:700}
+  /* El cuerpo del UFE estira con la ventana: la placa se lleva el espacio y el
+     panel derecho (histograma/estiramiento) queda anclado a la derecha, como ya
+     hace el UFE actual. Aquí solo cambia el tamaño, no su diseño interno. */
+  .ufe-body{display:grid;grid-template-columns:1fr 300px;gap:12px;flex:1;min-height:0}
+  .plate{background:#05060a;border:1px solid var(--line);border-radius:8px;position:relative;overflow:hidden}
+  .plate .frame{position:absolute;inset:14px;background:radial-gradient(120px 80px at 42% 46%,#39405c,#0a0c14 70%),#0a0c14;border-radius:4px}
+  .plate .star{position:absolute;background:#e8eaf2;border-radius:50%}
+  .plate .tag{position:absolute;left:10px;bottom:8px;color:var(--dim);font-size:11px}
+  .side{display:flex;flex-direction:column;gap:12px}
+  .hist{height:110px;border:1px solid var(--line);border-radius:8px;background:var(--base);padding:10px;display:flex;align-items:flex-end;gap:3px}
+  .hist i{flex:1;background:linear-gradient(180deg,var(--accent),#2f4d80);border-radius:2px 2px 0 0;display:block}
+  .ctl{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px;color:var(--dim);font-size:12px}
+  .ctl .line{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .seg{display:flex;border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+  .seg span{padding:3px 10px;font-size:11px}
+  .seg span.on{background:var(--sel);color:#fff}
+  .slider{height:6px;background:var(--line);border-radius:3px;flex:1;position:relative}
+  .slider b{position:absolute;top:-4px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+
+  .statusbar{height:24px;flex:0 0 24px;background:var(--base);border-top:1px solid var(--line);color:var(--dim);font-size:11px;display:flex;align-items:center;padding:0 12px;gap:16px}
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <b>MOCKUP</b> Interfaz 1.0 · estado:
+  <button data-state="welcome">Bienvenida</button>
+  <button data-state="home">Home</button>
+  <button data-state="new">Nuevo proyecto</button>
+  <button data-state="detail">Detalle</button>
+  <button data-state="ufe">UFE embebido</button>
+  <span class="muted">· barra de título + menú reales · barra de navegación con migas (← → ⌂ ⓘ Bienvenida, Alt+←/→) · pestaña vertical «PROYECTOS» abre el drawer · cada vista ocupa todo el área ·</span>
+</div>
+
+<div class="app">
+  <div class="titlebar">
+    <span class="logo"></span>
+    <span class="title">NightScribe <span>0.1.0</span></span>
+    <span class="win"><span>—</span><span>▢</span><span>✕</span></span>
+  </div>
+
+  <div class="menubar">
+    <div class="m">File
+      <div class="dd"><span>Quit</span></div>
+    </div>
+    <div class="m">Tools
+      <div class="dd">
+        <span>Settings…</span><span class="hr"></span>
+        <span>Sky calendar…</span>
+        <span>Explore object…</span>
+        <span>Blink (ad-hoc)…</span>
+        <span>Observing journal…</span>
+        <span>Campaigns…</span>
+        <span>NightScribe Image Workbench…</span>
+      </div>
+    </div>
+    <div class="m">Help
+      <div class="dd">
+        <span>Technical Documentation</span><span class="hr"></span>
+        <span>About NightScribe</span>
+        <span>Data sources</span>
+        <span>Open the log…</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="navbar">
+    <button class="navbtn" id="navBack" title="Atrás (Alt+←)">←</button>
+    <button class="navbtn off" id="navFwd" title="Adelante (Alt+→)">→</button>
+    <button class="navbtn" data-goto="home" title="Home (Alt+Home)">⌂</button>
+    <button class="navbtn" data-goto="welcome" title="Bienvenida / Guía de inicio">ⓘ Bienvenida</button>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="ctx">Irydeo (MPC Z41) · sáb 3 oct · Luna 62%</div>
+  </div>
+
+  <div class="shell">
+    <button class="vtab" id="vtab" title="Mostrar / ocultar la lista de proyectos">PROYECTOS <span class="chev">›</span></button>
+    <div class="scrim" id="scrim"></div>
+
+    <aside class="drawer" id="drawer">
+      <div class="drawer-head">
+        <h3>Mis proyectos</h3>
+        <button class="x" id="drawerClose" title="Cerrar">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="search" style="margin-bottom:10px">⌕ <input placeholder="Buscar…" readonly></div>
+        <!-- Mismas filas ricas que en «Proyectos» (misma estética): el
+             drawer reutiliza ProjectRow en la app. -->
+        <div class="plist" style="border-radius:6px">
+          <div class="prow" data-goto="detail">
+            <span class="fav on">★</span>
+            <span class="kind" style="background:var(--sn)"></span>
+            <div><div class="name">SN 2026abc</div><div class="meta">Supernova · activo · NGC 1234 · mag 14.2</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,16 12,13 22,15 32,9 42,11 52,6 62,8" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--sn)">82%</span>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--comet)"></span>
+            <div><div class="name">C/2025 K1 (ATLAS)</div><div class="meta">Cometa · activo · mag 9.8</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,18 12,15 22,16 32,12 42,14 52,10 62,11" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--comet)">64%</span>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--variable)"></span>
+            <div><div class="name">V CrB (variable)</div><div class="meta">Variable · activo · 5 visitas</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,17 12,17 22,14 32,8 42,6 52,9 62,7" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--variable)">71%</span>
+            </div>
+          </div>
+        </div>
+        <button class="newtile" data-goto="new" style="margin-top:10px;width:100%"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>
+      </div>
+    </aside>
+
+    <main class="content" id="content">
+
+      <!-- ============ A. BIENVENIDA ============ -->
+      <!-- Sustituye al QWizard modal: los tres pasos del asistente viven aquí
+           como stepper. Bienvenida se muestra solo cuando hace falta (primera
+           ejecución, actualización pendiente o sin proyectos). El paso Datos
+           es el único bloqueante (una vez por versión). -->
+      <section class="view" id="view-welcome">
+        <div class="hero">
+          <h1 class="wordmark">NIGHT<span>SCRIBE</span></h1>
+          <p class="tag">Planifica · Comprende · Cuenta tu noche de observación</p>
+          <p class="lead">Configura tu observatorio y tus objetivos en tres pasos; luego crea tu
+            primer proyecto y la app te guía: ficha, captura, análisis y publicación.</p>
+        </div>
+
+        <div class="stepper">
+          <button class="st on" data-step="obs"><span class="n">1</span> Tu observatorio</button>
+          <span class="st-arrow">→</span>
+          <button class="st" data-step="kinds"><span class="n">2</span> Tus objetivos</button>
+          <span class="st-arrow">→</span>
+          <button class="st" data-step="data"><span class="n">3</span> Tus datos, a salvo</button>
+        </div>
+
+        <div class="setup-panel on" id="step-obs">
+          <div class="setup">
+            <div class="sh"><b>Tu observatorio</b></div>
+            <div class="sub">Dinos desde dónde miras el cielo: NightScribe calcula salida, puesta, airmass y visibilidad para ese sitio exacto.</div>
+            <div class="row" style="gap:10px;margin-bottom:12px">
+              <button class="cta" style="padding:7px 14px">Detectar mi ubicación</button>
+              <span class="muted small">Solo al pulsar: la búsqueda usa tu IP para la ciudad y nada más.</span>
+            </div>
+            <div class="grid">
+              <label>Latitud (°)<input value="40.41678"></label>
+              <label>Longitud (° E)<input value="-3.70379"></label>
+              <label>Altura (m)<input value="650"></label>
+              <label>Nombre<input value="Observatorio Irydeo"></label>
+              <label>Código MPC<input placeholder="p. ej. Z41"></label>
+              <label>&nbsp;<button class="ghost" style="margin-top:0">Resolver MPC</button></label>
+            </div>
+            <div class="statusline">Ubicación encontrada: Madrid (40.41678, -3.70379). Ajusta los números si no cuadran.</div>
+          </div>
+        </div>
+
+        <div class="setup-panel" id="step-kinds">
+          <div class="setup">
+            <div class="sh"><b>Tus objetivos</b></div>
+            <div class="sub">Cada tipo es un flujo completo en NightScribe. Deja marcados los que quieras seguir: guían Tonight, los proyectos y los informes.</div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Objetos cercanos a la Tierra (NEO)</div><div class="kd">Asteroides y cometas que pasan cerca, con prioridad, ritmo aparente y banderas.</div><div class="ks">Fuente: NEOfixer + NEOCP (MPC) + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Supernovas</div><div class="kd">Descubrimientos nuevos con blink de confirmación, curva de luz y avisos de cadencia.</div><div class="ks">Fuente: Rochester Astronomy + PanSTARRS (MAST)</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Cometas</div><div class="kd">Visibles esta noche con su magnitud observada en vivo y fecha de perihelio.</div><div class="ks">Fuente: COBS (MPC) + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Candidatos a cometa (PCCP)</div><div class="kd">Objetos reportados como asteroides que podrían ser cometas; llegar primero importa.</div><div class="ks">Fuente: MPC PCCP + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Tránsitos de exoplanetas</div><div class="kd">Cuándo cruza el planeta, deriva O-C, encaje en tu noche y export pre-rellenado.</div><div class="ks">Fuente: ExoClock + NASA Exoplanet Archive</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Aproximaciones y alertas</div><div class="kd">Próximas aproximaciones de ESA NEOCC y el canal editorial de AAVSO.</div><div class="ks">Fuente: ESA NEOCC + AAVSO</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Estrellas HADS</div><div class="kd">Variables delta Scuti de gran amplitud, plegables por fase en una sola sesión.</div><div class="ks">Fuente: catálogo vivo de P. Wils</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Variables y deberes<span class="newbadge">nuevo</span></div><div class="kd">Miembros de campaña por cadencia, eventos en curso, extremos y vigilias.</div><div class="ks">Fuente: AAVSO VSX + fotometría de la comunidad + ZTF</div></div></div>
+          </div>
+        </div>
+
+        <div class="setup-panel" id="step-data">
+          <div class="setup">
+            <div class="sh"><b>Tus datos, a salvo</b></div>
+            <div class="sub">Antes de tocar nada, NightScribe copia tu base de datos y te cuenta en palabras qué cambia esta versión.</div>
+            <div class="datareport">
+              <span>Ejecutando NightScribe 0.1.0.</span>
+              <span>Copia de seguridad escrita y verificada: nightscribe-2026-10-01.db (36.5 MB).</span>
+              <span>Esta versión mueve tu base de datos del formato 12 al 13. Todo lo guardado (observaciones, proyectos, campañas, caché) se conserva. Pasos aplicados:</span>
+              <span>v13: banderas de dato separadas de los avisos de calibración.</span>
+            </div>
+            <div class="gate">
+              <button class="cta" style="padding:7px 16px">Entendido, continuar</button>
+              <span class="muted small">Obligatorio una sola vez por versión.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="welc-cta">
+          <button class="bigcta" data-goto="new">
+            <b>✦ CREAR MI PRIMER PROYECTO</b>
+            <small>elige entre los mejores objetos de esta noche</small>
+          </button>
+        </div>
+
+        <div class="infogrid">
+          <div class="card">
+            <h4>¿Qué puedes observar?</h4>
+            <ul>
+              <li>Supernovas y transitorios</li>
+              <li>NEOs y candidatos PCCP</li>
+              <li>Cometas y tránsitos de exoplanetas</li>
+              <li>Variables y HADS</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>¿Cómo funciona?</h4>
+            <div class="steps"><span class="step"><b>1</b> Ficha</span><span class="step"><b>2</b> Captura</span><span class="step"><b>3</b> Análisis</span><span class="step"><b>4</b> Publicación</span></div>
+            <button class="link">Ver la guía completa →</button>
+          </div>
+          <div class="card">
+            <h4>Explora el cielo</h4>
+            <p class="muted small">Calendario de eventos, diario de observación y campañas.</p>
+            <button class="link">Calendario del cielo →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ B. HOME ============ -->
+      <section class="view" id="view-home">
+        <div class="home-head">
+          <div class="h1">Mis proyectos</div>
+          <div class="spacer"></div>
+          <button class="newtile" data-goto="new"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>
+        </div>
+
+        <div class="skyband">
+          <div class="h">Qué pasa en el cielo</div>
+          <div class="skyrow">
+            <span class="ev">Eclipse lunar · esta noche</span>
+            <span class="ev">Conjunción Luna–Júpiter</span>
+            <span class="ev">Tránsito de Io</span>
+            <span class="spacer"></span>
+            <button class="link">Calendario del cielo →</button>
+          </div>
+        </div>
+
+        <div class="attention">
+          <div class="h">Te necesita</div>
+          <div class="att-row"><span class="dot"></span><b>SN 2026abc</b><span class="muted">captura pendiente, ventana hasta 02:40</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
+          <div class="att-row"><span class="dot"></span><b>V CrB</b><span class="muted">mínimo predicho esta noche</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
+          <div class="att-row"><span class="dot" style="background:#e0c060"></span><b>SN due: SN 2026abc</b><span class="muted">(4 d) toca revisitarla, cadencia de 3 d</span><span class="spacer"></span><button class="pact" data-goto="detail">Revisitar →</button></div>
+        </div>
+
+        <div class="filters">
+          <div class="search">⌕ <input placeholder="Buscar…" readonly></div>
+          <select class="select"><option>Activos</option><option>Todos</option><option>Hechos</option><option>Archivados</option></select>
+          <button class="ghost">Filtros ▸</button>
+          <label class="chip" style="cursor:pointer">★ Favoritos</label>
+        </div>
+
+        <div class="plist">
+          <div class="prow" data-goto="detail">
+            <span class="fav on">★</span>
+            <span class="kind" style="background:var(--sn)"></span>
+            <div><div class="name">SN 2026abc</div><div class="meta">Supernova · activo · NGC 1234 · mag 14.2 · hace 2 d</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,16 12,13 22,15 32,9 42,11 52,6 62,8" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--sn)">82%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--comet)"></span>
+            <div><div class="name">C/2025 K1 (ATLAS)</div><div class="meta">Cometa · activo · mag 9.8 · ventana 21:10–03:20</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,18 12,15 22,16 32,12 42,14 52,10 62,11" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--comet)">64%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--variable)"></span>
+            <div><div class="name">V CrB (variable)</div><div class="meta">Variable · activo · 5 visitas</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,17 12,17 22,14 32,8 42,6 52,9 62,7" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--variable)">71%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--neo)"></span>
+            <div><div class="name">(NEO) 2026 XY</div><div class="meta">NEO · hecho · 3 visitas</div></div>
+            <div class="score">
+              <span class="muted small">reporte enviado</span>
+              <button class="pact">Ver →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="campstrip">
+          Campañas: <span class="campill">HADS Cepheids · 4 proyectos</span>
+          <button class="link">→ ver todas</button>
+        </div>
+      </section>
+
+      <!-- ============ C. NUEVO PROYECTO / TONIGHT ============ -->
+      <section class="view" id="view-new">
+        <div class="row">
+          <button class="ghost" data-goto="home">← Proyectos</button>
+          <div class="h2" style="margin:0">Nuevo proyecto desde esta noche</div>
+        </div>
+        <div class="ctx">
+          <span>sáb 3 oct · Irydeo</span>
+          <select class="select"><option>Filtro: Todos</option><option>Solo supernovas</option><option>Solo cometas</option></select>
+          <span>☾ 62%</span>
+          <span class="spacer"></span>
+          <button class="ghost" title="Recalcular">↻</button>
+        </div>
+
+        <div class="manual">
+          <div class="search">⌕ <input placeholder="Buscar un objeto por nombre…" readonly></div>
+          <div class="row" style="margin-top:8px">
+            <span class="hint">¿No está en la lista? Búscalo aquí (VSX / SIMBAD) y crea el proyecto igualmente.</span>
+            <span class="spacer"></span>
+            <button class="cta" style="padding:7px 14px">Resolver</button>
+          </div>
+          <button class="link mf-toggle" id="mfToggle">No lo encuentro: crear objeto a mano →</button>
+        </div>
+
+        <div class="manualform" id="manualForm" hidden>
+          <div class="mf-head">
+            <b>Crear objeto a mano</b>
+            <span class="muted small">No se ha localizado. Rellena sus datos y se creará el proyecto igual: ficha, captura, análisis y publicación.</span>
+          </div>
+          <div class="mf-grid">
+            <label>Nombre<input value=""></label>
+            <label>Tipo
+              <select id="mfKind">
+                <option value="sn">Supernova</option>
+                <option value="neo">NEO</option>
+                <option value="comet">Cometa</option>
+                <option value="pccp">PCCP</option>
+                <option value="transit">Tránsito</option>
+                <option value="variable">Variable</option>
+                <option value="hads">HADS</option>
+              </select>
+            </label>
+            <label>AR (grados)<input placeholder="ej. 210.12345"></label>
+            <label>Dec (grados)<input placeholder="ej. 12.34567"></label>
+            <label>Magnitud<input placeholder="opcional"></label>
+            <label>Notas / alias<input placeholder="opcional"></label>
+          </div>
+
+          <div class="mf-type" data-kind="sn">
+            <label>Fecha de descubrimiento<input type="date"></label>
+            <label>Tipo espectral
+              <select><option>Ia</option><option>Ib</option><option>Ic</option><option>II</option><option>IIn</option></select>
+            </label>
+            <label>Galaxia anfitriona<input placeholder="ej. NGC 1234"></label>
+          </div>
+          <div class="mf-type" data-kind="comet">
+            <label>Fecha de perihelio<input type="date"></label>
+            <label>Magnitud absoluta H<input placeholder="opcional"></label>
+            <label>Pendiente<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="neo">
+            <label>Ritmo aparente (″/min)<input placeholder="opcional"></label>
+            <label>H<input placeholder="opcional"></label>
+            <label>MOID (AU)<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="transit">
+            <label>Período (d)<input></label>
+            <label>Época T0 (JD)<input></label>
+            <label>Duración (h)<input></label>
+            <label>Profundidad (mmag)<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="variable">
+            <label>Período (d)<input></label>
+            <label>Amplitud (mag)<input></label>
+            <label>Época de máximo (JD)<input></label>
+            <label>Subtipo VSX<input placeholder="ej. RRAB"></label>
+          </div>
+          <div class="mf-type" data-kind="hads">
+            <label>Período (d)<input></label>
+            <label>Amplitud (mag)<input></label>
+            <label>Época (JD)<input></label>
+          </div>
+
+          <div class="mf-actions">
+            <button class="ghost" id="mfCancel">Cancelar</button>
+            <button class="cta" data-goto="detail">Crear proyecto</button>
+          </div>
+        </div>
+
+        <div class="h2">Los mejores de esta noche</div>
+        <div class="sugg">
+          <div class="scard">
+            <div class="top">
+              <span class="rank">1</span>
+              <span class="badge" style="background:var(--sn);color:#11141d">SN</span>
+              <b>SN 2026abc</b>
+              <span class="muted">★★★ 82</span>
+              <span class="why">«La más brillante y aún está alta»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips">
+              <span class="chip">mag 14.2</span><span class="chip">alt 58°</span>
+              <span class="chip">hasta 02:40</span><span class="chip">Luna 62%</span>
+            </div>
+          </div>
+          <div class="scard">
+            <div class="top">
+              <span class="rank">2</span>
+              <span class="badge" style="background:var(--variable);color:#11141d">Variable</span>
+              <b>V CrB</b>
+              <span class="muted">★★☆ 71</span>
+              <span class="why">«Mínimo predicho justo esta noche»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips"><span class="chip">mag 3.9</span><span class="chip">alt 41°</span><span class="chip">toda la noche</span></div>
+          </div>
+          <div class="scard">
+            <div class="top">
+              <span class="rank">3</span>
+              <span class="badge" style="background:var(--comet);color:#11141d">Cometa</span>
+              <b>C/2025 K1 (ATLAS)</b>
+              <span class="muted">★★☆ 64</span>
+              <span class="why">«Buen momento de observación»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips"><span class="chip">mag 9.8</span><span class="chip">alt 33°</span></div>
+          </div>
+        </div>
+
+        <button class="expand">▾ Ver la lista completa (tabla ordenable)</button>
+      </section>
+
+      <!-- ============ D. DETALLE ============ -->
+      <section class="view" id="view-detail">
+        <div class="mast">
+          <button class="home" data-goto="home" title="Volver a mis proyectos">⌂</button>
+          <span class="name">SN 2026abc</span>
+          <span class="badge" style="background:var(--sn);color:#11141d">Supernova</span>
+          <span class="spacer"></span>
+          <span class="muted small">Campaña: —</span>
+          <button class="ghost" data-goto="ufe" title="Abrir las placas en el editor">Archivos (3)</button>
+        </div>
+        <div class="tabbar">
+          <button class="t on">Detalles</button><span class="arrow">→</span>
+          <button class="t">Plan</button><span class="arrow">→</span>
+          <button class="t">Análisis</button><span class="arrow">→</span>
+          <button class="t">Publicación</button>
+        </div>
+        <div class="next">
+          <span>Próximo:</span><b>exportar la secuencia de captura</b>
+          <span class="spacer"></span>
+          <button class="cta" style="padding:6px 16px">Go →</button>
+          <button class="ghost">✔ hecho</button>
+        </div>
+        <div class="placeholder">
+          Contenido de la pestaña activa (ficha / plan / análisis con visitas / publicación).<br>
+          Pulsa «Archivos (3)» para abrir el UFE embebido.
+        </div>
+      </section>
+
+      <!-- ============ E. UFE EMBEBIDO ============ -->
+      <section class="view" id="view-ufe">
+        <div class="ufe-top">
+          <button class="ghost" data-goto="detail">← Volver al proyecto</button>
+          <b>NightScribe Image Workbench</b>
+          <span class="muted small">SN 2026abc · img_0142.fits</span>
+          <span class="spacer"></span>
+          <button class="ghost">Abrir</button>
+          <button class="ghost">Guardar</button>
+          <button class="ghost">⚙</button>
+        </div>
+        <div class="ufe-tabs">
+          <button class="t on">Blink</button>
+          <button class="t">Fotometría</button>
+          <button class="t">Anotar</button>
+          <span class="spacer"></span>
+          <span class="muted small">punto (—)</span>
+          <button class="ghost">reset</button>
+        </div>
+        <div class="ufe-body">
+          <div class="plate">
+            <div class="frame"></div>
+            <span class="star" style="left:30%;top:38%;width:5px;height:5px"></span>
+            <span class="star" style="left:48%;top:52%;width:3px;height:3px"></span>
+            <span class="star" style="left:62%;top:30%;width:4px;height:4px"></span>
+            <span class="star" style="left:70%;top:64%;width:3px;height:3px"></span>
+            <span class="star" style="left:38%;top:68%;width:3px;height:3px"></span>
+            <span class="tag">TAN · 0.63 ″/px · N up · E left</span>
+          </div>
+          <div class="side">
+            <div class="hist">
+              <i style="height:20%"></i><i style="height:38%"></i><i style="height:62%"></i>
+              <i style="height:88%"></i><i style="height:100%"></i><i style="height:72%"></i>
+              <i style="height:46%"></i><i style="height:26%"></i><i style="height:14%"></i>
+            </div>
+            <div class="ctl">
+              <div>Recorte</div>
+              <div class="line"><div class="slider"><b style="left:18%"></b></div></div>
+              <div style="margin-top:12px">Estiramiento</div>
+              <div class="line">
+                <div class="seg"><span class="on">lineal</span><span>gamma</span></div>
+                <div class="slider"><b style="left:55%"></b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="statusbar">
+    <span>Listo</span><span>proyectos: 4</span><span>red: sin actividad</span>
+  </div>
+</div>
+
+<script>
+  // Mockup: cambia de estado y gestiona el drawer. Nada de esto existe en la app.
+  const views = ["welcome","home","new","detail","ufe"];
+  const content = document.getElementById("content");
+  const drawer = document.getElementById("drawer");
+  const scrim = document.getElementById("scrim");
+
+  // Migas por estado (Home › proyecto › pestaña) y una mini-historia para
+  // que Atrás/Adelante se comporten como en la app.
+  const CRUMBS = {
+    welcome: '<span class="here">Bienvenida</span>',
+    home: '<span class="here">Home</span>',
+    new: '<a data-goto="home">Home</a><span class="sep">›</span><span class="here">Nuevo proyecto</span>',
+    detail: '<a data-goto="home">Home</a><span class="sep">›</span><a data-goto="detail">SN 2026abc</a><span class="sep">›</span><span class="here">Análisis</span>',
+    ufe: '<a data-goto="home">Home</a><span class="sep">›</span><a data-goto="detail">SN 2026abc</a><span class="sep">›</span><span class="here">Image Workbench</span>',
+  };
+  let hist = [], fwd = [];
+  const current = ()=>views.find(v=>document.getElementById("view-"+v).classList.contains("on"));
+
+  function show(state, record=true){
+    const cur = current();
+    if (record && cur && cur !== state){ hist.push(cur); fwd = []; }
+    views.forEach(v=>{
+      document.getElementById("view-"+v).classList.toggle("on", v===state);
+    });
+    document.querySelectorAll(".mockbar button").forEach(b=>{
+      b.classList.toggle("on", b.dataset.state===state);
+    });
+    document.getElementById("crumbs").innerHTML = CRUMBS[state] || "";
+    document.querySelectorAll("#crumbs a[data-goto]").forEach(a=>
+      a.addEventListener("click", ()=>show(a.dataset.goto)));
+    document.getElementById("navBack").classList.toggle("off", hist.length===0);
+    document.getElementById("navFwd").classList.toggle("off", fwd.length===0);
+    content.scrollTop = 0;
+  }
+
+  function back(){
+    if (!hist.length) return;
+    fwd.push(current());
+    show(hist.pop(), false);
+  }
+  function forward(){
+    if (!fwd.length) return;
+    hist.push(current());
+    show(fwd.pop(), false);
+  }
+
+  function drawerOpen(on){
+    drawer.classList.toggle("on", on);
+    scrim.classList.toggle("on", on);
+  }
+
+  document.getElementById("vtab").addEventListener("click", ()=>drawerOpen(!drawer.classList.contains("on")));
+  document.getElementById("drawerClose").addEventListener("click", ()=>drawerOpen(false));
+  scrim.addEventListener("click", ()=>drawerOpen(false));
+  document.getElementById("navBack").addEventListener("click", back);
+  document.getElementById("navFwd").addEventListener("click", forward);
+  document.addEventListener("keydown", e=>{
+    if (e.key==="Escape") drawerOpen(false);
+    if (e.altKey && e.key==="ArrowLeft"){ back(); }
+    if (e.altKey && e.key==="ArrowRight"){ forward(); }
+  });
+
+  document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click", ()=>show(b.dataset.state)));
+  document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click", ()=>{
+    show(b.dataset.goto);
+    if(drawer.classList.contains("on")) drawerOpen(false);
+  }));
+
+  // Formulario manual de objeto: se despliega en la vista y cambia sus campos
+  // según el tipo elegido (progressive disclosure). Solo maqueta.
+  const manualForm = document.getElementById("manualForm");
+  const mfKind = document.getElementById("mfKind");
+  function mfShowType(kind){
+    const key = kind === "pccp" ? "neo" : kind;
+    document.querySelectorAll(".mf-type").forEach(el=>{
+      el.classList.toggle("on", el.dataset.kind === key);
+    });
+  }
+  document.getElementById("mfToggle").addEventListener("click", ()=>{
+    manualForm.hidden = false;
+    mfShowType(mfKind.value);
+  });
+  document.getElementById("mfCancel").addEventListener("click", ()=>{
+    manualForm.hidden = true;
+  });
+  mfKind.addEventListener("change", ()=>mfShowType(mfKind.value));
+
+  // Stepper de Bienvenida: cambia el panel del paso activo. Solo maqueta.
+  const stepBtns = document.querySelectorAll(".st");
+  function showStep(key){
+    document.querySelectorAll(".setup-panel").forEach(p=>{
+      p.classList.toggle("on", p.id === "step-" + key);
+    });
+    stepBtns.forEach(b=>b.classList.toggle("on", b.dataset.step === key));
+  }
+  stepBtns.forEach(b=>b.addEventListener("click", ()=>showStep(b.dataset.step)));
+
+  show("welcome");
+</script>
+</body>
+</html>

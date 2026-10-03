@@ -47,7 +47,13 @@ a = Analysis(
     pathex=[ROOT],
     binaries=[],
     datas=datas,
-    hiddenimports=["lxml._elementpath", "Pillow", "platformdirs"],
+    # QtSvg renders the Welcome hero's sky (gui/widgets/welcome_sky.py).
+    # It is imported inside a function, so it is named here rather than
+    # trusted to the import graph: a missing QtSvg would not crash the app
+    # (the hero falls back to a painted gradient) but it would quietly
+    # downgrade the first screen of every frozen build.
+    hiddenimports=["lxml._elementpath", "Pillow", "platformdirs",
+                   "PySide6.QtSvg"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter"],

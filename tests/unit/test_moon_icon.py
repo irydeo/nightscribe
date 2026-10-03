@@ -102,6 +102,22 @@ def test_crescent_illumination_in_band(qapp):
     assert 0.05 < r < 0.45, f"crescent lit ratio out of band: {r}"
 
 
+def test_crescents_read_alike_on_both_sides(qapp):
+    # The bundled photo is a FULL moon: its left half carries most of the
+    # maria and its limb is vignetted, so a waning crescent (whose lit arc
+    # sits on that dark limb) came out ~5x dimmer than the waxing one
+    # (measured before the wash: 0.0395 at -60 against 0.0980 at +60) and
+    # a thin one was nearly invisible. The flat wash over the lit area is
+    # what evens them out; this is the guard that it stays even.
+    from nightscribe.gui import moon_icon
+    for e in (30, 60):
+        wax = _lit_ratio(moon_icon.moon_pixmap(e, 40))
+        wan = _lit_ratio(moon_icon.moon_pixmap(-e, 40))
+        assert min(wax, wan) / max(wax, wan) > 0.5, (
+            f"at |E|={e} the two crescents read too differently: "
+            f"{wan:.4f} (waning) vs {wax:.4f} (waxing)")
+
+
 def test_gibbous_illumination_in_band(qapp):
     from nightscribe.gui import moon_icon
     # E=120 -> 0.75 predicted; again dimmer in practice, but well above
@@ -111,9 +127,38 @@ def test_gibbous_illumination_in_band(qapp):
 
 
 def test_waxing_lit_right_waning_lit_left(qapp):
+    # elong > 0 is the Moon EAST of the Sun (ephem_minor: lon_moon -
+    # lon_sun): waxing, lit on the right as seen from the northern
+    # hemisphere. The arguments here used to be the other way round, which
+    # is exactly the bug this test was named after and did not catch.
     from nightscribe.gui import moon_icon
-    assert _lit_side(moon_icon.moon_pixmap(-120, 40)) == "right"
-    assert _lit_side(moon_icon.moon_pixmap(120, 40)) == "left"
+    assert _lit_side(moon_icon.moon_pixmap(120, 40)) == "right"
+    assert _lit_side(moon_icon.moon_pixmap(-120, 40)) == "left"
+
+
+def test_both_moon_painters_light_the_same_side(qapp):
+    # The Welcome hero paints its own Moon (welcome_sky._lit_path) and the
+    # sky bar, the night ribbon, Tonight and the sky calendar use this
+    # module's icon. They share one screen, so they must agree: two Moons
+    # lighting opposite sides of the same night is what the observer
+    # reported as "the phase is wrong".
+    from PySide6.QtCore import QRectF
+    from nightscribe.gui import moon_icon
+    from nightscribe.gui.widgets.welcome_sky import WelcomeSky
+    hero = WelcomeSky()
+    for elong in (150, 120, 60, 30, -30, -60, -120, -150):
+        illum = moon_icon.lit_fraction(elong)
+        waxing = elong > 0
+        path = hero._lit_path(100.0, 100.0, 40.0, illum, waxing)
+        # the lit area of the hero's path sits left or right of its centre
+        box = path.boundingRect()
+        hero_side = "right" if box.center().x() > 100.0 else "left"
+        icon_side = _lit_side(moon_icon.moon_pixmap(elong, 40))
+        assert hero_side == icon_side, (
+            f"elong {elong}: hero lights the {hero_side}, the icon the "
+            f"{icon_side}")
+        assert hero_side == ("right" if waxing else "left"), (
+            f"elong {elong}: waxing must light the right")
 
 
 def test_waxing_waning_symmetry(qapp):

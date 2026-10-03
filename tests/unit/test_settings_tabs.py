@@ -58,14 +58,17 @@ def _tab_widgets(dlg, index):
     return [w.objectName() for w in page.findChildren(QWidget) if w.objectName()]
 
 
-def test_three_tabs_in_order(qapp):
+def test_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    assert len(tabs) == 4
-    # the last tab is Development (the UFE default switch, ADR-044);
-    # Integrations sits just before it
+    # Interfaz 1.4 added the Interface tab (the Welcome motion switch), so
+    # the count went from four to five; it sits between Integrations and
+    # Development, which keep their order.
+    assert len(tabs) == 5
+    # the last tab is Development (the UFE default switch, ADR-044)
     assert tabs[-1] in ("Development", "Desarrollo")
-    assert tabs[-2] in ("Integrations", "Integraciones")
+    assert tabs[-2] in ("Interface", "Interfaz")
+    assert tabs[-3] in ("Integrations", "Integraciones")
     # the first tab is the site page (language-aware)
     assert tabs[0] in ("Site & equipment", "Sitio y equipo")
     dlg.deleteLater()
@@ -74,7 +77,7 @@ def test_three_tabs_in_order(qapp):
 def test_site_tab_widgets(qapp):
     dlg = _dlg()
     names = set(_tab_widgets(dlg, 0))
-    for w in [" edt_mpc_code", "btn_resolve", "edt_obs_name",
+    for w in [" edt_mpc_code", "btn_resolve", "btn_map_pick", "edt_obs_name",
               "spn_lat", "spn_lon", "spn_height", "spn_aperture",
               "spn_limit_mag", "spn_pixel_um", "spn_focal_mm",
               "cmb_language"]:

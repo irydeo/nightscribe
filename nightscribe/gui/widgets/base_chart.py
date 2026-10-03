@@ -86,6 +86,20 @@ class ChartView(QGraphicsView):
     ZOOM_MAX = _ZOOM_MAX
     WHEEL_STEP = _WHEEL
 
+    # What a chart asks for when a layout is deciding how tall it should
+    # be. QGraphicsView has no sizeHint of its own and answers with the
+    # SCENE's size, which is whatever the data happened to span: a light
+    # curve with a long baseline asked for 520 px and pushed the Analysis
+    # tab half a screen past the fold. A chart is a preview, not a poster;
+    # wherever there IS room, the layout's stretch still grows it.
+    PREFERRED_W = 640
+    PREFERRED_H = 260
+
+    def sizeHint(self):
+        # @return: the chart's preferred size, in px
+        from PySide6.QtCore import QSize
+        return QSize(self.PREFERRED_W, self.PREFERRED_H)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._scene = QGraphicsScene(self)

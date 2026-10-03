@@ -101,13 +101,13 @@ def window(_point_db_at_tmpdir):
 
 
 def test_campaigns_tab_exists(window):
-    from PySide6.QtWidgets import QTabWidget
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 3      # ADR-036 J0 + ADR-040: History and the
-    # Sun & sky live in the Tools menu; ADR-043 removed the Observatory
-    # tab (its controls moved into the Capture step of each project)
-    assert tabs.widget(TAB_CAMPAIGNS) is window.campaigns
+    # Interfaz 1.0: the shell has four views (Home, Tonight, Campaigns,
+    # Detail); Campaigns keeps its own view (ADR-043 retired the
+    # Observatory view, its controls live in the Capture step).
+    stack = window._shell_stack()
+    assert stack.count() >= 4
+    assert stack.widget(TAB_CAMPAIGNS) is window.campaigns
 
 
 def test_campaign_list_shows_health(window):
@@ -184,7 +184,7 @@ def test_member_double_click_jumps_to_project(window):
     from nightscribe.core import campaign as camp_mod
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from nightscribe.gui.main_window import TAB_PROJECTS
+    from nightscribe.gui.main_window import VIEW_DETAIL
     cid = camp_mod.create(mw.db, "Campaña salto")
     p = proj_mod.create(mw.db, "variable", "R CrB",
                         {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
@@ -194,9 +194,7 @@ def test_member_double_click_jumps_to_project(window):
         if lst.item(i).data(Qt.UserRole) == cid:
             lst.setCurrentRow(i)
     window._campaign_member_opened(0, 0)
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_PROJECTS
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
 
@@ -208,9 +206,7 @@ def test_goto_campaigns_selects_the_campaign(window):
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
     cid = camp_mod.create(mw.db, "Campaña destino")
     window._goto_campaigns(cid)
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_CAMPAIGNS
+    assert window._shell_stack().currentIndex() == TAB_CAMPAIGNS
     cur = window.campaigns.lst_campaigns.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == cid
 
@@ -304,28 +300,22 @@ def test_header_badge_is_a_link(window):
     assert f"campaign://{cid}" in text and "Campaña enlace" in text
 
 
-def test_cadence_chip_navigates_to_followup(window):
+def test_followup_deep_link_opens_analysis(window):
+    # Interfaz 1.3: the cadence chips are gone (the row carries the due
+    # signal); the deep link they used is still alive.
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     p = proj_mod.create(mw.db, "sn", "SN 2099zz", {"mag": 15.0})
     fu.create_session(mw.db, p["id"])
-    # age the session beyond the cadence threshold
-    old = 1_700_000_000
-    mw.db.execute("UPDATE project_sessions SET created=? WHERE project_id=?",
-                  (old, p["id"]))
-    mw.db.commit()
-    window._show_cadence_hints()
-    chips = window.tonight.findChildren(QLabel, "ns_cadence_chip")
-    assert chips, "no cadence chip was created"
     window._goto_project_followup(p["id"])
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
-    # ADR-041: the project hub is a lazy tab bar — "navigate to
-    # Follow-up" builds the follow-up tab and activates it.
-    assert "analysis" in window._tab_pages, "the Follow-up tab was not built"
+    # ADR-041: the project hub is a lazy tab bar — the deep link builds
+    # the Analysis tab and activates it.
+    assert "analysis" in window._tab_pages, "the Analysis tab was not built"
     assert not window._tab_pages["analysis"].isHidden(), \
-        "the Follow-up tab should be active"
+        "the Analysis tab should be active"
 
 
 # --- ADR-037 SC2: the signals console -------------------------------------
@@ -487,7 +477,7 @@ def test_signal_double_click_opens_project(window):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from nightscribe.gui.main_window import TAB_PROJECTS
+    from nightscribe.gui.main_window import VIEW_DETAIL
     _wipe_campaigns()
     cid = camp_mod.create(mw.db, "Campaña doble clic")
     p = proj_mod.create(mw.db, "variable", "R Crl",
@@ -501,8 +491,7 @@ def test_signal_double_click_opens_project(window):
     item = next(lst.item(i) for i in range(lst.count())
                 if lst.item(i).data(Qt.UserRole) == p["id"])
     window._camp_signal_opened(item)
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_PROJECTS
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
 
@@ -748,12 +737,14 @@ def test_the_workbench_badge_speaks_the_project_list_s_language(window):
     window._ufe = dlg                          # keep the dialog alive here
     from PySide6.QtWidgets import QApplication
     QApplication.processEvents()
-    assert dlg.badge.isVisible()
+    # Interfaz 1.0: the workbench lives in the shell (the window is not
+    # shown in the test), so "shown" is isHidden(), not isVisible().
+    assert not dlg.badge.isHidden()
     assert dlg.badge.lbl_name.text() == expected["name"]
     assert dlg.badge.lbl_kind.text() == expected["kind_label"]
     assert expected["kind_color"] in dlg.badge.lbl_kind.styleSheet()
     assert expected["next_text"] in dlg.badge.toolTip()
     # and the ad-hoc open (Tools) has no project behind it
     dlg.set_project_badge(None)
-    assert not dlg.badge.isVisible()
+    assert dlg.badge.isHidden()
     dlg.close()

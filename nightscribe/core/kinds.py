@@ -228,3 +228,91 @@ def tr_text(text):
     if QCoreApplication is None:
         return text
     return QCoreApplication.translate(_K, text)
+
+
+# ---- the one-glance summary of a project's context -------------------
+#
+# A project row has room for two or three numbers, and WHICH numbers make
+# a project recognisable depends on what it is: a supernova is its
+# magnitude and its host, a NEO is how fast it moves and how close it
+# comes. The keys are the ones the manual object form and the enrichers
+# write (gui/widgets/manual_object_panel.py), so nothing here invents a
+# field name.
+_CTX_MAG = QT_TRANSLATE_NOOP("NSKinds", "mag {value}")
+_CTX_RATE = QT_TRANSLATE_NOOP("NSKinds", "{value}″/min")
+_CTX_MOID = QT_TRANSLATE_NOOP("NSKinds", "MOID {value} au")
+_CTX_H = QT_TRANSLATE_NOOP("NSKinds", "H {value}")
+_CTX_PERIOD = QT_TRANSLATE_NOOP("NSKinds", "period {value} d")
+_CTX_DEPTH = QT_TRANSLATE_NOOP("NSKinds", "depth {value} mmag")
+_CTX_AMP = QT_TRANSLATE_NOOP("NSKinds", "amp {value} mag")
+_CTX_PERIHELION = QT_TRANSLATE_NOOP("NSKinds", "perihelion {value}")
+
+# kind id -> the fields worth showing, in order of importance
+_CONTEXT_FIELDS = {
+    "sn": ("mag", "sn_type", "host"),
+    "neo": ("mag", "rate_arcsec_min", "moid"),
+    "pccp": ("mag", "rate_arcsec_min", "moid"),
+    "comet": ("mag", "perihelion_date"),
+    "transit": ("period_d", "depth_mmag"),
+    "variable": ("period_d", "amplitude"),
+    "hads": ("period_d", "amplitude"),
+    "alert": ("mag",),
+}
+
+
+def _ctx_number(value, short=False):
+    # @args: value - a float-ish; short - True for periods, which can be
+    #        tiny (a HADS star pulsates in 0.13 days)
+    # @return: the number as text, without a trailing ".0"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if short and abs(number) < 1.0:
+        return ("%.4f" % number).rstrip("0").rstrip(".")
+    if short:
+        return ("%.2f" % number).rstrip("0").rstrip(".")
+    return ("%.1f" % number).rstrip("0").rstrip(".")
+
+
+def context_line(kind_id, ctx, limit=3):
+    # @args: kind_id - a KINDS id; ctx - a project's context dict;
+    #        limit - how many numbers to keep (a list row has no room for
+    #        more; the object card shows them all)
+    # @return: "mag 15.2 · Ia · NGC 4414", or "" when there is nothing to
+    #          say. Never raises: a project with a half-written context is
+    #          normal, not exceptional.
+    if not ctx:
+        return ""
+    fields = _CONTEXT_FIELDS.get(kind_id)
+    if not fields:
+        return ""
+    parts = []
+    for key in fields:
+        value = ctx.get(key)
+        if value in (None, "", []):
+            continue
+        if key == "mag":
+            parts.append(tr_text(_CTX_MAG).format(value=_ctx_number(value)))
+        elif key == "rate_arcsec_min":
+            parts.append(tr_text(_CTX_RATE).format(value=_ctx_number(value)))
+        elif key == "moid":
+            parts.append(tr_text(_CTX_MOID).format(value="%.3f" % float(value)))
+        elif key == "h":
+            parts.append(tr_text(_CTX_H).format(value=_ctx_number(value)))
+        elif key == "period_d":
+            parts.append(tr_text(_CTX_PERIOD).format(
+                value=_ctx_number(value, short=True)))
+        elif key == "depth_mmag":
+            parts.append(tr_text(_CTX_DEPTH).format(value=_ctx_number(value)))
+        elif key == "amplitude":
+            parts.append(tr_text(_CTX_AMP).format(value=_ctx_number(value)))
+        elif key == "perihelion_date":
+            parts.append(tr_text(_CTX_PERIHELION).format(value=str(value)))
+        else:
+            # a short free-text field (the SN type, the host galaxy): its
+            # own value is the whole message
+            parts.append(str(value))
+        if len(parts) == limit:
+            break
+    return " · ".join(parts)

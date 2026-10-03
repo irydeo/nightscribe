@@ -12,10 +12,12 @@
 ############################################################
 
 # The object's «business card» as one reusable panel (phase D,
-# docs/WORKFLOWS.es.md §7ter): hook phrase, a coordinates block with
-# copyable RA/Dec (decimal + sexagesimal, object-card plan subplan 0),
-# fact bullets, the parameters table with a wide, multi-line
-# explanation column and a charts group (D2) rendered by
+# docs/WORKFLOWS.es.md §7ter), redesigned as a DOSSIER in ADR-057: the
+# hero (glyph, name, kind chip, hook, score ring with its "why tonight"
+# phrase), the "tonight" KPI strip, the alert-flags row, a coordinates
+# block with copyable RA/Dec (decimal + sexagesimal), the night ribbon,
+# the parameters grouped in themed section cards (core/orbits.py rows
+# carry a "group" key) and a charts group rendered by
 # core.post.build_charts. A slot that build_charts cannot produce is
 # hidden (the «omit what is missing» rule); when no chart can be made,
 # the whole charts group disappears instead of leaving a grid of
@@ -32,19 +34,28 @@
 # (light curve) and field (cutout) slots have no vector widget yet and
 # keep the QLabel+QPixmap route. Clicking any slot opens the same
 # ChartViewer dialog (widget mode or pixmap mode).
+#
+# ADR-057 layout note: the panel is a VERTICAL dossier and may scroll
+# (the parent pages are scroll areas). The two-column numbers|pictures
+# layout of Interfaz 1.8 is gone, and with it the parameters QTableWidget:
+# the section cards are label-based definition lists, which wrap and size
+# themselves (the table needed ~90 lines of manual row-fitting because Qt
+# does not auto-size a wrapped cell that spans columns).
 
 import datetime
 
 from PySide6.QtCore import (QEvent, QObject, QT_TRANSLATE_NOOP, Qt,
                             Signal)
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QLabel, QHeaderView, QTableWidgetItem,
-                               QWidget)
+from PySide6.QtWidgets import QLabel, QSizePolicy, QWidget
 
-from ..core import exposure, narrative, orbits
+from ..core import explain, exposure, kinds, narrative, orbits
 from .. import paths
 from . import theme
-from .ui_loader import adopt_ui
+from .ui_loader import adopt_ui, drop_in
+from .widgets.kpi_tile import KpiTile
+from .widgets.object_hero import ObjectHero
+from .widgets.section_card import SectionCard
 
 # Viewer / slot titles, translated at the point of use (tr() at the tab
 # site; QT_TRANSLATE_NOOP marks them here so lupdate can see them).
@@ -70,6 +81,10 @@ def _chip(text, color, tip=""):
     # @return: a small pill label, the same idiom the Tonight rows use
     lbl = QLabel(text)
     lbl.setStyleSheet(theme.chip_style(color))
+    # A pill is sized by its text. Without this the vertical policy lets the
+    # layout stretch it into a slab when the panel has room to spare (seen
+    # on the object card: three chips 80 px tall).
+    lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     if tip:
         lbl.setToolTip(tip)
     return lbl
@@ -82,15 +97,22 @@ def _chip(text, color, tip=""):
 # resize() sizes the WHOLE window (title bar + frame + layout margins),
 # so the panel's full height needs a little headroom to fit without a
 # vertical scrollbar.
+# Below this panel width the parameters/charts row stacks vertically
+# (ADR-057 rev.). The charts' own floor is 300 px (the tab widget) plus the
+# group's margins, and the section cards need ~300 to read; 660 leaves both
+# their minimum and a little air.
+_BODY_STACK_W = 660
+
 _MIN_READ_W = 780     # comfortable reading width (px)
 _MIN_READ_H = 640     # minimum usable height (px)
 _DLG_CHROME = 60      # title bar / frame / margins headroom (px)
 
 
-# Width cap for the Parameter/Value columns (object-card plan, subplan
-# 1): without it a long value steals the room the multi-line
-# "What it means" column needs.
-_PARAM_COL_MAX_W = 280
+# The "tonight" strip shows at most this many KPI tiles: past that the
+# eye stops scanning values and starts skimming shapes. The strip's
+# builder orders tiles by decision weight, so the cap only ever drops
+# the least informative ones.
+_KPI_MAX = 6
 
 
 # Resizes `parent` so the `panel` fits its content, keeping it wide and
@@ -202,7 +224,8 @@ class ObjectPanel(QWidget):
 
         # The structure is the Designer file's (ADR-005): every block
         # starts hidden and the states show them; the skins come from
-        # theme.py, and the chips / table rows / chart tabs are data.
+        # theme.py, and the hero texts / tiles / section rows / chart
+        # tabs are data.
         self._ui = adopt_ui(self, "object_panel")
         self._e = None          # last enriched dict (re-render on mode change)
 
@@ -210,8 +233,30 @@ class ObjectPanel(QWidget):
         self.lbl_state = self._ui.lbl_state
         self.lbl_state.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
 
-        self.lbl_hook = self._ui.lbl_hook
-        self.lbl_hook.setStyleSheet("font-size: 15px; font-weight: bold;")
+        # ADR-057: the hero carries the identity (glyph, name, kind, hook)
+        # and the tonight score ring; the old bare 15 px hook line is gone
+        self.hero = ObjectHero()
+        drop_in(self._ui.vbox_panel, self._ui.heroHost, self.hero)
+        self.hero.hide()
+        # lbl_hook stays as an attribute alias: the hook now lives in the
+        # hero, and the alias keeps the panel's contract (and its tests)
+        # reading the same name
+        self.lbl_hook = self.hero.lbl_hook
+
+        self.lbl_facts = self._ui.lbl_facts
+        self.lbl_facts.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+
+        # ADR-057: the "tonight" KPI strip (tiles are data, added in code)
+        self.kpi_strip = self._ui.kpi_strip
+        self._kpi_lay = self._ui.kpi_lay
+
+        # alert-flags row (the old capture-chips row, now only flags:
+        # period change, campaign, does-not-fit...; the numbers moved to
+        # the KPI strip)
+        self.row_capture = self._ui.row_capture
+        self.row_capture.setSizePolicy(QSizePolicy.Preferred,
+                                       QSizePolicy.Maximum)
+        self._chips = self._ui.chips
 
         # coordinates block (object-card plan, subplan 0): RA/Dec in
         # decimal AND sexagesimal, with a one-click copy button. Hidden
@@ -232,31 +277,32 @@ class ObjectPanel(QWidget):
         self.btn_copy_coords.clicked.connect(self._copy_coords)
         self._coords_clip = ""
 
-        self.lbl_facts = self._ui.lbl_facts
-        self.lbl_facts.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        # The night of THIS object, drawn (the same trick as the Welcome
+        # hero: a painted sky with real numbers). ADR-057: full width,
+        # between the coordinates and the parameter sections.
+        from .widgets.night_ribbon import NightRibbon
+        self._ribbon = NightRibbon()
+        drop_in(self._ui.vbox_panel, self._ui.ribbonHost, self._ribbon)
 
-        # capture/window block (D3): the chips are data, added in code
-        self.row_capture = self._ui.row_capture
-        self.row_capture.setStyleSheet(
-            f"background: {theme.C_BASE}; border-radius: 8px;"
-            f" border: 1px solid {theme.C_LINE};")
-        self._chips = self.row_capture.layout()
-
-        # parameters table
+        # parameters: a header row (title + "In depth" switch) and the
+        # section cards built under sectionsHost (ADR-057)
         self.grp_params = self._ui.grp_params
         self.chk_deep = self._ui.chk_deep
-        self.chk_deep.toggled.connect(lambda: self._refill_params())
-        self.tbl_params = self._ui.tbl_params
-        hdr = self.tbl_params.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.Interactive)
-        hdr.setSectionResizeMode(1, QHeaderView.Interactive)
-        hdr.setSectionResizeMode(2, QHeaderView.Stretch)
-        # multi-line rows must follow the stretch column when the window
-        # resizes: re-fit them every time the explanation column changes
-        # width (the header stretches AFTER the viewport's Resize event,
-        # so watching the section itself is the reliable hook)
-        self._rows_busy = False
-        hdr.sectionResized.connect(self._param_section_resized)
+        self.chk_deep.toggled.connect(lambda: self._refill_sections())
+        self._sections_lay = self._ui.sections_lay
+        self._section_cards = []
+
+        # ADR-057 rev.: the parameters and the charts share one row, 50/50.
+        # The columns are WIDGETS so that hiding one gives the other the
+        # whole width (a hidden widget takes no space in a layout; a hidden
+        # child inside a visible column would leave the column standing).
+        self.col_params = self._ui.col_params
+        self.col_charts = self._ui.col_charts
+        self._row_body = self._ui.row_body
+        self._row_body.setStretch(0, 1)
+        self._row_body.setStretch(1, 1)
+        self._body_direction = None      # what the row is laid out as now
+        self._apply_body_direction()
 
         # charts tabs (D2): each produced chart gets its own tab labelled
         # with the chart's title; with a single chart the tab bar hides and
@@ -275,7 +321,55 @@ class ObjectPanel(QWidget):
         self._action = "create"
         self.btn_project.clicked.connect(self._cta_clicked)
 
+        # the panel is born empty: the blocks are hidden by the .ui and the
+        # columns follow them, so an untouched panel shows no empty row
+        self._sync_body_columns()
+
     # ---------------- states ----------------
+
+    def _sync_body_columns(self):
+        # @return: None. A column is shown only when its block is.
+        #
+        # The block's own hidden flag stays the single source of truth (the
+        # .ui starts both hidden, the states and _render_charts toggle them,
+        # the tests read them). The COLUMN has to follow, and that is the
+        # whole point of the widget: a hidden block inside a visible column
+        # still leaves the column standing, taking its half of the row and
+        # squeezing the other one for nothing.
+        self.col_params.setVisible(not self.grp_params.isHidden())
+        self.col_charts.setVisible(not self.grp_charts.isHidden())
+
+    def _apply_body_direction(self):
+        # @return: None. Below _BODY_STACK_W the row turns vertical.
+        #
+        # Two 390 px columns do not fit a narrow pane, and the charts carry
+        # a 300 px floor: squeezed past it the row clips instead of
+        # shrinking. Stacked, the parameters keep their full width (their
+        # explanations wrap less) and the charts get the page, which is
+        # what the card did before the row existed.
+        row = getattr(self, "_row_body", None)
+        if row is None:
+            return
+        from PySide6.QtWidgets import QBoxLayout
+        stacked = self.width() < _BODY_STACK_W
+        want = QBoxLayout.TopToBottom if stacked else QBoxLayout.LeftToRight
+        if want == self._body_direction:
+            return
+        self._body_direction = want
+        row.setDirection(want)
+
+    def resizeEvent(self, event):
+        # @args: event - the QResizeEvent
+        super().resizeEvent(event)
+        self._apply_body_direction()
+
+    def showEvent(self, event):
+        # @args: event - the QShowEvent
+        # A widget is born 640 px wide (Qt's default) and the real width
+        # only arrives with the layout: without this the first paint of a
+        # wide panel could come out stacked.
+        super().showEvent(event)
+        self._apply_body_direction()
 
     def state(self):
         # @return: "empty" | "loading" | "missing" | "ready"
@@ -288,13 +382,21 @@ class ObjectPanel(QWidget):
         self.lbl_state.setText(self.tr("Loading…"))
         self.lbl_state.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
         self.lbl_state.show()
-        self.lbl_hook.hide()
-        self.lbl_facts.hide()
+        self.hero.set_hook("")      # the hook label's own flag drops too:
+        self.hero.hide()            # hero.hide() alone leaves it "shown"
+        self.lbl_facts.hide()       # inside a hidden parent
+        self.kpi_strip.hide()
         self.row_coords.hide()
         self.row_capture.hide()
         self.grp_params.hide()
+        self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self.btn_project.hide()
+        # the previous object's arc is dropped while it loads (a bare
+        # night is honest; the last object's curve over a "Loading" line
+        # is not)
+        self._refresh_ribbon(None, None)
 
     def _state_missing(self, name=None):
         # @args: name - identifier, shown when given
@@ -304,26 +406,38 @@ class ObjectPanel(QWidget):
             "%1", self._name or self.tr("the requested object")))
         self.lbl_state.setStyleSheet(f"color: {theme.C_WARN};")
         self.lbl_state.show()
-        self.lbl_hook.hide()
+        self.hero.set_hook("")
+        self.hero.hide()
         self.lbl_facts.hide()
+        self.kpi_strip.hide()
         self.row_coords.hide()
         self.row_capture.hide()
         self.grp_params.hide()
+        self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self._refresh_cta()
 
     def _state_ready(self, e):
         # @args: e - enriched dict from enrich.enrich()
         self._e = e
         self.lbl_state.hide()
-        hook = self._txt(narrative.hook(e))
-        self.lbl_hook.setText(hook)
-        self.lbl_hook.show()
+
+        kind = self._kind_of(e)
+        self.hero.set_object(self._name or e.get("name") or "", kind,
+                             subtitle=self._subtitle_for(e),
+                             pha=self._pha_of(e))
+        self.hero.set_hook(self._txt(narrative.hook(e)))
+        score, why = self._score_for(e)
+        self.hero.set_score(score, why)
+        self.hero.show()
 
         bullets = [b for b in (narrative.fact_bullets(e) or []) if self._txt(b)]
         if bullets:
+            # One flowing line under the hero, not four bullets: the same
+            # sentences for 36 px less of vertical rhythm.
             self.lbl_facts.setText(
-                "\n".join("•  " + self._txt(b) for b in bullets))
+                "   ·   ".join(self._txt(b) for b in bullets))
             self.lbl_facts.show()
         else:
             self.lbl_facts.hide()
@@ -335,12 +449,15 @@ class ObjectPanel(QWidget):
         else:
             self.row_coords.hide()
             self._coords_clip = ""
+        self._refresh_ribbon(ra, dec)
 
         self._rows = self._orbit_rows(e)
         self.grp_params.setVisible(bool(self._rows))
-        self._refill_params()
+        self._refill_sections()
         self._render_charts(e)
-        self._render_capture(e)
+        self._sync_body_columns()
+        self._render_kpis(e)
+        self._render_flags(e)
         self._refresh_cta()
         self._state = "ready"
         # The charts (and the CTA) are now on screen; let the owner
@@ -471,16 +588,21 @@ class ObjectPanel(QWidget):
         self._rows = []
         self._name = None
         self._fallback = None
-        self._clear_chips()
+        self._clear_flags()
+        self._clear_kpis()
         self._empty_tabs()
         self.lbl_state.hide()
-        self.lbl_hook.hide()
+        self.hero.set_hook("")
+        self.hero.hide()
         self.lbl_facts.hide()
+        self.kpi_strip.hide()
         self.row_coords.hide()
         self._coords_clip = ""
         self.row_capture.hide()
         self.grp_params.hide()
+        self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self.btn_project.hide()
 
     def _worker_done(self, w, e):
@@ -520,6 +642,126 @@ class ObjectPanel(QWidget):
         # @args: pair - {"es","en"} dict
         # @return: the string in the active language
         return orbits.pick(pair, self._lang())
+
+    # ---------------- hero: identity + tonight score (ADR-057) --------
+
+    def _kind_of(self, e):
+        # @args: e - enriched dict
+        # @return: the project kind id ("neo", "sn", ...): the context's
+        #          kind wins (the planner knows), else the enriched type
+        #          is mapped through core/kinds.py
+        ctx = self._ctx or self._fallback or {}
+        return ctx.get("kind") or kinds.project_kind(e) or ""
+
+    @staticmethod
+    def _subtitle_for(e):
+        # @return: a secondary designation for the hero, when it adds
+        #          anything to the name: the SBDB fullname for small
+        #          bodies, the AUID for variables; "" otherwise
+        d = e.get("data") or {}
+        name = e.get("name") or ""
+        full = ((d.get("sbdb") or {}).get("fullname") or "").strip()
+        if full and full != name:
+            return full
+        auid = ((d.get("variable") or {}).get("auid") or "").strip()
+        if auid and auid != name:
+            return auid
+        return ""
+
+    @staticmethod
+    def _pha_of(e):
+        # @return: True for a potentially hazardous asteroid (SBDB flag,
+        #          or a sub-0.05 AU MOID when the flag is absent)
+        d = e.get("data") or {}
+        sb = d.get("sbdb") or {}
+        if sb.get("pha"):
+            return True
+        try:
+            moid = sb.get("moid")
+            return moid is not None and float(moid) < 0.05
+        except (TypeError, ValueError):
+            return False
+
+    def _score_target(self, e):
+        # Builds the planner-shaped target dict core/suggest.py scores.
+        # @args: e - enriched dict
+        # @return: a target dict, or None when the kind is not scorable
+        #
+        # The panel never sees the planner's original target (it sees the
+        # enriched dict plus the project context), so the score's inputs
+        # are reassembled here: context keys win (they are tonight's
+        # planner values), enriched facts fill the gaps.
+        ctx = self._ctx or self._fallback or {}
+        d = e.get("data") or {}
+        kind = self._kind_of(e)
+        if kind not in ("neo", "sn", "comet", "pccp", "transit", "hads",
+                        "variable", "alert"):
+            return None
+        t = {"kind": kind, "id": ctx.get("id") or e.get("name"),
+             "name": e.get("name")}
+        for k in ("mag", "max_alt", "safe_max_alt", "hours_up", "hads",
+                  "variable", "transit", "campaign", "disc_date", "sn_type",
+                  "host", "nf_score", "nf_priority", "nf_urgency",
+                  "nf_cost_min", "pccp_score", "moid", "rate_arcsec_min",
+                  "ra_deg", "dec_deg", "neocp", "impact", "arc_days",
+                  "nobs", "perihelion_date", "delta_au", "r_au", "vigil",
+                  "aavso"):
+            v = ctx.get(k)
+            if v is None:
+                v = d.get(k)
+            if v is not None:
+                t[k] = v
+        # unconfirmed candidates keep their NEOfixer facts one level down
+        unc = d.get("unconfirmed") or {}
+        for k in ("nf_score", "nf_priority", "nf_cost_min", "nobs",
+                  "arc_days", "moid", "pccp_score", "mag"):
+            if t.get(k) is None and unc.get(k) is not None:
+                t[k] = unc[k]
+        if t.get("ra_deg") is None:
+            ra, dec = self._coords_from(e)
+            t["ra_deg"], t["dec_deg"] = ra, dec
+        return t
+
+    @staticmethod
+    def _hm_of(dt):
+        # @args: dt - datetime or ISO-8601 string
+        # @return: "HH:MM" string, or None (same contract as orbits._hm;
+        #          kept local so the panel never reaches into a private)
+        if isinstance(dt, str):
+            try:
+                dt = datetime.datetime.fromisoformat(dt)
+            except ValueError:
+                return None
+        if isinstance(dt, datetime.datetime):
+            return dt.strftime("%H:%M")
+        return None
+
+    def _score_for(self, e):
+        # @args: e - enriched dict
+        # @return: (score_0_100, why_text) or (None, "") — None when the
+        #          object is not scorable (the hero hides the ring then:
+        #          a missing number is honest, a made-up one is not)
+        from ..core import suggest
+        t = self._score_target(e)
+        if t is None:
+            return None, ""
+        # No planner signal, no ring: a bare name from Explore would score
+        # a flat 0, and a 0 ring reads as "bad object" when the truth is
+        # "we know nothing about tonight". Absent, not zero.
+        if not any(t.get(k) is not None for k in (
+                "mag", "max_alt", "safe_max_alt", "hours_up", "nf_score",
+                "pccp_score", "transit", "hads", "variable", "campaign",
+                "window_start")):
+            return None, ""
+        try:
+            from ..config import config
+            score, _parts = suggest.score_target(t, config)
+            why = self._txt(suggest.why_phrase(t, config))
+        except Exception:
+            # the score is a bonus, never a blocker: a half-filled context
+            # (a manual project) must not take the card down with it
+            return None, ""
+        return score, why
 
     # ---------------- coordinates block (object-card plan, subplan 0) --
 
@@ -622,7 +864,8 @@ class ObjectPanel(QWidget):
                                            d.get("family"), moid,
                                            sigmas=sb.get("sigmas"),
                                            n_resids=sb.get("n_resids"),
-                                           arc_days=sb.get("arc_days"))
+                                           arc_days=sb.get("arc_days"),
+                                           disc_date=sb.get("disc_date"))
         if d.get("unconfirmed"):
             return orbits.explain_neofixer(d["unconfirmed"])
         if e.get("type") == "transient":
@@ -693,7 +936,9 @@ class ObjectPanel(QWidget):
 
         # "approach" is purely vector: the group must stay visible even
         # when build_charts produced no PNG (elements without an ephemeris).
-        self.grp_charts.setVisible(bool(charts) or bool(self._slot_data))
+        has_charts = bool(charts) or bool(self._slot_data)
+        self.grp_charts.setVisible(has_charts)
+        self._sync_body_columns()
 
     def _empty_tabs(self):
         # Removes every chart tab and clears the slot state.
@@ -918,10 +1163,23 @@ class ObjectPanel(QWidget):
         from ..config import config
         return config
 
-    # ---------------- capture / window block (D3) ----------------
+    # ---------------- "tonight" KPI strip + alert flags (ADR-057) ------
+    #
+    # The strip replaces the old capture-chips row: the same numbers, but
+    # as value-over-caption tiles the eye can scan. Only the ALERTS stay
+    # as pills (period change, campaign, does-not-fit...): a flag is a
+    # badge, not a measurement.
 
-    def _clear_chips(self):
-        # Drops every chip the block currently shows.
+    def _clear_kpis(self):
+        # Drops every tile the strip currently shows.
+        while self._kpi_lay.count():
+            item = self._kpi_lay.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+
+    def _clear_flags(self):
+        # Drops every flag pill the row currently shows.
         lay = self._chips
         while lay.count():
             item = lay.takeAt(0)
@@ -929,24 +1187,45 @@ class ObjectPanel(QWidget):
             if w is not None:
                 w.deleteLater()
 
-    def _capture_chips(self, e):
-        # Builds the chip definitions for this object.
+    def _kpi_tiles(self, e):
+        # Builds the tile definitions for this object, decision weight
+        # first (the strip caps at _KPI_MAX, so order is what survives).
         # @args: e - enriched dict
-        chips = []
+        # @return: list of (value, caption, accent_or_None, tooltip)
+        tiles = []
         ctx = self._ctx or self._fallback or {}
-        kind = ctx.get("kind") or e.get("type")
+        kind = self._kind_of(e)
+        d = e.get("data") or {}
+
+        # the safety verdict leads: a session that does not fit is the ONE
+        # number that must never scroll off the strip
+        if (ctx.get("duration_s") and ctx.get("window_start")
+                and ctx.get("window_end") and not ctx.get("safe_window")):
+            mins = int(round(int(ctx.get("duration_s", 0)) / 60))
+            tiles.append((
+                f"⚠ {mins} min", self.tr("does not fit"), theme.C_WARN,
+                self.tr("The planned {0} min session does not fit in the "
+                        "time the object is above your local limit. "
+                        "Do NOT force the instrument.").format(mins)))
 
         mag = ctx.get("mag")
+        if mag is None:
+            mag = d.get("mag") or d.get("mag_now") \
+                or ((d.get("simbad") or {}).get("vmag"))
         if mag is not None:
             try:
                 mag = float(mag)
             except (TypeError, ValueError):
                 mag = None
         if mag is not None:
-            chips.append((
-                f"{self.tr('Mag')} {mag:.1f}", theme.C_OK,
-                self.tr("Predicted apparent magnitude tonight")))
+            tiles.append((
+                f"{mag:.1f}", self.tr("Mag"), theme.C_OK,
+                self.tr("Predicted apparent magnitude tonight") + " "
+                + self._txt(explain.short(explain.MAGNITUDE))))
 
+        # kind-specific extras (object-card plan, subplan 4): every family
+        # fills its strip with the same grammar — the card of an SN or a
+        # transit must not look sparse next to a NEO's
         rate = None
         if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
             try:
@@ -954,70 +1233,209 @@ class ObjectPanel(QWidget):
             except (TypeError, ValueError):
                 rate = None
         if rate:
-            chips.append((
-                f"{rate:.1f}″/min", theme.C_TEXT,
-                self.tr("Sky rate tonight — it must outrun the stars")))
+            tiles.append((
+                f"{rate:.1f}″/min", self.tr("Sky rate"), theme.C_TEXT,
+                self.tr("Sky rate tonight — it must outrun the stars") + " "
+                + self._txt(explain.short(explain.RATE))))
             from ..config import config
             scale = exposure.plate_scale(config.get("pixel_um"),
                                          config.get("focal_mm"))
             t_max = exposure.max_exposure_no_trail(rate, scale)
             if t_max:
-                chips.append((
-                    f"⚠ {self.tr('max')} {t_max:.0f}s", theme.C_WARN,
+                tiles.append((
+                    f"{t_max:.0f} s", self.tr("Max exposure"), theme.C_WARN,
                     str(self.tr("Longest single exposure before the "
-                                "target trails more than a pixel"))
-                ))
+                                "target trails more than a pixel")) + " "
+                    + self._txt(explain.short(explain.EXPOSURE))))
 
-        # kind-specific extras (object-card plan, subplan 4): every
-        # family fills its chip row with the same grammar — the card of
-        # an SN or a transit must not look sparse next to a NEO's
-        d = e.get("data") or {}
         is_sn = kind in ("sn", "transient")
-        is_transit = kind == "transit" or bool(d.get("transit"))
         if is_sn:
             otype = (((d.get("simbad") or {}).get("otype"))
                      or d.get("otype") or "").strip()
             if otype:
-                chips.append((
-                    otype, theme.C_TEXT,
-                    self.tr("Type of stellar explosion")))
+                tiles.append((
+                    otype, self.tr("Event type"), theme.C_TEXT,
+                    self.tr("Type of stellar explosion") + " "
+                    + self._txt(explain.short(explain.sn_type(otype)))))
             days = orbits.days_since(d["disc_date"]) \
                 if d.get("disc_date") else None
             if days is not None and days >= 0:
-                chips.append((
-                    f"{days} d",
+                tiles.append((
+                    f"{days} d", self.tr("Since discovery"),
                     theme.C_GOOD if days <= 14 else theme.C_TEXT,
                     self.tr("Days since discovery — a young light curve "
                             "is gold for science")))
-        if is_transit:
-            tr = d.get("transit") or ctx.get("transit") or {}
+
+        tr = d.get("transit") or ctx.get("transit") or {}
+        if kind == "transit" or tr:
             depth = tr.get("depth_mmag")
             if depth:
-                chips.append((
-                    f"Δ {float(depth):.1f} mmag", theme.C_TEXT,
-                    self.tr("How much the star dims at mid-transit")))
-        is_hads = kind == "hads" or bool(d.get("hads"))
-        if is_hads:
-            h = d.get("hads") or ctx.get("hads") or {}
+                tiles.append((
+                    f"{float(depth):.1f}", self.tr("Depth (mmag)"),
+                    theme.C_TEXT,
+                    self.tr("How much the star dims at mid-transit") + " "
+                    + self._txt(explain.short(explain.DEPTH))))
+            mid = self._hm_of(tr.get("mid"))
+            if mid:
+                tiles.append((
+                    f"{mid} UTC", self.tr("Mid-transit"), theme.C_TEXT,
+                    self.tr("The planet blocks the most light at this "
+                            "instant: plan around it")))
+            dur = tr.get("duration_h")
+            if dur:
+                tiles.append((
+                    f"{float(dur):.1f} h", self.tr("Duration"),
+                    theme.C_TEXT,
+                    self.tr("How long the full crossing lasts")))
+
+        h = d.get("hads") or ctx.get("hads") or {}
+        if kind == "hads" or h:
             per = h.get("period_h")
             if per:
-                chips.append((
-                    f"P {float(per):.2f} h", theme.KIND_COLORS["hads"],
+                tiles.append((
+                    f"{float(per):.2f} h", self.tr("Period"),
+                    theme.KIND_COLORS["hads"],
                     self.tr("Pulsation period — several full cycles fit in "
-                            "one night")))
+                            "one night") + " "
+                    + self._txt(explain.short(explain.PERIOD))))
             amp = h.get("amp")
             if amp is None and h.get("max") is not None \
                     and h.get("min") is not None:
                 amp = h["min"] - h["max"]   # inverted magnitude axis
             if amp:
-                chips.append((
-                    f"Δ {float(amp):.1f} mag", theme.C_TEXT,
-                    self.tr("Peak-to-peak brightness swing of the pulsation")))
+                tiles.append((
+                    f"{float(amp):.1f} mag", self.tr("Amplitude"),
+                    theme.C_TEXT,
+                    self.tr("Peak-to-peak brightness swing of the "
+                            "pulsation")))
             if h.get("cycles"):
-                chips.append((
-                    f"×{float(h['cycles']):.1f}", theme.KIND_COLORS["hads"],
+                tiles.append((
+                    f"×{float(h['cycles']):.1f}", self.tr("Cycles tonight"),
+                    theme.KIND_COLORS["hads"],
                     self.tr("Complete cycles that fit above your limit "
                             "tonight")))
+
+        v = d.get("variable") or ctx.get("variable") or {}
+        if kind == "variable" or v:
+            per = v.get("period_d")
+            if per:
+                tiles.append((
+                    f"{float(per):.1f} d", self.tr("Period"),
+                    theme.KIND_COLORS["variable"],
+                    self.tr("Variability period, in days") + " "
+                    + self._txt(explain.short(explain.PERIOD))))
+            amp = v.get("amp")
+            if amp is None and v.get("max") is not None \
+                    and v.get("min") is not None:
+                amp = v["min"] - v["max"]
+            if amp:
+                tiles.append((
+                    f"{float(amp):.1f} mag", self.tr("Amplitude"),
+                    theme.C_TEXT,
+                    self.tr("Peak-to-peak brightness swing")))
+            nxt = v.get("next_extremum") or {}
+            if nxt.get("days") is not None:
+                lab = self.tr("max") if nxt.get("kind") == "max" \
+                    else self.tr("min")
+                tiles.append((
+                    f"{lab} ~{float(nxt['days']):.0f} d",
+                    self.tr("Next extremum"), theme.KIND_COLORS["variable"],
+                    self.tr("Next expected extremum (VSX epoch)")))
+
+        ws = ctx.get("window_start")
+        we = ctx.get("window_end")
+        if ws and we:
+            tiles.append((
+                f"{ws[11:16]}–{we[11:16]}", self.tr("Window"), theme.C_OK,
+                self.tr("Times the object is safely above the limit")))
+
+        if ctx.get("safe_window"):
+            s0, s1 = ctx["safe_window"].split("|")
+            bt = ctx.get("best_time")
+            caption = self.tr("Safe window")
+            hint = self.tr("The capture window that still clears your "
+                           "local limit — the telescope stays in safe "
+                           "altitude through the whole session")
+            if bt:
+                caption += f" · ≤ {bt[11:16]}"
+                hint += self.tr(" · ≤ HH:MM is the latest safe start")
+            tiles.append((
+                f"{s0[11:16]}–{s1[11:16]}", caption, theme.C_GOOD, hint))
+
+        hours = ctx.get("hours_up")
+        if hours:
+            try:
+                hours = float(hours)
+            except (TypeError, ValueError):
+                hours = None
+            if hours:
+                tiles.append((
+                    f"{hours:.1f} h", self.tr("Above the limit"),
+                    theme.C_TEXT,
+                    self.tr("How long it stays a valid target")))
+
+        alt = ctx.get("safe_max_alt")
+        if alt is None:
+            alt = ctx.get("max_alt")
+        if alt is not None:
+            try:
+                alt = float(alt)
+            except (TypeError, ValueError):
+                alt = None
+        if alt:
+            tiles.append((
+                f"{alt:.0f}°", self.tr("Max altitude"), theme.C_TEXT,
+                self.tr("Highest altitude over your horizon tonight") + " "
+                + self._txt(explain.short(explain.ALTITUDE))))
+
+        # the Moon, when the user cares about it (Settings > limits): its
+        # separation and illumination decide the faint end of the night
+        t = self._score_target(e)
+        if t is not None:
+            try:
+                from ..config import config
+                from ..core import suggest
+                moon = suggest.moon_info(t, config)
+            except Exception:
+                moon = None
+            if moon:
+                tiles.append((
+                    f"{moon['sep_deg']:.0f}° · {moon['illum']:.0%}",
+                    self.tr("Moon"),
+                    theme.C_WARN if moon.get("warning") else None,
+                    self.tr("Moon separation and illumination tonight") + " "
+                    + self._txt(explain.short(explain.MOON))))
+
+        return tiles[:_KPI_MAX]
+
+    def _render_kpis(self, e):
+        # Shows the strip when it has at least one tile.
+        # @args: e - enriched dict
+        self._clear_kpis()
+        tiles = self._kpi_tiles(e)
+        if not tiles:
+            self.kpi_strip.hide()
+            return
+        for value, caption, accent, tip in tiles:
+            self._kpi_lay.addWidget(KpiTile(value, caption, accent, tip))
+        # the tiles hug their content on the left; the stretch absorbs the
+        # slack (re-added on every fill: _clear_kpis takes it away too)
+        self._kpi_lay.addStretch(1)
+        self.kpi_strip.show()
+
+    def _flag_chips(self, e):
+        # Builds the ALERT flags for this object (ADR-057): the pills that
+        # are a badge, not a measurement.
+        # @args: e - enriched dict
+        # @return: list of (text, color, tooltip)
+        chips = []
+        ctx = self._ctx or self._fallback or {}
+        kind = self._kind_of(e)
+        d = e.get("data") or {}
+
+        is_hads = kind == "hads" or bool(d.get("hads"))
+        if is_hads:
+            h = d.get("hads") or ctx.get("hads") or {}
             if h.get("priority") in ("period_change",
                                      "period_change_possible"):
                 chips.append((
@@ -1034,132 +1452,91 @@ class ObjectPanel(QWidget):
                     self.tr("Multiperiodic"), theme.KIND_COLORS["hads"],
                     self.tr("Several pulsation modes — observe on "
                             "consecutive nights")))
-        is_var = kind == "variable" or bool(d.get("variable"))
-        if is_var:
-            v = d.get("variable") or ctx.get("variable") or {}
-            per = v.get("period_d")
-            if per:
-                chips.append((
-                    f"P {float(per):.1f} d", theme.KIND_COLORS["variable"],
-                    self.tr("Variability period, in days")))
-            amp = v.get("amp")
-            if amp is None and v.get("max") is not None \
-                    and v.get("min") is not None:
-                amp = v["min"] - v["max"]
-            if amp:
-                chips.append((
-                    f"Δ {float(amp):.1f} mag", theme.C_TEXT,
-                    self.tr("Peak-to-peak brightness swing")))
-            nxt = v.get("next_extremum") or {}
-            if nxt.get("days") is not None:
-                lab = self.tr("max") if nxt.get("kind") == "max" \
-                    else self.tr("min")
-                chips.append((
-                    f"{lab} ~{float(nxt['days']):.0f} d",
-                    theme.KIND_COLORS["variable"],
-                    self.tr("Next expected extremum (VSX epoch)")))
-            camp = d.get("campaign") or ctx.get("campaign") or {}
-            if camp.get("name"):
-                chips.append((
-                    self.tr("Campaign: %1").replace("%1", camp["name"]),
-                    theme.C_OK,
-                    self.tr("This object belongs to an observing campaign")))
 
-        ws = ctx.get("window_start")
-        we = ctx.get("window_end")
-        if ws and we:
-            ws_hm = ws[11:16]
-            we_hm = we[11:16]
+        camp = d.get("campaign") or ctx.get("campaign") or {}
+        if camp.get("name"):
             chips.append((
-                f"{ws_hm}–{we_hm}", theme.C_OK,
-                self.tr("Times the object is safely above the limit")))
-            hours = ctx.get("hours_up")
-            if hours:
-                try:
-                    hours = float(hours)
-                except (TypeError, ValueError):
-                    hours = None
-                if hours:
-                    chips.append((
-                        f"{hours:.1f} h", theme.C_TEXT,
-                        self.tr("How long it stays a valid target")))
-
-        if ctx.get("safe_window"):
-            s0, s1 = ctx["safe_window"].split("|")
-            s0h, s1h = s0[11:16], s1[11:16]
-            bt = ctx.get("best_time")
-            bt_hm = bt[11:16] if bt else None
-            hint = self.tr("The capture window that still clears your "
-                           "local limit — the telescope stays in safe "
-                           "altitude through the whole session")
-            if bt_hm:
-                label = f"⊕ {s0h}–{s1h} · ≤ {bt_hm}"
-                hint += self.tr(" · ≤ HH:MM is the latest safe start")
-            else:
-                label = f"⊕ {s0h}–{s1h}"
-            chips.append((label, theme.C_GOOD, hint))
-        elif (ctx.get("duration_s") and ctx.get("window_start")
-                and ctx.get("window_end")):
-            mins = int(round(int(ctx.get("duration_s", 0)) / 60))
-            chips.append((
-                f"⚠ {self.tr('does not fit')} · {mins} min",
-                theme.C_WARN,
-                self.tr("The planned {0} min session does not fit in the "
-                        "time the object is above your local limit. "
-                        "Do NOT force the instrument.").format(mins)))
+                self.tr("Campaign: %1").replace("%1", camp["name"]),
+                theme.C_OK,
+                self.tr("This object belongs to an observing campaign")))
         return chips
 
-    def _render_capture(self, e):
-        # Shows the block when it has at least one chip.
+    def _render_flags(self, e):
+        # Shows the flags row when it has at least one pill.
         # @args: e - enriched dict
-        self._clear_chips()
-        chips = self._capture_chips(e)
+        self._clear_flags()
+        chips = self._flag_chips(e)
         if not chips:
             self.row_capture.hide()
             return
         for text, color, tip in chips:
-            self._chips.insertWidget(self._chips.count() - 1,
-                                     _chip(text, color, tip))
+            self._chips.addWidget(_chip(text, color, tip))
+        # The pills sit at the LEFT and the row keeps the rest. The trailing
+        # stretch has to be re-added on every fill: _clear_flags() takes
+        # every item away, spacer included, and without it three chips
+        # spread themselves across the whole width.
+        self._chips.addStretch(1)
         self.row_capture.show()
 
-    def _param_section_resized(self, index, _old, new):
-        # Re-fits the wrapped rows after the explanation column changed
-        # width (window resize / column fit). The signal fires BEFORE
-        # columnWidth() reports the new size, so the section is nudged
-        # to `new` first (a no-op for the header, which is already
-        # setting it); _rows_busy breaks the recursion (new row heights
-        # can toggle the scrollbar, which resizes the sections again).
-        if index != 2 or self._rows_busy:
+    def _refresh_ribbon(self, ra=None, dec=None):
+        # @args: ra, dec - the object in degrees, or None for a bare night
+        # @return: None. The site comes from the settings, so the band
+        #          answers for THIS observatory.
+        ribbon = getattr(self, "_ribbon", None)
+        if ribbon is None:
             return
-        self._rows_busy = True
+        from ..config import config
         try:
-            self.tbl_params.setColumnWidth(2, new)
-            self.tbl_params.resizeRowsToContents()
-        finally:
-            self._rows_busy = False
+            lat = float(config.get("lat") or 0.0)
+            lon = float(config.get("lon") or 0.0)
+        except (TypeError, ValueError):
+            lat = lon = 0.0
+        if not (lat or lon):
+            lat = lon = None
+        ribbon.set_site(lat, lon)
+        ribbon.set_object(ra, dec, self._name or "")
+        kind = (self._ctx or {}).get("kind")
+        ribbon.set_accent(theme.KIND_COLORS.get(kind, theme.C_ACCENT))
 
-    def _refill_params(self):
-        # Fills the parameters table from the cached rows.
+    # ---------------- parameter sections (ADR-057) ----------------
+
+    def _clear_sections(self):
+        # Drops every section card the panel currently shows.
+        while self._sections_lay.count():
+            item = self._sections_lay.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._section_cards = []
+
+    def _refill_sections(self):
+        # Rebuilds the section cards from the cached rows, honouring the
+        # "In depth" switch. Sections keep their first-seen order (the
+        # interpreter's own order: the story's, not the alphabet's).
+        self._clear_sections()
         rows = list(self._rows)
         if not self.chk_deep.isChecked():
             rows = [r for r in rows if r.get("level") == "basic"]
-        tbl = self.tbl_params
-        tbl.setRowCount(0)
+        order, by_group = [], {}
         for r in rows:
-            row = tbl.rowCount()
-            tbl.insertRow(row)
-            param = self._txt(r["param"]) if isinstance(r["param"], dict) \
-                else str(r["param"])
-            tbl.setItem(row, 0, QTableWidgetItem(param))
-            tbl.setItem(row, 1, QTableWidgetItem(str(r["value"])))
-            tbl.setItem(row, 2, QTableWidgetItem(self._txt(r)))
-        # Fit Parameter/Value to their content, capped so the explanation
-        # keeps its air; NEVER resizeToContents on the stretch column —
-        # with word wrap the hint is the full one-line width and the
-        # column would balloon past the viewport. The stretch column
-        # takes what is left; _RowResizer re-fits rows on real resizes.
-        for col in (0, 1):
-            tbl.resizeColumnToContents(col)
-            if tbl.columnWidth(col) > _PARAM_COL_MAX_W:
-                tbl.setColumnWidth(col, _PARAM_COL_MAX_W)
-        tbl.resizeRowsToContents()
+            g = r.get("group") or "orbit"
+            if g not in by_group:
+                order.append(g)
+                by_group[g] = []
+            by_group[g].append(r)
+        accent = theme.KIND_COLORS.get(self._kind_of(self._e or {}),
+                                       theme.C_ACCENT)
+        for g in order:
+            title = self._txt(orbits.SECTION_TITLES.get(
+                g, {"es": g, "en": g}))
+            card = SectionCard(title, accent)
+            for r in by_group[g]:
+                param = self._txt(r["param"]) if isinstance(r["param"], dict) \
+                    else str(r["param"])
+                # a row value may be bilingual too (e.g. HADS pulsation
+                # modes): pick the active language instead of leaking EN
+                value = self._txt(r["value"]) if isinstance(r["value"], dict) \
+                    else str(r["value"])
+                card.add_row(param, value, self._txt(r))
+            self._sections_lay.addWidget(card)
+            self._section_cards.append(card)

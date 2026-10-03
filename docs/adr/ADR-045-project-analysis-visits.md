@@ -13,6 +13,11 @@ migración v10) · **Enmendado / Amended**: 2026-09-26 (ADR-047: clic
 bidireccional; la fila de un punto con placa es clicable y reaparece
 esa placa en el UFE con su estado guardado; sin placa, aviso llano)
 
+**Enmendado / Amended**: 2026-10-02 (Interfaz 1.6: el UFE pasó de
+diálogo flotante a página de la ventana principal, así que la ventana de
+visita se aparta mientras el taller está en pantalla y vuelve al salir;
+el taller trae su propio navegador de tomas, así que no se pierde nada)
+
 **Ver / See**: ADR-019 (la UX v3 centrada en proyectos; revisado aquí) ·
 ADR-041 (la barra de pestañas del proyecto; enmendado aquí) · ADR-043 (la
 pestaña Observatory plegada en Captura; enmendado aquí) · ADR-044 (el UFE;
@@ -109,6 +114,22 @@ duplicado en el bloque de productos quedó corregido de paso. Documentan
 el cambio las guías de flujos y la de interfaz; AGENTS.md sigue el
 mapa.
 
+**Corrección (2026-10-02).** La ventana de visita es un `QDialog` no
+modal **con padre**, así que el gestor de ventanas la mantiene por encima
+de la ventana principal. Mientras el UFE era un diálogo flotante no había
+problema; desde que es una **página** de la ventana principal (Interfaz
+1.0), abrir una placa desde la visita dejaba el editor **detrás** de la
+ventana de visita. Afectaba a los tres caminos: la fila FITS
+(`open_in_editor`), medir la serie y abrir la medida de un punto.
+
+La ventana de visita **se aparta mientras el taller está en pantalla y
+vuelve al salir**, con su estado intacto. Se oculta en vez de bajarse
+(`lower()` sobre una ventana *transient* no es fiable) y en vez de
+cerrarse, porque no se pierde nada: el propio taller trae el navegador de
+tomas de la visita en su panel izquierdo (`ufe_visit_panel.ui`), que es
+justo para lo que se usaría la ventana mientras se mide, y las notas de la
+visita se guardan a cada tecla (`update_session_notes`).
+
 ## English
 
 **Context.** The project flow carried three real frictions, all
@@ -193,3 +214,18 @@ migration tests seed old databases and verify both. The manager has its
 own battery (`tests/unit/test_visits_panel.py`). The duplicated hint
 label bug in the products block was fixed on the way. The workflow and
 UI guides document the change; AGENTS.md follows the map.
+
+**Fix (2026-10-02).** The visit window is a non-modal `QDialog` **with a
+parent**, so the window manager keeps it above the main window. While the
+UFE was a floating dialog that was fine; since it became a **page** of the
+main window (Interfaz 1.0), opening a plate from a visit left the editor
+**behind** the visit window. It affected all three paths: the FITS row
+(`open_in_editor`), measuring the series and opening a point's measurement.
+
+The visit window **steps aside while the workbench is on screen and comes
+back when it leaves**, with its state intact. It hides rather than lowers
+(`lower()` on a transient window is not reliable) and rather than closes,
+because nothing is lost: the workbench carries the visit's frame navigator
+in its left pane (`ufe_visit_panel.ui`), which is exactly what the window
+would be used for while measuring, and the visit's notes are saved on every
+keystroke (`update_session_notes`).

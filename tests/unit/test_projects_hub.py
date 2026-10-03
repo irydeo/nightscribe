@@ -240,16 +240,17 @@ def test_select_project_drives_panel(window, panel):
     # (no follow-up for a NEO), lazy-built per click; the object card
     # carries the nested "Project files" block, and the Next card took
     # over the old wizard buttons
-    assert set(window._tab_pages) == {"details", "plan"}  # rest lazy
+    assert set(window._tab_pages) == {"details"}   # the rest lazy
     # the masthead "Files (0)" button is the single entry to the
     # project files (the old in-card section is retired); a fresh
     # project has none registered, so it reads zero and stays off
     assert not window.projects.btn_files.isEnabled()
     assert window.projects.btn_files.text() == window.tr("Files (0)")
-    # a fresh project opens on its next-action tab (a fresh project is
-    # at "plan"); the object card stays hidden until the user opens it
-    assert not window._tab_pages["plan"].isHidden()
-    assert window._tab_pages["details"].isHidden()
+    # ADR-041 rev.: a fresh project opens on the OBJECT CARD. The Next
+    # card still says what to do next (a fresh project sits at "plan") and
+    # its Go button jumps there; the Capture page is not built until asked.
+    assert not window._tab_pages["details"].isHidden()
+    assert "plan" not in window._tab_pages
     assert window._next_target == "plan"
     assert not window.projects.btn_next_go.isHidden()
     assert window.projects.lbl_next.text()
@@ -260,14 +261,15 @@ def test_select_project_drives_panel(window, panel):
 def test_panel_carries_project_context_chips(window, panel):
     _create_and_select(window, "neo", "chips-target", NEO_CTX)
     assert panel.state() == "ready"
-    assert not panel.row_capture.isHidden()
+    # ADR-057: the context numbers are KPI tiles now, not chips
+    assert not panel.kpi_strip.isHidden()
     from PySide6.QtWidgets import QLabel
-    chips = [w.text() for w in panel.row_capture.findChildren(QLabel)
+    tiles = [w.text() for w in panel.kpi_strip.findChildren(QLabel)
              if w.text().strip()]
-    assert any("19.5" in c for c in chips), f"mag chip missing: {chips!r}"
-    assert any("12.0" in c for c in chips), f"rate chip missing: {chips!r}"
-    assert any("21:00" in c and "23:30" in c for c in chips), \
-        f"window chip missing: {chips!r}"
+    assert any("19.5" in c for c in tiles), f"mag tile missing: {tiles!r}"
+    assert any("12.0" in c for c in tiles), f"rate tile missing: {tiles!r}"
+    assert any("21:00" in c and "23:30" in c for c in tiles), \
+        f"window tile missing: {tiles!r}"
 
 
 def test_select_missing_object_is_not_found(window):
@@ -374,11 +376,13 @@ def test_no_projects_clears_state(window):
     dbmod.db.commit()
     window.on_refresh_projects()
     assert window._current_project is None
-    # UX-PC (U2): with no projects the right pane is the dashboard's empty
-    # state (the "start from Tonight" pointer), not a stale detail
+    # Interfaz 1.6: with no project selected the right pane shows the night
+    # panel (its own heading), not a stale detail
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().currentIndex() == VIEW_HOME
     assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
-    assert window.projects.lbl_dash_title.text()
+        window.projects.page_night
+    assert window._night_panel.ui.lbl_night_head.text()
 
 
 # ---------------- D5 (corrected 2026-09-02): Explore dialog + CTA ----
@@ -576,62 +580,10 @@ def test_dashboard_shown_without_selection(window):
     # UX-PC (U2): no selection -> the right pane is the dashboard.
     window.projects.lst_projects.clearSelection()
     window._clear_project_detail()
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().currentIndex() == VIEW_HOME
 
 
-def test_dashboard_empty_state_points_to_tonight(window):
-    # UX-PC (U2): with zero projects in the db the dashboard teaches where
-    # projects come from (the Tonight tab) instead of showing a blank.
-    import nightscribe.core.db as dbmod
-    rows = dbmod.db.execute("SELECT id FROM projects").fetchall()
-    for (pid,) in rows:
-        dbmod.db.execute("DELETE FROM projects WHERE id=?", (pid,))
-        dbmod.db.execute("DELETE FROM project_steps WHERE project_id=?",
-                         (pid,))
-    dbmod.db.commit()
-    window.on_refresh_projects()
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
-    title = window.projects.lbl_dash_title.text()
-    assert title                                # "Your projects live here"
-    # the CTA button jumps to the Tonight tab
-    from PySide6.QtWidgets import QPushButton
-    btns = window.projects.dash_container.findChildren(QPushButton)
-    assert btns and "Tonight" in btns[0].text()
-    btns[0].click()
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == 0             # TAB_TONIGHT
-
-
-def test_dashboard_attention_card_lands_on_followup(window, panel):
-    # UX-PC (U2): a due SN produces a card whose button opens the project
-    # AND scrolls to its follow-up section.
-    import time
-    import nightscribe.core.db as dbmod
-    from nightscribe.core import followup, project
-    p = project.create(dbmod.db, "sn", "SN2099dash", {"kind": "sn"})
-    project.advance(dbmod.db, p["id"])
-    sid = followup.create_session(dbmod.db, p["id"])
-    dbmod.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
-                     (time.time() - 6 * 86400, sid))
-    dbmod.db.commit()
-    window.on_refresh_projects()
-    window.projects.lst_projects.clearSelection()
-    window._clear_project_detail()
-    from PySide6.QtWidgets import QPushButton
-    cards = [w for w in
-             window.projects.dash_container.findChildren(QPushButton)
-             if w.isEnabled()]
-    assert cards, "no attention cards rendered"
-    cards[0].click()
-    assert window._current_project is not None
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_detail
-    # ADR-045: the deep link ends on the analysis tab, built + active
-    assert "analysis" in window._tab_pages
-    assert not window._tab_pages["analysis"].isHidden()
 
 
 def test_rich_rows_carry_the_story(window, panel):
@@ -738,7 +690,8 @@ def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
     ctx.update({"ra_deg": 9.36667, "dec_deg": 72.3475,
                 "safe_window": "2026-09-06T16:52:02+00:00|"
                                "2026-09-07T12:53:15+00:00"})
-    _create_and_select(window, "neo", "seq-capture-target", ctx)
+    p = _create_and_select(window, "neo", "seq-capture-target", ctx)
+    _open_tab(window, p, "plan")     # the Capture step builds on first open
     w = window._project_widgets
     assert w["spn_darks"].value() == 25   # calibration group defaults
     assert w["spn_bias"].value() == 100
@@ -782,8 +735,9 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     # line says so; the connect button is the one enabled thing.
     # ADR-043: the controls live in the Capture step of the project page
     # (window._obs_widgets), there is no Observatory tab any more.
-    _create_and_select(window, "neo", "ccd-section-target",
-                       {"kind": "neo", "mag": 19.0})
+    p = _create_and_select(window, "neo", "ccd-section-target",
+                           {"kind": "neo", "mag": 19.0})
+    _open_tab(window, p, "plan")       # the Capture step builds on first open
     obs = window._obs_widgets          # connection + mount + live capture
     assert obs["ccd_connect"].isEnabled()
     assert window._ccd_connected is False
@@ -791,14 +745,18 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
                 "ccd_push", "ccd_start"):
         assert not obs[key].isEnabled(), f"{key} should start disabled"
     assert not obs["cmb_ccd_filter"].isEnabled()
-    assert obs["ccd_status"].text() == window.tr("CCDciel: not connected")
+    # Interfaz 1.8: the state is a chip with a dot and a colour
+    assert obs["ccd_status"].text().endswith(
+        window.tr("CCDciel: not connected"))
+    assert obs["ccd_status"].text().startswith("\u25cf")
 
 
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):
     # The wheel combo carries a sane static fallback until CCDciel answers
     # (UX-PC U3: the combo is the Observatory tab's, window-owned).
-    _create_and_select(window, "neo", "ccd-filter-target",
-                       {"kind": "neo", "mag": 19.0})
+    p = _create_and_select(window, "neo", "ccd-filter-target",
+                           {"kind": "neo", "mag": 19.0})
+    _open_tab(window, p, "plan")
     cmb = window._obs_widgets["cmb_ccd_filter"]
     items = [cmb.itemText(i) for i in range(cmb.count())]
     assert "L" in items and "Ha" in items and "OIII" in items
@@ -812,8 +770,9 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
     window._ccd_client = ccdciel.Client()
     window._ccd_connected = True
     try:
-        _create_and_select(window, "neo", "ccd-wheel-target",
-                           {"kind": "neo", "mag": 19.0})
+        p = _create_and_select(window, "neo", "ccd-wheel-target",
+                               {"kind": "neo", "mag": 19.0})
+        _open_tab(window, p, "plan")
         cmb = window._obs_widgets["cmb_ccd_filter"]
         items = [cmb.itemText(i) for i in range(cmb.count())]
         assert items == ["Red", "Green", "Blue"]
@@ -829,6 +788,7 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
     p = _create_and_select(window, "sn", "SN2099send", {"kind": "sn"})
+    _open_tab(window, p, "plan")
     project.update_step_data(dbmod.db, p["id"], "plan",
                              {"n_frames": 12, "exp_s": 45.0,
                               "filter": "R"})
@@ -970,7 +930,8 @@ def test_apply_position_updates_context_and_label(window, panel):
     # shows the new epoch.
     ctx = {"id": "2026AB", "ra_deg": 10.0, "dec_deg": 20.0, "kind": "neo",
            "rate_arcsec_min": 4.0}
-    _create_and_select(window, "neo", "2026AB", ctx)
+    p = _create_and_select(window, "neo", "2026AB", ctx)
+    _open_tab(window, p, "plan")
     window._ccd_apply_position(
         {"ra_deg": 123.45, "dec_deg": -12.0, "rate_arcsec_min": 5.0,
          "epoch_iso": "2026-09-07 22:30:00", "source": "horizons",
@@ -1523,51 +1484,7 @@ def test_fu_paste_dialog_parses(window, panel):
 
 # ---------------- B11: cadence hint in Tonight ----------------
 
-def test_cadence_hint_shows_for_stale_sn(window, panel):
-    # An active SN project with a session 3+ days ago should produce a cadence chip
-    from nightscribe.core import project, followup as fu
-    import nightscribe.core.db as dbmod
-    import datetime
-    p = _create_and_select(window, "sn", "SN2026cad", {"kind": "sn"})
-    sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
-    old = datetime.datetime.now().timestamp() - 5 * 86400
-    dbmod.db.execute(
-        "UPDATE project_sessions SET created=? WHERE id=?", (old, sid))
-    dbmod.db.commit()
-    window._tonight_all = []
-    window._show_cadence_hints()
-    from PySide6.QtWidgets import QLabel
-    chips = [c for c in window.tonight.findChildren(QLabel)
-             if c.objectName() == "ns_cadence_chip"]
-    assert len(chips) >= 1
 
-
-def test_cadence_hint_no_active_projects(window, panel):
-    # Clean up any projects left by previous tests in the module-scoped DB
-    import nightscribe.core.db as dbmod
-    dbmod.db.execute("DELETE FROM projects")
-    dbmod.db.commit()
-    window._tonight_all = []
-    window._show_cadence_hints()
-    from PySide6.QtWidgets import QLabel
-    # the stale-sn test may have left a chip; clean it explicitly
-    stale = window.tonight.findChild(QLabel, "ns_cadence_chip")
-    if stale is not None:
-        # deleteLater is async; the C++ object lingers. Force-remove.
-        stale.setParent(None)
-        stale.deleteLater()
-    # look only for the named cadence chip (not any label with "follow")
-    from PySide6.QtWidgets import QLabel
-    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
-    # the chip may still exist as a C++ object pending deleteLater;
-    # what matters is that it's no longer in the layout (parent = None)
-    if chip is not None:
-        chip.setParent(None)
-    assert window.tonight.findChild(QLabel, "ns_cadence_chip") is None or \
-        chip.parentWidget() is None
-
-
-# ---------------- gap fixes: orphaned B5/B6/B10 + B9 ----------------
 
 def test_fu_point_hook_saves_measure_point(window, panel):
     # ADR-044: the "Quick analysis" quick-look button is retired (it did
@@ -1926,32 +1843,6 @@ def test_variable_followup_drops_quicklook_hides_animation(window):
     assert "Export annotated FITS" not in btns
 
 
-def test_cadence_chip_ignores_campaign_projects(window):
-    from nightscribe.core import campaign as camp_mod
-    from nightscribe.core import followup as fu
-    from nightscribe.core import project as proj_mod
-    from nightscribe.gui import main_window as mw
-    import time
-    from PySide6.QtWidgets import QLabel
-    # campaign-less stale SN -> chip
-    p1 = proj_mod.create(mw.db, "sn", "SN 2026zzz", {"mag": 14.0})
-    fu.create_session(mw.db, p1["id"])
-    # campaign SN equally stale -> NO chip (it surfaces in the list instead)
-    cid = camp_mod.create(mw.db, "Campaña SN")
-    p2 = proj_mod.create(mw.db, "sn", "SN 2026yyy", {"mag": 14.0},
-                         campaign_id=cid)
-    fu.create_session(mw.db, p2["id"])
-    for pid in (p1["id"], p2["id"]):
-        sid = fu.list_sessions(mw.db, pid)[0]["id"]
-        mw.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
-                      (time.time() - 9 * 86400, sid))
-        mw.db.commit()
-    window._show_cadence_hints()
-    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
-    assert chip is not None
-    assert "SN 2026zzz" in chip.text()
-    assert "SN 2026yyy" not in chip.text()
-
 
 def test_followup_event_advisor_label(window):
     from nightscribe.core import followup as fu
@@ -2011,6 +1902,7 @@ def test_variable_plan_prefills_protocol_filters(window):
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
+    _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["B", "V"]
 
@@ -2020,6 +1912,7 @@ def test_variable_without_campaign_keeps_clear_default(window):
     from nightscribe.gui import main_window as mw
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
+    _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["Clear"]
 
@@ -2447,7 +2340,8 @@ def test_detail_spins_are_wheel_passive(window, panel):
     from PySide6.QtCore import QCoreApplication
     from nightscribe.gui.widgets.passive_wheel import (
         PassiveDoubleSpinBox, PassiveSpinBox)
-    _create_and_select(window, "neo", "wheel-passive-spin", dict(NEO_CTX))
+    p = _create_and_select(window, "neo", "wheel-passive-spin", dict(NEO_CTX))
+    _open_tab(window, p, "plan")
     for key, cls in (("spn_darks", PassiveSpinBox),
                      ("spn_darkexp", PassiveDoubleSpinBox)):
         w = window._project_widgets[key]
@@ -2462,7 +2356,8 @@ def test_detail_spins_are_wheel_passive(window, panel):
 def test_detail_spins_fine_tune_on_ctrl_wheel(window, panel):
     # Ctrl+wheel is the deliberate fine-tune gesture and must still work.
     from PySide6.QtCore import QCoreApplication, Qt
-    _create_and_select(window, "neo", "wheel-ctrl-spin", dict(NEO_CTX))
+    p = _create_and_select(window, "neo", "wheel-ctrl-spin", dict(NEO_CTX))
+    _open_tab(window, p, "plan")
     spn = window._project_widgets["spn_darks"]
     spn.setValue(50)
     e = _wheel_event(modifiers=Qt.ControlModifier)
@@ -2725,3 +2620,31 @@ def test_the_row_thumbnail_is_the_latest_curve_in_the_charts_scale(window):
                        for i in range(10)])
     payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
     assert source_label("measure") in payload["sparkline_text"]
+
+
+def test_home_new_project_tile_points_to_tonight(window):
+    # Interfaz 1.3: the header tile is the single new-project entry.
+    from PySide6.QtWidgets import QPushButton
+    from nightscribe.gui.main_window import VIEW_TONIGHT
+    tile = window.findChild(QPushButton, "newTile")
+    assert tile is not None and tile.isEnabled()
+    tile.click()
+    assert window._shell_stack().currentIndex() == VIEW_TONIGHT
+
+
+def test_due_project_row_carries_the_urgency(window, panel):
+    # Interfaz 1.3: the "needs you" / cadence signal lives in the row (the
+    # next action in words + the urgency tint), not in a separate panel.
+    import time
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project as proj_mod
+    from nightscribe.gui import main_window as mw, theme
+    p = proj_mod.create(mw.db, "sn", "SN2099due", {"kind": "sn"})
+    proj_mod.advance(mw.db, p["id"])
+    sid = followup.create_session(mw.db, p["id"])
+    dbmod.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+                     (time.time() - 9 * 86400, sid))
+    dbmod.db.commit()
+    row = window._project_row_widget(proj_mod.get(mw.db, p["id"]),
+                                     {"urgency": "due"}, {})
+    assert theme.C_WARN in row.lbl_next.styleSheet()

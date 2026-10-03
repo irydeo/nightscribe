@@ -173,3 +173,114 @@ def test_explain_hads_minimal_bundle_shape():
     assert "Brightness range" in params
     amp = next(r for r in rows if r["param"]["en"] == "Amplitude")
     assert amp["value"] == "Δ 0.5 mag"          # computed from Max/Min
+
+
+# ---------------- ADR-057: section grouping ----------------------------
+
+def _full_rows():
+    # @return: the row lists of every interpreter, each with a full
+    #          payload; shared by the grouping and the ADR-058 guards
+    return [
+        orbits.explain_elements(
+            {"a": 0.9224, "e": 0.1912, "i": 3.33, "q": 0.746, "Q": 1.099,
+             "per": 324.0, "U": 2},
+            {"H": 19.09, "rot_per": 30.56, "albedo": 0.2, "spec_B": "S"},
+            "Aten", moid=0.000254, sigmas={"a": 0.01}, n_resids=9,
+            arc_days=14, disc_date="2004-06-19"),
+        orbits.explain_neofixer(
+            {"nf_score": 5.4, "nf_priority": "medium", "nf_cost_min": 12.0,
+             "nobs": 14, "arc_days": "0.09", "moid": 0.01}),
+        orbits.explain_transient(
+            {"simbad": {"otype": "SN Ia", "z": 0.0114},
+             "host": {"name": "NGC 5908", "z": 0.0114}, "dist_mly": 121.0,
+             "mag": 14.2, "disc_date": "2026/08/30"}),
+        orbits.explain_transit(
+            {"pl_orbper": 3.5247, "pl_radj": 1.38, "pl_bmassj": 0.73,
+             "pl_eqt": 1449, "sy_dist": 48.3, "st_teff": 6065,
+             "st_met": 0.02, "disc_year": 1999, "discoverymethod": "Transit",
+             "transit": {"ingress": "2026-09-07T22:40:00+00:00",
+                         "mid": "2026-09-08T00:15:00+00:00",
+                         "egress": "2026-09-08T01:50:00+00:00",
+                         "duration_h": 3.1, "depth_mmag": 16.4,
+                         "v_mag": 7.65, "min_telescope_in": 6.0,
+                         "oc_min": -12.0}},
+            aperture_in=10.0),
+        orbits.explain_hads(
+            {"hads": {"period_h": 1.89, "max": 10.4, "min": 11.0, "amp": 0.6,
+                      "cycles": 3.5, "session_fits": True, "cadence_s": 438,
+                      "exp_s": 60, "covered_this_month": False,
+                      "priority": "period_change", "observed": False,
+                      "multiperiodic": True, "non_radial": False}}),
+        orbits.explain_variable(
+            {"variable": {"var_type": "NR+ELL", "period_d": 227.5528,
+                          "max": 2.0, "min": 10.8, "spectral": "M3III+WD",
+                          "auid": "000-BBB-123", "constellation": "CrB",
+                          "max_band": "V", "min_band": "V",
+                          "next_extremum": {"kind": "max", "days": 3.0}},
+             "campaign": {"name": "Campaña T CrB"}}),
+    ]
+
+
+def test_every_row_has_a_known_group():
+    # The object card groups rows into themed sections; a row without a
+    # known group would land in the family's default section silently, so
+    # every interpreter is exercised here with a full payload.
+    for rows in _full_rows():
+        assert rows, "an interpreter came back empty"
+        for r in rows:
+            assert r.get("group") in orbits.SECTION_TITLES, \
+                f"{r['param']!r} has no known group: {r.get('group')!r}"
+
+
+def test_no_row_explains_nothing():
+    # ADR-058: no row may carry an empty or echo explanation. A type row
+    # whose text is just its value («SN Ia») is the half-explanation the
+    # rule bans.
+    for rows in _full_rows():
+        for r in rows:
+            assert len(r["es"].strip()) > 40, f"{r['param']!r}: {r['es']!r}"
+            assert len(r["en"].strip()) > 40, f"{r['param']!r}: {r['en']!r}"
+            if not isinstance(r["value"], dict):
+                assert r["es"].strip() != str(r["value"]).strip(), \
+                    f"{r['param']!r} only echoes its value"
+                assert r["en"].strip() != str(r["value"]).strip(), \
+                    f"{r['param']!r} only echoes its value"
+
+
+def test_new_rows_carry_the_new_data():
+    # ADR-057 surfaces what the card hid before: the small body's
+    # discovery date, the exoplanet's stellar parameters, the HADS
+    # cadence/exposure/coverage and the variable's catalogue record.
+    rows = orbits.explain_elements({"a": 1.0, "e": 0.1, "i": 5.0},
+                                   {}, "Apollo", disc_date="2004-06-19")
+    disc = next(r for r in rows if r["param"]["en"] == "Discovered")
+    assert disc["value"] == "2004-06-19" and disc["group"] == "provenance"
+
+    rows = orbits.explain_transit(
+        {"pl_eqt": 1449.0, "st_teff": 6065.0, "st_tefferr1": 32.0,
+         "st_met": 0.02, "pl_radj": 1.38, "pl_radjerr1": 0.05})
+    params = [r["param"]["en"] for r in rows]
+    assert "Equilibrium temperature" in params
+    assert "Star temperature" in params
+    assert "Star metallicity" in params
+    teff = next(r for r in rows if r["param"]["en"] == "Star temperature")
+    assert "6065 K" in teff["value"] and "± 32" in teff["value"]
+    size = next(r for r in rows if r["param"]["en"] == "Planet size")
+    assert size["value"] == "1.38 ± 0.05 Rjup"     # uncertainty rides along
+
+    rows = orbits.explain_hads({"hads": {
+        "period_h": 1.46, "cadence_s": 438.0, "exp_s": 60.0,
+        "covered_this_month": False}})
+    params = [r["param"]["en"] for r in rows]
+    assert "Recommended cadence" in params
+    assert "Suggested exposure" in params
+    assert "Programme coverage" in params
+
+    rows = orbits.explain_variable({"variable": {
+        "var_type": "M", "auid": "000-BBB-123", "constellation": "CrB",
+        "max_band": "V", "min_band": "I"}})
+    params = [r["param"]["en"] for r in rows]
+    assert "AUID" in params and "Constellation" in params
+    bands = next(r for r in rows if r["param"]["en"] == "Extremum bands")
+    assert bands["value"] == "V – I"
+    assert bands["group"] == "catalogue"

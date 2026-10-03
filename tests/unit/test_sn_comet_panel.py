@@ -218,10 +218,11 @@ def test_panel_sn_sky_chart_offline(panel, no_sources):
     assert sky is not None, "no SkyChart widget found in the tabs"
     assert not sky.isHidden()
     assert sky.view.scene().items(), "sky scene is empty"
-    # capture chips: magnitude + the safe window the planner computed
+    # capture tiles (ADR-057): magnitude + the safe window the planner
+    # computed, now as KPI tiles instead of chips
     from PySide6.QtWidgets import QLabel
-    chips = " ".join(w.text()
-                     for w in panel.row_capture.findChildren(QLabel)
+    tiles = " ".join(w.text()
+                     for w in panel.kpi_strip.findChildren(QLabel)
                      if w.text().strip())
-    assert "16.4" in chips
-    assert "03:00" in chips
+    assert "16.4" in tiles
+    assert "03:00" in tiles

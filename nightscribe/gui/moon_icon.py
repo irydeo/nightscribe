@@ -22,10 +22,19 @@ If the asset is missing we fall back to a flat grey disc: the UI must
 never break because of a broken image.
 
 Sign convention (north, seen from Earth, as in ``ephem_minor.moon``):
-    elong < 0  -> waxing -> lit side is the RIGHT
-    elong > 0  -> waning -> lit side is the LEFT
+    elong > 0  -> waxing -> lit side is the RIGHT
+    elong < 0  -> waning -> lit side is the LEFT
     |elong| 0 / 90 / 180  -> new / quarter / full
     illum fraction = (1 - cos|E|) / 2
+
+``ephem_minor.moon`` computes elong = lon_moon - lon_sun, so POSITIVE means
+the Moon is east of the Sun: it sets after it and it is waxing, and in the
+northern hemisphere a waxing Moon is lit on the right (a waning one, on the
+left). ``night_brief`` says the same in its own words and the Welcome hero
+paints the same Moon with ``welcome_sky._lit_path``; this module used to
+have the sign the other way round, which drew every phase mirrored and made
+the two Moons of one screen disagree (fixed 2026-10-02; the guard lives in
+``tests/unit/test_moon_icon.py``).
 """
 
 import math
@@ -62,7 +71,11 @@ def lit_points(r, elong, n=200):
     if (1 - math.cos(math.radians(E))) / 2 < 0.015:
         return []                       # new moon: no lit region at all
     c = math.cos(math.radians(E))
-    sign = -1.0 if elong > 0 else 1.0   # waning mirrors the disc
+    # Waxing (elong > 0) lights the RIGHT half, waning the LEFT: the sign is
+    # what decides it and inverting it mirrors every phase (see the module
+    # header). The terminator below rides on the same sign, so the crescent
+    # or gibbous bulge stays on the correct side too.
+    sign = 1.0 if elong > 0 else -1.0
     pts = []
     # lit limb: outer semicircle, straight down the lit side (top -> bottom)
     for i in range(n + 1):
@@ -132,6 +145,18 @@ def moon_pixmap(elong, size=28):
             d = r * 2.08
             p.drawImage(QRectF(cx - d / 2, cy - d / 2, d, d),
                         photo, QRectF(0, 0, s, s))
+            # ...and a flat wash over it. The photo is a FULL moon: its limb
+            # is vignetted and its left half carries most of the maria, so a
+            # thin WANING crescent (the lit arc sits on that dark limb) came
+            # out nearly invisible (measured: 0.7% of the disc bright at
+            # elong -30 against 2.5% at +30). At this alpha the darkest
+            # craters lift without the craters themselves disappearing, and
+            # both crescents read the same.
+            wash = QColor(_FLAT_LIT)
+            wash.setAlpha(70)
+            p.setPen(Qt.NoPen)
+            p.setBrush(wash)
+            p.drawPath(path)
         else:
             p.setPen(Qt.NoPen)
             p.setBrush(_FLAT_LIT)

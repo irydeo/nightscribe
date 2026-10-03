@@ -1,28 +1,114 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.0: the app shell. A vertical "PROYECTOS" tab on the left always
+  visible, a QStackedWidget with the views (Home, Tonight, Campaigns,
+  Detail) and an overlay project drawer built in code (gui/main_window.py).
+  The old QTabWidget is gone; the same widgets are hosted here full-screen.
+-->
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
-   <rect><x>0</x><y>0</y><width>1200</width><height>800</height></rect>
+   <rect><x>0</x><y>0</y><width>1280</width><height>860</height></rect>
   </property>
   <property name="windowTitle">
    <string>NightScribe</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QVBoxLayout" name="centralLayout">
+    <property name="spacing"><number>0</number></property>
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
     <item>
-     <widget class="QTabWidget" name="tabs">
-      <property name="currentIndex"><number>0</number></property>
-      <widget class="QWidget" name="tab_tonight">
-       <attribute name="title"><string>Tonight</string></attribute>
-      </widget>
-      <widget class="QWidget" name="tab_projects">
-       <attribute name="title"><string>Projects</string></attribute>
-      </widget>
-      <widget class="QWidget" name="tab_campaigns">
-       <attribute name="title"><string>Campaigns</string></attribute>
-      </widget>
+     <widget class="QFrame" name="nav_bar">
+      <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+      <layout class="QHBoxLayout" name="navLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>8</number></property>
+       <property name="topMargin"><number>4</number></property>
+       <property name="rightMargin"><number>8</number></property>
+       <property name="bottomMargin"><number>4</number></property>
+       <item>
+        <widget class="QLabel" name="lbl_nav_logo">
+         <property name="minimumSize"><size><width>20</width><height>20</height></size></property>
+         <property name="maximumSize"><size><width>20</width><height>20</height></size></property>
+         <property name="toolTip"><string>NightScribe</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_back">
+         <property name="text"><string>←</string></property>
+         <property name="toolTip"><string>Back (Alt+Left)</string></property>
+         <property name="minimumSize"><size><width>36</width><height>28</height></size></property>
+         <property name="styleSheet"><string notr="true">font-size: 18px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_fwd">
+         <property name="text"><string>→</string></property>
+         <property name="toolTip"><string>Forward (Alt+Right)</string></property>
+         <property name="minimumSize"><size><width>36</width><height>28</height></size></property>
+         <property name="styleSheet"><string notr="true">font-size: 18px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_home">
+         <property name="text"><string>⌂</string></property>
+         <property name="toolTip"><string>Home (Alt+Home)</string></property>
+         <property name="minimumSize"><size><width>36</width><height>28</height></size></property>
+         <property name="styleSheet"><string notr="true">font-size: 18px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_welcome">
+         <property name="text"><string>ⓘ</string></property>
+         <property name="toolTip"><string>Welcome / setup guide</string></property>
+         <property name="minimumSize"><size><width>36</width><height>28</height></size></property>
+         <property name="styleSheet"><string notr="true">font-size: 18px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_crumbs">
+         <property name="text"><string/></property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="navSpacer">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        </spacer>
+       </item>
+       <item>
+        <!-- Interfaz 1.6: the night, always in sight. The real widget
+             (gui/widgets/sky_bar.py) replaces this placeholder: the Moon
+             at tonight's phase, the darkness window, the planets at dusk
+             and the sky-event chips, visible from every view. -->
+        <widget class="QWidget" name="skyHost"/>
+       </item>
+      </layout>
      </widget>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="shellLayout">
+      <property name="spacing"><number>0</number></property>
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item>
+       <widget class="QToolButton" name="btn_vtab">
+        <property name="text"><string>PROYECTOS</string></property>
+        <property name="toolTip"><string>Show or hide the project list</string></property>
+        <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+        <property name="maximumSize"><size><width>28</width><height>16777215</height></size></property>
+        <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QStackedWidget" name="stack"/>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
@@ -48,10 +134,12 @@
        </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
+     <addaction name="action_welcome"/>
      <addaction name="action_docs"/>
      <addaction name="separator_help"/>
      <addaction name="action_about"/>
      <addaction name="action_sources"/>
+     <addaction name="action_log"/>
     </widget>
     <addaction name="menu_file"/>
     <addaction name="menu_tools"/>
@@ -86,6 +174,10 @@
   </action>
   <action name="action_sources">
    <property name="text"><string>Data sources</string></property>
+  </action>
+  <action name="action_welcome">
+    <property name="text"><string>Welcome / setup guide</string></property>
+    <property name="toolTip"><string>Your observatory, your targets and the data report, at any time</string></property>
   </action>
   <action name="action_docs">
     <property name="text"><string>Technical Documentation</string></property>

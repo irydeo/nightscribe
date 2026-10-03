@@ -46,7 +46,10 @@ def _parse(data):
     except (KeyError, TypeError, ValueError):
         return None
     city = (data.get("city") or "").strip()
-    country = (data.get("country_name") or "").strip()
+    # ipapi.co spells it "country_name", ipwho.is just "country": reading
+    # only the first one silently dropped the country from the suggested
+    # name ("Madrid" instead of "Madrid, Spain") on the fallback provider.
+    country = (data.get("country_name") or data.get("country") or "").strip()
     name = ", ".join(part for part in (city, country) if part) or "your location"
     return {"lat": lat, "lon": lon, "name": name}
 
@@ -87,7 +90,16 @@ def elevation(lat, lon, force=False):
     try:
         body, _ = db.http_get(key, "elevation", fetch, force=force)
         data = json.loads(body.decode("utf-8", "replace"))
-        return int(round(float(data["elevation"])))
-    except (requests.RequestException, ValueError, KeyError) as err:
+        # open-meteo answers {"elevation": [666.0]}: a LIST, one value per
+        # requested point. Reading it as a bare number raised a TypeError
+        # that the old except list did not catch, so it escaped the button's
+        # slot and left "Finding your observatory..." on screen forever
+        # (seen 2026-10-02). Both shapes are accepted now.
+        value = data["elevation"]
+        if isinstance(value, (list, tuple)):
+            value = value[0]
+        return int(round(float(value)))
+    except (requests.RequestException, ValueError, KeyError, TypeError,
+            IndexError) as err:
         logger.info("elevation: failed (%s)", err)
         return None

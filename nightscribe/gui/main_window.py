@@ -12,13 +12,14 @@
 ############################################################
 
 import datetime
+import datetime as _dt
 import logging
 import re
 import uuid
 from pathlib import Path
 
 from PySide6 import Shiboken
-from PySide6.QtCore import (QCoreApplication, QSize, Qt, Signal,
+from PySide6.QtCore import (QCoreApplication, QEvent, QSize, Qt, Signal,
                             QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
@@ -43,7 +44,10 @@ from .skeleton import ShimmerRow
 from .widgets.passive_wheel import (PassiveDoubleSpinBox, PassiveList,
                                     PassiveSpinBox)
 from .widgets.campaign_row import CampaignRow
+from .widgets.project_row import ROW_HEIGHT as _PROJECT_ROW_H
 from .widgets.project_row import ProjectRow
+from .widgets.project_row import SPARK_H as ROW_SPARK_H
+from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
@@ -125,6 +129,25 @@ def tr(fmt, *sub):
     for i, val in enumerate(sub, 1):
         t = t.replace(f"%{i}", str(val))
     return t
+
+
+def _parse_date_obs(text):
+    # The FITS DATE-OBS, in the several shapes it actually arrives in.
+    # @args: text - "2026-10-02T21:14:03.5", "2026-10-02T21:14:03", a space
+    #        instead of the T, or None
+    # @return: a UTC datetime, or None when it cannot be read. A
+    #          half-written header is normal in the wild, not exceptional.
+    if not text:
+        return None
+    raw = str(text).strip().replace("Z", "").replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%d %H:%M:%S",
+                "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.datetime.strptime(raw, fmt).replace(
+                tzinfo=datetime.timezone.utc)
+        except ValueError:
+            continue
+    return None
 
 
 def _settings_two_columns(dlg):
@@ -260,13 +283,33 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
 # the kinds stay in the same order wherever they are shown.
 KIND_ORDER = list(kinds.ids())
 
-# Top-level tab indices (ui/main_window.ui order; ADR-036: History left
-# the bar for the Tools-menu journal dialog, J0): never use literals for
-# the main tabs.
-# UX-PC + SC2 (ADR-038/040): the Sun & sky content moved to the Tools
-# menu as the "Sky calendar…" dialog; ADR-043 folds the Observatory tab
-# into the project's Capture step, leaving three top-level tabs
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS = range(3)
+# Top-level view indices in the shell's QStackedWidget (Interfaz 1.0;
+# ADR-053). The old QTabWidget is gone: Home is the projects hub (the
+# start view), Tonight is the "new project" flow, Campaigns is the hub's
+# campaign section, and Detail is one project full-screen. The legacy
+# TAB_* names are kept as aliases so the deep links across the file
+# (project created -> hub, campaign badge -> campaigns) keep working.
+# Interfaz 1.6: the projects view is ONE page holding the list and the
+# project side by side (a splitter between them). Opening a project is a
+# SELECTION inside it, not a different place, so VIEW_HOME and VIEW_DETAIL
+# are two names for the same page: every deep link in the file keeps
+# working, the history still tells the two apart by the project id it
+# carries, and the list never disappears when you open something.
+VIEW_PROJECTS, VIEW_TONIGHT, VIEW_CAMPAIGNS, VIEW_WELCOME, VIEW_UFE = range(5)
+VIEW_HOME = VIEW_PROJECTS
+VIEW_DETAIL = VIEW_PROJECTS
+TAB_PROJECTS = VIEW_HOME
+TAB_TONIGHT = VIEW_TONIGHT
+TAB_CAMPAIGNS = VIEW_CAMPAIGNS
+
+# The projects list: how wide it opens, and the range the splitter allows.
+# It is the observer's to choose and it is remembered between runs. The
+# default is measured, not guessed: at ~500 px the row fits the curve AND
+# the object's numbers (at 420 the numbers have to give way, and at 560 the
+# campaign badge joins them).
+_LIST_W_DEFAULT = 500
+_LIST_W_MIN = 260
+_LIST_W_MAX = 560
 
 
 class _ClickableFrame(QFrame):
@@ -355,8 +398,24 @@ class MainWindow(QMainWindow):
     # holds the Sky calendar, the observing journal, and the contextual
     # Explore/Post/Blink dialogs.
 
-    def __init__(self):
+    # @args: snapshot - the pre-migration backup dict from core/backup.py
+    #        (the Welcome view's data report), or None when there is no
+    #        database yet
+    def __init__(self, snapshot=None):
         super().__init__()
+        self._snapshot = snapshot
+        self._welcome = None
+        self._welcome_gate = False   # True while an update is unacknowledged
+        # Interfaz 1.0: Tonight is computed on demand, when the new-project
+        # view is first opened (never at start).
+        self._tonight_loaded = False
+        self._tonight_running = False
+        # Interfaz 1.1: navigation history (back/forward) over locations
+        # (view, project, tab, campaign). _navigating guards against
+        # recording the history replay itself.
+        self._nav_back = []
+        self._nav_fwd = []
+        self._navigating = False
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
@@ -398,7 +457,7 @@ class MainWindow(QMainWindow):
         self._menus = win
         self._build_status_progress()
 
-        self._build_tabs()
+        self._build_shell()
         self._connect_menu()
         self._connect()
         # Projects are visible from the very first open: load the hub list
@@ -416,9 +475,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(600, self._ccd_connect)
         self.statusBar().showMessage(
             f"NightScribe {full_version()} — "
-            + self.tr("Ready — press 'Compute tonight'"), 8000)
-        if config.is_configured():
-            QTimer.singleShot(400, self.on_compute_tonight)
+            + self.tr("Ready"), 8000)
+        # Interfaz 1.0: nothing is computed on start. Tonight is on demand,
+        # when the observer asks for a new project (the app opens fast and
+        # offline). See ADR-053.
         self._now_timer = QTimer(self)
         self._now_timer.timeout.connect(self._refresh_now_badges)
         self._now_timer.start(5 * 60 * 1000)
@@ -491,39 +551,388 @@ class MainWindow(QMainWindow):
         return QSize(max(int(g.width() * 0.9), 640),
                      max(int(g.height() * 0.9), 480))
 
+    def _shell_stack(self):
+        # @return: the shell's QStackedWidget that hosts every view
+        from PySide6.QtWidgets import QStackedWidget
+        return self.centralWidget().findChild(QStackedWidget, "stack")
+
     def _goto_tab(self, index):
-        from PySide6.QtWidgets import QTabWidget
-        self.centralWidget().findChild(QTabWidget, "tabs").setCurrentIndex(index)
+        # Switches the shell's view. The name is kept (Interfaz 1.0): every
+        # deep link in the file calls _goto_tab(TAB_*). While an update's
+        # Data step is unacknowledged, Welcome is a gate: nothing else can
+        # be opened until "Got it".
+        if getattr(self, "_welcome_gate", False) and index != VIEW_WELCOME:
+            return
+        # The workbench stays alive when another view is opened (ADR-047:
+        # its plate and stretch survive); its workers are only shut down
+        # when the app itself closes (MainWindow.closeEvent -> ufe.close).
+        self._shell_stack().setCurrentIndex(index)
+        if index == VIEW_PROJECTS:
+            self._sync_projects_pane()
 
-    # ---------------- tab construction ----------------
+    # ---------------- navigation history (Interfaz 1.1, ADR-056) ---------
 
-    def _build_tabs(self):
-        from PySide6.QtWidgets import QTabWidget
-        tabs = self.centralWidget().findChild(QTabWidget, "tabs")
-        widgets = (self.tonight, self.projects, self.campaigns) = (
-            _load_ui("tonight_tab"), _load_ui("projects_tab"),
-            _load_ui("campaigns_tab"))
-        for i, w in enumerate(widgets):
-            title = tabs.tabText(i)
-            tabs.removeTab(i)
-            tabs.insertTab(i, w, title)
-        tabs.setCurrentIndex(0)
-        # UX-PC (plain-language rule): every tab explains itself in one
-        # line on hover — no concept is taken for granted
-        tabs.setTabToolTip(TAB_TONIGHT, self.tr(
-            "Tonight's best objects from your observatory"))
-        tabs.setTabToolTip(TAB_PROJECTS, self.tr(
-            "Your projects: one object with its three steps: capture, "
-            "track, follow-up — and what needs your attention"))
-        tabs.setTabToolTip(TAB_CAMPAIGNS, self.tr(
-            "Observing campaigns: several nights, several observatories, "
-            "one shared goal"))
-        # table starts collapsed
+    def _current_location(self):
+        # @return: the location the app is on right now, as a hashable
+        #          tuple (view, project id, tab key, campaign id)
+        pid = self._current_project["id"] if self._current_project else None
+        return (self._shell_stack().currentIndex(), pid,
+                getattr(self, "_active_tab", None), self._selected_campaign_id())
+
+    def navigate(self, view, pid=None, tab=None, cid=None, replace=False):
+        # The single entry for user navigation: records the current
+        # location on the back stack (unless replace), clears the forward
+        # stack and applies the new one. Applying never records.
+        # @args: view - a VIEW_* index; pid/tab/cid - the state to restore;
+        #        replace - drop the current location instead of stacking it
+        loc = (view, pid, tab, cid)
+        if getattr(self, "_navigating", False):
+            self._apply_location(loc)
+            return
+        cur = self._current_location()
+        if cur == loc:
+            return
+        if replace:
+            if self._nav_back and self._nav_back[-1] == cur:
+                self._nav_back.pop()
+        else:
+            self._nav_back.append(cur)
+        self._nav_fwd.clear()
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def _apply_location(self, loc):
+        # Restores a location WITHOUT recording it (used by navigate and by
+        # back/forward). A missing project is skipped to Home.
+        # @args: loc - (view, pid, tab, cid)
+        view, pid, tab, cid = loc
+        if view == VIEW_PROJECTS and pid is not None:
+            self._goto_tab(VIEW_PROJECTS)
+            if project.get(db, pid) is None:
+                # the project was deleted while it was in the history
+                self._goto_tab(VIEW_HOME)
+                return
+            if (self._current_project or {}).get("id") == pid:
+                # same project: a tab change is NOT a rebuild (only the
+                # page switches), or every click would wipe the pages
+                if tab:
+                    self._show_tab(tab)
+                return
+            # different project: keep the list highlight in sync WITHOUT
+            # re-entering _project_selected (signals blocked), open once
+            lst = self.projects.lst_projects
+            was_blocked = lst.signalsBlocked()
+            lst.blockSignals(True)
+            try:
+                self._select_project_row(pid)
+            finally:
+                lst.blockSignals(was_blocked)
+            if not self._open_project(pid):
+                # the project was deleted while it was in the history:
+                # fall back to the hub
+                self._goto_tab(VIEW_HOME)
+                return
+            if tab:
+                self._show_tab(tab)
+            return
+        if view == VIEW_CAMPAIGNS:
+            self._goto_tab(VIEW_CAMPAIGNS)
+            self._refresh_campaigns_tab()
+            if cid is not None:
+                lst = self.campaigns.lst_campaigns
+                for i in range(lst.count()):
+                    if lst.item(i).data(Qt.UserRole) == cid:
+                        lst.setCurrentRow(i)
+                        break
+            return
+        if view == VIEW_WELCOME:
+            self._ensure_welcome()
+            # the page is built once and reused: who is looking at it can
+            # have changed (a project was created, an update was sealed)
+            self._sync_welcome()
+        self._goto_tab(view)
+
+    def back(self):
+        # Goes to the previous location. Blocked while Welcome gates the
+        # app (an unacknowledged update). An open drawer closes first.
+        if getattr(self, "_welcome_gate", False):
+            return
+        if getattr(self, "_drawer", None) is not None and self._drawer.isVisible():
+            self._drawer_open(False)
+            return
+        if not self._nav_back:
+            return
+        cur = self._current_location()
+        loc = self._nav_back.pop()
+        self._nav_fwd.append(cur)
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def forward(self):
+        # Re-applies the location we just left with back().
+        if getattr(self, "_welcome_gate", False) or not self._nav_fwd:
+            return
+        cur = self._current_location()
+        loc = self._nav_fwd.pop()
+        self._nav_back.append(cur)
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def home(self):
+        # Back to the hub (the root of the app).
+        self.navigate(VIEW_HOME)
+
+    def _update_nav_bar(self):
+        # Paints the navigation bar (buttons + breadcrumb). Guarded so the
+        # history model works before the bar exists (early construction).
+        back = getattr(self._menus, "btn_nav_back", None)
+        if back is None:
+            return
+        gate = getattr(self, "_welcome_gate", False)
+        back.setEnabled(bool(self._nav_back) and not gate)
+        fwd = getattr(self._menus, "btn_nav_fwd", None)
+        if fwd is not None:
+            fwd.setEnabled(bool(self._nav_fwd) and not gate)
+        crumbs = getattr(self._menus, "lbl_crumbs", None)
+        if crumbs is not None:
+            crumbs.setText(self._crumbs_html())
+
+    def _breadcrumb(self):
+        # @return: [(label, view, pid, tab, cid)] from Home to here
+        loc = self._current_location()
+        view, pid, tab, _cid = loc
+        crumbs = []
+        if view == VIEW_WELCOME:
+            crumbs.append((self.tr("Welcome"), VIEW_WELCOME, None, None, None))
+            return crumbs
+        # Interfaz 1.6: the projects view holds the list AND the project, so
+        # the project is a second crumb of the SAME view (the pid is what
+        # tells the two states apart, not the index).
+        crumbs.append((self.tr("Projects"), VIEW_PROJECTS, None, None, None))
+        if view == VIEW_TONIGHT:
+            crumbs.append((self.tr("New project"), VIEW_TONIGHT,
+                           None, None, None))
+        elif view == VIEW_CAMPAIGNS:
+            crumbs.append((self.tr("Campaigns"), VIEW_CAMPAIGNS,
+                           None, None, None))
+        elif view == VIEW_PROJECTS and pid is not None:
+            p = project.get(db, pid) or self._current_project or {}
+            name = p.get("object_name") or "?"
+            crumbs.append((name, VIEW_PROJECTS, pid, None, None))
+            if tab:
+                crumbs.append((self._tab_label(tab), VIEW_PROJECTS, pid, tab,
+                               None))
+        elif view == VIEW_UFE and pid is not None:
+            p = project.get(db, pid) or self._current_project or {}
+            crumbs.append((p.get("object_name") or "?", VIEW_PROJECTS, pid,
+                           None, None))
+            crumbs.append((self.tr("Image Workbench"), VIEW_UFE, pid,
+                           None, None))
+        return crumbs
+
+    def _crumb_href(self, view, pid, tab, cid):
+        # @return: the internal link a breadcrumb segment points at.
+        #   Interfaz 1.6: the projects view answers two links, the list
+        #   ("nav:home") and one project ("nav:project:<id>"), and the pid
+        #   is what tells them apart now that both share a view index.
+        if view == VIEW_PROJECTS:
+            if pid is None:
+                return "nav:home"
+            base = f"nav:project:{pid}"
+            return f"{base}:{tab}" if tab else base
+        if view == VIEW_TONIGHT:
+            return "nav:tonight"
+        if view == VIEW_CAMPAIGNS:
+            return "nav:campaigns"
+        if view == VIEW_WELCOME:
+            return "nav:welcome"
+        if view == VIEW_UFE:
+            return f"nav:ufe:{pid}" if pid is not None else "nav:ufe"
+        return "nav:home"
+
+    def _crumbs_html(self):
+        # @return: the breadcrumb as rich text with clickable segments
+        import html as _html
+        items = self._breadcrumb()
+        parts = []
+        for i, (label, view, pid, tab, cid) in enumerate(items):
+            if i == len(items) - 1:
+                parts.append(
+                    '<span style="color:%s;font-weight:600">%s</span>'
+                    % (theme.C_TEXT, _html.escape(str(label))))
+            else:
+                parts.append(
+                    '<a href="%s" style="color:%s;text-decoration:none">%s</a>'
+                    % (self._crumb_href(view, pid, tab, cid), theme.C_ACCENT,
+                       _html.escape(str(label))))
+        # the tree reads with arrows: Home → project → tab. The separator
+        # is the dim text colour, not the border line: on the dark bar the
+        # line colour made the arrows almost invisible.
+        sep = ' <span style="color:%s">→</span> ' % theme.C_TEXT_DIM
+        return sep.join(parts)
+
+    def _crumb_clicked(self, url):
+        # @args: url - a nav:* link from the breadcrumb
+        if url == "nav:home":
+            self.home()
+        elif url == "nav:tonight":
+            self.navigate(VIEW_TONIGHT)
+        elif url == "nav:campaigns":
+            self.navigate(VIEW_CAMPAIGNS)
+        elif url == "nav:welcome":
+            self.navigate(VIEW_WELCOME)
+        elif url.startswith("nav:ufe"):
+            self.navigate(VIEW_UFE)
+        elif url.startswith("nav:project:"):
+            rest = url.split(":")[2:]
+            try:
+                pid = int(rest[0])
+            except (ValueError, IndexError):
+                return
+            tab = rest[1] if len(rest) > 1 else None
+            self.navigate(VIEW_DETAIL, pid=pid, tab=tab)
+
+    # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
+
+    def _build_shell(self):
+        # The widgets are the SAME as before, re-hosted full-screen in a
+        # QStackedWidget. The projects_tab husk keeps its registered child
+        # attributes (self.projects.lst_projects and friends), so no other
+        # code had to move: its two halves are reparented into the Home
+        # view (attention dashboard + project list) and the Detail view
+        # (the project page). The old QTabWidget is gone.
+        from PySide6.QtWidgets import QWidget, QVBoxLayout
+        self.tonight = _load_ui("tonight_tab")
+        self.projects = _load_ui("projects_tab")
+        self.campaigns = _load_ui("campaigns_tab")
+        proj = self.projects
+        stack = self._shell_stack()
+
+        # The projects view (Interfaz 1.6): header, then the list and the
+        # project side by side with a splitter between them. The old design
+        # pulled the two halves into separate shell pages, so opening a
+        # project threw the list away; together they let you move between
+        # projects without leaving the view, and the splitter is what makes
+        # the list's width the observer's choice.
+        home = QWidget()
+        hl = QVBoxLayout(home)
+        hl.setContentsMargins(12, 10, 12, 10)
+        hl.setSpacing(8)
+        from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
+                                       QPushButton, QSplitter)
+        # header: "My projects" + the prominent new-project tile
+        head = QFrame()
+        head.setObjectName("homeHead")
+        hlay = QHBoxLayout(head)
+        hlay.setContentsMargins(0, 0, 0, 0)
+        title = QLabel(self.tr("My projects"))
+        title.setObjectName("homeTitle")
+        hlay.addWidget(title)
+        hlay.addStretch(1)
+        newtile = QPushButton(self.tr("+ NEW PROJECT"))
+        newtile.setObjectName("newTile")
+        newtile.setCursor(Qt.PointingHandCursor)
+        newtile.setToolTip(self.tr("Create a project from tonight's targets"))
+        newtile.clicked.connect(self._new_project_view)
+        hlay.addWidget(newtile)
+        hl.addWidget(head)
+        # the splitter: list left, project right. Neither side collapses by
+        # accident (childrenCollapsible False); the « button is the one that
+        # hides the list, on purpose.
+        split = QSplitter(Qt.Horizontal)
+        split.setObjectName("projectsSplit")
+        split.setChildrenCollapsible(False)
+        split.setHandleWidth(6)
+        self._projects_split = split
+        # left: the list. It stops being a QGroupBox: a bordered box inside
+        # the page was a box inside a box, and its title said nothing.
+        lst = proj.grp_list
+        proj.layout().removeWidget(lst)
+        lst.setTitle("")
+        lst.setObjectName("projectsListPanel")
+        self.projects.btn_new_project.setVisible(False)
+        split.addWidget(lst)
+        # right: the detail stack, whose resting page is the night panel
+        right = QFrame()
+        right.setObjectName("projectsDetailPanel")
+        rlay = QVBoxLayout(right)
+        rlay.setContentsMargins(10, 0, 0, 0)
+        rlay.setSpacing(0)
+        rlay.addWidget(proj.stack_detail)
+        split.addWidget(right)
+        split.setStretchFactor(0, 0)      # the list keeps the width it is given
+        split.setStretchFactor(1, 1)      # the project takes what is left
+        # the list, and only the list, can fold: the « button does it and »
+        # brings it back at the width it had. The project pane never
+        # collapses (a view with nothing in it is not a state)
+        split.setCollapsible(0, True)
+        split.setCollapsible(1, False)
+        hl.addWidget(split, 1)
+        self._restore_list_width()
+        split.splitterMoved.connect(self._on_splitter_moved)
+        # double click on the handle = back to the default width (dragging
+        # something to a bad place needs an undo that is not a preference
+        # dialog)
+        handle = split.handle(1)
+        if handle is not None:
+            handle.installEventFilter(self)
+            handle.setToolTip(self.tr(
+                "Drag to resize the list; double click to reset"))
+        # the width is applied on the splitter's FIRST real resize: at build
+        # time it has none, and setSizes on a zero-width splitter does
+        # nothing (which is how the remembered width quietly got lost)
+        split.installEventFilter(self)
+        # Interfaz 1.6: the campaigns strip is gone from the bottom (it was
+        # a 45 px bar holding a single link). Campaigns is now a button in
+        # the header, next to the new-project tile, where the eye already is.
+        self._camp_btn = QPushButton(self.tr("Campaigns →"))
+        self._camp_btn.setObjectName("campTile")
+        self._camp_btn.setCursor(Qt.PointingHandCursor)
+        self._camp_btn.setToolTip(self.tr(
+            "Observing campaigns: several projects sharing a protocol"))
+        self._camp_btn.clicked.connect(self._tools_campaigns)
+        hlay.insertWidget(hlay.count() - 1, self._camp_btn)
+
+        # the night panel takes the resting page of the detail stack
+        self._build_night_panel()
+
+        stack.addWidget(home)            # VIEW_PROJECTS (home + detail)
+        stack.addWidget(self.tonight)    # VIEW_TONIGHT
+        stack.addWidget(self.campaigns)  # VIEW_CAMPAIGNS
+        # Fixed placeholder pages for the lazily built views: the stack
+        # ALWAYS has five pages, so VIEW_WELCOME (3) and VIEW_UFE (4) are
+        # valid whatever order the views are first opened in. Building them
+        # with addWidget() instead would append them at whatever free index
+        # and the constants would be wrong (the bug that hid the workbench).
+        self._welcome_page = QWidget()
+        stack.addWidget(self._welcome_page)      # VIEW_WELCOME
+        self._ufe_page_widget = QWidget()
+        stack.addWidget(self._ufe_page_widget)   # VIEW_UFE
+        stack.setCurrentIndex(VIEW_HOME)
+        self._sync_projects_pane()
+        # Interfaz 1.0: the new-project search bar sits at the top of the
+        # Tonight view (the manual search moved out of Tools). Tonight's
+        # own .ui is untouched: the bar is a shell widget inserted above it.
+        from .widgets.new_project_bar import NewProjectBar
+        self._newbar = NewProjectBar()
+        self._newbar.create_target.connect(self._new_project_from_target)
+        self.tonight.layout().insertWidget(0, self._newbar)
+        # the Tonight full table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
-        # remember and restore the Tonight kind filter (WORKFLOWS 7quater):
-        # the combo starts empty, so populate it from the enabled kinds and
-        # re-select last night's choice if it is still enabled
+        # remember and restore the Tonight kind filter (WORKFLOWS 7quater)
         self._rebuild_kind_filters()
         saved = config.get("tonight_kind", "") or None
         if saved and self.tonight.cmb_filter.findData(saved) >= 0:
@@ -533,16 +942,11 @@ class MainWindow(QMainWindow):
         # A3: restore the projects hub classification prefs
         self.projects.cmb_kind.setCurrentIndex(
             int(config.get("projects_filter_kind", 0)))
-        # UX-PC (U2): the sort combo gained "Needs you" at index 0 — a new
-        # config key keeps old prefs from pointing at the wrong order
         sort_idx = int(config.get("projects_filter_sort_v2", 0))
         sort_idx = max(0, min(sort_idx, self.projects.cmb_sort.count() - 1))
         self.projects.cmb_sort.setCurrentIndex(sort_idx)
         self.projects.chk_favorites.setChecked(
             bool(config.get("projects_filter_fav", False)))
-        # UX-PC (U2): the right pane starts on the dashboard (no selection)
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_dashboard)
         # UX-PC (U1): the advanced filters row starts collapsed; the toggle
         # restores the user's last choice
         filters_open = bool(config.get("projects_filters_open", False))
@@ -552,6 +956,456 @@ class MainWindow(QMainWindow):
         self.projects.btn_filters.setText(
             self.tr("Filters ▾") if filters_open else self.tr("Filters ▸"))
         self.projects.btn_filters.blockSignals(False)
+        self._build_drawer()
+        self._build_sky_bar()
+        # Interfaz 1.0 (ADR-053): Welcome only when it is needed: a first
+        # run (no observatory), a pending update (a newer version than the
+        # one last run) or no projects at all. Otherwise the app opens on
+        # Home, ready and offline.
+        from . import wizard as _wz
+        self._fresh = not config.is_configured()
+        self._update_due = _wz._wizard_needed(config.get("app_version") or "")
+        if self._fresh or self._update_due or not project.list_projects(db):
+            self._show_welcome()
+        else:
+            self._goto_tab(VIEW_HOME)
+
+    def _ensure_welcome(self):
+        # Builds the Welcome view into its fixed page ONCE. Shared by the
+        # startup decision (_show_welcome) and the manual entry
+        # (navigate(VIEW_WELCOME)) so both build the same widget.
+        # @return: the WelcomeSetup
+        if self._welcome is not None:
+            return self._welcome
+        from .widgets.welcome_setup import WelcomeSetup
+        from PySide6.QtWidgets import QVBoxLayout
+        self._welcome = WelcomeSetup(snapshot=self._snapshot)
+        self._welcome.create_project.connect(self._welcome_create)
+        self._welcome.finished.connect(self._welcome_finished)
+        # "Explore first": a first run is not a gate, so the observer may
+        # walk away from the setup and land on the projects (Interfaz 1.4)
+        self._welcome.skip.connect(self._welcome_skip)
+        self._welcome.open_guide.connect(self.on_docs)
+        self._welcome.open_skycal.connect(self._tools_skycal)
+        lay = QVBoxLayout(self._welcome_page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._welcome)
+        return self._welcome
+
+    def _sync_welcome(self):
+        # Tells the Welcome view WHO is looking at it (Interfaz 1.5): does
+        # the observer already have projects (which flips the call to
+        # action), and is this the post-update notice (which rewrites the
+        # hero and leaves a single action with the report). The page is
+        # built once and lives as long as the window, so this runs on every
+        # entry, not only at build time.
+        if self._welcome is None:
+            return
+        from . import wizard as _wz
+        self._welcome.set_context(
+            has_projects=bool(project.list_projects(db)),
+            update_version=(_wz._display_version()
+                            if self._welcome_gate else None))
+
+    def _show_welcome(self):
+        # Startup decision (first run / update / no projects): builds
+        # Welcome and makes it current. An update is a blocking gate (the
+        # data report is read before the app is usable); a first run is not.
+        self._ensure_welcome()
+        self._welcome_gate = bool(self._update_due
+                                  and self._snapshot is not None)
+        self._sync_welcome()
+        # Only a REAL update lands on the data report (the gate). A first
+        # run has no database to report on, so jumping to step 3 there
+        # would open the app on a paragraph about a file that does not
+        # exist yet: it starts at the observatory, which is the first thing
+        # an observer can actually answer (Interfaz 1.4).
+        if self._welcome_gate:
+            self._welcome.show_step("data")
+        self._shell_stack().setCurrentIndex(VIEW_WELCOME)
+        self._update_vtab_visibility()
+
+    def _welcome_finished(self):
+        # "Got it" on the Data step. Only a REAL update seals the version
+        # (and unlocks Home); a manual visit just goes back (Interfaz 1.1).
+        if self._update_due:
+            if self._welcome is not None:
+                self._welcome.ack_data()
+            self._update_due = False
+            self._welcome_gate = False
+            self.on_refresh_projects()
+            self.navigate(VIEW_HOME, replace=True)
+            return
+        if self._nav_back:
+            self.back()
+        else:
+            self.navigate(VIEW_HOME, replace=True)
+
+    def _welcome_skip(self):
+        # "Explore first" on Welcome. A pending update is still a gate (its
+        # report must be read once), so the skip is honoured only when the
+        # app is otherwise free; on a first run it simply lands on Home.
+        if self._welcome_gate:
+            return
+        self.navigate(VIEW_HOME, replace=True)
+
+    def _welcome_create(self):
+        # The CTA: persist the setup, acknowledge a pending update (the
+        # report was seen) and open the new-project view, replacing Welcome.
+        if self._update_due and self._welcome is not None:
+            self._welcome.ack_data()
+            self._update_due = False
+            self._welcome_gate = False
+        self.navigate(VIEW_TONIGHT, replace=True)
+
+    def _visit_window(self):
+        # @return: the visit window that is open right now, or None. The
+        #          visits panel owns it (one at a time); we only look.
+        panel = getattr(self, "_project_widgets", {}).get("visits_panel")
+        win = getattr(panel, "_win", None) if panel is not None else None
+        if win is None or not Shiboken.isValid(win):
+            return None
+        return win
+
+    def _ufe_enter(self):
+        # The workbench took the screen: get the visit window out of the
+        # way. Hidden, not closed: it is the same visit when you come back,
+        # and the workbench has its own frame navigator for measuring.
+        # @return: None
+        win = self._visit_window()
+        self._visit_win_hidden = None
+        if win is not None and win.isVisible():
+            self._visit_win_hidden = win
+            win.hide()
+
+    def _ufe_leave(self):
+        # Leaving the workbench: the visit window comes back, in front.
+        # @return: None
+        win = getattr(self, "_visit_win_hidden", None)
+        self._visit_win_hidden = None
+        if win is None or not Shiboken.isValid(win):
+            return
+        # a project change while it was hidden closes the panel's window;
+        # a stale reference must not resurrect it
+        if win is not self._visit_window():
+            return
+        win.show()
+        win.raise_()
+        win.activateWindow()
+
+    def _build_night_panel(self):
+        # Interfaz 1.6: the resting page of the detail pane. An empty pane
+        # is a wasted pane, so when nothing is selected it shows tonight
+        # (same painted sky and same brief as Welcome) and the way in to a
+        # new project.
+        from .ui_loader import drop_in
+        from .widgets.night_panel import NightPanel
+        host = self.projects.nightPanelHost
+        self._night_panel = NightPanel()
+        self._night_panel.create_project.connect(self._new_project_view)
+        self._night_panel.set_animations(
+            bool(config.get("ui_animations", True)))
+        drop_in(host.parentWidget().layout(), host, self._night_panel)
+
+    def _sync_projects_pane(self):
+        # The right pane shows the project, or the night when there is
+        # none. One place, so the two can never both be right.
+        # @return: None
+        if getattr(self, "_night_panel", None) is None:
+            return
+        stack = self.projects.stack_detail
+        page = (self.projects.page_detail if self._current_project
+                else self.projects.page_night)
+        if stack.currentWidget() is not page:
+            stack.setCurrentWidget(page)
+
+    def _restore_list_width(self):
+        # @return: None. The list's width belongs to the observer (it is
+        #          the splitter) and is remembered between runs.
+        try:
+            width = int(config.get("projects_list_width") or 0)
+        except (TypeError, ValueError):
+            width = 0
+        if width <= 0:
+            width = _LIST_W_DEFAULT
+        self._list_width = max(_LIST_W_MIN, min(_LIST_W_MAX, width))
+        # deferred: at build time the splitter has no width yet, and
+        # setSizes() SCALES the numbers when their sum does not match the
+        # widget, so [400, 1200] on a 1000 px splitter would give 250
+        QTimer.singleShot(0, self._apply_list_width)
+
+    def _apply_list_width(self, width=None):
+        # @args: width - the list's width to apply, or None for the one
+        #        remembered. Reads the splitter's REAL width on purpose:
+        #        QSplitter::setSizes distributes proportionally when the sum
+        #        of the sizes differs from the widget's, which is how a
+        #        request for 400 px quietly became 250.
+        # @return: None
+        total = self._projects_split.width()
+        if total <= 0:
+            return
+        if width is None:
+            width = getattr(self, "_list_width", _LIST_W_DEFAULT)
+        # the project pane keeps a floor: a list that eats the whole view is
+        # not a width, it is a mistake
+        width = max(0, min(int(width), max(0, total - 200)))
+        self._projects_split.setSizes([width, total - width])
+
+    def _on_splitter_moved(self, _pos, _index):
+        # Remembers where the divider was left. A single-shot timer because
+        # splitterMoved fires on every pixel of the drag, and the settings
+        # file has no business taking that many writes.
+        sizes = self._projects_split.sizes()
+        if sizes and sizes[0] > 20:
+            self._list_width = sizes[0]
+        if getattr(self, "_split_save", None) is None:
+            self._split_save = QTimer(self)
+            self._split_save.setSingleShot(True)
+            self._split_save.setInterval(400)
+            self._split_save.timeout.connect(
+                lambda: config.set("projects_list_width", self._list_width))
+        self._split_save.start()
+
+    def _toggle_list(self, show):
+        # @args: show - True brings the list back at the width it had,
+        #        False folds it away. The « / » buttons of the list header.
+        if show:
+            self._apply_list_width()
+        else:
+            sizes = self._projects_split.sizes()
+            if sizes and sizes[0] > 20:
+                self._list_width = sizes[0]
+            self._apply_list_width(0)
+
+    def eventFilter(self, obj, event):
+        split = getattr(self, "_projects_split", None)
+        # The remembered width lands on the splitter's first real resize:
+        # before that it has no width and setSizes is a no-op.
+        if (split is not None and obj is split
+                and event.type() == QEvent.Resize
+                and not getattr(self, "_list_width_applied", False)):
+            self._list_width_applied = True
+            self._apply_list_width()
+            return False
+        # Double click on the splitter handle: back to the default width.
+        # Dragging something into a bad place needs an undo that is not a
+        # preferences dialog.
+        if (event.type() == QEvent.MouseButtonDblClick
+                and split is not None
+                and obj is split.handle(1)):
+            self._list_width = _LIST_W_DEFAULT
+            self._apply_list_width(_LIST_W_DEFAULT)
+            config.set("projects_list_width", _LIST_W_DEFAULT)
+            return True
+        return super().eventFilter(obj, event)
+
+    def _build_sky_bar(self):
+        # Interfaz 1.6: the night in the navigation row. It replaces the
+        # "What's up in the sky" band that Home used to carry: the row
+        # already had the room (28 px buttons, 20 px chips), so the band's
+        # ~60 px go back to the projects list, and the Moon and the
+        # darkness window are visible from EVERY view, not only from Home.
+        from .ui_loader import drop_in
+        from .widgets.sky_bar import SkyBar
+        host = self._menus.skyHost
+        self._sky_bar = SkyBar()
+        self._sky_bar.calendar_clicked.connect(self._tools_skycal)
+        drop_in(host.parentWidget().layout(), host, self._sky_bar)
+        # the sky-event chips land in the bar from now on
+        self._sky_chips_row = self._sky_bar.chips
+        self.refresh_sky_bar()
+
+    def refresh_sky_bar(self):
+        # Recomputes the bar from the site. All local ephemeris, so it can
+        # afford to run whenever the site or the clock may have moved.
+        # @return: None
+        from ..core import night_brief as nb
+        try:
+            lat = float(config.get("lat") or 0.0)
+            lon = float(config.get("lon") or 0.0)
+        except (TypeError, ValueError):
+            lat = lon = 0.0
+        brief = nb.brief(lat, lon) if (lat or lon) else None
+        self._sky_bar.refresh(brief)
+        # the events are local maths too (ADR-040): the bar can fill its
+        # chips without waiting for the planner to run
+        self._skyevent_chips()
+
+    def _build_drawer(self):
+        # The overlay project drawer: a compact list summoned by the
+        # vertical tab from any view. A scrim dims the content behind it.
+        from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout,
+                                       QLabel, QPushButton, QListWidget)
+        cw = self.centralWidget()
+        self._scrim = QFrame(cw)
+        self._scrim.setObjectName("shell_scrim")
+        self._scrim.setStyleSheet("background: rgba(7,8,13,150);")
+        self._scrim.hide()
+        self._scrim.mousePressEvent = lambda _e: self._drawer_open(False)
+        self._drawer = QFrame(cw)
+        self._drawer.setObjectName("shell_drawer")
+        self._drawer.setStyleSheet(
+            "QFrame#shell_drawer { background: %s;"
+            " border-right: 1px solid %s; }" % (theme.C_BASE, theme.C_LINE))
+        lay = QVBoxLayout(self._drawer)
+        lay.setContentsMargins(12, 12, 12, 12)
+        head = QHBoxLayout()
+        title = QLabel(self.tr("Projects"))
+        title.setStyleSheet("font-weight: 700; font-size: 14px;")
+        head.addWidget(title)
+        head.addStretch(1)
+        close = QPushButton("✕")
+        close.setFlat(True)
+        close.setFixedWidth(28)
+        close.clicked.connect(lambda: self._drawer_open(False))
+        head.addWidget(close)
+        lay.addLayout(head)
+        # Interfaz 1.1: Home and Welcome at the top of the switcher
+        navrow = QHBoxLayout()
+        home_btn = QPushButton(self.tr("⌂ Home"))
+        home_btn.setFlat(True)
+        home_btn.clicked.connect(self._drawer_home)
+        navrow.addWidget(home_btn)
+        welcome_btn = QPushButton(self.tr("ⓘ Welcome"))
+        welcome_btn.setFlat(True)
+        welcome_btn.setToolTip(self.tr("Setup guide and observatory"))
+        welcome_btn.clicked.connect(self._drawer_welcome)
+        navrow.addWidget(welcome_btn)
+        navrow.addStretch(1)
+        lay.addLayout(navrow)
+        self._drawer_list = QListWidget()
+        self._drawer_list.setObjectName("drawer_list")
+        self._drawer_list.itemClicked.connect(self._drawer_row_clicked)
+        lay.addWidget(self._drawer_list, 1)
+        newp = QPushButton(self.tr("+ New project…"))
+        newp.clicked.connect(self._drawer_new_project)
+        lay.addWidget(newp)
+        self._drawer.hide()
+
+    def _drawer_open(self, on):
+        # @args: on - show (True) or hide (False) the overlay drawer
+        # Interfaz 1.3: on Home the list IS the screen, so the drawer is
+        # not available there (the vertical tab is hidden too).
+        if on and self._shell_stack().currentIndex() == VIEW_HOME:
+            return
+        if on:
+            self._refresh_drawer()
+            self._position_overlay()
+            self._scrim.show()
+            self._scrim.raise_()
+            self._drawer.show()
+            self._drawer.raise_()
+        else:
+            self._drawer.hide()
+            self._scrim.hide()
+
+    def _position_overlay(self):
+        # Places the drawer and the scrim over the content area (right of
+        # the vertical tab). Called on open and on every resize.
+        cw = self.centralWidget()
+        vw = getattr(self._menus, "btn_vtab", None)
+        vw = vw.width() if vw is not None else 28
+        rect = cw.rect()
+        self._scrim.setGeometry(vw, 0, rect.width() - vw, rect.height())
+        # 430 px: enough for the rich project row (icon + name + sparkline)
+        self._drawer.setGeometry(vw, 0,
+                                 min(430, rect.width() - vw), rect.height())
+
+    def _refresh_drawer(self):
+        # Interfaz 1.1: the overlay drawer shows the SAME rich rows as the
+        # hub list (same ProjectRow, same payload), built from the data of
+        # the last refresh so the two cannot drift.
+        self._drawer_list.clear()
+        projects_list = getattr(self, "_last_projects_list", None)
+        if projects_list is None:
+            return
+        attn_map = getattr(self, "_last_attn_map", {}) or {}
+        camp_names = getattr(self, "_last_camp_names", {}) or {}
+        current_id = (self._current_project or {}).get("id")
+        for p in projects_list:
+            item = QListWidgetItem(f"[{p['kind']}] {p['object_name']}")
+            item.setData(Qt.UserRole, p["id"])
+            # the item's height must carry the row's fixed 74 px
+            # the item's height must carry the row's fixed height (the
+            # rich row is a widget over the item, so the item has to be
+            # told how tall it is)
+            item.setSizeHint(QSize(0, _PROJECT_ROW_H))
+            self._drawer_list.addItem(item)
+            row = self._project_row_widget(p, attn_map.get(p["id"]),
+                                           camp_names)
+            row.clicked.connect(
+                lambda it=item: self._drawer_row_clicked(it))
+            row.double_clicked.connect(
+                lambda it=item: self._drawer_row_clicked(it))
+            self._drawer_list.setItemWidget(item, row)
+            if p["id"] == current_id:
+                row.set_selected(True)
+
+    def _drawer_row_clicked(self, item):
+        pid = item.data(Qt.UserRole)
+        self._drawer_open(False)
+        if pid is not None:
+            self.navigate(VIEW_DETAIL, pid=pid)
+
+    def _drawer_new_project(self):
+        self._drawer_open(False)
+        self._new_project_view()
+
+    def _drawer_home(self):
+        self._drawer_open(False)
+        self.home()
+
+    def _drawer_welcome(self):
+        self._drawer_open(False)
+        self.navigate(VIEW_WELCOME)
+
+    def _new_project_view(self):
+        # Interfaz 1.0: the new-project view (Tonight on demand + the
+        # embedded search/manual form). The hub's "New project…" and the
+        # drawer both land here, focusing the search.
+        self.navigate(VIEW_TONIGHT)
+        bar = getattr(self, "_newbar", None)
+        if bar is not None:
+            bar.edt_search.setFocus()
+
+    def _chip_band(self, title, variant="sky", link=None):
+        # A slim Home band that hosts a row of clickable chips (sky events,
+        # SN cadence). Hidden while it has no chips. Interfaz 1.2: the
+        # variant picks the accent stripe (sky = blue, cadence = orange) and
+        # an optional right-side link button.
+        # @args: title - the band's small header; variant - "sky"|"cadence";
+        #        link - (text, slot) for a trailing link button, or None
+        # @return: (the band QFrame, its chips QHBoxLayout)
+        from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
+                                       QVBoxLayout, QPushButton)
+        band = QFrame()
+        band.setObjectName("skyBand" if variant == "sky" else "cadenceBand")
+        lay = QVBoxLayout(band)
+        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setSpacing(6)
+        headrow = QHBoxLayout()
+        head = QLabel(title)
+        head.setObjectName("bandHead")
+        head.setStyleSheet("color: %s;" % (
+            theme.C_ACCENT if variant == "sky" else theme.C_WARN))
+        headrow.addWidget(head)
+        headrow.addStretch(1)
+        if link is not None:
+            btn = QPushButton(link[0])
+            btn.setFlat(True)
+            btn.setStyleSheet(
+                "color: %s; text-align: right; padding: 0; border: none;"
+                % theme.C_ACCENT)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(link[1])
+            headrow.addWidget(btn)
+        lay.addLayout(headrow)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addStretch(1)
+        lay.addLayout(row)
+        band.setVisible(False)
+        return band, row
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -572,6 +1426,8 @@ class MainWindow(QMainWindow):
         self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_log.triggered.connect(self.on_open_log)
+        self._menus.action_welcome.triggered.connect(
+            lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
@@ -582,10 +1438,18 @@ class MainWindow(QMainWindow):
         # Refresh the Projects hub list every time the user enters that
         # tab, so it is always up to date (UX-PC U1: the manual Refresh
         # fallback button is gone — the list never goes stale).
-        from PySide6.QtWidgets import QTabWidget
-        self.centralWidget().findChild(
-            QTabWidget, "tabs").currentChanged.connect(
-                self._on_main_tab_changed)
+        self._shell_stack().currentChanged.connect(self._on_main_tab_changed)
+        # the vertical tab toggles the overlay project drawer from any view
+        self._menus.btn_vtab.clicked.connect(
+            lambda: self._drawer_open(not self._drawer.isVisible()))
+        # Interfaz 1.1: the navigation bar (back/forward/home/welcome and
+        # the clickable breadcrumb)
+        self._menus.btn_nav_back.clicked.connect(self.back)
+        self._menus.btn_nav_fwd.clicked.connect(self.forward)
+        self._menus.btn_nav_home.clicked.connect(self.home)
+        self._menus.btn_nav_welcome.clicked.connect(
+            lambda: self.navigate(VIEW_WELCOME))
+        self._menus.lbl_crumbs.linkActivated.connect(self._crumb_clicked)
         t.btn_compute.clicked.connect(self.on_compute_tonight)
         t.btn_show_all.toggled.connect(self._toggle_table)
         # one filter rules grid + table (WORKFLOWS 7quater): the header combo
@@ -611,7 +1475,7 @@ class MainWindow(QMainWindow):
         # UX-c: one gesture language — double-click/Enter opens the
         # project at its current step, right-click offers every action,
         # the hand cursor advertises clickability.
-        p.btn_new_project.clicked.connect(self._tools_explore)
+        p.btn_new_project.clicked.connect(self._new_project_view)
         p.lst_projects.itemActivated.connect(
             self._project_open_activated)
         p.lst_projects.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -637,15 +1501,13 @@ class MainWindow(QMainWindow):
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(
-                lambda _=False, k=key: self._show_tab(k))
-        # UX-i: « / » — fold the list column away for more detail room
-        # (and bring it back); the choice is remembered across sessions
-        p.btn_hide_list.clicked.connect(
-            lambda: self._toggle_project_list(False))
-        p.btn_show_list.clicked.connect(
-            lambda: self._toggle_project_list(True))
-        if config.get("projects_list_hidden", 0):
-            self._toggle_project_list(False)
+                lambda _=False, k=key: self._show_tab(k, record=True))
+        # Interfaz 1.6: « folds the LIST pane (the splitter's left side) and
+        # » brings it back with the width it had. The list and the project
+        # share one page now, so folding is a matter of the splitter, not of
+        # leaving the view.
+        p.btn_hide_list.clicked.connect(lambda: self._toggle_list(False))
+        p.btn_show_list.clicked.connect(lambda: self._toggle_list(True))
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
@@ -721,11 +1583,25 @@ class MainWindow(QMainWindow):
         # ADR-044: the Unified FITS Editor lives in the Tools menu too
         self._menus.action_ufe.triggered.connect(self._tools_ufe)
         from PySide6.QtGui import QKeySequence, QShortcut
-        for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
-                                     TAB_CAMPAIGNS)):
+        for i, tab_idx in enumerate((VIEW_HOME, VIEW_TONIGHT,
+                                     VIEW_CAMPAIGNS)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
-            sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
+            sc.activated.connect(lambda idx=tab_idx: self.navigate(idx))
+        # Interfaz 1.1: back/forward/home shortcuts
+        for seq, fn in (("Alt+Left", self.back),
+                        ("Alt+Right", self.forward),
+                        ("Alt+Home", self.home)):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(Qt.ApplicationShortcut)
+            sc.activated.connect(fn)
+        # paint the bar for the initial view
+        logo = theme.app_logo(20)
+        if not logo.isNull():
+            self._menus.lbl_nav_logo.setPixmap(logo)
+        self._update_nav_bar()
+        self._update_vtab_visibility()
+        self._install_mouse_nav()
 
     def _open_url(self, url):
         from PySide6.QtGui import QDesktopServices
@@ -1069,6 +1945,9 @@ class MainWindow(QMainWindow):
             bool(config.get("ufe_bar_icons", True)))
         dlg.chk_ufe_default.setChecked(bool(config.get("ufe_default",
                                                        True)))
+        # Interfaz 1.4: motion is opt-out, never imposed. The Welcome sky
+        # breathes and the view fades in only while this is on.
+        dlg.chk_animations.setChecked(bool(config.get("ui_animations", True)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -1099,6 +1978,7 @@ class MainWindow(QMainWindow):
             lambda _t: self._horizon_file_preview(dlg))
         self._horizon_file_preview(dlg)
         dlg.btn_resolve.clicked.connect(lambda: self._resolve_into(dlg))
+        dlg.btn_map_pick.clicked.connect(lambda: self._map_pick_into(dlg))
         dlg.btn_horizon_browse.clicked.connect(
             lambda: self._horizon_browse_into(dlg))
         dlg.btn_projects_browse.clicked.connect(
@@ -1169,6 +2049,11 @@ class MainWindow(QMainWindow):
         config.set("vigil_list",
                    vigils.vigils_from_text(dlg.edt_vigils.toPlainText()))
         config.set("aavso_feed", dlg.chk_aavso.isChecked())
+        # Interface tab (Interfaz 1.4): the Welcome motion, applied live so
+        # the observer sees the effect without restarting the app
+        config.set("ui_animations", dlg.chk_animations.isChecked())
+        if self._welcome is not None:
+            self._welcome.refresh_animations()
         # Development tab (ADR-044): which UI the FITS work opens in
         config.set("ufe_default", dlg.chk_ufe_default.isChecked())
         config.set("ufe_bar_icons", dlg.chk_ufe_bar_icons.isChecked())
@@ -1269,6 +2154,23 @@ class MainWindow(QMainWindow):
                 f"{s['min_alt']:.1f}° – {s['max_alt']:.1f}° {peak} "
                 f"({len(h.points)} {self.tr('points')})")
 
+    def _map_pick_into(self, dlg):
+        # Opens the site picker (Interfaz 1.5) and copies the chosen point
+        # into the dialog's fields. The map is a dialog rather than a panel
+        # here because Settings is already a dense page of groups.
+        from .site_map_dialog import SiteMapDialog
+        picker = SiteMapDialog(lat=dlg.spn_lat.value(),
+                               lon=dlg.spn_lon.value(),
+                               name=dlg.edt_obs_name.text().strip(),
+                               parent=dlg)
+        if picker.exec() != QDialog.Accepted:
+            return
+        lat, lon = picker.chosen()
+        if lat is None:
+            return
+        dlg.spn_lat.setValue(lat)
+        dlg.spn_lon.setValue(lon)
+
     def _resolve_into(self, dlg):
         code = dlg.edt_mpc_code.text().strip().upper()
         if not code:
@@ -1349,113 +2251,16 @@ class MainWindow(QMainWindow):
     def _type_pixmap(self, kind, size=28):
         # Draws a small geometric icon per object type with QPainter.
         # Fast (no matplotlib), guaranteed to render on any platform.
+        # The painter itself lives in widgets/kind_glyph.py (ADR-057): the
+        # object card's hero draws the same glyph at 44 px, and one grammar
+        # of shapes wants one home.
         # @args: kind - object kind string, size - icon px
         # @return: QPixmap with a transparent background
-        from PySide6.QtCore import QPointF, QRectF
-        from PySide6.QtGui import (QBrush, QColor, QPainter,
-                                    QPainterPath, QPen, QPixmap)
-        pix = QPixmap(size, size)
-        pix.fill(Qt.transparent)
-        p = QPainter(pix)
-        p.setRenderHint(QPainter.Antialiasing)
-        color = QColor(self._KIND_COLORS.get(kind, "#888888"))
-        cx = cy = size / 2.0
-        if kind == "sn":
-            # 4-point star (spark burst)
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 2))
-            path.lineTo(QPointF(cx + 4, cy - 4))
-            path.lineTo(QPointF(size - 2, cy))
-            path.lineTo(QPointF(cx + 4, cy + 4))
-            path.lineTo(QPointF(cx, size - 2))
-            path.lineTo(QPointF(cx - 4, cy + 4))
-            path.lineTo(QPointF(2, cy))
-            path.lineTo(QPointF(cx - 4, cy - 4))
-            path.closeSubpath()
-            p.drawPath(path)
-        elif kind == "neo":
-            # small ellipse (asteroid body)
-            p.setBrush(QBrush(color))
-            p.drawEllipse(QRectF(cx - 7, cy - 4, 14, 8))
-        elif kind == "comet":
-            # nucleus + tail
-            p.setBrush(QBrush(color))
-            p.drawEllipse(QRectF(cx - 4, cy - 4, 8, 8))
-            p.setPen(QPen(color, 1.5))
-            p.drawLine(QPointF(cx + 3, cy), QPointF(size - 2, cy + 4))
-            p.drawLine(QPointF(cx + 3, cy + 1), QPointF(size - 3, cy + 5))
-        elif kind == "pccp":
-            # dashed circle (uncertain identity)
-            pen = QPen(color, 2)
-            pen.setStyle(Qt.DashLine)
-            p.setPen(pen)
-            p.setBrush(Qt.NoBrush)
-            p.drawEllipse(QRectF(cx - 8, cy - 8, 16, 16))
-        elif kind == "transit":
-            # light curve with a dip
-            p.setPen(QPen(color, 2))
-            p.drawLine(QPointF(2, cy), QPointF(cx - 6, cy))
-            p.drawArc(QRectF(cx - 6, cy - 6, 12, 12), 0, -180 * 16)
-            p.drawLine(QPointF(cx + 6, cy), QPointF(size - 2, cy))
-        elif kind == "alert":
-            # warning triangle
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 3))
-            path.lineTo(QPointF(size - 2, size - 3))
-            path.lineTo(QPointF(2, size - 3))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(QColor("#e8eaf2"), 1.5))
-            p.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, "!")
-        elif kind == "hads":
-            # pulsating star: small 4-point star + a sine wave underneath
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 4))
-            path.lineTo(QPointF(cx + 3, cy - 5))
-            path.lineTo(QPointF(size - 4, cy - 5))
-            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
-            path.lineTo(QPointF(cx, cy + 1))
-            path.lineTo(QPointF(cx - 3, cy - 2))
-            path.lineTo(QPointF(4, cy - 5))
-            path.lineTo(QPointF(cx - 3, cy - 5))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(color, 1.5))
-            wave = QPainterPath()
-            wave.moveTo(QPointF(3, size - 6))
-            wave.cubicTo(QPointF(cx - 4, size - 6), QPointF(cx - 6, size - 11),
-                         QPointF(cx, size - 11))
-            wave.cubicTo(QPointF(cx + 6, size - 11), QPointF(cx + 4, size - 6),
-                         QPointF(size - 3, size - 6))
-            p.drawPath(wave)
-        elif kind == "variable":
-            # long-period variable: 4-point star + a slow wave underneath
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 4))
-            path.lineTo(QPointF(cx + 3, cy - 5))
-            path.lineTo(QPointF(size - 4, cy - 5))
-            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
-            path.lineTo(QPointF(cx, cy + 1))
-            path.lineTo(QPointF(cx - 3, cy - 2))
-            path.lineTo(QPointF(4, cy - 5))
-            path.lineTo(QPointF(cx - 3, cy - 5))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(color, 1.5))
-            wave = QPainterPath()
-            wave.moveTo(QPointF(3, size - 8))
-            wave.cubicTo(QPointF(cx - 2, size - 2),
-                         QPointF(cx + 2, size - 12),
-                         QPointF(size - 3, size - 7))
-            p.drawPath(wave)
-        p.end()
-        return pix
+        from .widgets.kind_glyph import kind_glyph_pixmap
+        return kind_glyph_pixmap(kind, size)
 
     def on_compute_tonight(self):
+        self._tonight_running = True
         self.tonight.btn_compute.setEnabled(False)
         self._show_loading_state()
         self.statusBar().showMessage(self.tr("Computing tonight…"))
@@ -1464,6 +2269,19 @@ class MainWindow(QMainWindow):
         w.finished.connect(self._tonight_done)
         self._keep(w)
         w.start()
+
+    def _maybe_compute_tonight(self):
+        # Interfaz 1.0: the new-project view triggers the first compute on
+        # demand (the app itself never computes at start). A manual ↻
+        # still forces a fresh run through on_compute_tonight().
+        if self._tonight_loaded or self._tonight_running:
+            return
+        if not config.is_configured():
+            self.tonight.lbl_context.setText(
+                self.tr("Set your observatory in Welcome to get tonight's "
+                        "targets"))
+            return
+        self.on_compute_tonight()
 
     def _tonight_progress(self, msg):
         # One load phase arrived (see workers.TonightWorker). The human label
@@ -1530,6 +2348,8 @@ class MainWindow(QMainWindow):
         self.tonight.lbl_moon.setToolTip(self.tr("Computing…"))
 
     def _tonight_done(self, top, all_scored, error=""):
+        self._tonight_running = False
+        self._tonight_loaded = True
         self.tonight.btn_compute.setEnabled(True)
         self._stop_skeleton()
         self._bar_anim.stop()
@@ -1545,7 +2365,6 @@ class MainWindow(QMainWindow):
         self._update_night_header()
         self._build_suggestion_grid()
         self._fill_table()
-        self._show_cadence_hints()
         self._skyevent_chips()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
@@ -1614,78 +2433,26 @@ class MainWindow(QMainWindow):
                .replace("%1", f"{pct_now:.0f}").replace("%2", f"{pct_by_dawn:.0f}"))
         label.setToolTip(tip + "\n" + self._txt(why))
 
-    def _show_cadence_hints(self):
-        # B11: surface active SN projects that are due for a revisit ("hace
-        # N noches que no la visitas"). Reads the follow-up cadence from the
-        # project_sessions table and shows a chip in the Tonight header.
-        from ..core import followup as fu
-        # remove every previous cadence chip (several now, idempotent)
-        for old in self.tonight.findChildren(QLabel, "ns_cadence_chip"):
-            parent = old.parentWidget()
-            if parent and parent.layout():
-                parent.layout().removeWidget(old)
-            old.deleteLater()
-        threshold = int(config.get("sn_cadence_days", 3))
-        # campaign projects already surface in Tonight via the planner's
-        # "campaigns" phase (ADR-035, V-d): the chip only watches
-        # campaign-less SN projects
-        rows = db.execute(
-            "SELECT id, object_name FROM projects"
-            " WHERE status='active' AND kind='sn'"
-            " AND (campaign_id IS NULL)").fetchall()
-        hints = []
-        for pid, name in rows:
-            days = fu.days_since_last_session(db, pid)
-            if days is not None and days >= threshold:
-                hints.append((pid, name, days))
-        if not hints:
-            return
-        # insert the chips in the tonight header's layout (the parent of
-        # lbl_context is a QWidget; find its containing layout)
-        parent = self.tonight.lbl_context.parentWidget()
-        header_layout = parent.layout() if parent else None
-        if header_layout is None:
-            p = parent
-            while p is not None:
-                if p.layout() is not None:
-                    header_layout = p.layout()
-                    break
-                p = p.parentWidget()
-        if not (header_layout and hasattr(header_layout, "addWidget")):
-            return
-        for pid, name, days in hints[:3]:
-            chip = _LinkChip(
-                self.tr("SN due: %1 (%2 d)").replace(
-                    "%1", name).replace("%2", str(days)),
-                "#e0c060",
-                self.tr("Due for a revisit: click to open its Follow-up"))
-            chip.setObjectName("ns_cadence_chip")
-            chip.clicked.connect(
-                lambda _p=pid: self._goto_project_followup(_p))
-            header_layout.addWidget(chip)
-        if len(hints) > 3:
-            more = QLabel(f"+{len(hints) - 3}")
-            more.setObjectName("ns_cadence_chip")
-            more.setStyleSheet(theme.chip_style("#e0c060"))
-            header_layout.addWidget(more)
-
     def _goto_project_followup(self, pid):
-        # Opens the project's Follow-up tab (ADR-043: the multi-night
-        # journal keeps its "followup" key). The cadence chips land
-        # here (UX-d). ADR-045: lands on the Analysis tab.
-        if not self._goto_project_by_id(pid):
+        # Opens the project on its Analysis tab (ADR-045). The cadence
+        # chips land here (UX-d). Interfaz 1.1: one navigation that records
+        # the tab, so "back" returns to the chip's origin.
+        if not project.get(db, pid):
             return
-        self._scroll_to_section("analysis")
+        self.on_refresh_projects()
+        self.navigate(VIEW_DETAIL, pid=pid, tab="analysis")
 
     # ---------------- sky-event chips in the Tonight header (SC2) -------
 
     def _skyevent_chips(self, evs=None):
         # The solar system as an event source (SC2, ADR-040): up to three
-        # chips in the Tonight header, the big things first, one per
-        # family. Local maths, no network. A click opens the Sky calendar.
+        # chips, the big things first, one per family. Local maths, no
+        # network. A click opens the Sky calendar. Interfaz 1.0: their home
+        # is the Home band "What's up in the sky" (they used to fall to the
+        # bottom of Tonight by an accident of layout parenting).
         # @args: evs - optional precomputed list (tests inject fakes)
         # @return: the picked events (also handy for tests)
-        for old in self.tonight.findChildren(QLabel, "ns_skyevent_chip"):
+        for old in self.findChildren(QLabel, "ns_skyevent_chip"):
             parent = old.parentWidget()
             if parent and parent.layout():
                 parent.layout().removeWidget(old)
@@ -1713,30 +2480,31 @@ class MainWindow(QMainWindow):
                 continue
             seen.add(kind)
             picks.append(e)
-            if len(picks) == 3:
+            # Two, not three: the bar shares the row with the navigation
+            # and with the Moon, and a third chip pushed the last one off
+            # the right edge (seen at 1360 px). The rest of the calendar is
+            # one click away, which is where the chips lead anyway.
+            if len(picks) == 2:
                 break
+        # Interfaz 1.6: the chips live in the navigation sky bar now, which
+        # is always visible (its Moon and its darkness window do not depend
+        # on there being events). Only the chips come and go.
+        row = getattr(self, "_sky_chips_row", None)
+        if row is None:
+            # fallback (no shell): the old Tonight header home
+            parent = self.tonight.lbl_context.parentWidget()
+            row = parent.layout() if parent else None
+        if row is None or not hasattr(row, "insertWidget"):
+            return picks
         if not picks:
             return picks
-        # same header home as the cadence chips (the layout that hosts
-        # lbl_context; see _show_cadence_hints for the fallback walk)
-        parent = self.tonight.lbl_context.parentWidget()
-        header_layout = parent.layout() if parent else None
-        if header_layout is None:
-            p = parent
-            while p is not None:
-                if p.layout() is not None:
-                    header_layout = p.layout()
-                    break
-                p = p.parentWidget()
-        if not (header_layout and hasattr(header_layout, "addWidget")):
-            return picks
-        for e in picks:
+        for i, e in enumerate(picks):
             chip = _LinkChip(self._sky_chip_text(e), "#6ab0ff",
                              self.tr("From the solar-system calendar — "
                                      "click to open the Sky calendar"))
             chip.setObjectName("ns_skyevent_chip")
             chip.clicked.connect(self._tools_skycal)
-            header_layout.addWidget(chip)
+            row.insertWidget(i, chip)
         return picks
 
     def _sky_chip_text(self, e):
@@ -2387,11 +3155,43 @@ class MainWindow(QMainWindow):
         #        (TAB_PROJECTS == the hub, TAB_CAMPAIGNS == the
         #        campaigns manager, per main_window.ui order)
         # @return: None
+        # Interfaz 1.6 fix: the workbench is a PAGE of this window now, but
+        # the visit window is a non-modal dialog WITH a parent, so the
+        # window manager keeps it above its parent. Opening a plate from a
+        # visit therefore put the editor behind the visit window. The visit
+        # steps aside while the workbench is on screen and comes back when
+        # it leaves (nothing is lost: the workbench carries its own visit
+        # pane with the frame navigator).
+        previous = getattr(self, "_last_view_index", None)
+        self._last_view_index = index
+        if index == VIEW_UFE and previous != VIEW_UFE:
+            self._ufe_enter()
+        elif previous == VIEW_UFE and index != VIEW_UFE:
+            self._ufe_leave()
         # Keep both master-detail tabs always fresh on every visit.
         if index == TAB_PROJECTS:
             self.on_refresh_projects()
         elif index == TAB_CAMPAIGNS:
             self._refresh_campaigns_tab()
+        elif index == VIEW_TONIGHT:
+            # Interfaz 1.0: the new-project view computes tonight on demand
+            self._maybe_compute_tonight()
+        # Interfaz 1.3: the drawer has no place on Home (the list is the
+        # screen); close it and hide its tab while Home is shown.
+        if index == VIEW_HOME and getattr(self, "_drawer", None) is not None \
+                and self._drawer.isVisible():
+            self._drawer_open(False)
+        self._update_vtab_visibility()
+
+    def _update_vtab_visibility(self):
+        # The vertical PROJECTS tab is shown everywhere EXCEPT Home, where
+        # the project list is already the screen (Interfaz 1.3). While an
+        # update gates the app it stays visible but disabled.
+        btn = getattr(self._menus, "btn_vtab", None)
+        if btn is None:
+            return
+        btn.setVisible(self._shell_stack().currentIndex() != VIEW_HOME)
+        btn.setEnabled(not getattr(self, "_welcome_gate", False))
 
     def _rebuild_campaign_filter(self):
         # Refills the hub's campaign combo, keeping the current selection.
@@ -2761,6 +3561,11 @@ class MainWindow(QMainWindow):
                 if p["id"] in attn_map else 3)
         from ..core import campaign as _camp
         camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
+        # Interfaz 1.1: keep the last rows' data so the overlay drawer can
+        # rebuild the SAME rich rows without recomputing them
+        self._last_projects_list = projects_list
+        self._last_attn_map = attn_map
+        self._last_camp_names = camp_names
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads
         # on every visit to the tab and at startup, so we must not drop the
@@ -2810,21 +3615,15 @@ class MainWindow(QMainWindow):
             # widget. A QSize(-1, h) is normalised to an *invalid* hint by
             # PySide and silently ignored, which squeezed the rows to the
             # text height — use a valid zero width instead.
-            item.setSizeHint(QSize(0, 74))
+            # the item's height must carry the row's fixed height (the
+            # rich row is a widget over the item, so the item has to be
+            # told how tall it is)
+            item.setSizeHint(QSize(0, _PROJECT_ROW_H))
             lst.addItem(item)
             # UX-PC (U2): the rich row — the plain text above stays as the
             # accessible/searchable fallback under the widget
-            row = ProjectRow()
-            payload = self._project_row_payload(
-                p, attn_map.get(p["id"]), camp_names)
-            urgency = payload.pop("_urgency", None)
-            row.set_project(**payload)
-            if urgency == "event":
-                row.lbl_next.setStyleSheet(
-                    f"color: {theme.C_EVENT}; font-weight: bold;")
-            elif urgency == "due":
-                row.lbl_next.setStyleSheet(
-                    f"color: {theme.C_WARN}; font-weight: bold;")
+            row = self._project_row_widget(p, attn_map.get(p["id"]),
+                                           camp_names)
             row.clicked.connect(
                 lambda it=item: self.projects.lst_projects
                 .setCurrentItem(it))
@@ -2844,6 +3643,10 @@ class MainWindow(QMainWindow):
         # that mutate projects rebuild the page themselves.
         if lst.currentItem() is None:
             self._clear_project_detail()
+        # keep the overlay drawer in sync with the hub list
+        if getattr(self, "_drawer_list", None) is not None \
+                and self._drawer.isVisible():
+            self._refresh_drawer()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
 
@@ -2937,7 +3740,10 @@ class MainWindow(QMainWindow):
                else _fu.list_points(db, p["id"]))
         window = lightcurve_data.mag_window(
             [q["mag"] for q in pts if q.get("mag") is not None])
-        spark = sparkline_pixmap(pts, color=kind_color, y_window=window)
+        # the row's own thumbnail size: the standalone default (110x26)
+        # leaves the object's numbers no room at the default list width
+        spark = sparkline_pixmap(pts, width=ROW_SPARK_W, height=ROW_SPARK_H,
+                                 color=kind_color, y_window=window)
         spark_text = None
         if not spark.isNull():
             what = _fu.curve_summary(pts)
@@ -2952,11 +3758,17 @@ class MainWindow(QMainWindow):
             else:
                 spark_text = self.tr("{0} nights · {1} points").format(
                     what["nights"], what["points"])
+        # the one-glance numbers of the object (mag, rate, period...), in
+        # the vocabulary of its own kind: the row has room for two or three
+        # and the object card shows the rest
+        from ..core import kinds as _kinds
+        detail_text = _kinds.context_line(kind, p.get("context") or {})
         return {
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
             "campaign_name": camp_names.get(p.get("campaign_id")),
             "progress_text": dots, "next_text": next_text,
+            "detail_text": detail_text,
             "activity_text": self._activity_words(p),
             "window_text": self._project_window_chip(p, full),
             "sparkline": spark,
@@ -2967,6 +3779,24 @@ class MainWindow(QMainWindow):
             # not a widget field: the urgency tint is applied after
             "_urgency": urgency,
         }
+
+    def _project_row_widget(self, p, attn, camp_names):
+        # The single builder of a rich project row, shared by the hub list
+        # and the overlay drawer (Interfaz 1.1) so their look cannot drift.
+        # @args: p - the list row, attn - its attention entry or None,
+        #        camp_names - {campaign id: name}
+        # @return: a configured ProjectRow (payload + urgency tint)
+        row = ProjectRow()
+        payload = self._project_row_payload(p, attn, camp_names)
+        urgency = payload.pop("_urgency", None)
+        row.set_project(**payload)
+        if urgency == "event":
+            row.lbl_next.setStyleSheet(
+                f"color: {theme.C_EVENT}; font-weight: bold;")
+        elif urgency == "due":
+            row.lbl_next.setStyleSheet(
+                f"color: {theme.C_WARN}; font-weight: bold;")
+        return row
 
     def _project_row_selection_sync(self, current, _previous):
         # Paints the selection on the rich rows (the item widget covers the
@@ -3015,131 +3845,13 @@ class MainWindow(QMainWindow):
         }
         return texts[act["key"]]
 
-    def _attention_text(self, e):
-        # @args: e - an attention_report entry
-        # @return: the full-sentence reason (the dashboard rows are plain
-        #          words, never codes)
-        name = e["object_name"]
-        if e["reason"] == "event":
-            ev = e["event"] or {}
-            word = self.tr("down") if ev.get("direction") == "drop" \
-                else self.tr("up")
-            return self.tr("⚡ %1 — %2 mag %3 in %4 — measure tonight") \
-                .replace("%1", name).replace("%2", str(ev.get("delta_mag"))) \
-                .replace("%3", word).replace("%4", str(ev.get("filter")))
-        if e["reason"] == "due":
-            return self.tr("⏳ %1 — %2 nights since the last visit") \
-                .replace("%1", name).replace("%2", str(e["overdue_days"]))
-        if e["reason"] == "never_visited":
-            return self.tr("⏳ %1 — the first measurement opens the "
-                           "series").replace("%1", name)
-        if e["reason"] == "extremum":
-            ex = e["extremum"] or {}
-            word = self.tr("maximum") if ex.get("kind") == "max" \
-                else self.tr("minimum")
-            return self.tr("⏳ %1 — %2 expected in ~%3 d") \
-                .replace("%1", name).replace("%2", word) \
-                .replace("%3", str(ex.get("days")))
-        text = self._next_action_text(
-            {"key": e["reason"], "overdue_days": None,
-             "never_visited": False})
-        return f"○ {name} — {text[0].lower() + text[1:] if text else ''}"
-
-    def _attention_card(self, e):
-        # @args: e - an attention_report entry
-        # @return: a QFrame card: urgency band + the reason in words + one
-        #          action button landing on the right section
-        colors = {"event": theme.C_EVENT, "due": theme.C_WARN,
-                  "info": theme.C_OK}
-        color = colors.get(e["urgency"], theme.C_OK)
-        card = QFrame()
-        card.setObjectName("attcard")
-        card.setStyleSheet(
-            f"QFrame#attcard {{ background: {theme.C_BASE};"
-            f" border-radius: 8px; border: 1px solid {theme.C_LINE}; }}")
-        lay = QHBoxLayout(card)
-        lay.setContentsMargins(0, 8, 10, 8)
-        lay.setSpacing(10)
-        band = QFrame()
-        band.setFixedWidth(4)
-        band.setStyleSheet(f"background: {color}; border-radius: 2px;")
-        lay.addWidget(band)
-        text = self._attention_text(e)
-        if e.get("campaign"):
-            text += "  ·  ⚑ " + e["campaign"]
-        lbl = QLabel(text)
-        lbl.setWordWrap(True)
-        lay.addWidget(lbl, 1)
-        btn = QPushButton(
-            self.tr("Measure →") if e.get("section") == "analysis"
-            else self.tr("Go →"))
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.clicked.connect(lambda _=False, entry=e:
-                            self._dashboard_goto(entry))
-        lay.addWidget(btn, 0, Qt.AlignVCenter)
-        return card
-
-    def _dashboard_goto(self, e):
-        # A dashboard card button: open the project AND land on the
-        # section the reason calls for (the app speaks, then walks you).
-        # @args: e - the attention entry behind the card
-        if self._goto_project_by_id(e["project_id"]) and e.get("section"):
-            self._scroll_to_section(e["section"])
-
-    def _refresh_dashboard(self):
-        # Fills the dashboard page from the last attention report (UX-PC
-        # U2). Three states: no projects at all (a pointer to Tonight),
-        # nothing calling (calm), and the calling cards.
-        lay = self.projects.dash_container.layout()
-        self._wipe_layout(lay)
-        entries = getattr(self, "_attention", None)
-        if entries is None:
-            entries = attention.attention_report(db, config)
-        any_projects = bool(project.list_projects(db))
-        if not any_projects:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Your projects live here"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("A project is one object with its three steps: "
-                        "capture, track, follow-up. Pick an object in "
-                        "Tonight and it becomes a project that guides "
-                        "you."))
-            box = QLabel(
-                self.tr("No projects yet — tonight's best objects are on "
-                        "the Tonight tab."))
-            box.setWordWrap(True)
-            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
-            lay.addWidget(box)
-            btn = QPushButton(self.tr("Go to Tonight →"))
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda: self._goto_tab(TAB_TONIGHT))
-            lay.addWidget(btn, 0, Qt.AlignLeft)
-        elif not entries:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Needs your attention"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("Your projects calling for action, most urgent "
-                        "first."))
-            box = QLabel(self.tr("✨ All quiet — nothing needs you "
-                                 "tonight. Clear skies!"))
-            box.setWordWrap(True)
-            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
-            lay.addWidget(box)
-        else:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Needs your attention"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("Your projects calling for action, most urgent "
-                        "first."))
-            for e in entries[:5]:
-                lay.addWidget(self._attention_card(e))
-        lay.addStretch()
-
-    def _show_dashboard(self):
-        # Swaps the right pane to the dashboard (no selection) and fills it.
-        self._refresh_dashboard()
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_dashboard)
+    def _show_home(self):
+        # No selection: the hub (the list). It only NAVIGATES to Home when
+        # the observer is already in the hub or in a project: at startup
+        # this is called from on_refresh_projects with no selection, and
+        # switching blindly would yank the user out of Welcome.
+        if self._shell_stack().currentIndex() in (VIEW_HOME, VIEW_DETAIL):
+            self._goto_tab(VIEW_HOME)
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
@@ -3147,23 +3859,43 @@ class MainWindow(QMainWindow):
             self._clear_project_detail()
             return
         pid = items[0].data(Qt.UserRole)
-        p = project.get(db, pid)
-        if not p:
+        if not project.get(db, pid):
             self._clear_project_detail()
             return
+        if getattr(self, "_navigating", False):
+            # history replay / programmatic selection: open without recording
+            self._open_project(pid)
+            return
+        if (self._current_project or {}).get("id") == pid:
+            # re-select of the SAME project (status change, reload): refresh
+            # in place, do not push a duplicate location and do not move the
+            # observer off the tab they are on
+            self._open_project(pid, land="keep")
+            return
+        # a user pick is a navigation (Interfaz 1.1)
+        self.navigate(VIEW_DETAIL, pid=pid)
+
+    def _open_project(self, pid, land="details"):
+        # Opens one project full screen: header, page and object panel. No
+        # history here (the callers decide whether it is a navigation).
+        # @args: pid - project id; land - the tab to open, as
+        #        _build_project_page reads it ("details" by default)
+        # @return: True when the project existed and was opened
+        p = project.get(db, pid)
+        if not p:
+            return False
         self._current_project = p
-        # UX-PC (U2): the right pane shows the project page when there is
-        # a selection, the dashboard when there is none
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_detail)
+        self._goto_tab(VIEW_DETAIL)
+        self._sync_projects_pane()
         self._render_project_header(p)
-        self._build_project_page(p)
+        self._build_project_page(p, land=land)
         panel = self._get_proj_panel()
         if panel._worker is not None:
             panel.cancel()   # switching projects: drop the in-flight load
         ctx = dict(p.get("context") or {})
         ctx.setdefault("project_id", p["id"])   # B4: light-curve injection
         panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
+        return True
 
     def _project_open_activated(self, item):
         # Double-click / Enter on a project row (UX-c): jump straight to
@@ -3238,7 +3970,9 @@ class MainWindow(QMainWindow):
         #          already-selected project
         if item is not None and item.data(Qt.UserRole) == \
                 (self._current_project or {}).get("id"):
-            self._project_selected()
+            # clicking the already-selected row reloads the detail (no
+            # navigation: the location did not change, nor does the tab)
+            self._open_project(item.data(Qt.UserRole), land="keep")
 
     def _proj_files_build(self):
         # A4 (rewritten): the project files window (ADR-019, UX v3) is
@@ -3392,6 +4126,7 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self._reset_proj_panel()
         self._clear_project_page()
+        self._sync_projects_pane()
         # UX-i: reset the flat masthead (the old rich-text header is gone)
         mast = self.projects
         mast.lbl_mast_icon.clear()
@@ -3402,7 +4137,16 @@ class MainWindow(QMainWindow):
         mast.btn_files.setText(self.tr("Files (0)"))
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
-        self._show_dashboard()
+        # Interfaz 1.0: drop the list's current item too, or the refresh
+        # fired when we switch back to Home would re-select it and rebuild
+        # the detail we are clearing (re-entrancy).
+        lst = self.projects.lst_projects
+        was_blocked = lst.signalsBlocked()
+        lst.blockSignals(True)
+        lst.setCurrentItem(None)
+        lst.clearSelection()
+        lst.blockSignals(was_blocked)
+        self._show_home()
 
     def _render_project_header(self, p):
         # UX-i: the flat masthead — icon, name, kind chip, campaign
@@ -3487,13 +4231,16 @@ class MainWindow(QMainWindow):
             elif item.layout() is not None:
                 self._wipe_layout(item.layout())
 
-    def _section_layout(self, key, title):
+    def _section_layout(self, key):
         # One tab PAGE of the project detail (ADR-041): a flat page in
-        # the scroll area with a slim header (bold title + state chip)
-        # and the per-kind content below. Only one page is visible at a
-        # time — the tab bar in the masthead decides which.
-        # @args: key - "details"|"plan"|"process"|"publish"|"followup",
-        #        title - the visible header text
+        # the scroll area with the per-kind content, and the step's state
+        # chip in a slim row above it. Only one page is visible at a time,
+        # the tab bar in the masthead decides which.
+        #
+        # No page TITLE on purpose (Interfaz 1.7): the active tab already
+        # says which page you are on, and the bold label above the content
+        # was 25 px of a 500 px page spent repeating it.
+        # @args: key - "details"|"plan"|"analysis"|"publish"
         # @return: the page's content QLayout (where the per-kind
         #          builders add their widgets, exactly as before)
         page = QWidget(self.projects.page_container)
@@ -3501,12 +4248,11 @@ class MainWindow(QMainWindow):
         page._chip.setStyleSheet(theme.chip_style(theme.C_PANEL))
         page._chip.setVisible(False)  # _step_section lifts it with a badge
         header = QHBoxLayout()
-        head = QLabel(title, page)
-        head.setStyleSheet("font-weight: bold;")
-        header.addWidget(head, 1)
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addStretch(1)
         header.addWidget(page._chip)
         v = QVBoxLayout(page)
-        v.setContentsMargins(0, 6, 0, 0)
+        v.setContentsMargins(0, 0, 0, 0)
         v.addLayout(header)
         self._tab_pages[key] = page
         self.projects.page_container.layout().addWidget(page)
@@ -3636,17 +4382,23 @@ class MainWindow(QMainWindow):
             return
         self._show_tab("details" if key == "files" else key)
 
-    def _show_tab(self, key):
+    def _show_tab(self, key, record=False):
         # ADR-041: activate one tab page — built on first open (lazy),
         # the other pages of this project get hidden, and the bar is
         # repainted so the active tab reads "you are here". ADR-045: the
         # retired "process"/"followup" keys alias to "analysis" forever,
         # so every old deep link keeps landing.
-        # @args: key - tab key ("details"|"plan"|"analysis"|"publish")
+        # @args: key - tab key ("details"|"plan"|"analysis"|"publish");
+        #        record - True for a user tab click (Interfaz 1.1: a tab
+        #        change is a navigation, so back returns to the old tab)
         # @return: None (a no-op when the page cannot exist here)
         if key is None or self._current_project is None:
             return
         key = {"process": "analysis", "followup": "analysis"}.get(key, key)
+        if record and not getattr(self, "_navigating", False):
+            self.navigate(VIEW_DETAIL, pid=self._current_project["id"],
+                          tab=key)
+            return
         self._ensure_tab_built(key)
         if key not in self._tab_pages:
             return
@@ -3681,25 +4433,49 @@ class MainWindow(QMainWindow):
             self._tab_pages[key].layout().addLayout(
                 self._step_footer(p, key))
 
-    def _build_project_page(self, p):
+    def _build_project_page(self, p, land="details"):
         # The project detail (ADR-041): the object card, the steps and
         # follow-up are TAB PAGES under one scroll — one visible at a
         # time (the tab bar in the masthead decides). The object card
         # is the light page, so it builds eagerly; the step pages build
-        # lazily on first open and are cached in _tab_pages. The Next
-        # card still decides where you land.
+        # lazily on first open and are cached in _tab_pages.
+        #
+        # ADR-041 rev.: opening a project lands on the OBJECT CARD. It used
+        # to land on the Next card's target (a fresh project opened on
+        # Capture), which meant you landed in the middle of a workflow
+        # before seeing what the object is. The Next card still says what
+        # to do next and its Go button still jumps to that step; a double
+        # click on a row still jumps straight to the work
+        # (_project_open_activated).
+        #
+        # @args: p - the project dict
+        #        land - which tab to open after the rebuild:
+        #          "details" (default): the object card, the landing page
+        #          "keep": whatever tab was open. An IN-PLACE refresh (a
+        #                  survey landing, the curve after a measurement, a
+        #                  reload of the same project) must not throw the
+        #                  observer out of the page they are reading.
+        #          "next": the Next card's target. The step machine asks
+        #                  for it when a step is marked done or reopened,
+        #                  so "✔ Mark done" keeps moving you forward.
+        # the tab to keep, read BEFORE the wipe: _clear_project_page()
+        # resets _active_tab to None
+        keep = getattr(self, "_active_tab", None)
         self._clear_project_page()
-        kind, ctx = p["kind"], p["context"]
         # page 0: the object card + project files (not a step)
-        det = self._section_layout("details", self._tab_label("details"))
+        det = self._section_layout("details")
         panel = self._get_proj_panel()
         det.addWidget(panel)
         self._populate_project_files(p["id"])
-        # the Next card fills itself AND tells us which page starts
-        # active (a finished project — no target — lands on the object
-        # card); the other pages build on first click
+        # the Next card fills itself (its Go button and the "Mark done"
+        # chip need a target); the landing tab comes from the caller
         self._refresh_next_card(p)
-        self._show_tab(self._next_target or "details")
+        if land == "next":
+            self._show_tab(self._next_target or "details")
+        elif land == "keep":
+            self._show_tab(keep or "details")
+        else:
+            self._show_tab("details")
 
     def _step_section(self, key):
         # Builds one tab page with its state chip in the header
@@ -3708,7 +4484,7 @@ class MainWindow(QMainWindow):
         # (_step_footer).
         # @args: key - "plan"|"process"|"publish"|"followup"
         # @return: the page's content layout
-        layout = self._section_layout(key, self._tab_label(key))
+        layout = self._section_layout(key)
         p = self._current_project
         if p and key in _STEP_KEYS:
             # step state as a chip in the page header ("done <date>" /
@@ -3796,7 +4572,8 @@ class MainWindow(QMainWindow):
         p = project.get(db, p["id"])
         self._current_project = p
         self.on_refresh_projects()
-        self._build_project_page(p)
+        # the step machine advances: land on the step it moved to
+        self._build_project_page(p, land="next")
         self._render_project_header(p)
         if p["status"] != project.STATUS_ACTIVE:
             ans = QMessageBox.question(
@@ -3812,17 +4589,37 @@ class MainWindow(QMainWindow):
         project.reopen_step(db, self._current_project["id"], key)
         p = project.get(db, self._current_project["id"])
         self._current_project = p
-        self._build_project_page(p)
+        self._build_project_page(p, land="next")
 
     def _build_plan_tab(self, p, kind, ctx):
-        # Plan & Captura (ADR-030): the session plan (frames/exposure/filter),
-        # the calibration frames, the CCDciel/NINA/CSV export and the NEO
-        # ephemeris export all live in this single step.
+        # Plan & Captura (ADR-030), laid out as a mission console
+        # (ADR-059): a summary strip, the night drawn as a flight strip,
+        # and the plan grouped in cards (exposure, type block, sequence,
+        # telescope) so the page reads as cards instead of floating labels
+        # and QGroupBox chrome. Behaviour, widget keys and autosave are
+        # untouched.
+        from .widgets.section_card import PanelCard
         layout = self._step_section("plan")
-        # common: capture plan inputs
-        layout.addWidget(QLabel(self.tr("Capture plan")))
-        form = QFrame()
-        form_layout = QVBoxLayout(form)
+        accent = theme.KIND_COLORS.get(kind, theme.C_ACCENT)
+
+        # the summary strip: integration, filter and the dawn verdict, the
+        # three numbers the observer reads before touching anything
+        self._plan_summary_strip(layout, accent)
+
+        # Interfaz 1.8: the plan DRAWN on the night it happens in. The same
+        # band the Ficha uses for the object, here carrying the plan's own
+        # duration as a block inside the dark window and the verdict the
+        # observer actually asks ("does it fit before dawn?"). It is the
+        # Welcome hero's trick: a picture of YOUR night, with real numbers.
+        from .widgets.night_ribbon import NightRibbon
+        ribbon = NightRibbon()
+        layout.addWidget(ribbon)
+        self._project_widgets["plan_ribbon"] = ribbon
+
+        # --- card: exposure plan (frames / exposure / filter) -----------
+        card = PanelCard(self.tr("Exposure plan"), accent)
+        layout.addWidget(card)
+        body = card.body
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Frames:")))
         spn = PassiveSpinBox(); spn.setMinimum(1); spn.setMaximum(999); spn.setValue(30)
@@ -3836,8 +4633,16 @@ class MainWindow(QMainWindow):
         for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
             cmb_f.addItem(f)
         row.addWidget(cmb_f)
-        form_layout.addLayout(row)
-        layout.addWidget(form)
+        body.addLayout(row)
+        self._project_widgets["plan_spins"] = (spn, spn_exp, cmb_f)
+        for widget in (spn, spn_exp):
+            widget.valueChanged.connect(
+                lambda _v: self._plan_ribbon_refresh(p, ctx))
+        # the filter also feeds the summary strip
+        cmb_f.currentIndexChanged.connect(
+            lambda _i: self._plan_ribbon_refresh(p, ctx))
+        self._plan_ribbon_refresh(p, ctx)
+
         # NEO: exposure calculator
         if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
             from ..core import exposure
@@ -3845,7 +4650,7 @@ class MainWindow(QMainWindow):
                                           config.get("focal_mm"))
             t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
             if t_max:
-                layout.addWidget(QLabel(
+                body.addWidget(QLabel(
                     f"<small>{self.tr('Max exposure (no trail)')}: "
                     f"{t_max:.0f}s · {self.tr('plate scale')}: "
                     f"{scale:.2f}″/px · {self.tr('rate')}: "
@@ -3901,13 +4706,18 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
+
+        # --- card: sequence (multi-filter rows + exports) ---------------
+        seq_card = PanelCard(self.tr("Sequence"), accent)
+        layout.addWidget(seq_card)
+        sbody = seq_card.body
         # B8/Track V: SN and variable exposure hint
         # by brightness + multi-filter step rows
         if kind in ("sn", "variable") and ctx.get("mag") is not None:
             from ..core import exposure
             sn_exp = exposure.recommended_sn_exposure(ctx["mag"])
             if sn_exp:
-                layout.addWidget(QLabel(
+                sbody.addWidget(QLabel(
                     f"<small>{self.tr('Recommended exposure')}: "
                     f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
                     f" · {self.tr('guide, not SNR — confirm with a test shot')}"
@@ -3917,12 +4727,17 @@ class MainWindow(QMainWindow):
             # The "Add filter" button shares the header row (right side),
             # so we save one full row for the button alone
             filt_head = QHBoxLayout()
-            filt_head.addWidget(QLabel(self.tr("Filters (add rows for multi-band)")))
+            lbl_filt = QLabel(self.tr("Filters"))
+            lbl_filt.setToolTip(self.tr(
+                "Add a row per band: each one is its own set of frames, "
+                "exposure and filter (a supernova is worth following in "
+                "more than one)"))
+            filt_head.addWidget(lbl_filt)
             filt_head.addStretch()
             btn_add_filt = QPushButton(self.tr("Add filter"))
             btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
             filt_head.addWidget(btn_add_filt)
-            layout.addLayout(filt_head)
+            sbody.addLayout(filt_head)
             steps_container = QWidget()
             steps_vlay = QVBoxLayout(steps_container)
             steps_vlay.setContentsMargins(2, 2, 2, 2)
@@ -3937,7 +4752,7 @@ class MainWindow(QMainWindow):
                     default_filters = tuple(prot_filters)
             for filt in default_filters:
                 self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
-            layout.addWidget(steps_container)
+            sbody.addWidget(steps_container)
             self._project_widgets["sn_steps_container"] = steps_container
         # sequence export (all kinds): the format combo and the
         # right-aligned "Export sequence…" button share one row
@@ -3952,19 +4767,18 @@ class MainWindow(QMainWindow):
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         seq_row.addWidget(btn_seq)
-        layout.addLayout(seq_row)
+        sbody.addLayout(seq_row)
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
-            layout.addWidget(QLabel(""))
-            layout.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
+            sbody.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
             btn_eph = QPushButton(self.tr("Export ephemeris…"))
             btn_eph.clicked.connect(self._project_export_ephem)
-            layout.addWidget(btn_eph)
+            sbody.addWidget(btn_eph)
         self._project_widgets["cmb_seqfmt"] = cmb_fmt
         # ADR-043: the live CCDciel control lives in the Capture step
         # itself (the Observatory tab is gone): the hardware has one home,
         # and it is the step that plans its capture
-        self._build_capture_ccd_block(layout)
+        self._build_capture_ccd_block(layout, accent)
         # ADR-043: the plan auto-saves: every input writes the same payload
         # the "Save plan" button used to, silently (the project bar is the
         # visible truth). The connects sit after every build-time
@@ -3977,6 +4791,25 @@ class MainWindow(QMainWindow):
         spn_darkexp.valueChanged.connect(self._project_save_plan)
         spn_bias.valueChanged.connect(self._project_save_plan)
         layout.addStretch()
+
+    def _plan_summary_strip(self, layout, accent):
+        # The three numbers the observer reads before touching anything:
+        # total integration, filter and the "does it fit before dawn?"
+        # verdict. KpiTiles (ADR-057), updated live from the plan spins by
+        # _plan_ribbon_refresh, so the strip and the band never disagree.
+        # @args: layout - the Capture page layout, accent - the kind hue
+        from .widgets.kpi_tile import KpiTile
+        strip = QHBoxLayout()
+        strip.setSpacing(8)
+        t_int = KpiTile("—", self.tr("Integration"), accent)
+        t_fil = KpiTile("—", self.tr("Filter"))
+        t_ver = KpiTile("—", self.tr("Before dawn"))
+        for t in (t_int, t_fil, t_ver):
+            strip.addWidget(t)
+        strip.addStretch(1)
+        layout.addLayout(strip)
+        self._project_widgets["plan_kpis"] = {
+            "integration": t_int, "filter": t_fil, "verdict": t_ver}
 
     def _project_save_plan(self):
         if not self._current_project:
@@ -4015,19 +4848,20 @@ class MainWindow(QMainWindow):
                 project.update_context(db, p["id"],
                                        {k: v for k, v in sw.items()
                                         if v is not None})
-                # refresh the overview panel: the capture chips and the
-                # sky chart now carry the safe window
+                # refresh the overview panel: the KPI strip and the sky
+                # chart now carry the safe window (ADR-057)
                 panel = self._get_proj_panel()
                 if panel._e is not None:
                     panel._ctx = ctx
-                    panel._render_capture(panel._e)
+                    panel._render_kpis(panel._e)
+                    panel._render_flags(panel._e)
                     panel._render_charts(panel._e)
             # ADR-043: silent by design: the plan auto-saves from the
             # Capture step inputs; the project bar is the visible truth
 
     # -- CCDciel control (ADR-030) -----------------------------------------
 
-    def _build_capture_ccd_block(self, layout):
+    def _build_capture_ccd_block(self, layout, accent=None):
         # ADR-043: the Observatory tab is gone; this is its whole control
         # panel, rebuilt per project page inside the Capture step. Built
         # in code (not a .ui) because it is small and per-project now;
@@ -4037,38 +4871,59 @@ class MainWindow(QMainWindow):
         # had no purpose, so there is no target-selection combo (a
         # project that is not open is not what you are looking at that
         # night).
-        grp = QGroupBox(self.tr("CCDciel control"))
-        gv = QVBoxLayout(grp)
-        gv.setContentsMargins(12, 9, 12, 9)
+        # ADR-059: the panel is a PanelCard now, the same card voice as the
+        # rest of the Capture console. One card, four rows, and the status
+        # is one row of four pairs (Interfaz 1.8 had already collapsed the
+        # old three group boxes).
+        # @args: layout - the Capture page layout, accent - the kind hue
+        from .widgets.section_card import PanelCard
+        grp = PanelCard(self.tr("Telescope and camera"),
+                        accent or theme.C_ACCENT)
+        gv = grp.body
+
+        # row 1: the connection, with a colour that says which state it is
         row = QHBoxLayout()
+        row.setSpacing(8)
+        lbl_s = QLabel()
+        row.addWidget(lbl_s)
+        row.addStretch()
         btn_c = QPushButton(self.tr("Connect CCDciel"))
         btn_d = QPushButton(self.tr("Disconnect"))
         btn_r = QPushButton(self.tr("Refresh"))
-        lbl_s = QLabel(self.tr("CCDciel: not connected"))
         row.addWidget(btn_c)
         row.addWidget(btn_d)
         row.addWidget(btn_r)
-        row.addWidget(lbl_s)
-        row.addStretch()
         gv.addLayout(row)
-        layout.addWidget(grp)
 
-        grp = QGroupBox(self.tr("Observatory status"))
-        form = QFormLayout(grp)
+        # row 2: what the telescope is doing, in a 2x2 grid (hidden until
+        # CCDciel answers: four dashes are 130 px of nothing)
+        state = QWidget()
+        grid = QHBoxLayout(state)
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setSpacing(18)
         lbl_v = QLabel("—")
         lbl_t = QLabel("—")
         lbl_tr = QLabel("—")
         lbl_sl = QLabel("—")
-        form.addRow(self.tr("Version:"), lbl_v)
-        form.addRow(self.tr("CCD temperature:"), lbl_t)
-        form.addRow(self.tr("Tracking:"), lbl_tr)
-        form.addRow(self.tr("Slew:"), lbl_sl)
-        layout.addWidget(grp)
+        # ONE row of four pairs: the same four values in half the height the
+        # 2x2 grid took, and they still read left to right as "what version,
+        # how cold, is it tracking, is it moving"
+        for title, value in ((self.tr("Version"), lbl_v),
+                             (self.tr("Temperature"), lbl_t),
+                             (self.tr("Tracking"), lbl_tr),
+                             (self.tr("Slew"), lbl_sl)):
+            head = QLabel(title)
+            head.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
+            grid.addWidget(head)
+            grid.addWidget(value)
+        grid.addStretch(1)
+        self._ccd_state_grp = state
+        state.setVisible(False)
+        gv.addWidget(state)
 
-        grp = QGroupBox(self.tr("Telescope"))
-        gv = QVBoxLayout(grp)
-        gv.setContentsMargins(12, 9, 12, 9)
+        # row 3: pointing
         row = QHBoxLayout()
+        row.setSpacing(8)
         btn_goto = QPushButton(self.tr("Point telescope"))
         btn_goto.setToolTip(self.tr(
             "Quick slew to the freshly-computed position of a moving "
@@ -4084,12 +4939,10 @@ class MainWindow(QMainWindow):
         row.addWidget(btn_sync)
         row.addStretch()
         gv.addLayout(row)
-        layout.addWidget(grp)
 
-        grp = QGroupBox(self.tr("Live capture"))
-        gv = QVBoxLayout(grp)
-        gv.setContentsMargins(12, 9, 12, 9)
+        # row 4: live capture
         row = QHBoxLayout()
+        row.setSpacing(8)
         row.addWidget(QLabel(self.tr("Filter on wheel:")))
         cmb_f = QComboBox()
         btn_push = QPushButton(self.tr("Send plan"))
@@ -4103,15 +4956,13 @@ class MainWindow(QMainWindow):
         row.addWidget(btn_start)
         row.addStretch()
         gv.addLayout(row)
-        lbl_co = QLabel("—")
+        lbl_co = QLabel("")
         lbl_co.setWordWrap(True)
+        lbl_co.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
+        # an empty label costs a line: it appears when it has coordinates to
+        # name and hides again when it does not
+        lbl_co.setVisible(False)
         gv.addWidget(lbl_co)
-        lbl_h = QLabel(self.tr(
-            "Uses the current project's saved plan (its Capture step "
-            "holds frames × exposure)."))
-        lbl_h.setWordWrap(True)
-        lbl_h.setStyleSheet("color: #8a90a6; font-size: 11px;")
-        gv.addWidget(lbl_h)
         layout.addWidget(grp)
 
         self._obs_widgets = {
@@ -4156,6 +5007,11 @@ class MainWindow(QMainWindow):
         if not w.get("ccd_connect"):
             return
         on = self._ccd_connected
+        state_grp = getattr(self, "_ccd_state_grp", None)
+        if state_grp is not None:
+            # the block earns its place only when it has values: four
+            # dashes are 130 px of nothing in a page that has none to spare
+            state_grp.setVisible(bool(on))
         for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
                     "ccd_start", "ccd_goto", "ccd_sync"):
             widget = w.get(key)
@@ -4165,16 +5021,32 @@ class MainWindow(QMainWindow):
         if cb is not None:
             cb.setEnabled(on)
         w["ccd_connect"].setEnabled(not on)
+        # Interfaz 1.8: the state is a COLOUR, not a sentence. Green with a
+        # dot when CCDciel answers, amber when it does not: it is the one
+        # thing the observer glances at before trusting anything else in
+        # this panel, and it used to be grey text like everything else.
         if not on:
-            w["ccd_status"].setText(self.tr("CCDciel: not connected"))
+            w["ccd_status"].setText(
+                "\u25cf " + self.tr("CCDciel: not connected"))
+            w["ccd_status"].setStyleSheet(
+                f"color: {theme.C_WARN}; font-weight: 600;")
+            w["ccd_connect"].setStyleSheet(
+                f"background: {theme.composite(theme.C_ACCENT, '2e')};"
+                f" border: 1px solid {theme.C_ACCENT}; color: {theme.C_TEXT};")
             w["ccd_version"].setText(self.tr("—"))
             w["ccd_temp"].setText(self.tr("—"))
             w["ccd_tracking"].setText(self.tr("—"))
+            w["ccd_tracking"].setStyleSheet("")
             w["ccd_slew"].setText(self.tr("—"))
+            w["ccd_slew"].setStyleSheet("")
         else:
             w["ccd_status"].setText(
-                f"{self.tr('CCDciel')}: {self._ccd_client.host}:"
-                f"{self._ccd_client.port} · {self._ccd_version}")
+                "\u25cf " + f"{self.tr('CCDciel')}: "
+                f"{self._ccd_client.host}:{self._ccd_client.port}"
+                f" · {self._ccd_version}")
+            w["ccd_status"].setStyleSheet(
+                f"color: {theme.C_GOOD}; font-weight: 600;")
+            w["ccd_connect"].setStyleSheet("")
             self._ccd_fill_filters()
 
     def _ccd_connect(self):
@@ -4288,10 +5160,15 @@ class MainWindow(QMainWindow):
             tracking = tracking.strip().lower() not in ("", "false", "no", "0")
         if tracking is None:
             w["ccd_tracking"].setText(self.tr("—"))
+            w["ccd_tracking"].setStyleSheet("")
         elif tracking:
             w["ccd_tracking"].setText(self.tr("Tracking"))
+            w["ccd_tracking"].setStyleSheet(
+                f"color: {theme.C_GOOD}; font-weight: 600;")
         else:
             w["ccd_tracking"].setText(self.tr("Stopped"))
+            w["ccd_tracking"].setStyleSheet(
+                f"color: {theme.C_WARN}; font-weight: 600;")
         if slewing is None:
             slewing = mount.get("slewing")
         if slewing is None and "slewing" in cam:
@@ -4300,10 +5177,14 @@ class MainWindow(QMainWindow):
             slewing = slewing.strip().lower() not in ("", "false", "no", "0")
         if slewing is None:
             w["ccd_slew"].setText(self.tr("—"))
+            w["ccd_slew"].setStyleSheet("")
         elif slewing:
             w["ccd_slew"].setText(self.tr("Slewing…"))
+            w["ccd_slew"].setStyleSheet(
+                f"color: {theme.C_OK}; font-weight: 600;")
         else:
             w["ccd_slew"].setText(self.tr("Idle"))
+            w["ccd_slew"].setStyleSheet(f"color: {theme.C_TEXT_DIM};")
 
     def _ccd_poll_tick(self):
         # QTimer tick while connected: the read runs on the CCD worker
@@ -4361,8 +5242,9 @@ class MainWindow(QMainWindow):
         lbl = self._ccd_widgets().get("ccd_coords")
         if not p or not lbl:
             return
-        lbl.setText(self._ccd_coords_text(p.get("context") or {},
-                                          p.get("kind")))
+        text = self._ccd_coords_text(p.get("context") or {}, p.get("kind"))
+        lbl.setText(text)
+        lbl.setVisible(bool(text.strip()))
 
     def _ccd_point_action(self, slew_fn, ctx):
         # Builds a CcdcielWorker action that resolves a fresh position for
@@ -4590,17 +5472,45 @@ class MainWindow(QMainWindow):
             on_change=lambda: self._visit_data_changed(pid),
             # the curve below is the one of the visit you are looking at
             # (reported), so the list has to say which one that is
-            on_visit_selected=lambda _sid: self._fu_curve_refresh(pid),
+            on_visit_selected=lambda _sid: (
+                self._fu_curve_refresh(pid),
+                self._analysis_ribbon_refresh(p)),
             kind=kind)
         panel.set_project(pid)
-        layout.addWidget(panel, 1)
         self._project_widgets["visits_panel"] = panel
-        # The curve, right under the visits it belongs to and for EVERY
-        # kind that has one (a transit project with 1255 measured points
-        # had no chart here at all: the block was tied to the follow-up
-        # kinds). The switch inside decides between this visit and the
-        # whole project.
-        self._analysis_curve_block(layout, p, pid)
+        # Interfaz 1.7: the visits and their curve go SIDE BY SIDE. Stacked
+        # they asked for ~800 px in a 630 px page, so the tab always
+        # scrolled; and the two are exactly a master-detail pair: pick the
+        # visit on the left, read its curve on the right. The list keeps a
+        # sane width (it is a list of dates) and the chart takes the rest.
+        panel.setMinimumWidth(300)
+        panel.setMaximumWidth(520)
+        curve = self._analysis_curve_block(p, pid)
+        # Interfaz 1.8: the night the visit happened in, drawn above the
+        # visits it summarises (the same band the Ficha and Capture use).
+        # In the LEFT column on purpose: the right one is the chart, and
+        # the chart's column is the taller of the two, so the band costs
+        # the page NOTHING. Above the chart it took 73 px off the curve and
+        # left it too short to read.
+        from .widgets.night_ribbon import NightRibbon
+        ribbon = NightRibbon()
+        left = QWidget()
+        llay = QVBoxLayout(left)
+        llay.setContentsMargins(0, 0, 0, 0)
+        llay.setSpacing(6)
+        llay.addWidget(ribbon)
+        llay.addWidget(panel, 1)
+        self._project_widgets["analysis_ribbon"] = ribbon
+        pair = QHBoxLayout()
+        pair.setSpacing(10)
+        pair.addWidget(left)
+        pair.addWidget(curve, 1)
+        # 45/55: the visits are a list of dates (they only need their own
+        # column) and the chart is what wants the width
+        pair.setStretch(0, 9)
+        pair.setStretch(1, 11)
+        layout.addLayout(pair, 1)
+        self._analysis_ribbon_refresh(p)
         if kind == "transit":
             self._analysis_transit_block(layout, pid)
         elif kind == "hads":
@@ -4620,7 +5530,116 @@ class MainWindow(QMainWindow):
 
     # ------------- the Analysis curve: the selected visit (reported) ----
 
-    def _analysis_curve_block(self, layout, p, pid):
+    def _analysis_ribbon_refresh(self, p):
+        # @args: p - the project row
+        # @return: None. The band of the SELECTED visit: when its frames
+        #          were shot, drawn on the night they were shot in.
+        ribbon = self._project_widgets.get("analysis_ribbon")
+        panel = self._project_widgets.get("visits_panel")
+        if ribbon is None or panel is None:
+            return
+        try:
+            lat = float(config.get("lat") or 0.0)
+            lon = float(config.get("lon") or 0.0)
+        except (TypeError, ValueError):
+            lat = lon = 0.0
+        if not (lat or lon):
+            lat = lon = None
+        ctx = p.get("context") or {}
+        ribbon.set_site(lat, lon)
+        ribbon.set_object(ctx.get("ra_deg"), ctx.get("dec_deg"),
+                          p.get("object_name") or "")
+        ribbon.set_accent(theme.KIND_COLORS.get(p.get("kind"),
+                                                theme.C_ACCENT))
+        sid = panel.current_session_id()
+        stamps = []
+        if sid is not None:
+            from ..core import followup as _fu
+            for img in _fu.list_images(db, sid):
+                when = _parse_date_obs(img.get("date_obs"))
+                if when is not None:
+                    stamps.append(when)
+        if len(stamps) >= 1:
+            first, last = min(stamps), max(stamps)
+            # one block, not one per frame: twenty ticks in a 400 px band
+            # are a smear, and what the observer asks is "when was I out"
+            ribbon.set_blocks([{
+                "start": first, "end": max(last, first +
+                                           _dt.timedelta(minutes=2)),
+                "label": self.tr("{n} frames").format(n=len(stamps)),
+                "color": theme.KIND_COLORS.get(p.get("kind"),
+                                               theme.C_ACCENT)}])
+            ribbon.set_note(self.tr("{n} frames · {span} min").format(
+                n=len(stamps),
+                span=int((last - first).total_seconds() // 60)),
+                theme.C_TEXT_DIM)
+        else:
+            ribbon.set_blocks([])
+            ribbon.set_note("")
+
+    def _plan_ribbon_refresh(self, p, ctx):
+        # @args: p - the project row, ctx - its context
+        # @return: None. Feeds the plan's band: the site, the object's arc
+        #          and ONE block, the plan itself, dropped at dusk (when an
+        #          observer starts) with its total duration.
+        ribbon = self._project_widgets.get("plan_ribbon")
+        spins = self._project_widgets.get("plan_spins")
+        if ribbon is None or spins is None:
+            return
+        kind = p.get("kind")
+        try:
+            lat = float(config.get("lat") or 0.0)
+            lon = float(config.get("lon") or 0.0)
+        except (TypeError, ValueError):
+            lat = lon = 0.0
+        if not (lat or lon):
+            lat = lon = None
+        ra = ctx.get("ra_deg")
+        dec = ctx.get("dec_deg")
+        ribbon.set_site(lat, lon)
+        ribbon.set_object(ra, dec, p.get("object_name") or "")
+        ribbon.set_accent(theme.KIND_COLORS.get(kind, theme.C_ACCENT))
+        n_frames = int(spins[0].value())
+        exp_s = float(spins[1].value())
+        total_min = n_frames * exp_s / 60.0
+        # the summary strip reads the same numbers as the band (ADR-059):
+        # integration and filter are known before the window is
+        kp = self._project_widgets.get("plan_kpis")
+        if kp:
+            kp["integration"].set_value(
+                f"{total_min / 60.0:.1f} h" if total_min >= 90
+                else f"{total_min:.0f} min")
+            kp["filter"].set_value(spins[2].currentText())
+        window = ribbon.window()
+        if window is None:
+            ribbon.set_blocks([])
+            ribbon.set_note("")
+            if kp:
+                kp["verdict"].set_accent(None)
+                kp["verdict"].set_value("—")
+            return
+        dusk, dawn = window
+        end = min(dawn, dusk + _dt.timedelta(minutes=total_min))
+        fits = (dusk + _dt.timedelta(minutes=total_min)) <= dawn
+        ribbon.set_blocks([{
+            "start": dusk, "end": end,
+            "label": self.tr("{n} × {s} s").format(
+                n=n_frames, s=("%.0f" % exp_s).replace(".0", "")),
+            "color": theme.C_GOOD if fits else theme.C_WARN}])
+        ribbon.set_note(
+            self.tr("fits: {used} min of {dark} h").format(
+                used=("%.0f" % total_min),
+                dark=("%.1f" % ((dawn - dusk).total_seconds() / 3600.0)
+                      ).replace(".0", ""))
+            if fits else
+            self.tr("does not fit before dawn"),
+            theme.C_GOOD if fits else theme.C_WARN)
+        if kp:
+            kp["verdict"].set_accent(theme.C_GOOD if fits else theme.C_WARN)
+            kp["verdict"].set_value(
+                self.tr("fits") if fits else self.tr("does not fit"))
+
+    def _analysis_curve_block(self, p, pid):
         # The light curve of the Analysis tab: THE VISIT YOU SELECTED, with
         # a switch to the whole project.
         #
@@ -4630,9 +5649,9 @@ class MainWindow(QMainWindow):
         # curve here at all. The curve of a night is ONE pass (2026-09-30),
         # and that is what this draws by default; "all the nights" is the
         # project's curve, which is what folding a period needs.
-        # @args: layout - the Analysis column, p - the project row, pid -
-        #        the project id
-        # @return: None
+        # @args: p - the project row, pid - the project id
+        # @return: the block's widget (the caller places it: Interfaz 1.7
+        #          puts it BESIDE the visits list, not under it)
         from .widgets.lightcurve_widget import LightCurveChart
         grp = QGroupBox(self.tr("Light curve"))
         glc = QVBoxLayout(grp)
@@ -4657,10 +5676,9 @@ class MainWindow(QMainWindow):
         row.addWidget(chk_tpl)
         glc.addLayout(row)
         chart = LightCurveChart()
-        chart.setMinimumHeight(220)
+        chart.setMinimumHeight(190)
         glc.addWidget(chart, stretch=1)
         chk_tpl.toggled.connect(chart.set_template_visible)
-        layout.addWidget(grp)
         w = self._project_widgets
         w["fu_curve"] = chart
         w["fu_curve_scope"] = cmb
@@ -4669,6 +5687,7 @@ class MainWindow(QMainWindow):
         cmb.currentIndexChanged.connect(
             lambda _i: self._fu_curve_refresh(pid))
         self._fu_curve_refresh(pid)
+        return grp
 
     def _fu_curve_points(self, pid):
         # The points the Analysis curve draws, and the words that say which
@@ -5221,11 +6240,13 @@ class MainWindow(QMainWindow):
         #        the capture-plan exposure spin (preselected here)
         from ..core import coords, planner
         from .widgets.timeline_widget import TransitTimeline
+        from .widgets.section_card import PanelCard
         tr = ctx.get("transit") or {}
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
-        grp = QGroupBox(self.tr("Transit capture plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("Transit capture plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
 
         def _as_dt(v):
             # the context crosses the db as JSON: times come back as ISO
@@ -5429,11 +6450,13 @@ class MainWindow(QMainWindow):
         #        context (carries the "hads" snapshot + window keys),
         #        spn_exp - the capture-plan exposure spin (preselected here),
         #        spn_frames - the frames spin (defaulted to fill 2P)
+        from .widgets.section_card import PanelCard
         h = ctx.get("hads") or {}
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
-        grp = QGroupBox(self.tr("HADS capture plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("HADS capture plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
 
         def _hm(v):
             # @return: "HH:MM" UTC from an ISO string/datetime, or "—"
@@ -5577,9 +6600,11 @@ class MainWindow(QMainWindow):
         # saturation warning for bright stars (the T CrB lesson).
         # @args: layout - plan tab layout, p - project dict, ctx - context,
         #        spn_exp - the capture-plan exposure spin (preselected here)
+        from .widgets.section_card import PanelCard
         v = ctx.get("variable") or {}
-        grp = QGroupBox(self.tr("Variable star plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("Variable star plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             camp = _camp.get(db, p["campaign_id"])
@@ -6547,13 +7572,19 @@ class MainWindow(QMainWindow):
             # campaign summary over the saved points (ADR-044): the series
             # engine reports how the campaign goes so far, rebuilt on tab
             # open and refreshed in place after each saved point
-            grp_camp = QGroupBox(self.tr("Campaign summary"))
+            grp_camp = QFrame()
             grp_camp.setObjectName("fu_campaign_summary")
-            g_camp = QVBoxLayout(grp_camp)
+            g_camp = QHBoxLayout(grp_camp)
+            g_camp.setContentsMargins(10, 4, 10, 4)
+            g_camp.setSpacing(8)
+            head_camp = QLabel(self.tr("Campaign summary"))
+            head_camp.setStyleSheet(
+                "color: %s; font-weight: 700;" % theme.C_TEXT_DIM)
+            g_camp.addWidget(head_camp)
             camp_lbl = QLabel("")
             camp_lbl.setObjectName("fu_campaign_text")
             camp_lbl.setWordWrap(True)
-            g_camp.addWidget(camp_lbl)
+            g_camp.addWidget(camp_lbl, 1)
             camp_lbl.setText(self._fu_campaign_text(p, pid))
             layout.addWidget(grp_camp)
             self._project_widgets["fu_campaign_text"] = camp_lbl
@@ -7190,7 +8221,7 @@ class MainWindow(QMainWindow):
             if extra:
                 msg += " — " + str(extra)
             self.statusBar().showMessage(msg, 10000)
-            self._build_project_page(project.get(db, pid))
+            self._build_project_page(project.get(db, pid), land="keep")
             return
         if not pts:
             self.statusBar().showMessage(
@@ -7215,8 +8246,9 @@ class MainWindow(QMainWindow):
                .replace("%6", f"{max(mjds):.1f}")
                .replace("%7", ", ".join(bands)))
         self.statusBar().showMessage(msg, 15000)
-        # rebuild the page so the curve/points update in place
-        self._build_project_page(project.get(db, pid))
+        # rebuild the page so the curve/points update in place, without
+        # moving the observer off the tab they are reading
+        self._build_project_page(project.get(db, pid), land="keep")
 
     def _sn_add_step_row(self, layout, filt="Clear", n=30, exp=60.0):
         # B8: add a filter×N×exp row to the SN multi-filter step list.
@@ -7458,16 +8490,6 @@ class MainWindow(QMainWindow):
             self.tr("Filters ▾") if checked else self.tr("Filters ▸"))
         config.set("projects_filters_open", checked)
 
-    def _toggle_project_list(self, visible):
-        # UX-i: the list column is a luxury, not the point — « folds it
-        # away so the project page gets the full width, » brings it back.
-        # The choice sticks for the next sessions.
-        # @args: visible - show or hide the list pane
-        # @return: None
-        self.projects.grp_list.setVisible(visible)
-        self.projects.btn_show_list.setVisible(not visible)
-        config.set("projects_list_hidden", int(not visible))
-
     def _rebuild_manage_menu(self):
         # UX-PC (U1): the ⋯ menu in the project header is the single home
         # of project management — tags, folder and the whole lifecycle.
@@ -7603,15 +8625,28 @@ class MainWindow(QMainWindow):
                  "rate_arcsec_min", "nobs", "moid", "h",
                  "nf_score", "nf_priority", "neocp", "pccp_score",
                   "perihelion_date", "transit", "approach", "hads",
-                  "variable", "campaign", "project_id")
+                  "variable", "campaign", "project_id", "notes")
                  if target.get(k) is not None}
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
-            self._goto_tab(TAB_PROJECTS)
-            self._select_project_row(p["id"])
+            # Interfaz 1.1: the creation flow ends on the project. Coming
+            # from the new-project view, Tonight is REPLACED, so "back"
+            # returns to the hub, not to the search.
+            from_tonight = (self._shell_stack().currentIndex() == VIEW_TONIGHT)
+            self.navigate(VIEW_DETAIL, pid=p["id"], replace=from_tonight)
             self.statusBar().showMessage(
                 self.tr("Project created: %1").replace("%1", name), 8000)
+        return p
+
+    def _new_project_from_target(self, target):
+        # The new-project bar (search or manual form) built a target dict:
+        # create the project and clear the bar on success (the creation
+        # path itself navigates to the project).
+        # @args: target - a planner-target dict from the bar
+        p = self._create_project(target)
+        if p is not None and getattr(self, "_newbar", None) is not None:
+            self._newbar.reset()
         return p
 
     def _select_project_row(self, pid):
@@ -7624,23 +8659,19 @@ class MainWindow(QMainWindow):
         return False
 
     def _goto_project_by_id(self, pid):
-        # Jumps to the Projects hub with this project selected (UX-d).
-        # @return: True when the project was found in the list
+        # Jumps to this project's full-screen view (UX-d). Interfaz 1.1:
+        # recorded as a navigation so "back" returns to where we came from.
+        # @return: True when the project exists
         self.on_refresh_projects()
-        self._goto_tab(TAB_PROJECTS)
-        return self._select_project_row(pid)
+        if not project.get(db, pid):
+            return False
+        self.navigate(VIEW_DETAIL, pid=pid)
+        return True
 
     def _goto_campaigns(self, cid=None):
-        # Jumps to the Campaigns tab, optionally selecting a campaign
+        # Jumps to the Campaigns view, optionally selecting a campaign
         # (the landing spot of every campaign link, UX-d).
-        self._goto_tab(TAB_CAMPAIGNS)
-        self._refresh_campaigns_tab()
-        if cid is not None:
-            lst = self.campaigns.lst_campaigns
-            for i in range(lst.count()):
-                if lst.item(i).data(Qt.UserRole) == cid:
-                    lst.setCurrentRow(i)
-                    break
+        self.navigate(VIEW_CAMPAIGNS, cid=cid)
 
     def _campaign_link_clicked(self, url):
         # The project header campaign badge is a link (UX-d).
@@ -7920,8 +8951,8 @@ class MainWindow(QMainWindow):
                       if p["object_name"] == c), None)
         if not match:
             return False
-        self._goto_tab(TAB_PROJECTS)
-        return self._select_project_row(match["id"])
+        self.navigate(VIEW_DETAIL, pid=match["id"])
+        return True
 
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 
@@ -8866,7 +9897,7 @@ class MainWindow(QMainWindow):
         content.btn_sidc.clicked.connect(
             lambda: self._open_url("https://sidc.be/uset"))
         content.lbl_impact.linkActivated.connect(
-            lambda _u: self._goto_tab(TAB_TONIGHT))
+            lambda _u: self.navigate(VIEW_TONIGHT))
         content.btn_sun_post.clicked.connect(self.on_render_sun_post)
         content.btn_sky_post.clicked.connect(self.on_sky_post)
         self._skycal = dlg
@@ -8907,6 +9938,32 @@ class MainWindow(QMainWindow):
         self._ufe = UfeDialog(lang=self._lang(), parent=self)
         return self._ufe
 
+    def _ufe_page(self):
+        # Fills the fixed workbench page (VIEW_UFE) with the editor only.
+        # Interfaz 1.3: the host "Back" bar is gone — the general
+        # navigation stack (the top bar, Alt+Left, the mouse) already
+        # returns to wherever the workbench was opened from. Built once;
+        # the workbench's interior is the same widget as always.
+        if getattr(self, "_ufe_page_built", False):
+            return self._ufe_page_widget
+        from PySide6.QtWidgets import QVBoxLayout
+        lay = QVBoxLayout(self._ufe_page_widget)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        lay.addWidget(self._ufe_build(), 1)
+        self._ufe_page_built = True
+        return self._ufe_page_widget
+
+    def _ufe_back(self):
+        # Leaves the workbench: back to where it was opened from (the
+        # project, or Home), or Home when there is no history.
+        if self._nav_back:
+            self.back()
+        elif self._current_project is not None:
+            self.navigate(VIEW_DETAIL, pid=self._current_project["id"])
+        else:
+            self.navigate(VIEW_HOME)
+
     def _ufe_project_badge_payload(self, pid):
         # The badge's payload, built by the SAME function the project list
         # rows use (G): same kind chip, same hue, same words.
@@ -8931,9 +9988,9 @@ class MainWindow(QMainWindow):
         dlg.set_point_hook(None)     # and no project to save points to
         dlg.set_reset_hooks(None, None)   # and nothing to reset (ADR-047)
         dlg.set_object(None)         # and no stale project object
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        # Interfaz 1.0: the workbench is a page of the shell, full screen
+        self._ufe_page()
+        self.navigate(VIEW_UFE)
 
     def _use_ufe(self):
         # @return: True when FITS work opens in the unified editor
@@ -9078,12 +10135,11 @@ class MainWindow(QMainWindow):
             badge = getattr(dlg, "set_project_badge", None)
             if callable(badge):
                 badge(None)              # ad-hoc: no project behind it
+        self._ufe_page()
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        self.navigate(VIEW_UFE, pid=hook_pid)
         return dlg
 
     # (the object attaches via set_object at the end of _ufe_open; a
@@ -9773,6 +10829,39 @@ class MainWindow(QMainWindow):
     def _drop(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
+
+    def _install_mouse_nav(self):
+        # Interfaz 1.1: the mouse side buttons (back/forward) navigate too.
+        # An app-wide event filter is the only way to see them whatever
+        # widget is under the cursor.
+        from PySide6.QtCore import QObject, QEvent, Qt as _Qt
+        from PySide6.QtWidgets import QApplication
+        win = self
+
+        class _NavMouseFilter(QObject):
+            def eventFilter(self, obj, ev):
+                if ev.type() == QEvent.Type.MouseButtonPress:
+                    if ev.button() == _Qt.BackButton:
+                        win.back()
+                        return True
+                    if ev.button() == _Qt.ForwardButton:
+                        win.forward()
+                        return True
+                return False
+
+        self._nav_mouse_filter = _NavMouseFilter(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self._nav_mouse_filter)
+
+    def resizeEvent(self, event):
+        # Keeps the overlay drawer/scrim glued to the content area while
+        # the window grows or shrinks (Interfaz 1.0).
+        # @args: event - the QResizeEvent
+        super().resizeEvent(event)
+        if getattr(self, "_drawer", None) is not None \
+                and self._drawer.isVisible():
+            self._position_overlay()
 
     def closeEvent(self, event):
         # Quitting with live threads must not end in «QThread destroyed

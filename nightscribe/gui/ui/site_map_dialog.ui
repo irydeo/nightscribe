@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.5: the site picker as a dialog.
+
+  Settings is already a dense page, so the map is not embedded there: the
+  Observatory group offers a button that opens this window, and the chosen
+  point is copied back into the latitude and longitude fields. The map
+  itself is gui/widgets/site_map.py, the same widget the Welcome step uses,
+  so the two can never drift.
+
+  The structure, texts and tooltips live here (ADR-005); mapHost is a
+  placeholder for the custom widget (placeholder QWidget + drop_in).
+-->
+<ui version="4.0">
+ <class>SiteMapDialog</class>
+ <widget class="QDialog" name="SiteMapDialog">
+  <!-- No windowTitle and no minimumSize here on purpose: adopt_ui()
+       transplants ONLY the layout, so anything declared on the root is
+       silently dropped (it stays on the hidden husk). Both are set in
+       gui/site_map_dialog.py, like every other dialog of the app. -->
+  <layout class="QVBoxLayout" name="mapDialogLayout">
+   <property name="leftMargin"><number>16</number></property>
+   <property name="topMargin"><number>14</number></property>
+   <property name="rightMargin"><number>16</number></property>
+   <property name="bottomMargin"><number>14</number></property>
+   <property name="spacing"><number>8</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_map_title">
+     <property name="text"><string>Where do you look at the sky from?</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_map_sub">
+     <property name="text"><string>Click the point, drag to move around and use the wheel to zoom. The shaded half of the map is the half that is in the dark right now; the numbers under the cursor are what you are about to pick.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="mapHost">
+     <property name="minimumSize"><size><width>0</width><height>240</height></size></property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch><verstretch>1</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_map_pick">
+     <property name="text"><string/></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="mapDialogActions">
+     <item>
+      <spacer name="mapDialogSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_map_cancel">
+       <property name="text"><string>Cancel</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_map_use">
+       <property name="text"><string>Use this point</string></property>
+       <property name="toolTip"><string>Copy these coordinates into the site fields</string></property>
+       <property name="enabled"><bool>false</bool></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

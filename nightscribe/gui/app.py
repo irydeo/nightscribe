@@ -72,21 +72,18 @@ def run():
 
     # First the backup snapshot (ADR-042): core/backup.py copies the
     # current database before anything imports core.db, because that
-    # import migrates it in place and the wizard's report needs the
+    # import migrates it in place and the Welcome view's report needs the
     # BEFORE picture.
     # @return: the pre-migration dict, or None when no database exists yet
     from ..core import backup
     snapshot = backup.backup()
 
-    # Then the new-version wizard, with the snapshot for its data page.
-    from .wizard import maybe_run_wizard
-    if not maybe_run_wizard(snapshot):
-        return 0  # user cancelled the first-run wizard: clean exit
-
-    # Only now build the main window: a cancelled first run should not
-    # pay to import and assemble the whole app (and the wizard's choices
-    # are already in config).
+    # Interfaz 1.0 (ADR-053): no modal wizard blocks the start. The setup
+    # (observatory, targets, data report) lives inside the main window's
+    # Welcome view; the snapshot travels to it so the migration report is
+    # the "before" picture. A first run with no site opens Welcome and
+    # stays usable (nothing is computed until the observer asks).
     from .main_window import MainWindow
-    win = MainWindow()
+    win = MainWindow(snapshot=snapshot)
     win.show()
     return app.exec()

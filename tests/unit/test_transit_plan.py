@@ -125,6 +125,9 @@ def _select(window, name, ctx):
         window._proj_panel_loader = (lambda name_, fallback_target=None:
                                      FakeWorker(FAKE_ELEMENT))
         window._build_project_page(p)
+        # ADR-041 rev.: the landing page is the object card, so the Capture
+        # step (where these blocks live) has to be opened explicitly
+        window._show_tab("plan")
     finally:
         window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
     return p
@@ -186,6 +189,7 @@ def test_checklist_persists_across_rebuild(window):
                                  FakeWorker(FAKE_ELEMENT))
     try:
         window._build_project_page(fresh)
+        window._show_tab("plan")     # ADR-041 rev.: the card is the landing
     finally:
         window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
     cbs = window._project_widgets["transit_checklist"]

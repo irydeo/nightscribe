@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.0 (ADR-053): the manual object form. When the name search does
+  not locate an object, the observer types its data here and the project is
+  created just the same. Common fields for every kind; the kind-specific
+  block swaps with the Type combo (ADR-005: structure and texts live here,
+  gui/widgets/manual_object_panel.py wires and reads them).
+-->
+<ui version="4.0">
+ <class>ManualObjectPanel</class>
+ <widget class="QWidget" name="ManualObjectPanel">
+  <layout class="QVBoxLayout" name="mfLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_mf_title">
+     <property name="text"><string>Create the object by hand</string></property>
+     <property name="styleSheet"><string notr="true">font-size: 14px; font-weight: bold;</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_mf_sub">
+     <property name="text"><string>It was not located. Fill in its data and the project is created just the same: record, capture, analysis and publishing.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QGridLayout" name="commonGrid">
+     <item row="0" column="0"><widget class="QLabel" name="lbl_mf_name"><property name="text"><string>Name:</string></property></widget></item>
+     <item row="0" column="1"><widget class="QLineEdit" name="edt_mf_name"/></item>
+     <item row="0" column="2"><widget class="QLabel" name="lbl_mf_kind"><property name="text"><string>Type:</string></property></widget></item>
+     <item row="0" column="3">
+      <widget class="QComboBox" name="cmb_mf_kind">
+       <item><property name="text"><string>Supernova</string></property></item>
+       <item><property name="text"><string>NEO</string></property></item>
+       <item><property name="text"><string>Comet</string></property></item>
+       <item><property name="text"><string>PCCP</string></property></item>
+       <item><property name="text"><string>Transit</string></property></item>
+       <item><property name="text"><string>Variable</string></property></item>
+       <item><property name="text"><string>HADS</string></property></item>
+      </widget>
+     </item>
+     <item row="1" column="0"><widget class="QLabel" name="lbl_mf_ra"><property name="text"><string>RA (deg):</string></property></widget></item>
+     <item row="1" column="1"><widget class="QLineEdit" name="edt_mf_ra"/></item>
+     <item row="1" column="2"><widget class="QLabel" name="lbl_mf_dec"><property name="text"><string>Dec (deg):</string></property></widget></item>
+     <item row="1" column="3"><widget class="QLineEdit" name="edt_mf_dec"/></item>
+     <item row="2" column="0"><widget class="QLabel" name="lbl_mf_mag"><property name="text"><string>Magnitude:</string></property></widget></item>
+     <item row="2" column="1"><widget class="QLineEdit" name="edt_mf_mag"/></item>
+     <item row="2" column="2"><widget class="QLabel" name="lbl_mf_notes"><property name="text"><string>Notes / alias:</string></property></widget></item>
+     <item row="2" column="3"><widget class="QLineEdit" name="edt_mf_notes"/></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QStackedWidget" name="kind_stack">
+     <widget class="QWidget" name="page_sn">
+      <layout class="QGridLayout" name="snGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_sn_date"><property name="text"><string>Discovery date:</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_sn_date"><property name="placeholderText"><string>YYYY-MM-DD</string></property></widget></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_sn_type"><property name="text"><string>Type:</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_sn_type"><property name="placeholderText"><string>Ia, II…</string></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_sn_host"><property name="text"><string>Host galaxy:</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLineEdit" name="edt_sn_host"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_comet">
+      <layout class="QGridLayout" name="cometGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_comet_peri"><property name="text"><string>Perihelion date:</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_comet_peri"><property name="placeholderText"><string>YYYY-MM-DD</string></property></widget></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_comet_h"><property name="text"><string>Absolute H:</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_comet_h"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_neo">
+      <layout class="QGridLayout" name="neoGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_neo_rate"><property name="text"><string>Apparent rate (″/min):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_neo_rate"/></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_neo_h"><property name="text"><string>H:</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_neo_h"/></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_neo_moid"><property name="text"><string>MOID (AU):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLineEdit" name="edt_neo_moid"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_transit">
+      <layout class="QGridLayout" name="transitGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_tr_period"><property name="text"><string>Period (d):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_tr_period"/></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_tr_t0"><property name="text"><string>Epoch T0 (JD):</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_tr_t0"/></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_tr_dur"><property name="text"><string>Duration (h):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLineEdit" name="edt_tr_dur"/></item>
+       <item row="1" column="2"><widget class="QLabel" name="lbl_tr_depth"><property name="text"><string>Depth (mmag):</string></property></widget></item>
+       <item row="1" column="3"><widget class="QLineEdit" name="edt_tr_depth"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_variable">
+      <layout class="QGridLayout" name="varGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_var_period"><property name="text"><string>Period (d):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_var_period"/></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_var_amp"><property name="text"><string>Amplitude (mag):</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_var_amp"/></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_var_epoch"><property name="text"><string>Epoch (JD):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLineEdit" name="edt_var_epoch"/></item>
+       <item row="1" column="2"><widget class="QLabel" name="lbl_var_sub"><property name="text"><string>VSX subtype:</string></property></widget></item>
+       <item row="1" column="3"><widget class="QLineEdit" name="edt_var_sub"/></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_hads">
+      <layout class="QGridLayout" name="hadsGrid">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_hads_period"><property name="text"><string>Period (d):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_hads_period"/></item>
+       <item row="0" column="2"><widget class="QLabel" name="lbl_hads_amp"><property name="text"><string>Amplitude (mag):</string></property></widget></item>
+       <item row="0" column="3"><widget class="QLineEdit" name="edt_hads_amp"/></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_hads_epoch"><property name="text"><string>Epoch (JD):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLineEdit" name="edt_hads_epoch"/></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_mf_status">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="mfActions">
+     <item>
+      <spacer name="mfSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+     <item><widget class="QPushButton" name="btn_mf_cancel"><property name="text"><string>Cancel</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_mf_create"><property name="text"><string>Create project</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

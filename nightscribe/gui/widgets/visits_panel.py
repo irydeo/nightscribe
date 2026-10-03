@@ -38,12 +38,34 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
                                QMessageBox, QWidget)
 
 from ..ui_loader import adopt_ui, drop_in, load_ui
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
+
+# The visits list: how tall it may grow before it scrolls itself.
+_LIST_MAX_H = 168
+
+
+class _ContentList(PassiveList):
+    """A list that asks for the height of what it holds.
+
+    A QListWidget answers sizeHint() with a fixed 256x192 whatever its
+    content, so a project with one visit kept 180 px of empty box. This one
+    asks for the rows it has (capped), which is what lets the Analysis tab
+    fit without a page scrollbar.
+    """
+
+    def sizeHint(self):
+        # @return: the width the base wants, the height the content needs
+        base = super().sizeHint()
+        rows = max(1, min(self.count(), 8))
+        row = self.sizeHintForRow(0) if self.count() else 22
+        height = rows * max(row, 22) + 2 * self.frameWidth() + 6
+        return QSize(base.width(), min(height, _LIST_MAX_H))
+
 
 logger = logging.getLogger("nightscribe.gui.visits_panel")
 
@@ -124,12 +146,22 @@ class VisitsPanel(QWidget):
         self.btn_open.clicked.connect(self._on_open_selected)
         self.lbl_count = self._ui.lbl_count
         self.lbl_empty = self._ui.lbl_empty
-        self.lst = PassiveList()
+        self.lst = _ContentList()
+        # Interfaz 1.7: the list grows with its content instead of
+        # reserving a fixed box (a project with ONE visit kept ~180 px of
+        # empty list, which is what pushed the Analysis tab past the fold).
+        # The cap keeps twenty visits from taking the whole page: past it,
+        # the list scrolls itself.
+        self.lst.setMaximumHeight(_LIST_MAX_H)
         self.lst.setToolTip(self.tr(
             "The project's visits, newest first; double-click opens one"))
         self.lst.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.lst.itemSelectionChanged.connect(self._on_select)
         drop_in(self.layout(), self._ui.ph_list, self.lst)
+        # Interfaz 1.7: the panel shares its row with the light curve, so it
+        # is taller than its own content. Without this the label, the list
+        # and the buttons drift apart down the column.
+        self.layout().addStretch(1)
         self._show_empty(True)
 
     # ------------------------------------------------------------ state
@@ -181,7 +213,12 @@ class VisitsPanel(QWidget):
             item.setData(Qt.UserRole, s["id"])
             self.lst.addItem(item)
         n = len(sessions)
-        self.lbl_count.setText(self.tr("{0} visits").format(n) if n else "")
+        if not n:
+            self.lbl_count.setText("")
+        elif n == 1:
+            self.lbl_count.setText(self.tr("1 visit"))
+        else:
+            self.lbl_count.setText(self.tr("{0} visits").format(n))
         self._show_empty(n == 0)
         if n and sel is not None:
             for row in range(self.lst.count()):

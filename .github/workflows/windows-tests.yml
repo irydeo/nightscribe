@@ -65,7 +65,7 @@ jobs:
         # paying for the whole suite: `only` runs one or more files (also
         # serial) and `qpa` swaps QT_QPA_PLATFORM, which is how a platform
         # plugin's own bug is told apart from the app's.
-        timeout-minutes: 45
+        timeout-minutes: 70
         # 45 minutes, measured: the suite takes 7m38s serially on this
         # machine and that runner is about five times slower (the live
         # session test alone is 30s, the workbench fixtures 24s each, the

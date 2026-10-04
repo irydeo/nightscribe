@@ -132,6 +132,33 @@ CREATE INDEX IF NOT EXISTS idx_calib_key
 `core/calibration.py` usable desde tests y CLI, con la biblioteca indexada y la
 receta resuelta; la GUI todavía no expone la acción (llega en la fase 7).
 
+## Resultado (2026-10-04)
+
+Implementado en la rama `feature/astrometry-minor-planets`:
+
+- **`core/calibration.py`** con la biblioteca (`add_master`, `list_masters`,
+  `delete_master`, `find_master`), la receta (`resolve_recipe`), el motor
+  (`calibrate`, `load_masters`) y el lote (`calibrate_paths`,
+  `export_calibrated`). El recorte por ROI no es una función aparte: `calibrate`
+  y `load_masters` aceptan un `box` y el flat se normaliza siempre sobre el
+  frame completo (D32), que era el punto delicado.
+- **Lectura con astropy** siguiendo D32: `read_image` usa
+  `memmap=True, do_not_scale_image_data=True` y aplica `BSCALE`/`BZERO` a mano
+  en float32. Verificado con un FITS con `BZERO`.
+- **Migración v16** en `core/db.py`: `calib_masters` + `idx_calib_key`, con su
+  nota de migración para el asistente.
+- **Config**: `calib_root`, `calib_temp_tol_c` (3,0) y `calib_export` (False).
+- **Regla de la receta confirmada en tests**: un dark a la exposición del light
+  ya incluye el bias y **no** se resta además el bias; el bias es el respaldo y
+  avisa de que queda la térmica; el bias no se casa por exposición (no tiene
+  una propia); el flat se casa por filtro.
+- **Tests**: `tests/unit/test_calibration.py` (22) y `tests/unit/test_db_v16.py`
+  (3), más la actualización de las aserciones de «última versión» (15 → 16) en
+  los tests de migración existentes. Suite completa: **2614 passed**.
+
+Pendiente de la fase (no bloquea): el CLI de calibración y la nomenclatura
+real de los masters del autor (llega con la verificación 8 del checklist).
+
 ## Hecho cuando
 
 La suite unitaria está verde, la migración v16 abre bases existentes sin

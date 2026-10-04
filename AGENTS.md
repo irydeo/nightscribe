@@ -110,6 +110,10 @@ nightscribe/
                       #   RON, oscuridad, régimen short/normal y linealidad
                       #   sugerida (datasheet; linealidad y tope de exposición
                       #   se miden por ganancia)
+    calibration.py    # calibración de imágenes (ADR-061): biblioteca de masters
+                      #   indexada (cámara/ganancia/temperatura/exposición/filtro),
+                      #   receta declarativa (un dark ya incluye el bias), flat
+                      #   normalizado, en memoria con export opcional
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame atado por comparada, ensemble con veto MAD,
                       #   puertas que marcan y nunca borran, tiempo a media

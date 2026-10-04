@@ -215,7 +215,7 @@ def test_delete_cascades(tmp_db):
 
 def test_migration_user_version_is_current(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 15
+    assert v == 16
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -250,8 +250,8 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -300,8 +300,8 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
@@ -380,7 +380,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
 
     file, pid = _build_v3_db(tmp_path / "v3.db")
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
 
     # the project itself is intact (kind/name/status/context unchanged)
     row = db.execute(
@@ -415,7 +415,7 @@ def test_migration_v4_is_idempotent(tmp_path):
     file, _pid = _build_v3_db(tmp_path / "v3.db")
     Database(str(file))               # migrates 3 -> 4
     db = Database(str(file))          # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 16
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols

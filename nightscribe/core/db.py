@@ -446,6 +446,29 @@ def _migrate(conn):
                 conn.execute("ALTER TABLE project_sessions ADD COLUMN"
                              " curve_run_id INTEGER")
         conn.execute("PRAGMA user_version = 15")
+    if v < 16:
+        # IMAGE CALIBRATION (2026-10-04, ADR-061). The library of master
+        # frames the user builds outside: indexed by what makes a master
+        # valid (camera, gain, sensor temperature, exposure, filter), so
+        # the right dark is subtracted and the right flat divided. The
+        # files stay where the user keeps them; this only points at them.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS calib_masters (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind      TEXT NOT NULL,   -- bias | dark | dark_flat | flat
+            path      TEXT NOT NULL,
+            camera    TEXT,
+            gain      REAL,
+            temp_c    REAL,
+            exptime_s REAL,
+            filter    TEXT,
+            created   TEXT,
+            meta      TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_calib_key
+            ON calib_masters(camera, gain, exptime_s, filter, kind);
+        """)
+        conn.execute("PRAGMA user_version = 16")
     conn.commit()
 
 
@@ -508,6 +531,10 @@ MIGRATION_NOTES = {
         "night several times, the visit remembers which pass it shows, "
         "and you can pick any other from \"Series > Passes of this "
         "visit\"."),
+    16: QT_TRANSLATE_NOOP("NSMigrations",
+        "Image calibration: a library of master frames (bias, dark, "
+        "flat) that NightScribe uses to clean your lights before "
+        "stacking them."),
 }
 
 

@@ -103,6 +103,13 @@ DEFAULTS = {
     "ccd_read_noise": None,     # e-
     "ccd_saturate": None,       # ADU ceiling
     "flat_resid_mag": 0.007,    # flat-field residual floor in the error
+    # Image calibration (ADR-061): where the master frames live, how far
+    # the sensor temperature may drift and still accept a dark (+/-3 C by
+    # default), and whether the calibrated frames are written to disk (off
+    # by default: the stacking consumes them in memory).
+    "calib_root": "",           # empty -> the data dir's calib/ folder
+    "calib_temp_tol_c": 3.0,
+    "calib_export": False,
     # Camera profile (core/cameras.py presets): the sensor template and the
     # photometric limits the preset fills (all editable; the linearity and
     # the working max exposure are per gain and must be measured/set by the

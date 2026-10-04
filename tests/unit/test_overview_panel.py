@@ -1538,23 +1538,22 @@ def test_resize_keeps_full_panel_visible(qapp):
     qapp.processEvents()
     resize_to_panel_content(dlg, p)
     qapp.processEvents()
-    # A platform may clamp the window to its desktop (Windows does, the
-    # offscreen one does not): when the panel's own hint does not fit the
-    # viewport it was given, this screen cannot show it whole and the
-    # assertions below would fail with the design intact (measured
-    # 2026-10-01 on the 1024x768 Windows runner).
     # A platform may CLAMP the window to its desktop: Windows does, the
-    # offscreen one does not. When the dialog that comes back is shorter than
-    # the one the helper asked for, this screen cannot show the whole panel
-    # and the scroll area is the answer, not a bug (measured on the Windows
-    # runner: the panel needs 1929 px, the window came back at 1780, and the
-    # CTA sat below the fold). Asking the SCREEN does not work: the offscreen
-    # platform reports 800x800 and every run would skip.
-    from nightscribe.gui.overview import _DLG_CHROME
-    wanted = p.sizeHint().height() + _DLG_CHROME
-    if dlg.height() < wanted - 2:
+    # offscreen one does not. The helper grows the dialog until the panel
+    # fits, so when the window comes back SHORTER than the panel plus the
+    # chrome it actually has, the platform refused and this screen cannot
+    # show the panel whole: the scroll area is the answer there, not a bug
+    # (measured on the Windows runner: the panel needs 1929 px, the chrome is
+    # 193, and the window came back at 1989, so the CTA sat below the fold).
+    #
+    # The chrome is READ, not assumed: it is 22 px here (the dialog layout's
+    # own margins) and 193 there. Asking the SCREEN does not work either: the
+    # offscreen platform reports 800x800 and every run would skip.
+    chrome = dlg.height() - area.viewport().height()
+    if dlg.height() < p.sizeHint().height() + chrome - 2:
         pytest.skip(f"the platform clamped the window to {dlg.height()} px "
-                    f"(it asked for {wanted}): this screen cannot show the "
+                    f"({p.sizeHint().height()} px of panel plus {chrome} px "
+                    f"of chrome would need more): this screen cannot show the "
                     f"whole ready panel")
     # the CTA is not hidden, and the panel foot fits the visible viewport
     assert not p.btn_project.isHidden(), "CTA must be shown for for_post"

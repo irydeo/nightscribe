@@ -49,17 +49,17 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Unit tests (a red suite publishes nothing)
+        # The SAME command the CI job runs: -n auto --dist loadfile, one
+        # process per file. Serial, 2588 tests are 45-65 minutes on this
+        # runner and the step was killed at its 45-minute limit with the suite
+        # at 99%: the run that merged PR #18 did exactly that and the preview
+        # published NOTHING, which is the worst possible failure for a gate
+        # that exists to publish. Both gates give the same signal now.
+        #
         # Bounded on purpose: a test that stalls on the network must fail the
         # gate, not hang the runner. -v so a timeout log names the culprit.
-        #
-        # SERIAL: measured on this runner (2026-10-01), the suite does 1886
-        # tests in 12 minutes serially (0,38 s each, so 2400+ fit in ~16),
-        # while `-n auto` (8 workers for 2-4 cores) did not finish in 25.
         timeout-minutes: 45
-        # 45 minutes, measured: the suite takes 7m38s serially on this
-        # machine and that runner is about five times slower, so ~38
-        # minutes plus the install.
-        run: python -m pytest tests/unit -v
+        run: python -m pytest tests/unit -n auto --dist loadfile -v
 
       - name: Resolve the package version
         id: ver

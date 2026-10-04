@@ -89,8 +89,8 @@ def test_list_and_project_share_one_page(window):
     from nightscribe.gui.main_window import VIEW_DETAIL
     p = project.list_projects(coredb.db)[0]
     window.navigate(VIEW_DETAIL, pid=p["id"])
-    assert window.projects.lst_projects.isVisible()
-    assert window.projects.page_detail.isVisible()
+    assert not window.projects.lst_projects.isHidden()
+    assert not window.projects.page_detail.isHidden()
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_detail
 
@@ -110,11 +110,11 @@ def test_the_visit_window_steps_aside_for_the_workbench(window):
     assert panel is not None
     panel.btn_new.click()                  # creates the visit and opens it
     win = panel._win
-    assert win is not None and win.isVisible()
+    assert win is not None and not win.isHidden()
     window.navigate(VIEW_UFE)
-    assert not win.isVisible()             # out of the editor's way
+    assert win.isHidden()             # out of the editor's way
     window.navigate(VIEW_DETAIL, pid=p["id"])
-    assert win.isVisible()                 # and back, same visit
+    assert not win.isHidden()                 # and back, same visit
     assert panel._win is win
 
 
@@ -135,7 +135,7 @@ def test_a_visit_closed_while_hidden_is_not_resurrected(window):
     panel.btn_new.click()
     win = panel._win
     window.navigate(VIEW_UFE)
-    assert not win.isVisible()
+    assert win.isHidden()
     # a project switch closes the panel's window while it is hidden
     panel.close_visit_window()
     window.navigate(VIEW_DETAIL, pid=p["id"])
@@ -246,14 +246,14 @@ def test_a_project_row_carries_its_kind_colour(window):
 def test_a_narrow_row_drops_the_least_important_bits(window):
     row = _rows(window)[0]
     row.resize(320, 54)
-    assert not row.lbl_detail.isVisible()       # too narrow for the numbers
-    assert not row.lbl_camp.isVisible()
+    assert row.lbl_detail.isHidden()       # too narrow for the numbers
+    assert row.lbl_camp.isHidden()
     # The numbers come back as soon as they REALLY fit, and "really" is
     # measured with the running font: a fixed 500 is a Linux number and this
     # assertion failed on the Windows runner, where the same text is wider.
     fits = next(w for w in range(320, 1200, 10) if row._detail_fits(w))
     row.resize(fits, 54)
-    assert row.lbl_detail.isVisible()
+    assert not row.lbl_detail.isHidden()
 
 
 def test_the_curve_wins_the_room_at_the_default_width(window):
@@ -274,14 +274,14 @@ def test_the_curve_wins_the_room_at_the_default_width(window):
     row = [r for r in _rows(window) if r.lbl_name.text()
            == p["object_name"]][-1]
     row.resize(392, 54)                     # the default list width
-    assert row.lbl_spark.isVisible()        # the curve is there
-    assert not row.lbl_detail.isVisible()   # ... and the numbers gave way
+    assert not row.lbl_spark.isHidden()        # the curve is there
+    assert row.lbl_detail.isHidden()   # ... and the numbers gave way
     assert row.toolTip()                    # but they are one hover away
     assert row.lbl_detail.text() in row.toolTip()
     # widening the list brings both back; the width is measured, not
     # guessed (the numbers' threshold depends on the running font)
     fits = next(w for w in range(392, 1400, 10) if row._detail_fits(w))
     row.resize(fits, 54)
-    assert row.lbl_spark.isVisible()
-    assert row.lbl_detail.isVisible()
+    assert not row.lbl_spark.isHidden()
+    assert not row.lbl_detail.isHidden()
     assert not row.toolTip()

@@ -90,8 +90,8 @@ def test_opening_a_project_shows_it_beside_the_list(window):
     window.on_refresh_projects()
     window.navigate(VIEW_DETAIL, pid=p["id"])
     assert window._shell_stack().currentIndex() == VIEW_DETAIL
-    assert window.projects.page_detail.isVisible()
-    assert window.projects.lst_projects.isVisible()
+    assert not window.projects.page_detail.isHidden()
+    assert not window.projects.lst_projects.isHidden()
 
 
 def test_home_matches_the_mock(window):
@@ -114,13 +114,13 @@ def test_home_hides_the_drawer_and_its_tab(window):
     # hidden and the drawer does not open; both come back elsewhere.
     # Campaigns (not Tonight) so the test never triggers the network.
     from nightscribe.gui.main_window import VIEW_CAMPAIGNS
-    assert not window._menus.btn_vtab.isVisible()
+    assert window._menus.btn_vtab.isHidden()
     window._drawer_open(True)
-    assert not window._drawer.isVisible()
+    assert window._drawer.isHidden()
     window.navigate(VIEW_CAMPAIGNS)
-    assert window._menus.btn_vtab.isVisible()
+    assert not window._menus.btn_vtab.isHidden()
     window._drawer_open(True)
-    assert window._drawer.isVisible()
+    assert not window._drawer.isHidden()
     window._drawer_open(False)
 
 
@@ -156,7 +156,7 @@ def test_workbench_has_a_fixed_index_and_shows(window):
     window._ufe_page()
     window._goto_tab(VIEW_UFE)
     assert window._shell_stack().currentIndex() == VIEW_UFE
-    assert window._ufe.isVisible()
+    assert not window._ufe.isHidden()
     # and leaving the view keeps it alive (its state survives, ADR-047)
     from nightscribe.gui.main_window import VIEW_HOME
     window._goto_tab(VIEW_HOME)

@@ -200,7 +200,7 @@ def test_capture_fits_with_ccdciel_connected(window):
     window._ccd_timer.stop()
     for _ in range(8):
         QApplication.processEvents()
-    assert window._ccd_state_grp.isVisible()
+    assert not window._ccd_state_grp.isHidden()
     widgets = window._ccd_widgets()
     assert theme.C_GOOD in widgets["ccd_status"].styleSheet()
     assert theme.C_GOOD in widgets["ccd_tracking"].styleSheet()

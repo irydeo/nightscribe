@@ -389,7 +389,7 @@ def test_first_run_is_not_an_update(make_window):
     w = make_window(snapshot=None)
     u = w._welcome.ui
     w._welcome.set_context(has_projects=False, update_version=None)
-    assert not u.lbl_data_badge.isVisible()
+    assert u.lbl_data_badge.isHidden()
     assert u.btn_data_ack.property("primary") is False
     assert not u.btn_create.isHidden()
     assert not u.btn_step_obs.text().startswith("✓")

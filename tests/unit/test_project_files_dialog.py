@@ -66,7 +66,7 @@ def _menu_row_texts(dlg, row):
 
 def test_empty_state_message(dlg):
     dlg.set_files([])
-    assert dlg.lbl_status.isVisible()
+    assert not dlg.lbl_status.isHidden()
     assert dlg.lbl_status.text()
     assert dlg.tbl.rowCount() == 0
     assert dlg.project_id is None

@@ -469,6 +469,81 @@ def _migrate(conn):
             ON calib_masters(camera, gain, exptime_s, filter, kind);
         """)
         conn.execute("PRAGMA user_version = 16")
+    if v < 17:
+        # MINOR-PLANET ASTROMETRY (2026-10-04, phase 8, D14). The measured
+        # positions, the resolved rate and the frame manifest get their own
+        # tables, so one execution ("run") can be undone whole without ever
+        # touching the photometry of the visit.
+        #
+        # session_id is the VISIT (FK project_sessions), never the run: db.py
+        # keeps PRAGMA foreign_keys = ON and the multinight view links a point
+        # back to its night through that column. run_id is the execution (the
+        # same split measurement_runs made in ADR-048).
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS astrometry_runs (
+            id              INTEGER PRIMARY KEY,
+            project_id      INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+            session_id      INTEGER REFERENCES project_sessions(id)
+                            ON DELETE SET NULL,   -- the VISIT
+            created         TEXT,
+            cfg_json        TEXT,             -- method, thresholds, report_source...
+            status          TEXT,             -- complete|not_detected|incomplete|undone
+            object_name     TEXT,
+            method          TEXT,             -- sum|mean|median|sigma
+            n_frames        INTEGER,
+            n_obs           INTEGER,
+            rate_arcsec_min REAL,
+            pa_deg          REAL,
+            sweep_json      TEXT,             -- the velocity sweep grid
+            dither          INTEGER,
+            snr_gate        REAL,
+            submit_snr      REAL,
+            detected        INTEGER
+        );
+        CREATE TABLE IF NOT EXISTS astrometry_points (
+            id                 INTEGER PRIMARY KEY,
+            run_id             INTEGER REFERENCES astrometry_runs(id)
+                               ON DELETE CASCADE,
+            project_id         INTEGER REFERENCES projects(id)
+                               ON DELETE CASCADE,
+            session_id         INTEGER REFERENCES project_sessions(id)
+                               ON DELETE SET NULL,   -- the VISIT
+            group_index        INTEGER,       -- which observation of the sequence
+            mjd                REAL,          -- T_mid of the group
+            ra                 REAL,
+            dec                REAL,
+            rms_ra             REAL,
+            rms_dec            REAL,
+            mag                REAL,
+            band               TEXT,
+            x                  REAL,
+            y                  REAL,
+            n_frames           INTEGER,
+            snr                REAL,
+            mag_limit          REAL,
+            source             TEXT,          -- stack|frames
+            method             TEXT,
+            flags              TEXT,
+            check_residual_ra  REAL,
+            check_residual_dec REAL,
+            check_scatter      REAL,
+            check_ok           INTEGER,
+            check_note         TEXT
+        );
+        CREATE TABLE IF NOT EXISTS astrometry_frames (
+            id        INTEGER PRIMARY KEY,
+            run_id    INTEGER REFERENCES astrometry_runs(id)
+                      ON DELETE CASCADE,
+            path      TEXT,
+            size      INTEGER,
+            filter    TEXT,
+            exptime_s REAL,
+            date_obs  TEXT,
+            archived  INTEGER DEFAULT 0,
+            moved_to  TEXT
+        );
+        """)
+        conn.execute("PRAGMA user_version = 17")
     conn.commit()
 
 
@@ -535,6 +610,10 @@ MIGRATION_NOTES = {
         "Image calibration: a library of master frames (bias, dark, "
         "flat) that NightScribe uses to clean your lights before "
         "stacking them."),
+    17: QT_TRANSLATE_NOOP("NSMigrations",
+        "Minor-planet astrometry: the measured positions, the resolved "
+        "motion and the frames of each run, tied to their visit and "
+        "undoable as one execution."),
 }
 
 

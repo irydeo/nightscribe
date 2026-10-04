@@ -1,0 +1,74 @@
+[
+  {
+    "_note": "Extract of a real MPC get-obs reply for (99942) Apophis, trimmed to 5 rows and to the ADES_DF fields NightScribe uses. Values are the ones the MPC served on 2026-10-04; the payload is NOT the full 9527-row answer. The trailing integer (200) mirrors the API envelope [payload, http_status].",
+    "ADES_DF": [
+      {
+        "stn": "W34",
+        "obstime": "2020-02-22T01:11:04Z",
+        "ra": "53.53118",
+        "dec": "12.77173",
+        "rmsra": "0.15",
+        "rmsdec": "0.15",
+        "mag": "19.8",
+        "band": "G",
+        "astcat": "Gaia2",
+        "ref": "MPS  1158847",
+        "mode": "CCD"
+      },
+      {
+        "stn": "703",
+        "obstime": "2020-12-04T10:41:43.230Z",
+        "ra": "169.165455",
+        "dec": "-7.125910",
+        "rmsra": "0.657",
+        "rmsdec": "0.648",
+        "mag": "19.35",
+        "band": "G",
+        "astcat": "Gaia2",
+        "ref": "MPS  1318603",
+        "mode": "CCD"
+      },
+      {
+        "stn": "T05",
+        "obstime": "2020-12-07T13:56:31.28Z",
+        "ra": "169.901010",
+        "dec": "-7.903010",
+        "rmsra": "0.255",
+        "rmsdec": "0.255",
+        "mag": "18.56",
+        "band": "Ao",
+        "astcat": "Gaia2",
+        "ref": "MPS  1318603",
+        "mode": "CCD"
+      },
+      {
+        "stn": "T08",
+        "obstime": "2020-12-09T13:35:24.25Z",
+        "ra": "170.374730",
+        "dec": "-8.400490",
+        "rmsra": "0.277",
+        "rmsdec": "0.277",
+        "mag": "18.46",
+        "band": "Ao",
+        "astcat": "Gaia2",
+        "ref": "MPS  1318603",
+        "mode": "CCD"
+      },
+      {
+        "stn": "F51",
+        "obstime": "2020-12-12T14:25:30.4Z",
+        "ra": "171.097675",
+        "dec": "-9.166820",
+        "rmsra": "0.019",
+        "rmsdec": "0.019",
+        "mag": "19.10",
+        "band": "Pw",
+        "astcat": "Gaia1",
+        "ref": "MPS  1318603",
+        "mode": "CCD"
+      }
+    ],
+    "OBS80": "99942        KC2020 02 22.04935 03 34 07.48 +12 46 18.2          19.8 GV~3lpXW34\n99942         C2020 12 04.44563911 16 39.71 -07 07 33.3          19.35GV~4ROF703\n99942         C2020 12 07.58091811 19 36.24 -07 54 10.8          18.56oV~4ROFT05\n99942         C2020 12 09.56625311 21 29.94 -08 24 01.8          18.46oV~4ROFT08\n99942         C2020 12 12.60104611 24 23.442-09 10 00.55         19.10wU~4ROFF51\n"
+  },
+  200
+]

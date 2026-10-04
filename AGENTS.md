@@ -118,6 +118,17 @@ nightscribe/
                       #   (media exposición), solve del primer frame, WCS
                       #   compuesto por registro, posición del objeto por
                       #   frame y aviso de dithering
+    astrometry.py     # medida astrométrica (ADR-062, fase 4): centroide
+                      #   subpíxel (photutils) para el stack y por frame,
+                      #   combinación por 1/σ², contraste de las dos vías,
+                      #   presupuesto de error y magnitud (se omite sin
+                      #   comparsas)
+    astrometry_store.py # persistencia de la astrometría (ADR-062, fase 8):
+                      #   astrometry_runs/points/frames, Undo por ejecución
+    free_space.py     # liberar espacio (ADR-062, fase 9): mover los
+                      #   originales de un run con éxito a procesados/ dentro
+                      #   del proyecto (no borrar), registrar el movimiento y
+                      #   poder restaurarlos; los calibrados se borran aparte
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame atado por comparada, ensemble con veto MAD,
                       #   puertas que marcan y nunca borran, tiempo a media

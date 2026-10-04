@@ -120,6 +120,26 @@ El módulo mide una posición por grupo y por las dos vías, las contrasta,
 calcula la magnitud si puede y devuelve rmsRA/rmsDec con su desglose. La GUI
 todavía no lo expone.
 
+## Resultado (2026-10-04)
+
+Implementado `core/astrometry.py` (rama `feature/astrometry-minor-planets`):
+
+- `centroid`: centroide subpíxel con `photutils` (`centroid_2dg`) sobre una
+  ventana con cielo local restado; devuelve error en píxeles, FWHM, redondez y
+  SNR. Rechaza una fuente pegada al borde de la ventana.
+- `measure_stack` / `measure_frames`: las dos vías, con el **mismo** centroide
+  (D7). La de frames combina con pesos 1/σ² y la RA ponderada por `cos(dec)`.
+- `combine_positions`: media ponderada con el desenrollado de la RA alrededor
+  de la media (para no romper en el salto 0/360) y la dispersión observada.
+- `compare`: el contraste de D16 (flag `disagree` si superan 0,5″ o 3σ).
+- `error_budget`: centroide + WCS + tiempo en cuadratura, con el desglose; la
+  RA dividida por `cos(dec)` (un píxel de RA no es un segundo de arco).
+- `measure_magnitude`: reutiliza la receta de punto cero de `core/photometry.py`;
+  sin comparsas ni punto cero devuelve `None` (se omite, no se inventa).
+
+Tests: `tests/unit/test_astrometry.py` (12), offline. El ancla del centroide es
+subpíxel (0,15 px) y el error crece con el ruido.
+
 ## Hecho cuando
 
 A6 y A11 pasan, el error total nunca es menor que sus partes, y la magnitud se

@@ -110,6 +110,31 @@ DEFAULTS = {
     "calib_root": "",           # empty -> the data dir's calib/ folder
     "calib_temp_tol_c": 3.0,
     "calib_export": False,
+    # Track & stack (ADR-062): the detection gate and the submission bar
+    # are DIFFERENT thresholds on purpose (the MPC recommends SNR >= 20 to
+    # submit and forbids marginal detections), the sweep walks a 5x5 grid
+    # around the theoretical velocity, and the cutout carries a margin
+    # over the object's own trail.
+    "astrometry_snr_sigma": 3.5,
+    "astrometry_submit_snr": 20.0,
+    "astrometry_sweep_pct": 5.0,
+    "astrometry_sweep_steps": 25,
+    "astrometry_method": "sigma",
+    "astrometry_cutout_margin_px": 64,
+    "astrometry_full_frame_final": True,
+    "astrometry_disagree_arcsec": 0.5,
+    "astrometry_disagree_sigma": 3.0,
+    "astrometry_astcat": "Gaia2",
+    # The check against other observers (ADR-062): Find_Orb is an external
+    # tool the user installs (never bundled); the residual is normalised by
+    # our own rms and the robust scatter of the others inside a window.
+    "findorb_path": "",
+    "findorb_run": False,
+    "astrometry_check_enabled": True,
+    "astrometry_check_sigma": 3.0,
+    "astrometry_check_floor_arcsec": 1.0,
+    "astrometry_check_window_days": 30,
+    "mpc_obs_ttl_h": 6,
     # Camera profile (core/cameras.py presets): the sensor template and the
     # photometric limits the preset fills (all editable; the linearity and
     # the working max exposure are per gain and must be measured/set by the

@@ -235,6 +235,24 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   only reused in posts when the survey licence allows it (ZTF/ATLAS with credit).
   Otherwise we link to the TNS object page. See ADR-016.
 
+## Minor Planet Center observations (the astrometry check and the card)
+
+`core/sources/mpc_obs.py` (ADR-062). Two public endpoints, no key, cached
+(TTL `mpc_obs_ttl_h`, 6 h):
+
+- `https://data.minorplanetcenter.net/api/get-obs` — every published
+  observation of an object, in ADES (`ADES_DF`, fields in lowercase:
+  `stn`, `obstime`, `ra`, `dec`, `rmsra`, `rmsdec`, `astcat`...) or in
+  `OBS80`. It is a GET **with a JSON body**.
+- `https://data.minorplanetcenter.net/api/get-obs-neocp` — the same for an
+  unconfirmed tracklet on the NEOCP (`trksubs`).
+
+Used for two things: the **check against other observers** (the residuals
+that Find_Orb compares ours with) and the object card's **history** (how
+many distinct observatories have seen it and the date of the last
+observation, D28). The occultation rows carry no RA/Dec, so positions are
+optional; dropping them would lose two stations and a year of history.
+
 ## External links (never embedded — copyright)
 
 Raben solar maps, SolarMonitor, SIDC/uset, universemonitor, ETD (var.astro.cz),

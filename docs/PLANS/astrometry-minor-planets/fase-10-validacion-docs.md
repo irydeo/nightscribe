@@ -84,6 +84,22 @@ validación y el reporte están implementados, documentados en los dos idiomas y
 validados con datos reales; las compuertas abiertas, si las hay, quedan
 escritas con su porqué y su plan.
 
+## Resultado (2026-10-04)
+
+- **Documentación de usuario**: `docs/ASTROMETRY.es.md` y `docs/ASTROMETRY.md`
+  publicados (flujo paso a paso, qué significa cada cifra, cuándo fiarse,
+  Find_Orb, liberar espacio y solución de problemas). Los borradores
+  `doc-findorb.es.md`/`doc-findorb.md` del plan quedan integrados en su
+  sección 6.
+- **`docs/DATA_SOURCES.md`**: entrada del source `mpc_obs` (endpoints, campos
+  en minúsculas, la trampa del GET con cuerpo, y para qué se usa).
+- **Validación real (A10)**: pendiente de ejecutar. El material está en
+  `tests/data/astrometry/` (manifiesto, PNG de Tycho y fixture recortado) y
+  el test funcional usa `NIGHTSCRIBE_ASTRO_DATASET`; necesita ASTAP, Horizons
+  y los 2,5 GB locales. **La agrupación en observaciones queda por determinar
+  empíricamente** (el folder no mapea de forma obvia a las posiciones
+  publicadas).
+
 ## Hecho cuando
 
 A10 pasa (residual < 0,3″, o la compuerta real queda documentada como abierta

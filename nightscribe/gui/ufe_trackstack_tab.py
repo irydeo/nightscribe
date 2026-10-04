@@ -1,0 +1,655 @@
+############################################################
+# -*- coding: utf-8 -*-
+#
+# NightScribe - Unified FITS Editor: Track & Stack tab module
+# Python  v3.12
+#
+# Francisco José Calvo Fernández
+# (c) 2026
+#
+# Licence GPL v3
+#
+############################################################
+
+"""The Track & Stack tab (astrometry plan, phase 7): the visit's sequence
+becomes MPC observations. The structure, texts and tooltips live in
+ui/ufe_trackstack_tab.ui (ADR-005); this module wires the signals, fills
+the tables and runs the pipeline through gui/workers.TrackStackWorker.
+
+The flow, top to bottom: how many observations the user wants (with the
+expected SNR per group recalculated on every change, D22), the stacking
+run with progress and Cancel, the group's stack in this tab's OWN viewer
+(the dialog's plate is never touched), the measurement with its two ways
+and the disagreement flag (D7/D16), the Find_Orb check with its verdict
+(D25/D29) and the report that lands in the visit's MPC block, where the
+ADR-022 validator has the last word.
+"""
+
+import logging
+import math
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QTableWidgetItem, QWidget
+
+from ..config import config
+from .ufe_state import UfeImageState
+from .ui_loader import adopt_ui, drop_in
+from .widgets.ufe_image_view import UfeImageView, cross_marker_items
+
+logger = logging.getLogger("nightscribe.gui.ufe_trackstack_tab")
+
+
+class UfeTrackStackTab(QWidget):
+    # @args: state - the shared UfeImageState (its plate is NOT touched:
+    #        the group stacks are shown in this tab's own state), lang -
+    #        "es" | "en", parent - widget
+
+    def __init__(self, state, lang="es", parent=None):
+        super().__init__(parent)
+        self._state = state
+        self._lang = lang
+        self._worker = None        # TrackStackWorker while it runs
+        self._frames = None        # list[Frame] of the open visit
+                                   # (headers only: no pixels live here)
+        self._ctx_paths = None     # the paths _frames was loaded from
+        self._base_snr = None      # SNR of the whole-sequence stack (the
+                                   # first run turns the expected-SNR
+                                   # column into a real projection, D22)
+        self._result = None        # the last run's payload
+        self._build_ui()
+        self._sync_context()
+
+    # ------------------------------------------------------------------ UI
+
+    def _build_ui(self):
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, fills the combos (labels through literal
+        # tr() so lupdate sees them) and wires every signal.
+        self._ui = adopt_ui(self, "ufe_trackstack_tab")
+        self.lbl_object = self._ui.lbl_object
+        self.spn_nobs = self._ui.spn_nobs
+        self.tbl_snr = self._ui.tbl_snr
+        self.cmb_method = self._ui.cmb_method
+        self.btn_stack = self._ui.btn_stack
+        self.prg_stack = self._ui.prg_stack
+        self.lbl_status = self._ui.lbl_status
+        self.lbl_notes = self._ui.lbl_notes
+        self.cmb_group = self._ui.cmb_group
+        self.tbl_points = self._ui.tbl_points
+        self.lbl_check = self._ui.lbl_check
+        self.chk_force = self._ui.chk_force
+        self.cmb_format = self._ui.cmb_format
+        self.btn_report = self._ui.btn_report
+        self.btn_send_mpc = self._ui.btn_send_mpc
+        self.txt_report = self._ui.txt_report
+        # the group viewer is this tab's OWN state + view: the dialog's
+        # plate (and its overlays) belong to the workbench, and a group's
+        # stack is another image (placeholder + replaceWidget, ADR-005)
+        self._stack_state = UfeImageState(self)
+        self._stack_view = UfeImageView(self._stack_state)
+        drop_in(self.layout(), self._ui.ph_stack_view, self._stack_view)
+        # the four combination methods of core/track_stack (D11), with the
+        # setting's default on top
+        self.cmb_method.addItem(self.tr("Sum"), "sum")
+        self.cmb_method.addItem(self.tr("Mean"), "mean")
+        self.cmb_method.addItem(self.tr("Median"), "median")
+        self.cmb_method.addItem(self.tr("Sigma-clipped"), "sigma")
+        _mi = self.cmb_method.findData(
+            config.get("astrometry_method", "sigma"))
+        self.cmb_method.setCurrentIndex(_mi if _mi >= 0 else 3)
+        self.cmb_format.addItem(self.tr("ADES PSV"), "ades")
+        self.cmb_format.addItem(self.tr("MPC 80 columns"), "mpc80")
+        self._btn_stack_label = self.btn_stack.text()
+        self.spn_nobs.valueChanged.connect(lambda _v: self._refresh_preview())
+        self.btn_stack.clicked.connect(self._on_stack)
+        self.cmb_group.currentIndexChanged.connect(self._show_group)
+        self.chk_force.toggled.connect(lambda _on: self._sync_report_buttons())
+        self.btn_report.clicked.connect(self._on_report)
+        self.btn_send_mpc.clicked.connect(self._on_send_mpc)
+        self._sync_report_buttons()
+
+    # ------------------------------------------------------- host wiring
+
+    def set_active(self, flag):
+        # @args: flag - True when the dialog hands this tab the stage
+        # @return: None. The context is re-read on entering: the visit may
+        #          have been armed (or changed) while the tab was hidden.
+        if flag:
+            self._sync_context()
+
+    def refresh_context(self):
+        # Called by the dialog when the host sets (or clears) the
+        # astrometry hook, so the tab does not wait for a stage change.
+        # @return: None
+        self._sync_context()
+
+    def shutdown(self):
+        # The pipeline worker must not outlive the workbench: a QThread
+        # destroyed while it runs aborts the whole application (the trap
+        # every other tab documents). Cancel stops it at the next stage
+        # boundary and wait() gives it a bounded time to land.
+        # @return: None
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._worker.wait(5000)
+        self._worker = None
+
+    def _context(self):
+        # @return: the visit context {"pid", "session_id", "paths",
+        #          "object_name"} the host hooked, or None (ad-hoc open:
+        #          without a visit there is no sequence, D15)
+        dlg = self.window()
+        getter = getattr(dlg, "astrometry_context", None)
+        if not callable(getter):
+            return None
+        try:
+            return getter()
+        except Exception as err:
+            logger.warning("astrometry hook failed: %s", err)
+            return None
+
+    def _say(self, text):
+        # @args: text - the status line's text ("" hides it)
+        # @return: None
+        self.lbl_status.setVisible(bool(text))
+        self.lbl_status.setText(text or "")
+
+    # ------------------------------------------------------------- visit
+
+    def _sync_context(self):
+        # The visit arms the tab (D15): with no visit the stack button
+        # stays DISABLED and the object line says why (a dead button
+        # teaches nobody). The frames' headers are read once per visit:
+        # load_sequence never touches pixels, so this is cheap enough for
+        # the GUI thread.
+        # @return: None
+        ctx = self._context() or {}
+        paths = tuple(ctx.get("paths") or ())
+        running = self._worker is not None and self._worker.isRunning()
+        self.btn_stack.setEnabled(bool(paths) and not running)
+        if not paths:
+            self._frames = None
+            self._ctx_paths = None
+            self.spn_nobs.setEnabled(False)
+            self.tbl_snr.setRowCount(0)
+            self.lbl_object.setText(self.tr(
+                "Object and ephemeris: open the editor from a visit to arm "
+                "the sequence."))
+            return
+        if paths != self._ctx_paths:
+            from ..core import track_stack
+            self._frames = track_stack.load_sequence(list(paths), config)
+            self._ctx_paths = paths
+            # a different visit invalidates the last run: its stacks, its
+            # check and its report belong to the other sequence
+            self._base_snr = None
+            self._result = None
+            self.cmb_group.clear()
+            self.cmb_group.setEnabled(False)
+            self.txt_report.clear()
+            self.lbl_notes.setVisible(False)
+            self._sync_report_buttons()
+        n = len(self._frames)
+        self.spn_nobs.setEnabled(True)
+        self.spn_nobs.blockSignals(True)
+        self.spn_nobs.setRange(1, max(1, n))
+        self.spn_nobs.setValue(min(self.spn_nobs.value(), max(1, n)))
+        self.spn_nobs.blockSignals(False)
+        # the object line, read-only (it comes from the project and from
+        # Horizons): name, frames and the visit's own time window
+        name = ctx.get("object_name") or self.tr("(unnamed)")
+        line = self.tr("Object: %1 · %2 frames").replace(
+            "%1", name).replace("%2", str(n))
+        stamps = [f.t_mid_jd for f in self._frames if f.t_mid_jd is not None]
+        if stamps:
+            from ..core import coords
+            t0 = coords.datetime_from_jd(min(stamps))
+            t1 = coords.datetime_from_jd(max(stamps))
+            line += self.tr(" · window %1–%2 UT").replace(
+                "%1", t0.strftime("%H:%M")).replace("%2", t1.strftime("%H:%M"))
+        self.lbl_object.setText(line)
+        self._refresh_preview()
+
+    def _refresh_preview(self):
+        # D22: the SNR grows with sqrt(n), so asking for more observations
+        # splits the signal, and the table says it BEFORE the user accepts.
+        # Until the first run there is no measured base SNR and the column
+        # stays "–": an estimate without a measurement would be invented.
+        # @return: None
+        from ..core import track_stack
+        rows = track_stack.preview_groups(self._frames or [],
+                                          self.spn_nobs.value(),
+                                          base_snr=self._base_snr)
+        floor = float(config.get("astrometry_submit_snr", 20.0))
+        tbl = self.tbl_snr
+        tbl.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            cells = (str(i + 1), str(row["n_frames"]),
+                     self._t_mid_text(row["t_mid"]),
+                     self._snr_text(row["snr_est"], floor))
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                item.setFlags(Qt.ItemIsEnabled)   # read-only: a preview
+                if col == 3 and row["snr_est"] is not None \
+                        and row["snr_est"] < floor:
+                    item.setToolTip(self.tr(
+                        "Below the MPC submission floor of %1: this "
+                        "observation would be left out of the report"
+                    ).replace("%1", f"{floor:.0f}"))
+                tbl.setItem(i, col, item)
+
+    def _snr_text(self, est, floor):
+        # @args: est - the expected SNR or None, floor - the submission
+        #        floor (D26)
+        # @return: the cell text; the ⚠ marks a group below the floor, so
+        #          it is seen before stacking, not after
+        if est is None:
+            return "–"
+        return f"{est:.1f}" + (" ⚠" if est < floor else "")
+
+    def _t_mid_text(self, jd):
+        # @args: jd - the group's middle-of-exposure instant (JD) or None
+        # @return: "HH:MM:SS" UTC, or "–"
+        if jd is None:
+            return "–"
+        from ..core import coords
+        return coords.datetime_from_jd(jd).strftime("%H:%M:%S")
+
+    # -------------------------------------------------------------- run
+
+    def _on_stack(self):
+        # The run button, and its Cancel while the worker runs (a long
+        # pipeline must have a way out, P1 #12). Everything heavy lives in
+        # TrackStackWorker; the tab wires, paints and persists nothing:
+        # the report goes to the visit's MPC block, which owns the
+        # database round trip (ADR-022/045).
+        # @return: None
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.cancel()
+            self._say(self.tr(
+                "Cancelling: the pipeline stops at the stage boundary it "
+                "is at; nothing is kept from a cancelled run."))
+            return
+        ctx = self._context() or {}
+        paths = ctx.get("paths") or []
+        name = ctx.get("object_name") or ""
+        if not paths:
+            self._say(self.tr(
+                "No visit with frames: open the editor from a visit to "
+                "stack its sequence."))
+            return
+        if not name:
+            self._say(self.tr(
+                "The project has no object name: the ephemeris cannot be "
+                "fetched, and without it there is no track."))
+            return
+        from .workers import TrackStackWorker
+        self.prg_stack.setVisible(True)
+        self.prg_stack.setRange(0, 0)          # busy until a stage counts
+        self.btn_stack.setText(self.tr("Cancel"))
+        self._say("")
+        self._worker = TrackStackWorker(
+            paths, name, self.spn_nobs.value(),
+            method=self.cmb_method.currentData() or "sigma", cfg=config,
+            obs_code=str(config.get("mpc_code", "")),
+            site=str(config.get("mpc_code", "")))
+        self._worker.progress.connect(self._on_progress)
+        self._worker.finished.connect(self._on_finished)
+        self._worker.failed.connect(self._on_failed)
+        self._worker.start()
+
+    def _on_progress(self, stage, done, total):
+        # @args: stage - the worker's stage key, done/total - inside that
+        #        stage
+        # @return: None. The human text is a literal self.tr() table (the
+        #          way TonightWorker's phases do it, CONTRIBUTING rule 5).
+        self.prg_stack.setRange(0, max(1, total))
+        self.prg_stack.setValue(done)
+        text = self._stage_text(stage)
+        if text:
+            self._say(text + (f" ({done}/{total})" if total > 1 else ""))
+
+    def _stage_text(self, key):
+        # @args: key - one of TrackStackWorker's stage keys
+        # @return: the human text for the status line
+        return {
+            "solve": self.tr("Solving the reference frame…"),
+            "register": self.tr("Registering the frames…"),
+            "base": self.tr("Stacking the whole sequence…"),
+            "detect": self.tr("Looking for the object…"),
+            "sweep": self.tr("Sweeping the velocity…"),
+            "groups": self.tr("Stacking each observation…"),
+            "measure": self.tr("Measuring the positions…"),
+            "check": self.tr("Checking against other observers…"),
+        }.get(key, "")
+
+    def _run_ended(self):
+        # @return: None. The button comes back from Cancel and the bar
+        #          hides; the button stays disabled without a visit.
+        self.btn_stack.setText(self._btn_stack_label)
+        self.prg_stack.setVisible(False)
+        self.btn_stack.setEnabled(bool(self._ctx_paths))
+
+    def _on_failed(self, message):
+        # @args: message - the worker's error (internal English, like the
+        #        other workers' failed signal)
+        # @return: None
+        self._run_ended()
+        self._say(self.tr("The run failed:") + f" {message}")
+
+    def _on_finished(self, payload):
+        # @args: payload - TrackStackWorker's result dict
+        # @return: None
+        self._run_ended()
+        self._result = payload if isinstance(payload, dict) else {}
+        status = self._result.get("status")
+        if status == "cancelled":
+            self._say(self.tr("Cancelled: nothing was kept from this run."))
+            return
+        if status == "error":
+            self._say(self.tr("The run could not finish:") + " "
+                      + str(self._result.get("error") or ""))
+            return
+        if status == "not_detected":
+            self._paint_not_detected()
+            return
+        self._paint_run()
+
+    def _paint_not_detected(self):
+        # D10: below the gate there is no sweep and no measurement (the
+        # sweep would measure noise); the limit magnitude is the useful
+        # datum, because it says how deep the night reached.
+        # @return: None
+        det = self._result.get("detection")
+        gate = float(config.get("astrometry_snr_sigma", 3.5))
+        text = self.tr(
+            "The object was not detected above the %1σ gate: the velocity "
+            "sweep is not run, because measuring noise is how a false "
+            "positive is manufactured.").replace("%1", f"{gate:.1f}")
+        if det is not None and getattr(det, "mag_limit", None) is not None:
+            text += " " + self.tr(
+                "The stack's limit magnitude is %1: the night reached "
+                "that deep.").replace("%1", f"{det.mag_limit:.2f}")
+        self.lbl_notes.setVisible(True)
+        self.lbl_notes.setText(text)
+        self.cmb_group.setEnabled(False)
+        self._sync_report_buttons()
+        self._say("")
+
+    def _paint_run(self):
+        # @return: None. The run's notes (dithering D27, WCS quality, the
+        #          sweep's winner), the group viewer, the measurement
+        #          table and the check's verdict.
+        notes = []
+        dither = self._result.get("dither")
+        if dither is not None and not dither.dithered:
+            # informative, never blocking (D27): pattern noise stacks and
+            # manufactures phantom detections (the MPC's warning number one)
+            notes.append(self.tr(
+                "The sequence is not dithered: pattern noise may stack up"))
+        qc = self._result.get("wcs_qc")
+        if qc is not None and not qc.ok:
+            notes.append(self.tr(
+                "The composed WCS is off by up to %1″ against a direct "
+                "solve: the field's distortion is biting").replace(
+                    "%1", f"{qc.max_offset_arcsec:.2f}"))
+        sweep = self._result.get("sweep")
+        if sweep is not None and sweep.best is not None:
+            notes.append(self.tr(
+                "Velocity sweep: %1″/min at PA %2° (%3 velocities scored; "
+                "the score is SNR × roundness, which penalises a smeared "
+                "object)").replace("%1", f"{sweep.best['rate']:.2f}").replace(
+                    "%2", f"{sweep.best['pa']:.0f}").replace(
+                    "%3", str(len(sweep.grid))))
+        det = self._result.get("detection")
+        if det is not None:
+            gate = float(config.get("astrometry_snr_sigma", 3.5))
+            notes.append(self.tr(
+                "Detected on the base stack with SNR %1 (the gate is %2σ: "
+                "below it nothing is measured)").replace(
+                    "%1", f"{det.snr:.1f}").replace("%2", f"{gate:.1f}"))
+        self.lbl_notes.setVisible(bool(notes))
+        self.lbl_notes.setText("\n".join("• " + n for n in notes))
+        # the viewer: one entry per observation, the first one on stage
+        self.cmb_group.blockSignals(True)
+        self.cmb_group.clear()
+        for i, group in enumerate(self._result.get("groups") or []):
+            self.cmb_group.addItem(
+                self.tr("Observation %1 (%2 frames)").replace(
+                    "%1", str(i + 1)).replace("%2", str(group[1] - group[0])),
+                i)
+        self.cmb_group.blockSignals(False)
+        self.cmb_group.setEnabled(self.cmb_group.count() > 0)
+        if self.cmb_group.count():
+            self.cmb_group.setCurrentIndex(0)
+            self._show_group(0)
+        self._fill_points()
+        self._fill_check()
+        # the measured base SNR turns the expected-SNR column into a real
+        # projection for the next choice of observations (D22)
+        if det is not None and det.snr:
+            self._base_snr = float(det.snr)
+            self._refresh_preview()
+        n = len(self._result.get("points") or [])
+        self._say(self.tr("Sequence stacked: %1 observations measured."
+                          ).replace("%1", str(n)))
+
+    def _show_group(self, index):
+        # The group's stack in this tab's OWN viewer. UfeImageState loads
+        # from a path, so the stack is written to a temporary FITS: the
+        # dialog's plate state is never touched and the workbench keeps
+        # showing the frame the observer had open.
+        # @args: index - the group's index in the last run
+        # @return: None
+        result = self._result or {}
+        stacks = result.get("stacks") or []
+        if index is None or index < 0 or index >= len(stacks):
+            return
+        import tempfile
+        import numpy as np
+        stack, _rep = stacks[index]
+        path = Path(tempfile.gettempdir()) / \
+            f"nightscribe_trackstack_group{index}.fits"
+        try:
+            from astropy.io import fits
+            fits.PrimaryHDU(np.asarray(stack, dtype=np.float32)).writeto(
+                str(path), overwrite=True)
+            self._stack_state.load(str(path))
+        except Exception as err:     # a viewer that cannot show says so
+            logger.warning("group stack view failed: %s", err)
+            self._say(self.tr("The group's stack could not be shown:")
+                      + f" {err}")
+            return
+        # the measured position, marked: scene coordinates are the state's
+        # business (it is the only one that flips y), never the tab's
+        self._stack_view.clear_overlays()
+        points = result.get("points") or []
+        if index < len(points):
+            sp = points[index][0]
+            w, h = self._stack_state.plate_shape
+            sx, sy = self._stack_state.data_to_scene(sp.x, sp.y)
+            for item in cross_marker_items(sx, sy, float(w), float(h),
+                                           "#ff5555", 10.0):
+                self._stack_view.add_overlay(item)
+
+    # ------------------------------------------------------ measurement
+
+    def _fill_points(self):
+        # The two ways per group (D7) and their contrast (D16): the Δ
+        # column is the separation between the stack's position and the
+        # per-frame one; a disagreement is flagged in its own column,
+        # never chosen in silence.
+        # @return: None
+        from ..core import coords
+        tbl = self.tbl_points
+        points = self._result.get("points") or []
+        mids = self._result.get("mids") or []
+        tbl.setRowCount(len(points))
+        for i, (sp, fp, flags) in enumerate(points):
+            delta = ""
+            if fp is not None and not math.isnan(fp.ra):
+                cosd = max(math.cos(math.radians(sp.dec)), 1e-6)
+                dra = (sp.ra - fp.ra) * cosd * 3600.0
+                ddec = (sp.dec - fp.dec) * 3600.0
+                delta = f"{math.hypot(dra, ddec):.2f}"
+            warn = ", ".join(self._flag_text(f) for f in (flags or []))
+            cells = (str(sp.group_index + 1),
+                     self._t_mid_text(mids[i] if i < len(mids) else None),
+                     coords.ra_deg_to_hms(sp.ra) if not math.isnan(sp.ra)
+                     else "–",
+                     coords.dec_deg_to_dms(sp.dec) if not math.isnan(sp.dec)
+                     else "–",
+                     delta,
+                     f"{sp.snr:.1f}" if sp.snr else "–",
+                     f"{sp.mag:.3f}" if sp.mag is not None else "–",
+                     warn)
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                item.setFlags(Qt.ItemIsEnabled)
+                if col == 4:
+                    item.setToolTip(self.tr(
+                        "Separation between the stack measurement and the "
+                        "per-frame one (the same centroid recipe on both)"))
+                if col == 7 and text:
+                    item.setToolTip(self.tr(
+                        "The two measurements disagree: the point is "
+                        "flagged, nothing is chosen in silence"))
+                tbl.setItem(i, col, item)
+
+    def _flag_text(self, flag):
+        # @args: flag - a measurement flag from core/astrometry
+        # @return: its human text (literal tr() strings so lupdate sees
+        #          them; an unknown flag passes through, never hidden)
+        if flag == "disagree":
+            return self.tr("The two measurements disagree")
+        if flag == "no_frame_centroid":
+            return self.tr("No per-frame centroid")
+        return str(flag)
+
+    def _fill_check(self):
+        # The verdict in plain language (D25/D29): available or not,
+        # blocked or not, and the numbers behind it. Find_Orb missing is
+        # SAID, never faked; without a reference nothing is blocked.
+        # @return: None
+        check = self._result.get("check")
+        if check is None:
+            return
+        if not check.available:
+            if str(check.note).startswith("Find_Orb is not configured"):
+                text = self.tr(
+                    "Find_Orb is not configured: the check is not "
+                    "available. Set it up in Settings; meanwhile the "
+                    "centred sequence and the submission floor are the "
+                    "safety net.")
+            else:
+                text = self.tr("The check is not available:") \
+                    + f" {check.note}"
+        elif check.no_reference:
+            text = self.tr(
+                "No other observations to compare with: nothing is blocked "
+                "(a real discovery has no reference); the centred sequence "
+                "and the submission floor decide.")
+        elif check.blocked:
+            text = self.tr(
+                "Our point is an outlier against the other observers: the "
+                "report is blocked by default. Forcing it leaves the "
+                "decision on record.")
+        else:
+            text = self.tr(
+                "The check passes: our residual fits inside the published "
+                "observations' dispersion.")
+        if check.our_residual:
+            text += " " + self.tr(
+                "Our residual: %1″ / %2″ · %3 distinct observatories"
+            ).replace("%1", f"{check.our_residual[0]:.2f}").replace(
+                "%2", f"{check.our_residual[1]:.2f}").replace(
+                "%3", str(check.n_stations))
+        self.lbl_check.setText(text)
+        self.chk_force.setEnabled(bool(check.blocked))
+        if not check.blocked and self.chk_force.isChecked():
+            self.chk_force.setChecked(False)
+
+    # ------------------------------------------------------------ report
+
+    def _sync_report_buttons(self):
+        # The report exists only after a complete run, and an outlier
+        # blocks it unless the observer forces it (D25): the buttons SAY
+        # that with their enabled state instead of failing on click.
+        # @return: None
+        result = self._result or {}
+        ok = result.get("status") == "ok" and bool(result.get("points"))
+        check = result.get("check")
+        blocked = bool(check is not None and check.blocked
+                       and not self.chk_force.isChecked())
+        self.btn_report.setEnabled(ok and not blocked)
+        self.btn_send_mpc.setEnabled(
+            ok and not blocked
+            and bool(self.txt_report.toPlainText().strip()))
+
+    def _on_report(self):
+        # The generator applies the submission floor itself (D26) and the
+        # round trip through the validator (the generator that cannot pass
+        # its own judge is our bug). The dropped groups are re-explained
+        # here from the DATA, in the GUI's language: the core's notes are
+        # internal English and never reach the user verbatim.
+        # @return: None
+        from ..core import mpc_astrometry
+        ctx = self._context() or {}
+        points = [sp for sp, _fp, _fl
+                  in (self._result or {}).get("points") or []]
+        if not points:
+            self._say(self.tr("Measure the sequence first."))
+            return
+        fmt = self.cmb_format.currentData() or "ades"
+        rep = mpc_astrometry.generate(points, fmt,
+                                      str(config.get("mpc_code", "")),
+                                      ctx.get("object_name") or "", config)
+        self.txt_report.setPlainText(rep["text"])
+        floor = float(config.get("astrometry_submit_snr", 20.0))
+        notes = []
+        for point in rep.get("dropped") or []:
+            snr = getattr(point, "snr", None)
+            g = str(getattr(point, "group_index", "?"))
+            if snr is None:
+                notes.append(self.tr(
+                    "Observation %1 left out: no SNR was measured, so it "
+                    "cannot be shown to clear the floor of %2").replace(
+                        "%1", g).replace("%2", f"{floor:.0f}"))
+            else:
+                notes.append(self.tr(
+                    "Observation %1 left out: SNR %2 is below the MPC "
+                    "submission floor of %3 (a marginal detection risks a "
+                    "false tracklet)").replace("%1", g).replace(
+                        "%2", f"{float(snr):.1f}").replace(
+                        "%3", f"{floor:.0f}"))
+        validation = rep.get("validation") or {}
+        if not validation.get("valid", True):
+            notes.extend(str(e) for e in (validation.get("errors") or [])[:3])
+        self.lbl_notes.setVisible(bool(notes))
+        if notes:
+            self.lbl_notes.setText("\n".join("• " + n for n in notes))
+        self._sync_report_buttons()
+        kept = len(rep.get("kept") or [])
+        self._say(self.tr("Report generated: %1 observations kept."
+                          ).replace("%1", str(kept)))
+
+    def _on_send_mpc(self):
+        # The report lands in the visit's MPC paste box; ADR-022's
+        # validator there has the last word (the round trip is the point:
+        # our own output goes through the same judge as a pasted report).
+        # @return: None
+        text = self.txt_report.toPlainText().strip()
+        if not text:
+            self._say(self.tr("Generate the report first."))
+            return
+        dlg = self.window()
+        send = getattr(dlg, "send_to_mpc_block", None)
+        if callable(send) and send(text):
+            self._say(self.tr(
+                "Report sent to the visit's MPC block: its validator has "
+                "the last word before saving."))
+        else:
+            self._say(self.tr(
+                "The visit window is not open: open the visit to send the "
+                "report to its MPC block."))

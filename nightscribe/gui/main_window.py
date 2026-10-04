@@ -1626,6 +1626,24 @@ class MainWindow(QMainWindow):
         rep = astap.probe(dlg.edt_astap_path.text().strip())
         QMessageBox.information(dlg, self.tr("ASTAP"), rep["message"])
 
+    def _pick_findorb(self, dlg):
+        # Browse for the Find_Orb executable (astrometry plan, D31: the
+        # NON-interactive one; probe refuses the interactive program).
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the Find_Orb executable"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_findorb_path.setText(path)
+
+    def _test_findorb(self, dlg):
+        # Probe the configured binary: `fo` exists, and it is not the
+        # interactive Find_Orb (the mistake everybody makes once).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import findorb
+        _path, message = findorb.probe(dlg.edt_findorb_path.text().strip())
+        QMessageBox.information(dlg, self.tr("Find_Orb"), message)
+
     def _pick_exotic_python(self, dlg):
         # Browse for the Python <=3.10 interpreter that will host EXOTIC.
         from PySide6.QtWidgets import QFileDialog
@@ -1856,6 +1874,12 @@ class MainWindow(QMainWindow):
         dlg.btn_astap_browse.clicked.connect(
             lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
+        # Find_Orb (astrometry plan, D31): the NON-interactive `fo` that
+        # checks our measurements against the published observations
+        dlg.edt_findorb_path.setText(config.get("findorb_path", ""))
+        dlg.btn_findorb_browse.clicked.connect(
+            lambda: self._pick_findorb(dlg))
+        dlg.btn_findorb_test.clicked.connect(lambda: self._test_findorb(dlg))
         # EXOTIC orchestration (plan phase A): the external Python <=3.10
         # and its private environment
         dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))
@@ -2003,6 +2027,7 @@ class MainWindow(QMainWindow):
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
         config.set("solver", dlg.cmb_solver.currentData() or "auto")
         config.set("astap_path", dlg.edt_astap_path.text().strip())
+        config.set("findorb_path", dlg.edt_findorb_path.text().strip())
         config.set("solve_save", dlg.chk_solve_save.isChecked())
         config.set("exotic_python_path",
                    dlg.edt_exotic_python.text().strip())
@@ -10064,6 +10089,19 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(self._ufe_run_undo)
             dlg.set_exoclock_hook(
                 lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # astrometry plan, phase 7: the visit context for the
+            # Calibration and Track & Stack tabs (their frames and the
+            # project's object, D15) and the way a generated report
+            # reaches the visit's MPC block. Asked defensively, like
+            # every other hook: a host double need not have the method.
+            astro_hook = getattr(dlg, "set_astrometry_hook", None)
+            if callable(astro_hook):
+                astro_hook(
+                    lambda: self._ufe_astrometry_context(hook_pid,
+                                                         session_id))
+            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
+            if callable(mpc_hook):
+                mpc_hook(self._ufe_mpc_send)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10121,6 +10159,12 @@ class MainWindow(QMainWindow):
             dlg.set_points_hook(None)
             dlg.set_run_undo_hook(None)
             dlg.set_exoclock_hook(None)
+            astro_hook = getattr(dlg, "set_astrometry_hook", None)
+            if callable(astro_hook):
+                astro_hook(None)
+            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
+            if callable(mpc_hook):
+                mpc_hook(None)
             dlg.set_exotic_hooks(None, None)
             dlg.set_sequence_hook(None)
             passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
@@ -10487,6 +10531,40 @@ class MainWindow(QMainWindow):
                 "scope": "visit", "nights": 1,
                 "visits": len(visits),
                 "path_sessions": {path: session_id for path in paths}}
+
+    def _ufe_astrometry_context(self, pid, session_id):
+        # Astrometry plan, phase 7 (D15): the Calibration and Track &
+        # Stack tabs work from the visit's frames and the project's
+        # object, never a folder dialog. No visit (or no FITS in it): the
+        # tabs stay disarmed and say why.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: {"pid", "session_id", "paths", "object_name"} or None
+        if session_id is None:
+            return None
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            return None
+        p = project.get(db, pid) or {}
+        return {"pid": pid, "session_id": session_id, "paths": paths,
+                "object_name": p.get("object_name") or ""}
+
+    def _ufe_mpc_send(self, text):
+        # The Track & Stack tab's report lands in the visit's MPC paste
+        # box (ADR-045 form A: the block lives in the visit window), and
+        # the block's own ADR-022 validator speaks right away.
+        # @args: text - the generated report
+        # @return: True when the block received it
+        win = self._visit_window()
+        txt = getattr(win, "txt_mpc", None)
+        if txt is None:
+            return False
+        txt.setPlainText(text)
+        validate = getattr(win, "_on_mpc_validate", None)
+        if callable(validate):
+            validate()
+        return True
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its

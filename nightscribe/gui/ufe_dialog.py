@@ -121,6 +121,12 @@ class UfeDialog(QWidget):
         self._points_hook = None
         self._run_undo_hook = None
         self._exoclock_hook = None
+        # astrometry hooks (astrometry plan, phase 7): the visit context
+        # for the Calibration and Track & Stack tabs (D15: without a visit
+        # there is no sequence) and the way a generated report reaches the
+        # visit's MPC block
+        self._astrometry_hook = None
+        self._mpc_send_hook = None
         # the passes of the visit (one night, one curve, 2026-09-30): the
         # list and which of them the chart shows
         self._visit_passes_hook = None
@@ -608,6 +614,16 @@ class UfeDialog(QWidget):
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)
         self.tabs.addTab(self.tab_annotate, self.tr("Annotate"))
+        # astrometry plan, phase 7 (D4/D15): calibration is a step of the
+        # app with its own tab, and track & stack turns the visit's
+        # sequence into MPC observations. Both work from the visit the
+        # host hooks (set_astrometry_hook); without one they stay disarmed.
+        from .ufe_calibration_tab import UfeCalibrationTab
+        self.tab_calibration = UfeCalibrationTab(self.state, self._lang)
+        self.tabs.addTab(self.tab_calibration, self.tr("Calibration"))
+        from .ufe_trackstack_tab import UfeTrackStackTab
+        self.tab_trackstack = UfeTrackStackTab(self.state, self._lang)
+        self.tabs.addTab(self.tab_trackstack, self.tr("Track && Stack"))
         # only the current tab owns the view's clicks and overlays
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
         self._on_feature_tab_changed(self.tabs.currentIndex())
@@ -647,6 +663,16 @@ class UfeDialog(QWidget):
                 measure.shutdown()
             except Exception as err:  # a failed cleanup never blocks close
                 logger.warning("measure tab shutdown failed: %s", err)
+        # the astrometry tabs' workers (calibration, track & stack): a
+        # QThread destroyed while it runs aborts the whole application, so
+        # each is asked to stop and given a bounded time to land
+        for name in ("tab_calibration", "tab_trackstack"):
+            tab = getattr(self, name, None)
+            if tab is not None:
+                try:
+                    tab.shutdown()
+                except Exception as err:   # a failed cleanup never blocks
+                    logger.warning("%s shutdown failed: %s", name, err)
         # and the visit's batch: a QThread destroyed while it runs aborts
         # the whole application (the same trap the tabs document)
         worker = getattr(self, "_visit_worker", None)
@@ -940,6 +966,53 @@ class UfeDialog(QWidget):
         except Exception as err:
             logger.warning("series hook failed: %s", err)
             return None
+
+    # ------------------------------------------------- visit astrometry
+
+    def set_astrometry_hook(self, fn):
+        # @args: fn - callable() -> {"pid", "session_id", "paths",
+        #        "object_name"} or None. The host arms it only when the
+        #        editor was opened from a visit (astrometry plan, phase 7):
+        #        the Calibration and Track & Stack tabs work from the
+        #        visit's frames and the project's object (D15), exactly
+        #        like the series block does with set_series_hook.
+        # @return: None
+        self._astrometry_hook = fn if callable(fn) else None
+        for name in ("tab_calibration", "tab_trackstack"):
+            tab = getattr(self, name, None)
+            refresh = getattr(tab, "refresh_context", None)
+            if callable(refresh):
+                refresh()
+
+    def astrometry_context(self):
+        # @return: the visit context the host hooked, or None (ad-hoc
+        #          open: the astrometry tabs stay disarmed)
+        if self._astrometry_hook is None:
+            return None
+        try:
+            return self._astrometry_hook()
+        except Exception as err:
+            logger.warning("astrometry hook failed: %s", err)
+            return None
+
+    def set_mpc_send_hook(self, fn):
+        # @args: fn - callable(text) -> True when the visit's MPC block
+        #        received the report, or None
+        # @return: None
+        self._mpc_send_hook = fn if callable(fn) else None
+
+    def send_to_mpc_block(self, text):
+        # The Track & Stack tab's report lands in the visit's MPC paste
+        # box, where the ADR-022 validator has the last word.
+        # @args: text - the generated report
+        # @return: True when the block received it
+        if self._mpc_send_hook is None:
+            return False
+        try:
+            return bool(self._mpc_send_hook(text))
+        except Exception as err:
+            logger.warning("mpc send hook failed: %s", err)
+            return False
 
     # ----------------------------------------------------- visit frames
 

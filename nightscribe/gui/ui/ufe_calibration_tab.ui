@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>UfeCalibrationTab</class>
+ <widget class="QWidget" name="UfeCalibrationTab">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>406</width>
+    <height>340</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="vbox_calibration">
+   <property name="leftMargin"><number>9</number></property>
+   <property name="topMargin"><number>9</number></property>
+   <property name="rightMargin"><number>9</number></property>
+   <property name="bottomMargin"><number>9</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_recipe_title">
+     <property name="text"><string>Calibration recipe for this visit</string></property>
+     <property name="toolTip">
+      <string>Which master of the library each piece uses (a dark already includes the bias; the flat is per filter and normalised), resolved against the first frame's header</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_recipe">
+     <property name="text"><string>Open the editor from a visit to see its recipe.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chk_export">
+     <property name="text"><string>Export the calibrated frames (FITS copies)</string></property>
+     <property name="toolTip">
+      <string>Calibration works in memory; writing hundreds of calibrated FITS is optional and explicit. The copies land in the project's folder (a "calibrados" subfolder) and are registered to the visit</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_run">
+     <item>
+      <widget class="QPushButton" name="btn_calibrate">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Calibrate the visit</string></property>
+       <property name="toolTip">
+        <string>Apply the recipe to every frame of the visit (offset first, flat second). While it runs, this button is the Cancel</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QProgressBar" name="prg_calib">
+       <property name="visible"><bool>false</bool></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_status">
+     <property name="visible"><bool>false</bool></property>
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_warnings_title">
+     <property name="text"><string>Warnings</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_warnings">
+     <property name="text"><string/></property>
+     <property name="toolTip">
+      <string>What the recipe could not do and what stays in the frames: no dark, no bias, no flat for the filter, or a master out of tolerance</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="vspacer_calibration">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

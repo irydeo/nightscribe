@@ -904,3 +904,353 @@ class ExoticRunWorker(QThread):
             res = {"ok": False, "returncode": None, "log_path": None,
                    "out_dir": str(self._dir), "cancelled": False}
         self.finished.emit(res)
+
+
+class CalibrationWorker(QThread):
+    # Calibrates a visit's lights off the GUI thread (astrometry plan,
+    # phase 7 / ADR-061): the same core/calibration engine the CLI and the
+    # tests use, wrapped with progress and cancellation (SeriesWorker's
+    # pattern, ADR-048).
+    #
+    # MEMORY: calibrate_paths returns the calibrated ARRAY of every frame,
+    # and a visit is hundreds of them: holding all of them would keep
+    # gigabytes alive until the run ends (D32 is exactly about this). So
+    # the worker walks the visit frame by frame, exports the copy when
+    # asked (D6: writing calibrated FITS is explicit) and drops the pixels
+    # right away; what survives is the report, which is what the tab shows.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # {"status", "reports", "written"}
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, db, export_dir=None, cfg=None):
+        super().__init__()
+        self._paths = list(paths)
+        self._db = db
+        self._export = str(export_dir) if export_dir else None
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the button doubles as Cancel): the engine stops
+        # between frames and the payload says "cancelled".
+        self._cancel = True
+
+    def run(self):
+        from ..core import calibration
+        reports, written = [], []
+        try:
+            total = len(self._paths)
+            if self._export:
+                Path(self._export).mkdir(parents=True, exist_ok=True)
+            for index, path in enumerate(self._paths, 1):
+                if self._cancel:
+                    break
+                # one frame at a time (see MEMORY above): same recipe the
+                # batch entry point resolves, per frame, from its header
+                out = calibration.calibrate_paths(
+                    [path], self._db, self._cfg,
+                    cancel=lambda: self._cancel)
+                if not out:
+                    break
+                src, data, header, report = out[0]
+                reports.append((src, report))
+                if self._export:
+                    dest = Path(self._export) / (Path(src).stem + "_cal.fits")
+                    written.append(str(calibration.export_calibrated(
+                        data, header, dest, report)))
+                del data               # the pixels die with their frame
+                self.progress.emit(index, total)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("calibration worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit({"status": "cancelled" if self._cancel else "ok",
+                            "reports": reports, "written": written})
+
+
+class TrackStackWorker(QThread):
+    # The whole track & stack pipeline off the GUI thread (astrometry plan,
+    # phases 2-6 wired by phase 7): solve the reference, register, stack the
+    # base sequence, detect (the 3.5 sigma gate, D10), sweep the velocity
+    # (D9), stack each observation (D22), measure the two ways (D7) and
+    # check against the published observations with Find_Orb (D25).
+    #
+    # Progress is per STAGE (a key plus done/total inside it): the tab maps
+    # the key to a literal self.tr() table, the way TonightWorker's phases
+    # do (CONTRIBUTING rule 5). The payload is a dict with numpy stacks
+    # inside, so it travels as Signal(object): a Signal(dict) would force
+    # the recursive QVariant conversion that once segfaulted the sequence
+    # worker (see SequenceWorker's comment).
+
+    progress = Signal(str, int, int)  # (stage key, done, total)
+    finished = Signal(object)         # the result dict (below)
+    failed = Signal(str)              # an unexpected error, in English
+
+    def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
+                 obs_code="", site=""):
+        super().__init__()
+        self._paths = list(paths)
+        self._name = name
+        self._n_obs = max(1, int(n_obs))
+        self._method = method
+        self._cfg = cfg
+        self._obs_code = obs_code
+        self._site = site
+        self._cancel = False
+
+    def cancel(self):
+        # Every engine call takes the same callable: the run stops at the
+        # next boundary and the payload says "cancelled" (D18's spirit).
+        self._cancel = True
+
+    # @return: cfg value by key with a fallback (cfg may be None in tests)
+    def _cfg_get(self, key, default):
+        if self._cfg is None:
+            return default
+        return self._cfg.get(key, default)
+
+    def run(self):
+        import math
+        from ..core import astrometry, findorb, mpc_astrometry, track_stack
+        out = {"status": "ok", "name": self._name, "method": self._method,
+               "n_obs": self._n_obs}
+        try:
+            # --- solve: the grid every frame is registered on -------------
+            self.progress.emit("solve", 0, 1)
+            frames = track_stack.load_sequence(self._paths, self._cfg)
+            if len(frames) < 2:
+                out.update(status="error",
+                           error="the visit needs at least two frames")
+                self.finished.emit(out)
+                return
+            ref, w0 = track_stack.solve_reference(
+                frames, self._cfg, cancel=lambda: self._cancel,
+                progress=lambda d, t, _l: self.progress.emit("solve", d, t))
+            if w0 is None:
+                out.update(status="error",
+                           error="no frame could be solved: no WCS, no sky")
+                self.finished.emit(out)
+                return
+            if self._cancel:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+            shape = (int(ref.header.get("NAXIS1", 1)),
+                     int(ref.header.get("NAXIS2", 1)))
+            out["shape"] = shape
+
+            # --- register: the frames vote their transform (D44) ----------
+            self.progress.emit("register", 0, len(frames))
+            track_stack.register_sequence(
+                frames,
+                progress=lambda d, t, _l: self.progress.emit("register", d, t),
+                cancel=lambda: self._cancel)
+            out["dither"] = track_stack.dither_check(frames)
+            if self._cancel:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+
+            # --- ephemeris over the visit's own window (D8) ---------------
+            motion = track_stack.sequence_motion(frames, self._name,
+                                                 site=self._site)
+            if motion is None:
+                out.update(status="error",
+                           error="no ephemeris for the object: Horizons did "
+                                 "not answer or the name is not resolved")
+                self.finished.emit(out)
+                return
+            track_stack.object_positions(frames, motion)
+            t_all, q_all = track_stack.group_q(frames, (0, len(frames)),
+                                               w0, motion)
+            if q_all is None or t_all is None:
+                out.update(status="error",
+                           error="the object does not fall on the plate at "
+                                 "the sequence's instant")
+                self.finished.emit(out)
+                return
+            scale = astrometry.pixel_scale_arcsec(w0)
+            margin = int(self._cfg_get("astrometry_cutout_margin_px", 64))
+            box_all = track_stack.cutout_box(frames, (0, len(frames)), q_all,
+                                             margin_px=margin, shape=shape)
+
+            # --- base stack + the detection gate (D10) ---------------------
+            self.progress.emit("base", 0, 1)
+            base_stack, _rep = track_stack.stack_group(
+                frames, (0, len(frames)), q_all, self._method, box_all,
+                shape, cfg=self._cfg)
+            q_all_box = (q_all[0] - box_all[0], q_all[1] - box_all[1])
+            self.progress.emit("detect", 0, 1)
+            detection = track_stack.detect(base_stack, q_all_box, self._cfg)
+            out["detection"] = detection
+            if not detection.detected:
+                # below the gate there is NO sweep: measuring noise is how
+                # a false positive is manufactured (D10)
+                out["status"] = "not_detected"
+                self.progress.emit("detect", 1, 1)
+                self.finished.emit(out)
+                return
+            self.progress.emit("detect", 1, 1)
+
+            # --- velocity sweep, once for the whole sequence (D9/D22) -----
+            base_rate, base_pa = _rate_pa(motion, t_all)
+            out["base_rate"], out["base_pa"] = base_rate, base_pa
+            if base_rate is not None:
+                # cfg stores the COMBINATION count (25 = D9's 5x5 grid);
+                # the engine wants the steps per axis
+                steps = max(2, int(round(math.sqrt(
+                    float(self._cfg_get("astrometry_sweep_steps", 25))))))
+                self.progress.emit("sweep", 0, steps * steps)
+                sweep = track_stack.sweep(
+                    frames, q_all, base_rate, base_pa, box_all, shape,
+                    pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
+                    steps=steps, method="median", cfg=self._cfg,
+                    progress=lambda d, t, _l: self.progress.emit(
+                        "sweep", d, t),
+                    cancel=lambda: self._cancel)
+                out["sweep"] = sweep
+                if self._cancel:
+                    out["status"] = "cancelled"
+                    self.finished.emit(out)
+                    return
+                if sweep.best is not None:
+                    _apply_sweep(frames, base_rate, base_pa,
+                                 sweep.best["rate"], sweep.best["pa"],
+                                 t_all, scale)
+
+            # --- WCS quality control: composed vs a direct solve ----------
+            out["wcs_qc"] = track_stack.verify_composed_wcs(
+                frames, cancel=lambda: self._cancel)
+
+            # --- one stack per observation (D22/D23) -----------------------
+            groups = track_stack.split_groups(frames, self._n_obs)
+            q_by_group, boxes, mids = [], [], []
+            for group in groups:
+                t_mid, q_g = track_stack.group_q(frames, group, w0, motion)
+                if q_g is None:
+                    # the ephemeris failed at this instant: fall back to
+                    # the sequence's point and let the flags speak
+                    q_g = q_all
+                q_by_group.append(q_g)
+                mids.append(t_mid)
+                boxes.append(track_stack.cutout_box(
+                    frames, group, q_g, margin_px=margin, shape=shape))
+            self.progress.emit("groups", 0, len(groups))
+            stacks = track_stack.stack_groups(
+                frames, groups, q_by_group, self._method, boxes, shape,
+                cfg=self._cfg,
+                progress=lambda d, t, _l: self.progress.emit("groups", d, t),
+                cancel=lambda: self._cancel)
+            if self._cancel or len(stacks) < len(groups):
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+
+            # --- measurement, the two ways per group (D7/D16) -------------
+            self.progress.emit("measure", 0, len(stacks))
+            points = []
+            for index, (stack, _srep) in enumerate(stacks):
+                box = boxes[index]
+                q_box = (q_by_group[index][0] - box[0],
+                         q_by_group[index][1] - box[1])
+                mjd = mids[index] - 2400000.5 if mids[index] else None
+                # each stack is a cutout of the reference grid, so it is
+                # measured with the reference WCS shifted by the box's
+                # origin (CRPIX moves, the sky does not)
+                res = astrometry.measure_groups(
+                    [stack], [q_box], _shift_wcs(w0, box),
+                    frames=frames, groups=[groups[index]], cfg=self._cfg,
+                    mjd_by_group=[mjd])
+                sp, fp, flags = res[0]
+                sp.group_index = index      # measure_groups counts from 0
+                if fp is not None:          # on every call: restore the
+                    fp.group_index = index  # group the point belongs to
+                points.append((sp, fp, flags))
+                self.progress.emit("measure", index + 1, len(stacks))
+            out.update(points=points, groups=groups, stacks=stacks,
+                       boxes=boxes, qs=q_by_group, mids=mids, w0=w0)
+
+            # --- the check, delegated to Find_Orb (D25) -------------------
+            self.progress.emit("check", 0, 1)
+            check = None
+            if bool(self._cfg_get("astrometry_check_enabled", True)):
+                kept, _dropped, _notes = mpc_astrometry.submittable(
+                    [sp for sp, _fp, _fl in points], self._cfg)
+                if not kept:
+                    check = findorb.CheckReport(
+                        available=False,
+                        note="no observation clears the submission floor")
+                else:
+                    ours = mpc_astrometry.to_mpc80(kept, self._obs_code,
+                                                   self._name, self._cfg)
+                    check = findorb.check(ours.splitlines(), self._name,
+                                          self._cfg,
+                                          cancel=lambda: self._cancel)
+            else:
+                check = findorb.CheckReport(available=False,
+                                            note="disabled in the settings")
+            out["check"] = check
+            self.progress.emit("check", 1, 1)
+            self.finished.emit(out)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("track&stack worker failed: %s", err)
+            self.failed.emit(str(err))
+
+
+def _rate_pa(motion, t_mid_jd):
+    # @args: motion - callable(jd) -> (ra_deg, dec_deg), t_mid_jd - the
+    #        sequence's middle instant
+    # @return: (rate arcsec/min, PA degrees north-through-east) or (None,
+    #          None) when the ephemeris cannot be sampled
+    # The linear seed of the sweep (D9): the ephemeris' own motion measured
+    # over two minutes around the middle of the sequence. The PA convention
+    # is the one sweep/_rescore uses: 0 deg towards +dec (north), 90 deg
+    # towards +RA (east, which is -x on the usual CD1_1<0 grid).
+    import math
+    p0 = motion(t_mid_jd - 1.0 / 2880.0)
+    p1 = motion(t_mid_jd + 1.0 / 2880.0)
+    if not p0 or not p1:
+        return None, None
+    cosd = math.cos(math.radians(p0[1]))
+    dra = (p1[0] - p0[0]) * cosd * 3600.0     # arcsec of arc over 2 min
+    ddec = (p1[1] - p0[1]) * 3600.0
+    rate = math.hypot(dra, ddec) / 2.0
+    pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+    return rate, pa
+
+
+def _apply_sweep(frames, base_rate, base_pa, rate, pa, t0_jd, scale):
+    # @args: frames - list[Frame] with object_xy, base_rate/base_pa - the
+    #        ephemeris seed, rate/pa - the sweep's winner, t0_jd - the
+    #        instant the sweep measured its offsets from, scale - arcsec/px
+    # @return: None (the frames' object_xy is shifted in place)
+    # The sweep runs ONCE and applies to every group (D22). stack_group
+    # re-derives its offsets from object_xy (track_offsets), so shifting
+    # each frame's predicted position by exactly the displacement
+    # sweep._rescore scored with makes the per-group stacks freeze the
+    # object with the corrected velocity, landing on the q group_q reports.
+    import math
+    d_rate = rate - base_rate
+    d_pa = math.radians(pa - base_pa)
+    for frame in frames:
+        if frame.transform is None or frame.object_xy is None \
+                or frame.t_mid_jd is None:
+            continue
+        dt_min = (frame.t_mid_jd - t0_jd) * 1440.0
+        dra = d_rate * dt_min * math.sin(d_pa) / max(scale, 1e-6)
+        ddec = d_rate * dt_min * math.cos(d_pa) / max(scale, 1e-6)
+        frame.object_xy = (frame.object_xy[0] - dra,
+                           frame.object_xy[1] + ddec)
+
+
+def _shift_wcs(w0, box):
+    # @args: w0 - the reference astropy WCS, box - (x0, y0, x1, y1) cutout
+    # @return: a WCS for the cutout's own pixel grid
+    # A group's stack is a cutout: its pixel (0, 0) is the reference's
+    # (x0, y0), so CRPIX moves by the origin and all_pix2world stays true
+    # for the box coordinates the centroid measured in.
+    import copy
+    w = copy.deepcopy(w0)
+    w.wcs.crpix = [w0.wcs.crpix[0] - box[0], w0.wcs.crpix[1] - box[1]]
+    return w

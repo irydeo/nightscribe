@@ -49,9 +49,11 @@ def dlg(qapp):
 
 
 def test_layout_three_placeholder_tabs(dlg):
-    assert dlg.tabs.count() == 3          # Blink, Photometry, Annotate
+    assert dlg.tabs.count() == 5          # Blink, Photometry, Annotate,
+    # Calibration and Track & Stack (astrometry plan, phase 7)
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate",
+                      "Calibration", "Track && Stack"]
     assert dlg.histogram is not None      # the phase-B histogram strip
     # the image dominates: at 1280 px the view is wider than the tab column
     assert dlg.view.width() > dlg.tabs.width()
@@ -127,7 +129,7 @@ def test_export_png_via_dialog(dlg, monkeypatch, tmp_path):
 def test_add_feature_tab_is_the_whole_extension_api(dlg):
     from PySide6.QtWidgets import QLabel
     idx = dlg.add_feature_tab("Future", QLabel("soon"))
-    assert dlg.tabs.count() == 4
+    assert dlg.tabs.count() == 6      # the five features plus this one
     assert dlg.tabs.tabText(idx) == "Future"
 
 

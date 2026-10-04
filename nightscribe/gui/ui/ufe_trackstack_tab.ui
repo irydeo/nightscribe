@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>UfeTrackStackTab</class>
+ <widget class="QWidget" name="UfeTrackStackTab">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>406</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="vbox_trackstack">
+   <property name="leftMargin"><number>9</number></property>
+   <property name="topMargin"><number>9</number></property>
+   <property name="rightMargin"><number>9</number></property>
+   <property name="bottomMargin"><number>9</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_object">
+     <property name="text">
+      <string>Object and ephemeris: open the editor from a visit to arm the sequence.</string>
+     </property>
+     <property name="toolTip">
+      <string>The object comes from the project and the ephemeris from Horizons; both are read-only here (the sequence is tracked with the full ephemeris, not a linear rate)</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_nobs">
+     <item>
+      <widget class="QLabel" name="lbl_nobs">
+       <property name="text"><string>Number of observations:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QSpinBox" name="spn_nobs">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="minimum"><number>1</number></property>
+       <property name="maximum"><number>999</number></property>
+       <property name="toolTip">
+        <string>How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal: the table below shows it before you accept</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_nobs">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_snr_title">
+     <property name="text"><string>Expected SNR per observation</string></property>
+     <property name="toolTip">
+      <string>Estimated from the frames each group gets (the SNR grows with the square root of n). A group below the MPC submission floor (SNR 20 by default) will be left out of the report, with its reason</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="tbl_snr">
+     <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
+     <property name="toolTip">
+      <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach</string>
+     </property>
+     <column><property name="text"><string>Obs.</string></property></column>
+     <column><property name="text"><string>Frames</string></property></column>
+     <column><property name="text"><string>T_mid (UT)</string></property></column>
+     <column><property name="text"><string>Expected SNR</string></property></column>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_method">
+     <item>
+      <widget class="QLabel" name="lbl_method">
+       <property name="text"><string>Method:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_method">
+       <property name="toolTip">
+        <string>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean's SNR while rejecting the trails (the default)</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_stack">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Stack the sequence</string></property>
+       <property name="toolTip">
+        <string>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="prg_stack">
+     <property name="visible"><bool>false</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_status">
+     <property name="visible"><bool>false</bool></property>
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_notes">
+     <property name="visible"><bool>false</bool></property>
+     <property name="text"><string/></property>
+     <property name="toolTip">
+      <string>Warnings of the run: dithering, the composed WCS quality and the velocity sweep result</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_view">
+     <item>
+      <widget class="QLabel" name="lbl_view">
+       <property name="text"><string>Stack of the observation:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_group">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="toolTip">
+        <string>Which observation's stack is shown below, with the measured position marked</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="ph_stack_view" native="true">
+     <property name="minimumSize"><size><width>0</width><height>220</height></size></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_points_title">
+     <property name="text"><string>Measurement per observation</string></property>
+     <property name="toolTip">
+      <string>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="tbl_points">
+     <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
+     <column><property name="text"><string>Obs.</string></property></column>
+     <column><property name="text"><string>T_mid (UT)</string></property></column>
+     <column><property name="text"><string>RA (stack)</string></property></column>
+     <column><property name="text"><string>Dec (stack)</string></property></column>
+     <column><property name="text"><string>Δ ways (″)</string></property></column>
+     <column><property name="text"><string>SNR</string></property></column>
+     <column><property name="text"><string>Mag</string></property></column>
+     <column><property name="text"><string>Warnings</string></property></column>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_check">
+     <property name="title"><string>Check against other observers</string></property>
+     <layout class="QVBoxLayout" name="vbox_check">
+      <item>
+       <widget class="QLabel" name="lbl_check">
+        <property name="text"><string>Find_Orb fits the published observations without ours and predicts where ours should land; our residual against their dispersion decides.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_check_hint">
+        <property name="text"><string>The check filters, it does not prove: fitting a short arc is not proof of a detection.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chk_force">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="text"><string>Force the report even if the check blocks it (it will be recorded)</string></property>
+        <property name="toolTip">
+         <string>An outlier blocks the report by default; forcing it leaves the decision on record</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_report">
+     <property name="title"><string>Report</string></property>
+     <layout class="QVBoxLayout" name="vbox_report">
+      <item>
+       <layout class="QHBoxLayout" name="row_format">
+        <item>
+         <widget class="QLabel" name="lbl_format">
+          <property name="text"><string>Format:</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="cmb_format">
+          <property name="toolTip">
+           <string>ADES PSV is the modern machine-readable format the MPC prefers; the 80-column format is the classic one, readable by every program</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_report">
+        <item>
+         <widget class="QPushButton" name="btn_report">
+          <property name="enabled"><bool>false</bool></property>
+          <property name="text"><string>Generate report</string></property>
+          <property name="toolTip">
+           <string>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_send_mpc">
+          <property name="enabled"><bool>false</bool></property>
+          <property name="text"><string>Send to the visit's MPC block</string></property>
+          <property name="toolTip">
+           <string>Fill the visit's MPC paste box with the report; the validator there has the last word before saving</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QPlainTextEdit" name="txt_report">
+        <property name="maximumSize"><size><width>16777215</width><height>110</height></size></property>
+        <property name="readOnly"><bool>true</bool></property>
+        <property name="font"><font><family>Monospace</family></font></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="vspacer_trackstack">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

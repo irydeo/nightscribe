@@ -1,0 +1,659 @@
+{
+ "object": "2026PY9",
+ "horizons": "2026 PY9",
+ "mpec": "https://minorplanetcenter.net/mpec/K26/K26Q24.html",
+ "exptime_s": 5,
+ "filter": "Clear",
+ "n_frames": 60,
+ "crop": {
+  "box": [
+   909,
+   937,
+   1165,
+   1193
+  ],
+  "size": 256
+ },
+ "cd": [
+  [
+   0.0002956558787361,
+   1.178601335317e-05
+  ],
+  [
+   1.172778848003e-05,
+   -0.0002957574190394
+  ]
+ ],
+ "published": [
+  {
+   "time": "2026-08-16T22:34:55.488",
+   "ra_deg": 313.32933,
+   "dec_deg": -4.86186,
+   "mag": 19.3,
+   "band": "G",
+   "astcat": "Gaia3E"
+  },
+  {
+   "time": "2026-08-16T22:51:54.144",
+   "ra_deg": 313.34554,
+   "dec_deg": -4.87744,
+   "mag": 19.2,
+   "band": "G",
+   "astcat": "Gaia3E"
+  }
+ ],
+ "tycho_png": {
+  "provid": "6HE2A22",
+  "frames": 130,
+  "exptime_s": 5,
+  "total_exposure_s": 650,
+  "speed_arcsec_min": 4.76,
+  "pa_deg": 134,
+  "mag": 19.3,
+  "band": "G",
+  "time": "2026-08-16T22:34:55.5"
+ },
+ "grouping": "to be determined empirically against the published positions",
+ "frames": [
+  {
+   "file": "frame000.fits",
+   "date_obs": "2026-08-16T22:30:38.115000+00:00",
+   "object_ra_deg": 313.3254156,
+   "object_dec_deg": -4.8580545,
+   "object_xy": [
+    114.2,
+    114.3
+   ]
+  },
+  {
+   "file": "frame001.fits",
+   "date_obs": "2026-08-16T22:30:44.963000+00:00",
+   "object_ra_deg": 313.3255203,
+   "object_dec_deg": -4.8581592,
+   "object_xy": [
+    114.58,
+    114.68
+   ]
+  },
+  {
+   "file": "frame002.fits",
+   "date_obs": "2026-08-16T22:30:51.737000+00:00",
+   "object_ra_deg": 313.3256238,
+   "object_dec_deg": -4.8582626,
+   "object_xy": [
+    114.85,
+    115.04
+   ]
+  },
+  {
+   "file": "frame003.fits",
+   "date_obs": "2026-08-16T22:30:58.530000+00:00",
+   "object_ra_deg": 313.3257275,
+   "object_dec_deg": -4.8583664,
+   "object_xy": [
+    115.26,
+    115.42
+   ]
+  },
+  {
+   "file": "frame004.fits",
+   "date_obs": "2026-08-16T22:31:05.588000+00:00",
+   "object_ra_deg": 313.3258393,
+   "object_dec_deg": -4.8584717,
+   "object_xy": [
+    115.73,
+    115.8
+   ]
+  },
+  {
+   "file": "frame005.fits",
+   "date_obs": "2026-08-16T22:31:12.383000+00:00",
+   "object_ra_deg": 313.3259478,
+   "object_dec_deg": -4.8585723,
+   "object_xy": [
+    116.1,
+    116.16
+   ]
+  },
+  {
+   "file": "frame006.fits",
+   "date_obs": "2026-08-16T22:31:19.292000+00:00",
+   "object_ra_deg": 313.3260581,
+   "object_dec_deg": -4.8586747,
+   "object_xy": [
+    116.44,
+    116.53
+   ]
+  },
+  {
+   "file": "frame007.fits",
+   "date_obs": "2026-08-16T22:31:26.070000+00:00",
+   "object_ra_deg": 313.3261664,
+   "object_dec_deg": -4.8587751,
+   "object_xy": [
+    116.88,
+    116.9
+   ]
+  },
+  {
+   "file": "frame008.fits",
+   "date_obs": "2026-08-16T22:31:32.886000+00:00",
+   "object_ra_deg": 313.3262753,
+   "object_dec_deg": -4.8588761,
+   "object_xy": [
+    117.14,
+    117.25
+   ]
+  },
+  {
+   "file": "frame009.fits",
+   "date_obs": "2026-08-16T22:31:39.688000+00:00",
+   "object_ra_deg": 313.3263839,
+   "object_dec_deg": -4.8589769,
+   "object_xy": [
+    117.62,
+    117.62
+   ]
+  },
+  {
+   "file": "frame010.fits",
+   "date_obs": "2026-08-16T22:31:46.450000+00:00",
+   "object_ra_deg": 313.3264919,
+   "object_dec_deg": -4.859077,
+   "object_xy": [
+    118.0,
+    117.98
+   ]
+  },
+  {
+   "file": "frame011.fits",
+   "date_obs": "2026-08-16T22:31:53.492000+00:00",
+   "object_ra_deg": 313.3266044,
+   "object_dec_deg": -4.8591814,
+   "object_xy": [
+    118.45,
+    118.36
+   ]
+  },
+  {
+   "file": "frame012.fits",
+   "date_obs": "2026-08-16T22:32:00.310000+00:00",
+   "object_ra_deg": 313.3267131,
+   "object_dec_deg": -4.8592825,
+   "object_xy": [
+    118.8,
+    118.72
+   ]
+  },
+  {
+   "file": "frame013.fits",
+   "date_obs": "2026-08-16T22:33:56.016000+00:00",
+   "object_ra_deg": 313.3285197,
+   "object_dec_deg": -4.8610502,
+   "object_xy": [
+    125.23,
+    125.07
+   ]
+  },
+  {
+   "file": "frame014.fits",
+   "date_obs": "2026-08-16T22:34:03.039000+00:00",
+   "object_ra_deg": 313.3286319,
+   "object_dec_deg": -4.8611575,
+   "object_xy": [
+    125.69,
+    125.46
+   ]
+  },
+  {
+   "file": "frame015.fits",
+   "date_obs": "2026-08-16T22:34:09.857000+00:00",
+   "object_ra_deg": 313.3287408,
+   "object_dec_deg": -4.8612617,
+   "object_xy": [
+    126.02,
+    125.83
+   ]
+  },
+  {
+   "file": "frame016.fits",
+   "date_obs": "2026-08-16T22:34:16.631000+00:00",
+   "object_ra_deg": 313.328849,
+   "object_dec_deg": -4.8613652,
+   "object_xy": [
+    126.38,
+    126.2
+   ]
+  },
+  {
+   "file": "frame017.fits",
+   "date_obs": "2026-08-16T22:34:23.397000+00:00",
+   "object_ra_deg": 313.328957,
+   "object_dec_deg": -4.8614686,
+   "object_xy": [
+    126.78,
+    126.58
+   ]
+  },
+  {
+   "file": "frame018.fits",
+   "date_obs": "2026-08-16T22:34:30.481000+00:00",
+   "object_ra_deg": 313.3290702,
+   "object_dec_deg": -4.8615768,
+   "object_xy": [
+    127.16,
+    126.97
+   ]
+  },
+  {
+   "file": "frame019.fits",
+   "date_obs": "2026-08-16T22:34:37.229000+00:00",
+   "object_ra_deg": 313.329178,
+   "object_dec_deg": -4.8616799,
+   "object_xy": [
+    127.55,
+    127.34
+   ]
+  },
+  {
+   "file": "frame020.fits",
+   "date_obs": "2026-08-16T22:34:44.022000+00:00",
+   "object_ra_deg": 313.3292865,
+   "object_dec_deg": -4.8617837,
+   "object_xy": [
+    127.99,
+    127.71
+   ]
+  },
+  {
+   "file": "frame021.fits",
+   "date_obs": "2026-08-16T22:34:50.774000+00:00",
+   "object_ra_deg": 313.3293943,
+   "object_dec_deg": -4.8618868,
+   "object_xy": [
+    128.29,
+    128.08
+   ]
+  },
+  {
+   "file": "frame022.fits",
+   "date_obs": "2026-08-16T22:34:57.588000+00:00",
+   "object_ra_deg": 313.3295031,
+   "object_dec_deg": -4.8619909,
+   "object_xy": [
+    128.68,
+    128.45
+   ]
+  },
+  {
+   "file": "frame023.fits",
+   "date_obs": "2026-08-16T22:35:04.388000+00:00",
+   "object_ra_deg": 313.3296087,
+   "object_dec_deg": -4.8620948,
+   "object_xy": [
+    129.02,
+    128.82
+   ]
+  },
+  {
+   "file": "frame024.fits",
+   "date_obs": "2026-08-16T22:35:11.154000+00:00",
+   "object_ra_deg": 313.3297121,
+   "object_dec_deg": -4.8621982,
+   "object_xy": [
+    129.39,
+    129.19
+   ]
+  },
+  {
+   "file": "frame025.fits",
+   "date_obs": "2026-08-16T22:35:18.270000+00:00",
+   "object_ra_deg": 313.3298208,
+   "object_dec_deg": -4.8623069,
+   "object_xy": [
+    129.91,
+    129.59
+   ]
+  },
+  {
+   "file": "frame026.fits",
+   "date_obs": "2026-08-16T22:35:25.066000+00:00",
+   "object_ra_deg": 313.3299246,
+   "object_dec_deg": -4.8624107,
+   "object_xy": [
+    130.27,
+    129.96
+   ]
+  },
+  {
+   "file": "frame027.fits",
+   "date_obs": "2026-08-16T22:35:31.884000+00:00",
+   "object_ra_deg": 313.3300288,
+   "object_dec_deg": -4.8625149,
+   "object_xy": [
+    130.63,
+    130.33
+   ]
+  },
+  {
+   "file": "frame028.fits",
+   "date_obs": "2026-08-16T22:35:38.696000+00:00",
+   "object_ra_deg": 313.3301329,
+   "object_dec_deg": -4.862619,
+   "object_xy": [
+    130.98,
+    130.71
+   ]
+  },
+  {
+   "file": "frame029.fits",
+   "date_obs": "2026-08-16T22:35:45.524000+00:00",
+   "object_ra_deg": 313.3302372,
+   "object_dec_deg": -4.8627233,
+   "object_xy": [
+    131.32,
+    131.08
+   ]
+  },
+  {
+   "file": "frame030.fits",
+   "date_obs": "2026-08-16T22:35:52.363000+00:00",
+   "object_ra_deg": 313.3303417,
+   "object_dec_deg": -4.8628278,
+   "object_xy": [
+    131.65,
+    131.45
+   ]
+  },
+  {
+   "file": "frame031.fits",
+   "date_obs": "2026-08-16T22:35:59.137000+00:00",
+   "object_ra_deg": 313.3304451,
+   "object_dec_deg": -4.8629313,
+   "object_xy": [
+    132.03,
+    131.82
+   ]
+  },
+  {
+   "file": "frame032.fits",
+   "date_obs": "2026-08-16T22:36:06.213000+00:00",
+   "object_ra_deg": 313.3305576,
+   "object_dec_deg": -4.8630394,
+   "object_xy": [
+    132.47,
+    132.21
+   ]
+  },
+  {
+   "file": "frame033.fits",
+   "date_obs": "2026-08-16T22:36:12.756000+00:00",
+   "object_ra_deg": 313.3306621,
+   "object_dec_deg": -4.8631393,
+   "object_xy": [
+    132.81,
+    132.57
+   ]
+  },
+  {
+   "file": "frame034.fits",
+   "date_obs": "2026-08-16T22:36:19.070000+00:00",
+   "object_ra_deg": 313.3307629,
+   "object_dec_deg": -4.8632358,
+   "object_xy": [
+    133.18,
+    132.92
+   ]
+  },
+  {
+   "file": "frame035.fits",
+   "date_obs": "2026-08-16T22:36:25.864000+00:00",
+   "object_ra_deg": 313.3308714,
+   "object_dec_deg": -4.8633396,
+   "object_xy": [
+    133.52,
+    133.29
+   ]
+  },
+  {
+   "file": "frame036.fits",
+   "date_obs": "2026-08-16T22:36:32.644000+00:00",
+   "object_ra_deg": 313.3309797,
+   "object_dec_deg": -4.8634432,
+   "object_xy": [
+    133.97,
+    133.66
+   ]
+  },
+  {
+   "file": "frame037.fits",
+   "date_obs": "2026-08-16T22:36:39.733000+00:00",
+   "object_ra_deg": 313.331093,
+   "object_dec_deg": -4.8635515,
+   "object_xy": [
+    134.33,
+    134.05
+   ]
+  },
+  {
+   "file": "frame038.fits",
+   "date_obs": "2026-08-16T22:36:46.525000+00:00",
+   "object_ra_deg": 313.3312014,
+   "object_dec_deg": -4.8636552,
+   "object_xy": [
+    134.73,
+    134.42
+   ]
+  },
+  {
+   "file": "frame039.fits",
+   "date_obs": "2026-08-16T22:36:53.295000+00:00",
+   "object_ra_deg": 313.3313096,
+   "object_dec_deg": -4.8637587,
+   "object_xy": [
+    135.15,
+    134.8
+   ]
+  },
+  {
+   "file": "frame040.fits",
+   "date_obs": "2026-08-16T22:36:59.521000+00:00",
+   "object_ra_deg": 313.331409,
+   "object_dec_deg": -4.8638538,
+   "object_xy": [
+    135.54,
+    135.14
+   ]
+  },
+  {
+   "file": "frame041.fits",
+   "date_obs": "2026-08-16T22:37:06.079000+00:00",
+   "object_ra_deg": 313.3315138,
+   "object_dec_deg": -4.8639512,
+   "object_xy": [
+    135.83,
+    135.49
+   ]
+  },
+  {
+   "file": "frame042.fits",
+   "date_obs": "2026-08-16T22:37:13.128000+00:00",
+   "object_ra_deg": 313.3316263,
+   "object_dec_deg": -4.8640556,
+   "object_xy": [
+    136.23,
+    135.86
+   ]
+  },
+  {
+   "file": "frame043.fits",
+   "date_obs": "2026-08-16T22:37:19.563000+00:00",
+   "object_ra_deg": 313.3317291,
+   "object_dec_deg": -4.8641509,
+   "object_xy": [
+    136.69,
+    136.21
+   ]
+  },
+  {
+   "file": "frame044.fits",
+   "date_obs": "2026-08-16T22:37:26.335000+00:00",
+   "object_ra_deg": 313.3318373,
+   "object_dec_deg": -4.8642513,
+   "object_xy": [
+    136.99,
+    136.57
+   ]
+  },
+  {
+   "file": "frame045.fits",
+   "date_obs": "2026-08-16T22:37:33.159000+00:00",
+   "object_ra_deg": 313.3319463,
+   "object_dec_deg": -4.8643524,
+   "object_xy": [
+    137.35,
+    136.93
+   ]
+  },
+  {
+   "file": "frame046.fits",
+   "date_obs": "2026-08-16T22:37:39.907000+00:00",
+   "object_ra_deg": 313.3320541,
+   "object_dec_deg": -4.8644523,
+   "object_xy": [
+    137.8,
+    137.29
+   ]
+  },
+  {
+   "file": "frame047.fits",
+   "date_obs": "2026-08-16T22:37:46.720000+00:00",
+   "object_ra_deg": 313.3321629,
+   "object_dec_deg": -4.8645533,
+   "object_xy": [
+    138.2,
+    137.65
+   ]
+  },
+  {
+   "file": "frame048.fits",
+   "date_obs": "2026-08-16T22:37:53.513000+00:00",
+   "object_ra_deg": 313.3322714,
+   "object_dec_deg": -4.8646539,
+   "object_xy": [
+    138.62,
+    138.02
+   ]
+  },
+  {
+   "file": "frame049.fits",
+   "date_obs": "2026-08-16T22:38:00.573000+00:00",
+   "object_ra_deg": 313.3323838,
+   "object_dec_deg": -4.8647588,
+   "object_xy": [
+    138.99,
+    138.39
+   ]
+  },
+  {
+   "file": "frame050.fits",
+   "date_obs": "2026-08-16T22:38:07.320000+00:00",
+   "object_ra_deg": 313.3324868,
+   "object_dec_deg": -4.8648618,
+   "object_xy": [
+    139.39,
+    138.76
+   ]
+  },
+  {
+   "file": "frame051.fits",
+   "date_obs": "2026-08-16T22:38:14.107000+00:00",
+   "object_ra_deg": 313.3325905,
+   "object_dec_deg": -4.8649655,
+   "object_xy": [
+    139.66,
+    139.13
+   ]
+  },
+  {
+   "file": "frame052.fits",
+   "date_obs": "2026-08-16T22:38:20.943000+00:00",
+   "object_ra_deg": 313.332695,
+   "object_dec_deg": -4.86507,
+   "object_xy": [
+    140.09,
+    139.51
+   ]
+  },
+  {
+   "file": "frame053.fits",
+   "date_obs": "2026-08-16T22:38:27.828000+00:00",
+   "object_ra_deg": 313.3328001,
+   "object_dec_deg": -4.8651751,
+   "object_xy": [
+    140.46,
+    139.89
+   ]
+  },
+  {
+   "file": "frame054.fits",
+   "date_obs": "2026-08-16T22:38:34.559000+00:00",
+   "object_ra_deg": 313.332903,
+   "object_dec_deg": -4.865278,
+   "object_xy": [
+    140.83,
+    140.25
+   ]
+  },
+  {
+   "file": "frame055.fits",
+   "date_obs": "2026-08-16T22:38:41.354000+00:00",
+   "object_ra_deg": 313.3330068,
+   "object_dec_deg": -4.8653818,
+   "object_xy": [
+    141.21,
+    140.63
+   ]
+  },
+  {
+   "file": "frame056.fits",
+   "date_obs": "2026-08-16T22:38:48.362000+00:00",
+   "object_ra_deg": 313.3331139,
+   "object_dec_deg": -4.8654889,
+   "object_xy": [
+    141.57,
+    141.01
+   ]
+  },
+  {
+   "file": "frame057.fits",
+   "date_obs": "2026-08-16T22:38:55.193000+00:00",
+   "object_ra_deg": 313.3332182,
+   "object_dec_deg": -4.8655932,
+   "object_xy": [
+    141.98,
+    141.38
+   ]
+  },
+  {
+   "file": "frame058.fits",
+   "date_obs": "2026-08-16T22:39:01.960000+00:00",
+   "object_ra_deg": 313.333323,
+   "object_dec_deg": -4.8656966,
+   "object_xy": [
+    142.26,
+    141.75
+   ]
+  },
+  {
+   "file": "frame059.fits",
+   "date_obs": "2026-08-16T22:39:08.715000+00:00",
+   "object_ra_deg": 313.3334309,
+   "object_dec_deg": -4.8657998,
+   "object_xy": [
+    142.73,
+    142.12
+   ]
+  }
+ ]
+}

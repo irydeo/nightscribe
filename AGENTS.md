@@ -114,6 +114,10 @@ nightscribe/
                       #   indexada (cámara/ganancia/temperatura/exposición/filtro),
                       #   receta declarativa (un dark ya incluye el bias), flat
                       #   normalizado, en memoria con export opcional
+    track_stack.py    # track & stack (ADR-062, fase 2): ingesta con T_mid
+                      #   (media exposición), solve del primer frame, WCS
+                      #   compuesto por registro, posición del objeto por
+                      #   frame y aviso de dithering
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame atado por comparada, ensemble con veto MAD,
                       #   puertas que marcan y nunca borran, tiempo a media

@@ -130,6 +130,44 @@ resto y cada frame conoce su WCS, su transformación y la posición efemérica d
 su instante. El control de calidad dice si el WCS compuesto es de fiar y si la
 secuencia está dithered.
 
+## Resultado (2026-10-04)
+
+Implementado `core/track_stack.py` (rama `feature/astrometry-minor-planets`):
+
+- `Frame` + `load_sequence`: lee solo la cabecera, calcula `T_mid` (media
+  exposición) y ordena por tiempo. El instante que representa la observación
+  es el centro de la exposición, no su inicio.
+- `solve_reference`: usa el WCS que la placa ya trae (cabecera o caché) y solo
+  recurre al solver cuando falta; el **primer** frame es la rejilla (el plan lo
+  dice así, y de paso la dirección del registro queda constante).
+- `register_sequence`: estima la transformación con `core/register.py` y compone
+  el WCS por frame con `compose_wcs` (delega en `register.ref_to_src_point`, que
+  es donde se confunde la dirección si se reescribe). Un frame no fiable hereda
+  la transformación anterior y se marca.
+- `object_positions`: evalúa la efeméride en el `T_mid` de cada frame y la
+  convierte a píxeles con su WCS.
+- `dither_check`: aviso cuando la secuencia no se movió (el ruido de patrón se
+  apila), medido con las propias traslaciones del registro.
+- `verify_composed_wcs`: control de calidad que resuelve un par de frames y
+  compara el WCS compuesto contra el directo (avisa si la distorsión muerde).
+
+Dos hallazgos que quedan escritos en el código y en los tests:
+
+1. **La pista del registro no puede ser la identidad de la referencia**: pasar
+   la transformación del frame de referencia como `guess` del siguiente arrastra
+   el voto de estrellas a un mínimo malo (un desplazamiento de 2 px se leyó como
+   29). La pista es la del frame **anterior**, y para el primero es `None`.
+2. **El registro es asimétrico**: con esta pareja sintética funciona con la
+   referencia «original» (n=11) y falla con la «desplazada» (n=5). Es una
+   razón más para fijar la referencia al primer frame.
+
+Tests: `tests/unit/test_track_stack_ingest.py` (9), offline (sin solver ni
+Horizons). Suite completa: **2623 passed**.
+
+Pendiente de la fase: probar el solve real y el control de calidad sobre el
+fixture de `tests/data/astrometry/` (necesita ASTAP), y el barrido de
+multiproceso de la fase 3.
+
 ## Hecho cuando
 
 La suite unitaria está verde y el control de calidad de un set real (checklist

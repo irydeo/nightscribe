@@ -129,6 +129,11 @@ nightscribe/
                       #   originales de un run con éxito a procesados/ dentro
                       #   del proyecto (no borrar), registrar el movimiento y
                       #   poder restaurarlos; los calibrados se borran aparte
+    findorb.py        # handoff a Find_Orb (ADR-062, fase 5.2): fichero de
+                      #   observaciones, `fo` headless con entorno propio y
+                      #   límite de CPU, y la decisión sobre sus residuos
+    mpc_astrometry.py # generadores de reporte MPC (ADR-062, fase 6): ADES
+                      #   PSV y 80 columnas, listón de envío (SNR >= 20)
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame atado por comparada, ensemble con veto MAD,
                       #   puertas que marcan y nunca borran, tiempo a media

@@ -329,7 +329,7 @@ def _crossing_text(q, Q):
 
 def explain_elements(elements, phys=None, family=None, moid=None,
                      sigmas=None, n_resids=None, arc_days=None,
-                     disc_date=None):
+                     disc_date=None, n_stations=None, last_obs=None):
     # Translates each orbital/physical parameter into *intuitive* language.
     # Every row has a "level": "basic" rows are the handful everyone should
     # see; "deep" rows appear under the "in depth" toggle (see ADR-017).
@@ -337,7 +337,9 @@ def explain_elements(elements, phys=None, family=None, moid=None,
     #        family - key from classify(), moid - MOID in AU if known,
     #        sigmas - per-element uncertainties (preliminary NEOfixer orbits),
     #        n_resids - number of astrometric residuals, arc_days - observed arc
-    #        disc_date - discovery date (ISO) from SBDB, when known
+    #        disc_date - discovery date (ISO) from SBDB, when known,
+    #        n_stations - how many DIFFERENT observatories have seen it,
+    #        last_obs - date of the last observation (ISO), from the MPC
     # @return: list of dicts: {"param", "value", "level", "es", "en", "group"}
     phys = phys or {}
     out = []
@@ -534,6 +536,25 @@ def explain_elements(elements, phys=None, family=None, moid=None,
                   "tiempo. Con arcos cortos, volverlo a medir esta noche vale oro.",
             "en": "The orbit is fitted to those measurements spread over that time "
                   "arc. With short arcs, measuring it again tonight is worth gold."})
+    if n_stations is not None or last_obs:
+        # D28: how many DIFFERENT observatories have seen it, and when it
+        # was last seen. It is the plainest sign of whether the object is
+        # alive (many stations, a recent date) or about to be lost (one
+        # station, months of silence).
+        val = " · ".join(str(v) for v in
+                         (f"{n_stations} observatorios" if n_stations is not None
+                          else None,
+                          f"última {last_obs}" if last_obs else None) if v)
+        out.append({
+            "param": {"es": "Observatorios y última vez",
+                      "en": "Observatories and last seen"},
+            "value": val, "level": "basic",
+            "es": "Cuántos observatorios distintos lo han medido y cuándo fue "
+                  "la última vez. Muchos y reciente: objeto vivo y bien "
+                  "determinado. Uno solo y hace meses: candidato a perderse.",
+            "en": "How many different observatories have measured it and when "
+                  "it was last seen. Many and recent: a live, well-determined "
+                  "object. One and months ago: a candidate to be lost."})
     if disc_date:
         out.append({
             "param": {"es": "Descubierto", "en": "Discovered"},

@@ -44,6 +44,7 @@ def parse_sbdb(data):
     # observation of the orbit solution — both normalised to ISO
     disc = (data.get("discovery") or {}).get("date")
     first_obs = (data.get("orbit") or {}).get("first_obs")
+    orbit = data.get("orbit") or {}
     return {
         "fullname": obj.get("fullname") or obj.get("des"),
         "des": obj.get("des"),
@@ -55,6 +56,11 @@ def parse_sbdb(data):
         "elements": elements,
         "moid": elements.get("moid") or data.get("orbit", {}).get("moid"),
         "phys": phys,
+        # the observation history the card shows (D28): how many residuals
+        # the solution used, when it was last seen and how long the arc is
+        "n_obs_used": orbit.get("n_obs_used"),
+        "last_obs": dates.normalize_date(orbit.get("last_obs")),
+        "data_arc": orbit.get("data_arc"),
         "disc_date": dates.normalize_date(disc)
         or dates.normalize_date(first_obs),
     }

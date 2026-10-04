@@ -149,6 +149,28 @@ def _isolated_config_file(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_widgets_left_open():
+    # Close whatever top-level widget a test left on screen, and let the
+    # deferred deletions run. A shown widget that is only deleteLater()'d
+    # stays MAPPED until the event loop next spins, which is inside the NEXT
+    # test: that race took an xdist worker down (one run in six, "worker
+    # 'gw7' crashed while running
+    # test_project_files_dialog.py::test_empty_state_message") and it is also
+    # how a long run accumulates windows it never frees. There are ~36 sites
+    # that show a widget and delete it later; this covers all of them, and
+    # any future one.
+    yield
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    if app is None:
+        return
+    for w in app.topLevelWidgets():
+        if w.isVisible():
+            w.close()
+    app.processEvents()
+
+
+@pytest.fixture(autouse=True)
 def _isolated_config_data(monkeypatch):
     # Config.set() writes into the in-memory _data dict, and the singleton is
     # shared by the whole process: a test that sets the site, the language or

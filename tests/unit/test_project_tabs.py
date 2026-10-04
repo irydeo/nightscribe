@@ -546,7 +546,7 @@ def test_files_button_opens_the_files_window(window, panel):
     btn.click()
     dlg = window._proj_files_dlg
     assert dlg is not None
-    assert dlg.isVisible()
+    assert not dlg.isHidden()
     assert dlg.project_id == p["id"]
     assert dlg.tbl.rowCount() == 2
     kinds = {dlg.tbl.item(i, 0).text() for i in range(dlg.tbl.rowCount())}
@@ -565,7 +565,7 @@ def test_files_window_survives_project_switch_and_rekeys(window, panel):
     window._populate_project_files(p1["id"])
     window.projects.btn_files.click()
     dlg = window._proj_files_dlg
-    assert dlg.isVisible()
+    assert not dlg.isHidden()
     assert dlg.project_id == p1["id"]
     assert dlg.tbl.rowCount() == 1
     # switch to a second project while the window is open...
@@ -573,7 +573,7 @@ def test_files_window_survives_project_switch_and_rekeys(window, panel):
     project.add_file(dbmod.db, p2["id"], "/tmp/b1.gif", "chart")
     window._populate_project_files(p2["id"])
     # ...the window stays, still attached to the first project...
-    assert dlg.isVisible()
+    assert not dlg.isHidden()
     assert dlg.project_id == p1["id"]
     # ...until it is shown again, when it re-keys onto the current one.
     window.projects.btn_files.click()

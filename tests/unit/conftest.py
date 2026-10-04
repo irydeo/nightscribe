@@ -149,6 +149,25 @@ def _isolated_config_file(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_config_data(monkeypatch):
+    # Config.set() writes into the in-memory _data dict, and the singleton is
+    # shared by the whole process: a test that sets the site, the language or
+    # the app version leaks it into every test that runs after it. The fixture
+    # above isolates the FILE, which is not enough (it is what let
+    # test_cta_needs_a_site see a site, and what made a Spanish test inherit
+    # whatever the runner's locale said). Each test gets its own copy of the
+    # dict, and monkeypatch restores the original one afterwards.
+    from nightscribe.config import config
+    monkeypatch.setattr(config, "_data", dict(config._data))
+    # The language is part of the same problem: the GUI reads it from the
+    # config and falls back to the HOST locale ("system"), so the same test
+    # passed on an es_ES machine and failed on an en-US runner. Pin the base
+    # language (ADR-014: the code's strings are English, Spanish is a
+    # translation) and let a test that checks Spanish ask for it.
+    monkeypatch.setitem(config._data, "language", "en")
+
+
+@pytest.fixture(autouse=True)
 def _chart_style_defaults(monkeypatch):
     # The GUI reads the chart-annotation settings (ADR-046) live from the
     # config singleton, which loads the DEVELOPER'S real config file: a

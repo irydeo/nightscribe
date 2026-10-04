@@ -125,6 +125,25 @@ def resize_to_panel_content(parent, panel):
     w = max(int(hint.width()), _MIN_READ_W)
     h = max(int(hint.height()) + _DLG_CHROME, _MIN_READ_H)
     parent.resize(w, h)
+    # The chrome is NOT the constant above. Measured on the author's machine
+    # it is 22 px (the dialog layout's own margins); on the Windows runner it
+    # is 193, and there the panel did not fit the viewport it had been given
+    # (1929 px of panel in a 1796 px viewport, so the CTA sat below the fold
+    # and test_resize_keeps_full_panel_visible failed with the design intact).
+    # Once the dialog is on screen the real chrome can be READ: it is what the
+    # dialog's height has over its scroll area's viewport. The caller runs
+    # this from a 0 ms singleShot, so pumping the events here is safe and lets
+    # the layout settle between measurements.
+    from PySide6.QtWidgets import QAbstractScrollArea, QApplication
+    area = parent.findChild(QAbstractScrollArea)
+    if area is None:
+        return
+    for _ in range(3):
+        QApplication.processEvents()
+        chrome = parent.height() - area.viewport().height()
+        if chrome <= _DLG_CHROME:
+            break                       # the constant was enough (or better)
+        parent.resize(w, max(int(hint.height()) + chrome, _MIN_READ_H))
 
 
 def _mark_embedded(w):

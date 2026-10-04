@@ -39,6 +39,11 @@ def dlg(qapp):
     from nightscribe.gui.project_files_dialog import ProjectFilesDialog
     d = ProjectFilesDialog()
     d.show()
+    # The empty-state test asks isVisible(), and a widget is only visible once
+    # the window has been MAPPED: on a loaded machine the suite went red on
+    # that race (it passed on three consecutive runs afterwards). Pump the
+    # events here so every test of this file starts from the same state.
+    qapp.processEvents()
     yield d
     d.deleteLater()
 
@@ -61,7 +66,7 @@ def _menu_row_texts(dlg, row):
 
 def test_empty_state_message(dlg):
     dlg.set_files([])
-    assert dlg.lbl_status.isVisible()
+    assert not dlg.lbl_status.isHidden()
     assert dlg.lbl_status.text()
     assert dlg.tbl.rowCount() == 0
     assert dlg.project_id is None

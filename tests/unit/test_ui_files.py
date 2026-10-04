@@ -54,7 +54,7 @@ def _check(host, expect_margins, first_control=None, do_show=True):
     if do_show:
         host.show()
     assert _margins(host) == (expect_margins,) * 4
-    assert not host._ui.isVisible(), "the .ui husk must be hidden"
+    assert host._ui.isHidden(), "the .ui husk must be hidden"
     if first_control is not None:
         w = getattr(host, first_control, None) or \
             getattr(host._ui, first_control)

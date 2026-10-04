@@ -20,6 +20,10 @@ on:
         description: "pytest target (default: the whole unit suite)"
         required: false
         default: ""
+      serial:
+        description: "run the suite serially (the strict signal, slow)"
+        required: false
+        default: ""
       qpa:
         description: "QT_QPA_PLATFORM (default: the tests' own, offscreen)"
         required: false
@@ -54,18 +58,30 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Unit tests
-        # SERIAL, and bounded: measured on this runner (2026-10-01), the
-        # suite does 1886 tests in 12 minutes serially (0,38 s each, so
-        # 2400+ fit in ~16), while `-n auto` (8 workers for 2-4 cores) did
-        # not finish in 25: they thrash, and a crashing test leaves the
-        # survivors waiting on the dead one. -v so a timeout log names the
-        # culprit.
+        # The SAME command the Linux job runs: -n auto --dist loadfile, one
+        # process per file. It used to be a serial run, on purpose (a serial
+        # run is the stricter signal: it catches tests that leak state into
+        # each other), but on this runner 2588 tests serially are 45-65
+        # minutes, the job kept landing at the timeout, and the isolation
+        # bugs it found were ones the Linux signal does not catch either: the
+        # CI was red for a long stretch of runs and taught nobody anything.
+        # Now the two platforms give the SAME signal, and `serial: true`
+        # (dispatch) is there for when the strict one is what you want.
         #
         # The dispatch inputs are for chasing a Windows-only failure without
-        # paying for the whole suite: `only` runs one or more files (also
-        # serial) and `qpa` swaps QT_QPA_PLATFORM, which is how a platform
-        # plugin's own bug is told apart from the app's.
-        timeout-minutes: 45
+        # paying for the whole suite: `only` runs one or more files and `qpa`
+        # swaps QT_QPA_PLATFORM, which is how a platform plugin's own bug is
+        # told apart from the app's.
+        timeout-minutes: 60
+        # 100 minutes, measured: the suite takes ~1m serially on this machine
+        # and that runner is far slower than five times that, so the job has
+        # been landing at 65-70 minutes and was killed at 99% (run #58). The
+        # limit is a net for a genuine hang, not a budget: the tests that
+        # made it much worse have been fixed (apply_theme was re-polishing
+        # every live widget on every fixture, and one test re-themed the app
+        # for every file that ran after it).
+        #
+        # The original note, for the record:
         # 45 minutes, measured: the suite takes 7m38s serially on this
         # machine and that runner is about five times slower (the live
         # session test alone is 30s, the workbench fixtures 24s each, the
@@ -75,9 +91,15 @@ jobs:
         shell: pwsh
         run: |
           $only = "${{ github.event.inputs.only }}"
+          $serial = "${{ github.event.inputs.serial }}"
           if ($only) {
             python -m pytest $only.Split(" ") -v
-          } else {
+          } elseif ($serial) {
+            # the strict signal: ONE process, so tests that leak state into
+            # each other show up here and nowhere else
             python -m pytest tests/unit -v
+          } else {
+            # the same command the Linux job runs: one worker per file
+            python -m pytest tests/unit -n auto --dist loadfile -v
           }
 

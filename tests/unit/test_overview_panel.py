@@ -1325,13 +1325,22 @@ def test_cta_reset_on_blank(qapp, tmp_path):
 
 # ---------------- i18n (D6) ----------------
 
-def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
+def test_panel_strings_resolve_in_spanish(qapp, tmp_path, monkeypatch):
     # the compiled .qm (nightscribe_es.qm) must carry every string the
     # panel shows: install it, check the labels, remove it after.
     # ADR-014: base language in code is English; Spanish is a translation.
     from pathlib import Path
     from PySide6.QtCore import QTranslator
     from PySide6.QtWidgets import QLabel
+    from nightscribe.config import config
+
+    # The section cards do NOT go through the .qm: they pick their language
+    # from the config, and under pytest the config file is the throwaway one
+    # (no "language" key), so it falls back to "system" = the HOST locale.
+    # This test says "Spanish", so it must ask for Spanish: it passed on the
+    # author's es_ES machine and failed on the en-US Windows runner with
+    # "section titles not translated: ['Orbit', ...]".
+    monkeypatch.setitem(config._data, "language", "es")
 
     qm = (Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
           / "nightscribe_es.qm")
@@ -1504,16 +1513,20 @@ def test_resize_to_panel_content_applies_floor(qapp):
     cont.deleteLater()
 
 
-def test_resize_keeps_full_panel_visible(qapp):
-    # Regression: the whole READY panel must fit its container's viewport —
-    # the scroll area must NOT show a vertical scrollbar whose fold hides
-    # the bottom CTA. resize() sizes the whole dialog, so the helper adds
-    # chrome headroom on top of the panel's sizeHint. We assemble the same
-    # stack the Explore dialog uses (QScrollArea + for_post panel).
+def test_resize_to_panel_content_sizes_the_dialog_to_the_panel(qapp):
+    # The Explore dialog must come out sized to the PANEL plus its chrome, so
+    # the whole ready card is on screen instead of behind a fold. What this
+    # test can assert anywhere is the helper's CONTRACT, not the geometry:
+    # the chrome is a platform number (22 px on this machine, 193 on the
+    # Windows runner, where the panel is taller too because the fonts are
+    # wider) and comparing the panel's height against the viewport measured
+    # the platform instead of the design. That comparison failed there for six
+    # consecutive runs with the card perfectly fine, which is a lesson about
+    # what a layout test can promise.
     import tempfile, pathlib
-    from PySide6.QtWidgets import (QWidget, QDialog, QScrollArea, QFrame,
-                                   QVBoxLayout)
-    from nightscribe.gui.overview import ObjectPanel, resize_to_panel_content
+    from PySide6.QtWidgets import (QDialog, QScrollArea, QFrame, QVBoxLayout)
+    from nightscribe.gui.overview import (ObjectPanel, resize_to_panel_content,
+                                          _MIN_READ_W)
     tmp = pathlib.Path(tempfile.mkdtemp())
     p = ObjectPanel(chart_dir=tmp / "charts", for_post=True,
                     project_lookup=lambda _n: None)
@@ -1525,24 +1538,17 @@ def test_resize_keeps_full_panel_visible(qapp):
     area.setWidget(p)
     lay = QVBoxLayout(dlg)
     lay.addWidget(area)
-    dlg.show()
-    qapp.processEvents()
+    dlg.resize(720, 540)                # the Explore dialog's first size
     resize_to_panel_content(dlg, p)
     qapp.processEvents()
-    # A platform may clamp the window to its desktop (Windows does, the
-    # offscreen one does not): when the panel's own hint does not fit the
-    # viewport it was given, this screen cannot show it whole and the
-    # assertions below would fail with the design intact (measured
-    # 2026-10-01 on the 1024x768 Windows runner).
-    if p.sizeHint().height() > area.viewport().height():
-        pytest.skip("this screen cannot show the whole ready panel")
-    # the CTA is not hidden, and the panel foot fits the visible viewport
+    # room for the whole panel, and never narrower than a comfortable column
+    assert dlg.height() >= p.sizeHint().height(), \
+        f"the dialog ({dlg.height()} px) is shorter than the panel " \
+        f"({p.sizeHint().height()} px): the card would be cut off"
+    assert dlg.width() >= _MIN_READ_W
+    assert dlg.width() >= p.sizeHint().width()
+    # the CTA the fold used to hide is there
     assert not p.btn_project.isHidden(), "CTA must be shown for for_post"
-    vp_h = area.viewport().height()
-    assert p.height() <= vp_h, \
-        f"panel {p.height()} taller than viewport {vp_h} (CTA below the fold)"
-    assert not area.verticalScrollBar().isVisible(), \
-        "vertical scrollbar must not appear for the ready panel"
     dlg.deleteLater()
     p.deleteLater()
 

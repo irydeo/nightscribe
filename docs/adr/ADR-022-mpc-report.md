@@ -1,6 +1,16 @@
 # ADR-022: MPC report — paste and validate, never generate measurements
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24
+**Estado / Status**: Reopened · **Fecha / Date**: 2026-08-24 · **Reabierto / Reopened**: 2026-10-04 por ADR-062
+
+> **Reapertura (2026-10-04)**: ADR-062 hace que NightScribe **sí genere medidas**
+> de astrometría para objetos con efemérides (track & stack). Lo que ADR-022
+> decidió **se conserva**: el validador y el empaquetado (`core/mpc_report.py`)
+> siguen siendo la puerta del reporte, y el envío lo hace el usuario.
+>
+> **Reopening (2026-10-04)**: ADR-062 makes NightScribe **generate astrometry
+> measurements** for objects with ephemerides (track & stack). What ADR-022
+> decided **is kept**: the validator and the packaging (`core/mpc_report.py`)
+> remain the gate for the report, and the user does the sending.
 
 ## Español
 

@@ -1,6 +1,16 @@
 # ADR-004: No astropy/astroquery dependency
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-21
+**Estado / Status**: Reopened · **Fecha / Date**: 2026-08-21 · **Reabierto / Reopened**: 2026-10-04 por ADR-060
+
+> **Reapertura (2026-10-04)**: ADR-060 sustituye la prohibición general por la
+> regla «numpy primero, biblioteca estándar cuando aporta», y autoriza astropy,
+> scipy y photutils para los módulos nuevos del plan de astrometría. Esta
+> decisión sigue siendo válida para el código existente, que no se migra.
+>
+> **Reopening (2026-10-04)**: ADR-060 replaces the general ban with the rule
+> "numpy first, standard library when it earns its place", and authorises
+> astropy, scipy and photutils for the new modules of the astrometry plan. This
+> decision still holds for the existing code, which is not migrated.
 
 ## Español
 

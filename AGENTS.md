@@ -57,7 +57,9 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
   para fichas y posts); ningún módulo duplica ese conocimiento. Ver ADR-058.
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
-- **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
+- **Mantenible por personas**: funciones cortas, sin magia, y **numpy primero**:
+  una biblioteca estándar (astropy, scipy, photutils) entra cuando aporta y su
+  coste está justificado (ADR-060; reabre ADR-004).
 - **La interfaz se define en `gui/ui/*.ui` (ADR-005)**: toda ventana, diálogo o pestaña
   lleva su estructura, textos y tooltips en Designer (cargado vía
   `gui/ui_loader.load_ui`, `<class>` = clase propietaria, `objectName` = atributo);

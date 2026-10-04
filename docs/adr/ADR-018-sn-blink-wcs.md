@@ -1,6 +1,18 @@
 # ADR-018: Supernova blink — own FITS/WCS + geometry-matched survey cutouts
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-22
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-22 · **Nota / Note**: 2026-10-04 (ADR-060)
+
+> **Nota (2026-10-04)**: ADR-060 convierte el lector FITS propio
+> (`core/fits_io.py`) en **legado para el código nuevo**: los módulos del plan
+> de astrometría usan `astropy.io.fits`. Esta decisión sigue vigente en lo demás:
+> la alineación por construcción, el WCS TAN propio para ASTAP y blink, y la
+> regla de no remuestrear nunca los píxeles del usuario.
+>
+> **Note (2026-10-04)**: ADR-060 turns the own FITS reader (`core/fits_io.py`)
+> into **legacy for new code**: the astrometry plan's modules use
+> `astropy.io.fits`. This decision still holds for the rest: alignment by
+> construction, the own TAN WCS for ASTAP and blink, and the rule of never
+> resampling the user's pixels.
 
 ## Español
 

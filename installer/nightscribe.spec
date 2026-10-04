@@ -20,12 +20,20 @@
 import glob
 import os
 
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import (collect_data_files, copy_metadata)
 
 block_cipher = None
 ROOT = os.path.abspath(os.path.join(os.path.dirname(SPEC), ".."))
 
 datas = []
+# astropy ships data files it reads at runtime (IERS tables, its bundled
+# constants, etc.). The hooks usually catch the Python modules but not every
+# data file, and a missing one shows up as a runtime error in a frozen build
+# only. It is pulled in by the astrometry/calibration modules (ADR-060).
+try:
+    datas += collect_data_files("astropy")
+except Exception:
+    pass  # bare environment without astropy: the app still runs without it
 # Bundle the installed dist-info so the frozen app reports the real
 # package version instead of the "not installed" fallback.
 try:
@@ -53,7 +61,16 @@ a = Analysis(
     # (the hero falls back to a painted gradient) but it would quietly
     # downgrade the first screen of every frozen build.
     hiddenimports=["lxml._elementpath", "Pillow", "platformdirs",
-                   "PySide6.QtSvg"],
+                   "PySide6.QtSvg",
+                   # astropy/scipy/photutils are imported lazily by the
+                   # astrometry modules, so the import graph does not reach
+                   # them; naming the pieces we actually use keeps the bundle
+                   # from swallowing all of astropy (ADR-060).
+                   "astropy", "astropy.io.fits", "astropy.wcs",
+                   "astropy.units", "astropy.time", "astropy.utils.iers",
+                   "scipy.ndimage", "scipy.optimize", "scipy.stats",
+                   "photutils.centroids", "photutils.detection",
+                   "photutils.aperture"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter"],

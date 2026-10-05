@@ -1279,3 +1279,24 @@ def test_a_comp_on_its_own_window_gives_the_same_magnitude():
     assert win.mag == pytest.approx(full.mag, abs=1e-9)
     assert win.zp["zp"] == pytest.approx(full.zp["zp"], abs=1e-9)
     assert win.err_total == pytest.approx(full.err_total, abs=1e-12)
+
+
+def test_auto_picks_the_estimator_the_data_can_afford():
+    # The moments integrate the window's noise pedestal as if it were
+    # light. On a plate whose noise is large next to the star's peak they
+    # come out three times too large (measured on 2025 UR: 13 px against
+    # the radial profile's 2.7, with a comp peaking 3 sigma over the sky).
+    # "auto" asks the data: the radial there, the moments where they are
+    # the more accurate of the two.
+    yy, xx = np.ogrid[0:80, 0:80]
+    true = 2.3548 * 1.5
+    profile = np.exp(-((xx - 40.0) ** 2 + (yy - 40.0) ** 2) / (2 * 1.5 ** 2))
+    clean = 100.0 + 8000.0 * profile
+    rng = np.random.default_rng(5)
+    noisy = 100.0 + 800.0 * profile + rng.normal(0.0, 260.0, (80, 80))
+    assert phot.estimate_fwhm(clean, [(40.0, 40.0)]) == pytest.approx(
+        true, rel=0.1)
+    got = phot.estimate_fwhm(noisy, [(40.0, 40.0)])
+    bad = phot.estimate_fwhm(noisy, [(40.0, 40.0)], method="moments")
+    assert bad > 2.0 * got                  # the pedestal, in action
+    assert got == pytest.approx(true, rel=0.35)

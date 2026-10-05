@@ -1268,18 +1268,18 @@ class TrackStackWorker(QThread):
         # seeing must be sized by the same PSF the comps have (the object
         # shares it: same frames, same grid).
         #
-        # "radial" and not "moments": on a noisy plate the median-subtracted
-        # window keeps a noise pedestal, and the second moments integrate it
-        # into a FWHM three or four times too large (measured on 2025 UR,
-        # whose sky noise is 261 ADU: moments said 13 px, radial says 2.7).
-        # The radial profile finds the half-maximum crossing instead, which
-        # is what the aperture rule actually needs.
+        # "auto" (the default) and not a fixed method: it asks the DATA
+        # which estimator it can afford. On a noisy plate the median-
+        # subtracted window keeps a noise pedestal, and the second moments
+        # integrate it into a FWHM three or four times too large (measured
+        # on 2025 UR, whose sky noise is 261 ADU: moments said 13 px,
+        # radial says 2.7); on a clean one the moments are the more
+        # accurate, and the estimator picks itself.
         import numpy as np
         from ..core import photometry
         fwhms = []
         for _entry, image, x, y in windows:
-            value = photometry.estimate_fwhm(image, [(x, y)],
-                                             method="radial")
+            value = photometry.estimate_fwhm(image, [(x, y)])
             if value:
                 fwhms.append(float(value))
         if not fwhms:

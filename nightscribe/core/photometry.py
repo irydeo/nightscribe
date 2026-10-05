@@ -68,6 +68,14 @@ _INFERRED_CEILING_FRAC = 0.94   # flag peaks this close to an INFERRED
                                 # cores before they sit exactly on it
 _PLATEAU_MAX_FWHM = 4.0     # the 99 %-plateau rule in suggest_apertures
                             # is only believed within this many FWHM
+# How far a star's peak must clear the local noise before the second
+# moments can measure its width. The window's positive half of the noise
+# is a pedestal (about 0.4 sigma per pixel over the 19x19 cutout) and the
+# moments integrate it as if it were light: for a PSF of ~1.2 px the
+# pedestal overtakes the star's own flux below ~20 sigma, and the FWHM
+# comes out three times too large (measured on 2025 UR: 13 px against the
+# radial profile's 2.7). Above it the moments are the better of the two.
+_MOMENTS_MIN_SNR = 20.0
 
 # One comparison star tells us nothing about the scatter; the quoted
 # uncertainty floors at a generous constant instead of pretending to be zero.
@@ -631,8 +639,7 @@ def fwhm_radial(data, x, y, rmax=None, level=None, bin_width=0.5):
     return None
 
 
-def estimate_fwhm(data, positions, sat_adu=None, method="moments",
-                  rmax=12.0):
+def estimate_fwhm(data, positions, sat_adu=None, method="auto", rmax=12.0):
     # The median seeing of a frame, measured on several stars.
     #
     # Two definitions are available, and which one is right DEPENDS on the
@@ -662,8 +669,18 @@ def estimate_fwhm(data, positions, sat_adu=None, method="moments",
     #
     # @args: data - 2D array, positions - [(x, y)] star pixels,
     #        sat_adu - ceiling in ADU, stars near it are skipped,
-    #        method - "moments" | "radial", rmax - radial reach (px)
+    #        method - "auto" | "moments" | "radial", rmax - radial reach (px)
     # @return: the median FWHM in px, or None when nothing is usable
+    #
+    # "auto" (the default) asks the DATA which estimator it can afford: a
+    # star whose peak barely clears the noise goes to the radial profile,
+    # and a bright one to the moments, which are the more accurate of the
+    # two on a narrow PSF. The reason is measured, not aesthetic: on 2025
+    # UR the sky noise is 261 ADU and a mag-17.4 comp peaks 816 above it,
+    # so the positive half of the noise over the 19x19 window is FIVE times
+    # the star's own flux and the moments came out at 13 px where the
+    # radial profile says 2.7. Silently handing a 17 px aperture to the
+    # observer is worse than a 18 % bias on a narrow star.
     if data is None:
         return None
     if method == "radial":
@@ -691,6 +708,16 @@ def estimate_fwhm(data, positions, sat_adu=None, method="moments",
         if sat_adu is not None and peak >= SAT_FRAC * float(sat_adu):
             continue
         sky = float(np.nanmedian(sub))
+        noise = float(outliers.scaled_mad(sub))
+        if method == "auto" and noise > 0.0 \
+                and (peak - sky) < _MOMENTS_MIN_SNR * noise:
+            # this star cannot afford the moments: the window's positive
+            # noise is a pedestal the second moments integrate as if it
+            # were light (see the note above the function)
+            value = fwhm_radial(data, x, y, rmax=rmax)
+            if value is not None and 0.8 <= value <= 50.0:
+                fwhms.append(value)
+            continue
         bright = sub - sky
         bright[bright < 0] = 0.0
         total = float(bright.sum())

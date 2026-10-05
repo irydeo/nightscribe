@@ -111,6 +111,14 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    (aperturas, método de cielo, centroide, término de color) son **los de la
    pestaña Fotometría**: se editan allí y ningún otro sitio, y la línea de esta
    pestaña te dice, antes de lanzar, con qué se va a medir.
+   La ejecución te dice además **la forma del objeto** en su apilado: si
+   sale **estelado** (por ejemplo 2,4 px según PA 245°) es que la exposición
+   fue larga para ese movimiento, y acortarla es la mejora más barata que
+   existe. Y te dice cuánto leería el **filtro adaptado** (pesar cada píxel
+   por la forma esperada en vez de sumar un círculo): medido sobre un
+   apilado real de 139 tomas, **1,55 a 1,63× el SNR de la apertura**. El
+   reporte sigue usando la magnitud de la apertura, que es la que valida el
+   validador; el filtro se enseña al lado.
 8. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube

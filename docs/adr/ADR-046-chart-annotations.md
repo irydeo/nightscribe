@@ -215,7 +215,9 @@ lo que el run ha medido, con las mismas reglas de color:
   `(cat)`. La velocidad y el PA llevan el mismo color por rol: `motion` en tinta cuando
   el barrido de velocidad los midió, y `motion-eph` apagado y con la palabra `(eph)`
   cuando solo son la predicción de la efeméride (simétrico a `pos` / `pos-cat` y a
-  `mag` / `mag-cat`). El formato es el de `viz/motion_view` (`1.23″/min PA 245°`).
+  `mag` / `mag-cat`). La velocidad y el PA son **dos segmentos**, unidos por el
+  separador propio de la banda (el mismo punto que separa el nombre, la posición y la
+  magnitud): `1.23″/min · PA 245°`.
 - **Línea 2 (contexto)**: la exposición de un stack se escribe **«N × T s»** (las tomas
   que combina por su exposición), no una exposición suelta que ocultaría cuánta luz hay.
   `format_exposure` lo decide y `n_frames` viaja dentro de `meta`.
@@ -294,7 +296,9 @@ run measured, under the same colour rules:
   `(cat)`. Velocity and PA follow the same colour-per-role: `motion` in ink when the
   velocity sweep measured them, and `motion-eph` dimmed with the word `(eph)` when they
   are only the ephemeris' prediction (symmetric to `pos` / `pos-cat` and `mag` /
-  `mag-cat`). The format is `viz/motion_view`'s (`1.23″/min PA 245°`).
+  `mag-cat`). The rate and the PA are **two segments**, joined by the band's own
+  separator (the same dot that separates the name, the position and the magnitude):
+  `1.23″/min · PA 245°`.
 - **Line 2 (context)**: a stack's exposure is written **"N × T s"** (the frames it
   combines times their exposure), not a bare exposure that would hide how much light
   there is. `format_exposure` decides it and `n_frames` travels inside `meta`.

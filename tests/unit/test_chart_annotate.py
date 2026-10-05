@@ -67,9 +67,12 @@ def test_format_exposure_says_how_many_frames_a_stack_combines():
     assert ca.format_exposure(8, None) is None
 
 
-def test_format_rate_pa_keeps_the_motion_view_shape():
-    assert ca.format_rate_pa(1.234, 245.4) == "1.23″/min PA 245°"
-    assert ca.format_rate_pa(1.234) == "1.23″/min"
+def test_format_rate_and_pa_are_two_pieces():
+    # Two pieces on purpose: the band's renderer joins them with its own
+    # separator, so the rate and the PA get the same dot as every other
+    # datum instead of being glued into one run of text.
+    assert ca.format_rate(1.234) == "1.23″/min"
+    assert ca.format_pa(245.4) == "PA 245°"
 
 
 def test_format_pixel_scale_and_fov():
@@ -329,10 +332,14 @@ def test_the_band_shows_the_measured_motion_and_position():
         ("2025 UR", ca.ROLE_NAME),
         ("RA 03 19 57.7 · Dec +49 52 07.5", ca.ROLE_POS),
         ("12.34 ± 0.04 (V)", ca.ROLE_MAG),
-        ("1.23″/min PA 245°", ca.ROLE_MOTION)]
+        ("1.23″/min", ca.ROLE_MOTION),
+        ("PA 245°", ca.ROLE_MOTION)]
     # the measured position is this plate's, so it never wears the (cat)
     assert "(cat)" not in first[1]["text"]
-    assert [s["field"] for s in first] == ["name", "pos", "mag", "motion"]
+    # the rate and the PA are two segments: the renderer puts its separator
+    # between them, the same dot as between the other data
+    assert [s["field"] for s in first] == \
+        ["name", "pos", "mag", "motion", "motion"]
     # a stack says how many frames it combines, not just the exposure
     assert ("8 × 40.0 s", ca.ROLE_CONTEXT) in _roles(second)
 
@@ -340,10 +347,13 @@ def test_the_band_shows_the_measured_motion_and_position():
 def test_the_band_marks_a_motion_that_was_only_predicted():
     # Without a sweep the ephemeris still gives a rate and a PA, but they
     # are a prediction: the word (eph) and the dimmed colour say so, the
-    # same way a catalogue position says (cat).
+    # same way a catalogue position says (cat). The marker rides the last
+    # segment, the PA.
     band = ca.build_band(
         name="2025 UR",
         motion={"rate_arcsec_min": 30.6, "pa_deg": 90.0, "measured": False})
-    motion = band["lines"][0][-1]
-    assert motion["role"] == ca.ROLE_MOTION_EPH
-    assert motion["text"] == "30.60″/min PA 90° (eph)"
+    first = band["lines"][0]
+    assert _roles(first) == [
+        ("2025 UR", ca.ROLE_NAME),
+        ("30.60″/min", ca.ROLE_MOTION_EPH),
+        ("PA 90° (eph)", ca.ROLE_MOTION_EPH)]

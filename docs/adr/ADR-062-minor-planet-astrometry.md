@@ -119,6 +119,23 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     (ganancia 1,022×); con una décima parte de las tomas al triple de ruido
     la ganancia sería del 28 %. Es un seguro para la noche que se rompe, y
     además es el modelo de ruido que el filtro adaptado necesita.
+18. **Medida por filtro adaptado y la estela, como segunda opinión medida**:
+    con una forma `m` conocida (que suma uno) y ruido `σ` por píxel, el mejor
+    estimador lineal del flujo es `Σ(m(p−cielo))/Σ(m²)` y su SNR es el mayor
+    que cualquier filtro lineal alcanza (Cauchy-Schwarz); una apertura es el
+    caso `m = 1`, que da a las alas el peso del núcleo. El filtro usa el
+    **mismo centroide, el mismo cielo y el mismo σ** que la apertura, para
+    que la comparación mida el filtro y no otra cosa, y la forma sale del
+    **propio apilado del objeto** (el FWHM, de las estrellas, que en ese
+    apilado son trazos), de modo que un objeto estelado se filtra con la
+    línea que es. La estela se invierte de los momentos segundos
+    (`σ_largo² = σ² + L²/12`) con **ventana de 2 FWHM y umbral a 1σ**,
+    medidos: con 4 FWHM una estrella redonda reportaba 1,56 px. Medido en
+    el apilado real de 139 tomas de 2025 UR: el filtro alcanza **1,55 a
+    1,63×** el SNR de la apertura, y `√(n_ap/n_eff)` predice 1,59×. El
+    reporte **sigue usando la magnitud de la apertura**; el filtro se
+    reporta al lado, y la estela se dice en palabras para acortar la
+    exposición siguiente.
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el
@@ -255,6 +272,24 @@ calibrate, stack following the motion, measure and report. The field's reference
     and on 2026 PY9 11 % (gain 1.022x); with a tenth of the frames at three
     times the noise the gain would be 28 %. It is insurance for the night
     that breaks, and it is also the noise model the matched filter needs.
+18. **Matched-filter measurement and the trail, as a measured second
+    opinion**: with a known shape `m` (summing to one) and noise `σ` per
+    pixel, the best linear estimate of the flux is
+    `sum(m(p-sky))/sum(m^2)` and its SNR is the largest any linear filter
+    reaches (Cauchy-Schwarz); an aperture is the case `m = 1`, which gives
+    the wings the weight of the core. The filter uses the **same centroid,
+    the same sky and the same sigma** as the aperture, so the comparison
+    measures the filter and nothing else, and the shape comes from the
+    **object's own stack** (the FWHM from the stars, which are trails
+    there), so a trailed object is filtered with the line it is. The trail
+    is inverted from the second moments (`sigma_long^2 = sigma^2 + L^2/12`)
+    with a **2-FWHM window and a 1-sigma threshold**, both measured: with
+    4 FWHM a round star reported 1.56 px of trail. Measured on the real
+    139-frame 2025 UR stack: the filter reaches **1.55 to 1.63x** the
+    aperture's SNR, and `sqrt(n_ap/n_eff)` predicts 1.59x. The report
+    **still uses the aperture's magnitude**; the filter is reported beside
+    it, and the trail is said in words so the next exposure can be
+    shortened.
 
 **Reopening ADR-022**: NightScribe **now does generate measurements**, bounded to
 known objects, with the user as reviewer and sender. ADR-022's validator and

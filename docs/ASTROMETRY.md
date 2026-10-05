@@ -112,6 +112,14 @@ project). No visit, no series: that is the house rule.
    colour term) are the **Photometry tab's**: they are edited there and
    nowhere else, and this tab's line tells you, before the run, what the
    brightness will be measured with.
+   The run also tells you the **object's shape** on its stack: if it comes
+   out **trailed** (say 2.4 px along PA 245) the exposure was long for that
+   motion, and shortening it is the cheapest improvement there is. And it
+   tells you what the **matched filter** would read (weighting each pixel
+   by the expected shape instead of summing a circle): measured on a real
+   139-frame stack, **1.55 to 1.63x the aperture's SNR**. The report still
+   uses the aperture's magnitude, which is the one the validator checks;
+   the filter is shown beside it.
 8. **Check.** NightScribe downloads the object's published observations (or
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your

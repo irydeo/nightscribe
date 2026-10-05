@@ -121,16 +121,19 @@ def format_exposure(n_frames, exptime_s):
     return text
 
 
-def format_rate_pa(rate_arcsec_min, pa_deg=None):
-    # @args: rate_arcsec_min - apparent sky rate in arcsec/min, pa_deg -
-    #        position angle in degrees (north through east) or None
-    # @return: "1.23″/min PA 245°", or just the rate when the PA is unknown
-    # The same shape viz/motion_view uses, so the number reads the same in
-    # the motion figure and in the band.
-    line = f"{rate_arcsec_min:.2f}″/min"
-    if pa_deg is not None:
-        line += f" PA {pa_deg:.0f}°"
-    return line
+def format_rate(rate_arcsec_min):
+    # @args: rate_arcsec_min - apparent sky rate in arcsec/min
+    # @return: "1.23″/min". The band puts the rate and the PA as two
+    #          segments so the renderer joins them with its own separator
+    #          (the same dot as between the other data), instead of gluing
+    #          them into one run of text.
+    return f"{rate_arcsec_min:.2f}″/min"
+
+
+def format_pa(pa_deg):
+    # @args: pa_deg - position angle in degrees (north through east)
+    # @return: "PA 245°"
+    return f"PA {pa_deg:.0f}°"
 
 
 def format_pixel_scale(arcsec_px):
@@ -425,14 +428,20 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
             pass
     # The object's motion: the velocity sweep's own answer when it was
     # measured (ink), the ephemeris' prediction otherwise (dimmed and with
-    # the word, the same way a catalogue position says (cat)).
+    # the word, the same way a catalogue position says (cat)). The rate and
+    # the PA are TWO segments, so the renderer joins them with the same
+    # separator it puts between every other datum; the (eph) marker rides
+    # the last one (the PA when there is one).
     if motion and motion.get("rate_arcsec_min") is not None:
-        text = format_rate_pa(motion["rate_arcsec_min"],
-                              motion.get("pa_deg"))
-        if motion.get("measured"):
-            identity.append(_seg(text, ROLE_MOTION, "motion"))
-        else:
-            identity.append(_seg(text + " (eph)", ROLE_MOTION_EPH, "motion"))
+        measured = bool(motion.get("measured"))
+        role = ROLE_MOTION if measured else ROLE_MOTION_EPH
+        parts = [format_rate(motion["rate_arcsec_min"])]
+        if motion.get("pa_deg") is not None:
+            parts.append(format_pa(motion["pa_deg"]))
+        if not measured:
+            parts[-1] += " (eph)"
+        for text in parts:
+            identity.append(_seg(text, role, "motion"))
     context = []
     date = format_date_ut(meta.get("date_obs"))
     if date:

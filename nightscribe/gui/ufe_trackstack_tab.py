@@ -834,7 +834,38 @@ class UfeTrackStackTab(QWidget):
         extra = self._register_note(self._result.get("register_report"))
         if extra:
             note += " " + extra
+        shape = self._shape_note(self._result.get("photometry"))
+        if shape:
+            note += " " + shape
         self._say(note)
+
+    def _shape_note(self, phot):
+        # @args: phot - the run's photometry dict (or None)
+        # @return: what the object's SHAPE says, in words (or "")
+        # P2: the trail is the honest half of the exposure. A moving object
+        # smears along its path, and the app says by how many pixels, so the
+        # next exposure can be shortened instead of the loss being found
+        # later as a low SNR. The matched filter's gain is said too: it is
+        # what the pipeline could read on this very stack, and a number the
+        # observer can compare with the SNR they got.
+        phot = phot or {}
+        parts = []
+        trail = phot.get("trail_px")
+        if trail:
+            line = self.tr("The object is trailed by %1 px").replace(
+                "%1", f"{float(trail):.1f}")
+            pa = phot.get("trail_pa_deg")
+            if pa is not None:
+                line += self.tr(" along PA %1°").replace(
+                    "%1", f"{float(pa):.0f}")
+            parts.append(line + self.tr(
+                ": shorten the exposure or expect a wider PSF."))
+        gain = phot.get("snr_gain")
+        if gain and float(gain) > 1.05:
+            parts.append(self.tr(
+                "The matched filter would read %1x the aperture's SNR on "
+                "this stack.").replace("%1", f"{float(gain):.2f}"))
+        return " ".join(parts)
 
     def _register_note(self, report):
         # @args: report - track_stack.registration_report output (or None)
@@ -1100,7 +1131,8 @@ class UfeTrackStackTab(QWidget):
             ra, dec = header.get("NS_RA"), header.get("NS_DEC")
             if ra is not None and dec is not None:
                 # the position MEASURED on this plate (the astrometric
-                # centroid), written by the annotation pass
+                # centroid): written with the stack and, again, by the
+                # annotation pass
                 facts["measured_pos"] = (float(ra), float(dec))
             measured = self._measured_from_header(header)
             if measured is not None:
@@ -1163,7 +1195,8 @@ class UfeTrackStackTab(QWidget):
                 return
             for key in ("EXPTIME", "FILTER", "INSTRUME", "TELESCOP"):
                 value = (ref.header or {}).get(key)
-                if isinstance(value, (str, int, float)):
+                if isinstance(value, (str, int, float)) \
+                        and str(value).strip():
                     header[key] = value
             # the date is the observation's own middle instant, so a visit
             # that spans two hours is dated where it really happened
@@ -1548,10 +1581,13 @@ class UfeTrackStackTab(QWidget):
         validation = rep.get("validation") or {}
         if not validation.get("valid", True):
             notes.extend(str(e) for e in (validation.get("errors") or [])[:3])
-        self.lbl_notes.setVisible(bool(notes))
+        # The same notes BOX the run fills: the report's "left out and why"
+        # is part of the same story, and a box has its own height and scroll
+        # (a label grew or clipped). The pre-rename code shared it too; the
+        # rename to txt_notes missed this spot and crashed on Generate.
+        self.txt_notes.setVisible(bool(notes))
         if notes:
-            self.lbl_notes.setText("\n".join("• " + n for n in notes))
-        self._fit_label(self.lbl_notes)
+            self.txt_notes.setPlainText("\n".join("• " + n for n in notes))
         self._sync_report_buttons()
         kept = len(rep.get("kept") or [])
         self._say(self.tr("Report generated: %1 observations kept."

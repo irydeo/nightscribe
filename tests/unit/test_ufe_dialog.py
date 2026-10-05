@@ -404,9 +404,11 @@ def test_the_band_says_the_motion_and_brightness_of_an_asteroid_stack(dlg):
         "NS_MAGB": "G", "NS_RA": 30.0, "NS_DEC": 10.0,
     })
     first, second = dlg._chart_band()["lines"]
-    motion = next(seg for seg in first if seg["field"] == "motion")
-    assert motion["role"] == "motion"
-    assert motion["text"] == "1.23″/min PA 245°"
+    # the rate and the PA are two segments (the renderer's own separator
+    # goes between them), both in the measured ink
+    motions = [seg for seg in first if seg["field"] == "motion"]
+    assert [seg["text"] for seg in motions] == ["1.23″/min", "PA 245°"]
+    assert all(seg["role"] == "motion" for seg in motions)
     mag = next(seg for seg in first if seg["field"] == "mag")
     assert mag["role"] == "mag" and mag["text"] == "18.05 ± 0.04 (G)"
     pos = next(seg for seg in first if seg["field"] == "pos")

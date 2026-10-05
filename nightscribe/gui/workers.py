@@ -1197,13 +1197,14 @@ class TrackStackWorker(QThread):
                 comp_images = [w[1:] for w in windows]
                 star_stack = None
                 fwhm = self._seeing(windows)
+            radii = self._radii(recipe, fwhm)
             cfg = photometry.PlateConfig(
                 target_xy=centre,
                 entries=comp_entries,
                 comp_images=comp_images,
                 comp_image=star_stack,
                 header=ref.header, wcs=wcs_box, band=band,
-                fallback_band=band, radii=self._radii(recipe, fwhm),
+                fallback_band=band, radii=radii,
                 fwhm=fwhm,
                 centroid_mode=("none" if recipe.get("manual_centre")
                                else "gaussian"),
@@ -1226,12 +1227,34 @@ class TrackStackWorker(QThread):
             if not res.ok or res.mag is None:
                 per_obs.append(None)
                 continue
+            # P2: the object's SHAPE on its own stack, and what the matched
+            # filter reads there. The FWHM comes from the STARS (on this
+            # stack they are trails), and the filter is given the shape just
+            # measured, so a trailed object is filtered with the line it
+            # actually is instead of with a round PSF that is not there.
+            # Measured on the 2025 UR star stack: the matched filter reaches
+            # 1.55-1.63x the aperture's SNR, which is what sqrt(n_ap/n_eff)
+            # predicts.
+            shape = photometry.psf_elongation(stack, centre[0], centre[1],
+                                              fwhm_px=fwhm)
+            matched = None
+            if shape.get("ok"):
+                psf = photometry.gaussian_psf(
+                    shape.get("fwhm_px") or fwhm,
+                    ratio=shape.get("ratio") or 1.0,
+                    pa_deg=shape.get("pa_deg") or 0.0)
+                matched = photometry.measure_matched(
+                    stack, centre[0], centre[1], psf, r_ap=radii[0],
+                    r_ann_in=radii[1], r_ann_out=radii[2], fwhm=fwhm)
+                if not matched.get("ok"):
+                    matched = None
             per_obs.append({"mag": float(res.mag),
                             "err": float(res.err_total or 0.0),
                             "n_comps": len([1 for e, _r in (res.used or [])
                                             if (e.get("kind") or "comp")
                                             == "comp"]),
-                            "check": (res.check or {}).get("verdict")})
+                            "check": (res.check or {}).get("verdict"),
+                            "shape": shape, "matched": matched})
             if sp is not None:
                 # one magnitude per observation: it is what the MPC
                 # publishes, and the point is the observation
@@ -1241,9 +1264,26 @@ class TrackStackWorker(QThread):
         if not good:
             return None
         mags = np.asarray([p["mag"] for p in good], dtype=float)
+        # the run's shape summary (P2): the trail of the observation that
+        # has one (the median over the ones that do), and the SNR the
+        # matched filter would reach against the aperture. Both are SAID,
+        # never used silently: the report keeps the aperture's magnitude,
+        # and the trail is advice for the next exposure.
+        trails = [float(p["shape"]["trail_px"]) for p in good
+                  if p.get("shape") and p["shape"].get("ok")
+                  and p["shape"].get("significant")]
+        pas = [float(p["shape"]["pa_deg"]) for p in good
+               if p.get("shape") and p["shape"].get("ok")
+               and p["shape"].get("significant")]
+        gains = [float(p["matched"]["snr"]) / float(p["matched"]["snr_ap"])
+                 for p in good
+                 if p.get("matched") and p["matched"].get("snr_ap")]
         return {"mag": float(np.median(mags)),
                 "err": float(np.median([p["err"] for p in good])),
                 "band": band,
+                "trail_px": (float(np.median(trails)) if trails else None),
+                "trail_pa_deg": (float(np.median(pas)) if pas else None),
+                "snr_gain": (float(np.median(gains)) if gains else None),
                 "n_comps": max(p["n_comps"] for p in good),
                 "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
                 "n_obs": len(good), "source": source, "per_obs": per_obs,

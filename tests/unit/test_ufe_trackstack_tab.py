@@ -365,6 +365,34 @@ def test_the_run_paints_the_strip_the_magnitude_and_the_brightness(qapp,
     assert len(panels) == 2
 
 
+def test_generating_the_report_shows_why_an_observation_was_left_out(
+        qapp, tmp_path, monkeypatch):
+    # The report's own notes ("left out and why") land in the SAME notes box
+    # the run fills. The rename lbl_notes -> txt_notes missed this spot, so
+    # Generate crashed with AttributeError; nothing covered _on_report, and
+    # this test is the one that would have caught it.
+    from nightscribe.config import config
+    from nightscribe.core import astrometry
+    monkeypatch.setitem(config._data, "mpc_code", "Z41")
+    tab, _host = _tab(qapp, tmp_path)
+    good = astrometry.AstrometryPoint(
+        ra=322.0, dec=-12.0, rms_ra=0.2, rms_dec=0.2, mag=18.0, band="G",
+        snr=35.0, n_frames=5, group_index=0, mjd=59288.5)
+    weak = astrometry.AstrometryPoint(
+        ra=322.0, dec=-12.0, rms_ra=0.2, rms_dec=0.2, mag=18.0, band="G",
+        snr=6.0, n_frames=5, group_index=1, mjd=59288.5)
+    tab._result = {"status": "ok", "points": [(good, None, []),
+                                              (weak, None, [])]}
+    tab.txt_notes.setPlainText("the run's own notes")
+    tab._on_report()                       # used to raise AttributeError
+    assert tab.txt_report.toPlainText().strip()      # the block is there
+    assert tab.txt_notes.isVisibleTo(tab)
+    text = tab.txt_notes.toPlainText()
+    assert "left out" in text and "6.0" in text
+    # the box is shared with the run notes, as it was before the rename
+    assert "the run's own notes" not in text
+
+
 def test_the_brightness_row_says_what_the_run_will_measure_with(qapp,
                                                                tmp_path):
     # The recipe is read LIVE from the Photometry tab and shown BEFORE the
@@ -798,3 +826,18 @@ def test_the_register_reasons_are_words_not_codes(qapp, tmp_path):
         "their stars did not agree on the fit: 2, too few stars: 1"
     assert tab._register_reasons({"weird": 1}) == "weird"
     assert tab._register_reasons({}) == ""
+
+
+def test_the_shape_note_says_the_trail(qapp, tmp_path):
+    # P2: a trailed object is SAID, with its pixels and its position angle,
+    # so the next exposure can be shortened instead of the loss being found
+    # later as a low SNR. The matched filter's gain is said too.
+    tab, _host = _tab(qapp, tmp_path)
+    text = tab._shape_note({"trail_px": 2.4, "trail_pa_deg": 245.0,
+                            "snr_gain": 1.58})
+    assert "trailed by 2.4 px" in text
+    assert "PA 245" in text
+    assert "1.58x" in text
+    # a round object with nothing to gain says nothing at all
+    assert tab._shape_note({"trail_px": None, "snr_gain": 1.0}) == ""
+    assert tab._shape_note(None) == ""

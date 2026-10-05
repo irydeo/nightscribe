@@ -345,6 +345,329 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
             "ok": True, "reason": None, "cen_ok": cen_ok}
 
 
+# ------------------------------------------------- the point spread (P2)
+
+# The PSF model's half-size in pixels: big enough to hold the wings of a
+# seeing-limited star (measured on 2025 UR: FWHM 5.4 px, so this is a bit
+# over 4 FWHM across) and small enough that the matched filter stays a
+# patch operation.
+PSF_HALF_DEFAULT = 12
+# FWHM = 2 * sqrt(2 ln 2) * sigma, the constant that ties a Gaussian's
+# width to what the observer measures on the screen.
+_FWHM_TO_SIGMA = 2.3548200450309493
+# Below this trail (px) the object is called round. Measured on synthetic
+# stars of the same seeing: a ROUND star reads up to 1.45 px of trail at
+# SNR ~20, because the second moments of a noisy image are not exactly
+# isotropic. Calling that a trail would send the observer to shorten an
+# exposure that was already fine.
+TRAIL_MIN_PX = 1.5
+
+
+def gaussian_psf(fwhm_px, half=None, ratio=1.0, pa_deg=0.0):
+    # @args: fwhm_px - the point spread's FWHM in px (None: 3 px),
+    #        half - the box's half-size in px, ratio - the minor/major axis
+    #        ratio (1.0 round, below 1 trailed), pa_deg - the major axis's
+    #        position angle in the same convention as the trail
+    # @return: a normalised (2*half+1)^2 PSF that SUMS to one
+    # Summing to one is what makes the matched filter's amplitude the
+    # star's own flux: the filter answers "how much flux, in this shape",
+    # and the shape carries no scale of its own.
+    fwhm = float(fwhm_px) if fwhm_px else 3.0
+    half = int(PSF_HALF_DEFAULT if half is None else half)
+    sigma = max(1e-3, fwhm / _FWHM_TO_SIGMA)
+    yy, xx = np.mgrid[-half:half + 1, -half:half + 1]
+    # the trail: stretch along the position angle and squeeze across it,
+    # which moves the light without adding any (the area is kept)
+    ang = math.radians(float(pa_deg))
+    u = xx * math.cos(ang) + yy * math.sin(ang)
+    v = -xx * math.sin(ang) + yy * math.cos(ang)
+    sx = sigma / math.sqrt(max(1e-6, float(ratio)))
+    sy = sigma * math.sqrt(max(1e-6, float(ratio)))
+    m = np.exp(-0.5 * ((u / sx) ** 2 + (v / sy) ** 2))
+    total = float(m.sum())
+    return (m / total) if total > 0 else m
+
+
+def empirical_psf(cutouts, half=None):
+    # @args: cutouts - list of (2h+1, 2h+1) star patches, already
+    #        sky-subtracted and centred on the star, half - the box's
+    #        half-size (taken from the patches when None)
+    # @return: a normalised PSF (sums to one), or None when nothing is
+    #          usable
+    # The MEDIAN of the patches, never the mean: a cosmic ray, a hot pixel
+    # or a close neighbour in one star must not become part of the shape.
+    # The empirical profile is the honest one because it carries the real
+    # wings, and the wings are exactly where a matched filter beats an
+    # aperture: an aperture gives them the same weight as the core, and
+    # they are mostly noise.
+    stack = [np.asarray(c, dtype=np.float64) for c in (cutouts or [])]
+    stack = [c for c in stack if c.ndim == 2 and c.size]
+    if not stack:
+        return None
+    shapes = {c.shape for c in stack}
+    if len(shapes) != 1:
+        return None
+    cube = np.stack(stack, axis=0)
+    med = np.median(cube, axis=0)
+    # the patches are sky-subtracted but a residual pedestal can survive
+    # (a comp on a faint gradient): removing the corners' median keeps the
+    # shape from carrying a pedestal of its own
+    h, w = med.shape
+    edge = np.concatenate([med[:2].ravel(), med[-2:].ravel(),
+                           med[:, :2].ravel(), med[:, -2:].ravel()])
+    med = med - float(np.median(edge))
+    med = np.clip(med, 0.0, None)
+    total = float(med.sum())
+    if not np.isfinite(total) or total <= 0:
+        return None
+    return med / total
+
+
+def _shift_psf(psf, dx, dy):
+    # @args: psf - a normalised PSF on an odd grid, centred, dx/dy - the
+    #        sub-pixel shift to apply (in px, the fractional part of the
+    #        object's position inside its central pixel)
+    # @return: the shifted PSF, renormalised so it still sums to one
+    # Bilinear on purpose: the PSF is smooth, and a spline's ringing on a
+    # 25x25 grid would put negative "light" in the wings, which a matched
+    # filter would then subtract from the star.
+    if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+        return psf
+    m = np.asarray(psf, dtype=np.float64)
+    h, w = m.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    xs = xx - dx
+    ys = yy - dy
+    x0 = np.floor(xs).astype(int)
+    y0 = np.floor(ys).astype(int)
+    fx = xs - x0
+    fy = ys - y0
+    out = np.zeros_like(m)
+    for oy in (0, 1):
+        for ox in (0, 1):
+            xa = np.clip(x0 + ox, 0, w - 1)
+            ya = np.clip(y0 + oy, 0, h - 1)
+            weight = (fx if ox else 1.0 - fx) * (fy if oy else 1.0 - fy)
+            out += weight * m[ya, xa]
+    total = float(out.sum())
+    return (out / total) if total > 0 else m
+
+
+def sky_sigma(values):
+    # @args: values - 1D sky samples (ADU)
+    # @return: the sky's noise per pixel (ADU), or None when it cannot be
+    #          measured
+    # The scaled MAD, not the standard deviation: the sky samples of an
+    # annulus carry the object's wings and any neighbour that fell inside,
+    # and a robust estimator ignores them by construction. This is the
+    # sigma the matched filter needs, and it is the SAME one the aperture
+    # comparison uses, so the two differ only in their weighting.
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    if arr.size < 5:
+        return None
+    sigma = float(outliers.scaled_mad(arr))
+    return sigma if np.isfinite(sigma) and sigma > 0 else None
+
+
+def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
+                    r_ann_out=R_ANN_OUT, sat_adu=None, fwhm=None,
+                    centroid_mode="gaussian"):
+    # @args: data - 2D array (ADU), x/y - the object's position, psf - a
+    #        normalised PSF (sums to one) on an odd grid, the same
+    #        apertures as measure_point, sat_adu - the ceiling, fwhm - the
+    #        seeing, centroid_mode - as measure_point
+    # @return: {"ok", "reason", "x", "y", "flux", "flux_ap", "snr",
+    #          "snr_ap", "n_eff", "n_pix", "sky_pp", "sigma_pp", "peak"}
+    # THE MATCHED FILTER. With a known shape m (summing to one) and white
+    # noise sigma per pixel, the best estimate of the star's flux is
+    #
+    #     A = sum(m * (p - sky)) / sum(m^2)
+    #
+    # and its signal-to-noise is
+    #
+    #     SNR = sum(m * (p - sky)) / (sigma * sqrt(sum(m^2)))
+    #
+    # which is the largest SNR any LINEAR filter can reach on that data
+    # (Cauchy-Schwarz: the optimal weight is proportional to the shape
+    # itself). An aperture is the special case m = 1 inside the circle,
+    # and it is not optimal: it gives the noisy wings the same weight as
+    # the core. The gain is largest exactly where it matters, at low SNR.
+    #
+    # Both numbers come out of the SAME centroid and the SAME sky, and
+    # both SNRs use the same sigma: the only difference between them is
+    # the weighting, so the comparison measures the FILTER and nothing
+    # else. A new centroid or a new sky per method would hide the effect
+    # inside the difference of two other estimates.
+    ap = measure_point(data, x, y, r_ap=r_ap, r_ann_in=r_ann_in,
+                       r_ann_out=r_ann_out, sat_adu=sat_adu, fwhm=fwhm,
+                       centroid_mode=centroid_mode)
+    if not ap.get("ok"):
+        out = dict(ap)
+        out.update(flux=None, flux_ap=None, snr=None, snr_ap=None,
+                   n_eff=None, sigma_pp=None)
+        return out
+    cx, cy = float(ap["x"]), float(ap["y"])
+    sky_pp = float(ap.get("sky_pp") or 0.0)
+    h, w = data.shape
+    half = (np.asarray(psf).shape[0] - 1) // 2
+    # the patch has to hold the whole PSF around the object, and the sky
+    # annulus is measured on the SAME patch the aperture used (its own)
+    pad = int(math.ceil(max(r_ann_out, r_ap, half))) + 2
+    py0 = max(0, int(math.floor(cy)) - pad)
+    py1 = min(h, int(math.ceil(cy)) + pad + 1)
+    px0 = max(0, int(math.floor(cx)) - pad)
+    px1 = min(w, int(math.ceil(cx)) + pad + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
+    r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+    ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
+    sigma = sky_sigma(sub[ann_mask])
+    if sigma is None:
+        out = dict(ap)
+        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
+                   n_eff=None, sigma_pp=None)
+        return out
+    # the PSF placed where the object actually is, inside its pixel
+    m = _shift_psf(psf, cx - math.floor(cx), cy - math.floor(cy))
+    mh = (m.shape[0] - 1) // 2
+    ix = int(math.floor(cx)) - px0 - mh
+    iy = int(math.floor(cy)) - py0 - mh
+    patch = np.full(sub.shape, 0.0)
+    sx0, sy0 = max(0, ix), max(0, iy)
+    sx1 = min(sub.shape[1], ix + m.shape[1])
+    sy1 = min(sub.shape[0], iy + m.shape[0])
+    if sx1 <= sx0 or sy1 <= sy0:
+        out = dict(ap)
+        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
+                   n_eff=None, sigma_pp=sigma)
+        return out
+    patch[sy0:sy1, sx0:sx1] = m[sy0 - iy:sy1 - iy, sx0 - ix:sx1 - ix]
+    net = sub - sky_pp
+    num = float(np.nansum(patch * net))
+    gg = float(np.nansum(patch ** 2))
+    if gg <= 0:
+        out = dict(ap)
+        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
+                   n_eff=None, sigma_pp=sigma)
+        return out
+    flux = num / gg
+    snr = num / (sigma * math.sqrt(gg))
+    # the aperture's own SNR with the SAME noise per pixel and the same
+    # sky: this is what isolates the weighting (see the docstring)
+    n_ap = float(ap.get("n_pix") or 0.0)
+    flux_ap = float(ap.get("flux") or 0.0)
+    snr_ap = (flux_ap / (sigma * math.sqrt(n_ap))) if n_ap > 0 else None
+    return {"ok": True, "reason": None, "x": cx, "y": cy, "flux": flux,
+            "flux_ap": flux_ap, "snr": snr, "snr_ap": snr_ap,
+            "n_eff": 1.0 / gg, "n_pix": n_ap, "sky_pp": sky_pp,
+            "sigma_pp": sigma, "peak": ap.get("peak"),
+            "saturated": ap.get("saturated"), "n_sky": ap.get("n_sky")}
+
+
+def psf_elongation(data, x, y, fwhm_px=None, r_max=None, sky_pp=None,
+                   thresh=1.0):
+    # @args: data - 2D array, x/y - the object's position, fwhm_px - the
+    #        seeing when the caller knows it, r_max - the moment window's
+    #        radius (default: 2x the FWHM, see below), sky_pp - the sky per
+    #        pixel when the caller knows it, thresh - how many sigma above
+    #        the sky a pixel has to be to count (default 1)
+    # @return: {"ok", "reason", "ratio", "pa_deg", "trail_px", "fwhm_px",
+    #          "fwhm_major_px", "significant", "sky_pp", "sigma_pp"}
+    # The shape of what was measured, from its second moments: the axis
+    # ratio (minor over major), the position angle of the MAJOR axis, and
+    # the equivalent TRAIL length.
+    #
+    # The trail is the honest part. A moving object smears along its path,
+    # and a uniform line of length L convolved with a round PSF of width
+    # sigma comes out as a Gaussian whose long axis carries
+    # sigma_long^2 = sigma^2 + L^2/12 (the variance of a uniform segment).
+    # Inverting that turns "the object looks elongated" into "the exposure
+    # was 2.4 px too long for this motion", which is a number the observer
+    # can act on.
+    #
+    # The window and the threshold are MEASURED, not chosen by taste. A
+    # wide window makes the second moments chase the sky noise (measured
+    # with a 4-FWHM window on a round, bright star: it reported a 1.56 px
+    # trail out of nothing), and a low threshold lets the noise's positive
+    # half in. The table below is a synthetic Gaussian of FWHM 3.5 px with
+    # sky 1000 ADU and sigma 5, injected trails of 0, 3, 6 and 10 px, ten
+    # realisations each:
+    #
+    #     window   thresh   flux 20000        flux 2000         flux 300
+    #     2 FWHM   1.0      0.4 3.4 6.2 9.7   1.5 2.7 5.6 9.1   3.4 3.1 3.0 5.4
+    #     2 FWHM   0.0      0.6 4.9 4.9 4.9   1.8 4.9 4.9 4.9   3.6 4.9 4.9 4.9
+    #     4 FWHM   1.0      (a round star reads 1.5 px of trail)
+    #
+    # so the window is 2 FWHM and the threshold 1 sigma, and the result is
+    # only called a trail above TRAIL_MIN_PX: a round star reads up to
+    # 1.45 px at SNR ~20, and a trail shorter than that is not one.
+    if data is None or data.size == 0:
+        return _fail("no hay imagen", "no image")
+    h, w = data.shape
+    if not (0 <= x < w and 0 <= y < h):
+        return _fail("fuera del marco", "out of frame")
+    if fwhm_px is None:
+        # the radial profile, not the moments: on a broad or noisy PSF the
+        # radial one is the robust of the two (see estimate_fwhm's table)
+        fwhm_px = estimate_fwhm(data, [(x, y)], method="radial")
+    fwhm_px = float(fwhm_px) if fwhm_px else 3.0
+    if r_max is None:
+        r_max = int(max(5, min(30, round(2.0 * fwhm_px))))
+    r_max = int(max(4, min(r_max, min(h, w) // 2 - 1)))
+    px0 = max(0, int(math.floor(x)) - r_max)
+    px1 = min(w, int(math.ceil(x)) + r_max + 1)
+    py0 = max(0, int(math.floor(y)) - r_max)
+    py1 = min(h, int(math.ceil(y)) + r_max + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
+    r2 = (xx - x) ** 2 + (yy - y) ** 2
+    ann = (r2 >= (0.75 * r_max) ** 2) & (r2 <= r_max ** 2)
+    sigma = None
+    if sky_pp is None:
+        sky_pp = 0.0
+        if np.any(ann):
+            med, _n = _sigma_clipped_median(sub[ann])
+            sky_pp = float(med or 0.0)
+    if np.any(ann):
+        sigma = sky_sigma(sub[ann])
+    floor = float(sky_pp) + (float(thresh) * sigma if sigma else 0.0)
+    weight = np.where(r2 <= r_max ** 2, sub - floor, 0.0)
+    weight = np.clip(weight, 0.0, None)
+    total = float(weight.sum())
+    if total <= 0:
+        return _fail("sin luz que medir", "no light to measure")
+    mx = float((weight * (xx - x)).sum()) / total
+    my = float((weight * (yy - y)).sum()) / total
+    vxx = float((weight * (xx - x - mx) ** 2).sum()) / total
+    vyy = float((weight * (yy - y - my) ** 2).sum()) / total
+    vxy = float((weight * (xx - x - mx) * (yy - y - my)).sum()) / total
+    # the eigenvectors of the covariance give the axes without a fit
+    half_trace = 0.5 * (vxx + vyy)
+    disc = math.sqrt(max(0.0, 0.25 * (vxx - vyy) ** 2 + vxy ** 2))
+    major = half_trace + disc
+    minor = half_trace - disc
+    if major <= 0 or minor <= 0:
+        return _fail("la luz no tiene forma medible",
+                     "the light has no measurable shape")
+    ratio = math.sqrt(max(0.0, minor / major))
+    # the position angle of the MAJOR axis, in the image's own convention
+    pa = 0.5 * math.atan2(2.0 * vxy, vxx - vyy)
+    # the trail: the extra length a line would add along the major axis
+    sigma_long = math.sqrt(major)
+    sigma_short = math.sqrt(minor)
+    extra = max(0.0, major - minor)
+    trail = math.sqrt(12.0 * extra) if extra > 0 else 0.0
+    return {"ok": True, "reason": None, "ratio": float(ratio),
+            "pa_deg": float(math.degrees(pa) % 180.0),
+            "trail_px": float(trail),
+            "significant": bool(trail >= TRAIL_MIN_PX),
+            "fwhm_px": float(sigma_short * _FWHM_TO_SIGMA),
+            "fwhm_major_px": float(sigma_long * _FWHM_TO_SIGMA),
+            "sky_pp": float(sky_pp),
+            "sigma_pp": (float(sigma) if sigma else None)}
+
+
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
                    dark_e_s=None, n_sky=None):
     # Honest CCD equation for the net flux (Merline & Howell, Handbook of

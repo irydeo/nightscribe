@@ -205,6 +205,33 @@ dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
   (arriba a la derecha bajo la banda, abajo a la izquierda): ya no hay esquinas que
   liberar.
 
+**Revisión (2026-10-05): la banda de un stack de asteroide dice su movimiento.** Al
+apilar una secuencia de un asteroide (ADR-062), la banda que ya encabeza la placa añade
+lo que el run ha medido, con las mismas reglas de color:
+
+- **Línea 1 (identidad)**: nombre, **posición medida**, magnitud medida, **velocidad y
+  PA**. La posición medida (el centroide astrométrico de esa placa) gana a la del
+  catálogo colocada por la solución: es de esta placa, así que va en tinta y sin el
+  `(cat)`. La velocidad y el PA llevan el mismo color por rol: `motion` en tinta cuando
+  el barrido de velocidad los midió, y `motion-eph` apagado y con la palabra `(eph)`
+  cuando solo son la predicción de la efeméride (simétrico a `pos` / `pos-cat` y a
+  `mag` / `mag-cat`). El formato es el de `viz/motion_view` (`1.23″/min PA 245°`).
+- **Línea 2 (contexto)**: la exposición de un stack se escribe **«N × T s»** (las tomas
+  que combina por su exposición), no una exposición suelta que ocultaría cuánta luz hay.
+  `format_exposure` lo decide y `n_frames` viaja dentro de `meta`.
+- **Orden de descarte**: en la línea 1 el movimiento se suelta primero (es el relato, no
+  la identidad), luego la magnitud y por último la posición (`DROP_ORDER_NAME`).
+- **De dónde salen los datos del stack**: se escriben en la **cabecera del propio
+  stack** cuando el run lo guarda (`gui/ufe_trackstack_tab.py`): `NS_RATE` / `NS_PA` /
+  `NS_MOT` (el movimiento medido o predicho), `NS_MAG` / `NS_MAGER` / `NS_MAGB` /
+  `NS_MAGNC` / `NS_MAGOK` (la magnitud de esa observación con las señales que la
+  colorean) y, copiadas del frame, `EXPTIME` / `DATE-OBS` / `FILTER` / `INSTRUME` /
+  `TELESCOP` (sin ellas un stack no tenía fecha, exposición ni filtro). La posición
+  medida ya viajaba como `NS_RA` / `NS_DEC` (la anotación). Así la banda dice lo mismo
+  recién hecho el run y meses después, sin la base de datos y sin el run en memoria. El
+  stack de estrellas lleva el movimiento pero nunca la magnitud: allí el objeto es una
+  traza y no se midió.
+
 **Revision (2026-09-30): the plate says its own thing in a band, not in boxes**. The
 boxes were to be rethought: the same style as the band that already heads the image
 (name, coordinates, magnitude), with what was missing (exposure, Stn, PSc, FOV) and
@@ -256,3 +283,29 @@ boxes were to be rethought: the same style as the band that already heads the im
   (off by default) now governs the other charts' boxes only. The compass and the scale
   bar return to their classic spots (top right under the band, bottom left): there are
   no corners to free any more.
+
+**Revision (2026-10-05): an asteroid stack's band says its motion.** When a sequence of
+an asteroid is stacked (ADR-062), the band that already heads the plate adds what the
+run measured, under the same colour rules:
+
+- **Line 1 (identity)**: name, **measured position**, measured magnitude, **velocity
+  and PA**. The measured position (that plate's astrometric centroid) beats the
+  catalogue's placed by the solution: it is this plate's, so it wears the ink and no
+  `(cat)`. Velocity and PA follow the same colour-per-role: `motion` in ink when the
+  velocity sweep measured them, and `motion-eph` dimmed with the word `(eph)` when they
+  are only the ephemeris' prediction (symmetric to `pos` / `pos-cat` and `mag` /
+  `mag-cat`). The format is `viz/motion_view`'s (`1.23″/min PA 245°`).
+- **Line 2 (context)**: a stack's exposure is written **"N × T s"** (the frames it
+  combines times their exposure), not a bare exposure that would hide how much light
+  there is. `format_exposure` decides it and `n_frames` travels inside `meta`.
+- **Drop order**: on line 1 the motion goes first (it is the story, not the identity),
+  then the magnitude and the position last (`DROP_ORDER_NAME`).
+- **Where a stack's data comes from**: it is written into the **stack's own header**
+  when the run saves it (`gui/ufe_trackstack_tab.py`): `NS_RATE` / `NS_PA` / `NS_MOT`
+  (the measured or predicted motion), `NS_MAG` / `NS_MAGER` / `NS_MAGB` / `NS_MAGNC` /
+  `NS_MAGOK` (that observation's brightness with the signals that colour it) and, copied
+  from the frame, `EXPTIME` / `DATE-OBS` / `FILTER` / `INSTRUME` / `TELESCOP` (without
+  them a stack had no date, exposure or filter). The measured position already travelled
+  as `NS_RA` / `NS_DEC` (the annotation). So the band says the same right after the run
+  and months later, with no database and no run in memory. The star stack carries the
+  motion but never the magnitude: there the object is a trail and was not measured.

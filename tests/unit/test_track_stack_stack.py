@@ -340,3 +340,83 @@ def test_the_stack_does_not_warn_about_its_own_footprint():
             # 0; the other three propagate the NaN, which is the honest
             # answer for a pixel no frame ever covered
             assert np.isnan(out[0, 0]), method
+
+
+# ------------------------------------------- P1: the weighted combination
+
+def test_without_weights_the_weighted_method_is_the_sigma_clip():
+    # The new method degrades into the PROVEN one, never into something
+    # new: same clip, and an unweighted average of the survivors.
+    rng = np.random.default_rng(3)
+    stack = np.asarray([1000.0 + rng.normal(0.0, 5.0, (24, 24))
+                        for _ in range(5)], dtype=np.float32)
+    stack[2, 12, 12] = 9000.0            # a trail the clip must reject
+    a = ts.combine(stack, "sigma", sigma=2.0, iterations=3)
+    b = ts.combine(stack, "weighted", sigma=2.0, iterations=3)
+    assert np.allclose(a, b, atol=1e-3, equal_nan=True)
+
+
+def test_the_weighted_average_beats_the_plain_one():
+    # The optimal combination of measurements of the SAME signal with
+    # different noise is the inverse-variance average: the frame with less
+    # noise carries more of the answer. Here four clean frames and one with
+    # fifteen times the noise, over thirty realisations so the number is a
+    # statistic and not a coin toss. The clip is wide on purpose: what is
+    # being measured is the WEIGHT, not the rejection.
+    rng = np.random.default_rng(7)
+    truth, size = 1000.0, 32
+    weights = np.asarray([1 / 4.0] * 4 + [1 / 900.0])
+    err_w, err_e = [], []
+    for _ in range(30):
+        frames = [truth + rng.normal(0.0, 2.0, (size, size))
+                  for _ in range(4)]
+        frames.append(truth + rng.normal(0.0, 30.0, (size, size)))
+        stack = np.asarray(frames, dtype=np.float32)
+        w = ts.combine(stack, "weighted", sigma=100.0, weights=weights)
+        e = ts.combine(stack, "weighted", sigma=100.0,
+                       weights=np.ones(5))
+        err_w.append(float(np.abs(w - truth).mean()))
+        err_e.append(float(np.abs(e - truth).mean()))
+    # measured: the weighted average lands ~6x closer to the truth, which
+    # is what 1/sigma^2 promises (sigma 6.05 -> 1.00)
+    assert float(np.mean(err_w)) < 0.5 * float(np.mean(err_e))
+
+
+def test_frame_weights_are_the_inverse_variance():
+    def _frame(sigma):
+        f = ts.Frame(path="x.fits")
+        f.sky_sigma = sigma
+        return f
+    w = ts.frame_weights([_frame(1.0), _frame(2.0), _frame(4.0)])
+    assert list(w) == pytest.approx([1.0, 0.25, 0.0625])
+    # no frame knows its noise: no weights, and the caller falls back
+    assert ts.frame_weights([_frame(None), _frame(None)]) is None
+    # a frame that could not be measured gets the median of the others: it
+    # is a real frame, only an unmeasured one
+    w = ts.frame_weights([_frame(2.0), _frame(2.0), _frame(None)])
+    assert list(w) == pytest.approx([0.25, 0.25, 0.25])
+
+
+def test_the_noise_of_a_frame_is_measured_from_its_sky():
+    rng = np.random.default_rng(9)
+    data = 1000.0 + rng.normal(0.0, 7.0, (64, 64))
+    sigma = ts._frame_noise(data)
+    assert sigma == pytest.approx(7.0, rel=0.15)
+    assert ts._frame_noise(np.zeros((4, 4))) is None      # no noise at all
+
+
+def test_the_two_paths_agree_with_weights(tmp_path):
+    # The weights are a property of the FRAME, not of a strip, so the RAM
+    # and the streaming paths must use the same ones (they are pinned to
+    # agree for every method).
+    frames = _sequence(tmp_path, n=6)
+    for i, f in enumerate(frames):
+        f.sky_sigma = 2.0 + i          # deliberately different per frame
+    box = (16, 16, 48, 48)
+    ram, _ = ts.stack_group(frames, (0, 6), (32.0, 32.0), "weighted", box,
+                            (64, 64), budget_bytes=10 ** 9)
+    streamed, report = ts.stack_group(frames, (0, 6), (32.0, 32.0),
+                                      "weighted", box, (64, 64),
+                                      budget_bytes=1)
+    assert report.streamed is True
+    assert np.allclose(ram, streamed, atol=1e-4, equal_nan=True)

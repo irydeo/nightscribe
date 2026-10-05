@@ -74,6 +74,11 @@ class Frame:
     transform: dict | None = None      # register.estimate_transform result
     failed_register: bool = False
     register_note: str = ""            # why it failed, or how it was saved
+    sky_sigma: float | None = None     # the frame's own noise (ADU), for the
+    #                                    inverse-variance weights: the sky
+    #                                    dominates for the faint objects this
+    #                                    exists for, and a frame with more
+    #                                    noise must weigh less
     object_ra: float | None = None
     object_dec: float | None = None
     object_xy: tuple | None = None
@@ -171,6 +176,24 @@ def solve_reference(frames, cfg=None, cancel=None, progress=None):
     return None, None
 
 
+def _frame_noise(data):
+    # @args: data - a frame's pixels (ADU)
+    # @return: the frame's robust noise in ADU, or None when it cannot be
+    #          measured. The scaled MAD of the whole frame is the sky's
+    #          sigma: the stars and the object are a small fraction of the
+    #          pixels, and a median-based estimator ignores them by
+    #          construction. This is the number the inverse-variance
+    #          weighting of P1 stands on.
+    try:
+        sigma = outliers.scaled_mad(np.asarray(data).ravel())
+    except Exception as err:
+        logger.warning("the frame's noise could not be measured: %s", err)
+        return None
+    if sigma is None or not np.isfinite(sigma) or sigma <= 0:
+        return None
+    return float(sigma)
+
+
 def session_fwhm(ref_data, ref_stars, sat=None):
     # @args: ref_data - the reference frame's pixels, ref_stars - its
     #        detect_stars output, sat - saturation ceiling
@@ -220,6 +243,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
         ref = next((f for f in frames if f.wcs is not None), frames[0])
     ref_data, _ = calibration.read_image(ref.path)
     ref_stars = register.detect_stars(register.source_image(ref_data))
+    ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:
         fwhm_px = session_fwhm(ref_data, ref_stars, sat=sat)
     previous = None
@@ -233,6 +257,11 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
             frame.register_note = "reference"
         else:
             data, _ = calibration.read_image(frame.path)
+            # the frame's own noise, measured here because the pixels are
+            # already in hand: the weighted combination needs it and the
+            # robust MAD does not care about the stars or the object
+            # sitting on top of the sky
+            frame.sky_sigma = _frame_noise(data)
             # the guess is the PREVIOUS frame's transform, never the
             # reference's identity: a wrong guess drags the star voting
             # into a bad minimum (measured: a 2 px shift read as -29 px)
@@ -529,7 +558,7 @@ def sequence_motion(frames, name, site="", lat=None, lon=None):
 # this; the full-frame final stack is where the budget matters.
 MEMORY_BUDGET_BYTES = 2 * 1024 ** 3
 # Combination methods, in the order the UI offers them.
-METHODS = ("sum", "mean", "median", "sigma")
+METHODS = ("sum", "mean", "median", "sigma", "weighted")
 
 
 @dataclass
@@ -741,14 +770,51 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3):
     return warped, ones > 0.5
 
 
-def combine(stack, method, mask=None, sigma=3.0, iterations=3):
+def frame_weights(frames):
+    # @args: frames - list[Frame], each with sky_sigma when it is known
+    # @return: (n,) the inverse-variance weight of each frame, or None when
+    #          no frame knows its own noise
+    # 1/sigma^2 is the optimal linear weighting of several measurements of
+    # the SAME signal with different noise: the frame with less noise
+    # carries more of the answer. On a stable night every weight is nearly
+    # equal and this changes nothing; on a night with thin cloud, moon or
+    # variable transparency it is what keeps one bad frame from dragging
+    # the stack down. It is also the noise model the matched filter needs.
+    sigmas = [f.sky_sigma for f in frames]
+    known = [s for s in sigmas if s]
+    if not known:
+        return None
+    # a frame whose noise could not be measured gets the median of the
+    # others: it is a real frame, only an unmeasured one
+    median = float(np.median(known))
+    values = np.asarray([s if s else median for s in sigmas], dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return 1.0 / np.square(values)
+
+
+def _weight_row(weights, n):
+    # @args: weights - (n,) array or None, n - how many frames
+    # @return: the weights shaped (n, 1, 1) for broadcasting, or None
+    if weights is None:
+        return None
+    w = np.asarray(weights, dtype=np.float64).ravel()
+    if w.size != n:
+        return None
+    return w.reshape((-1, 1, 1))
+
+
+def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None):
     # @args: stack - (n, h, w) float32, method - one of METHODS, mask -
-    #        optional (n, h, w) validity, sigma/iterations - for sigma-clip
+    #        optional (n, h, w) validity, sigma/iterations - for sigma-clip,
+    #        weights - optional (n,) per-frame weights (see frame_weights)
     # @return: the combined (h, w) float32 image
     # sum and mean are equivalent in signal (mean is sum / n); both are
     # offered because the user will see them in the concept, but the app
     # says they differ only in scale. sigma-clipped keeps almost all of
     # the mean's SNR while rejecting the star trails like the median.
+    # "weighted" is the sigma clip with an inverse-variance average of the
+    # survivors: the clip removes what is not the object, the weight gives
+    # each frame the say its own noise deserves.
     #
     # The pixels OUTSIDE the frames' footprint are all-NaN BY CONSTRUCTION
     # (the mask says so), so every NaN-aware reduction warns about them on
@@ -764,7 +830,33 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="All-NaN slice.*")
         warnings.filterwarnings("ignore", message="Mean of empty slice.*")
+        if method == "weighted":
+            return _combine_weighted(data, weights, sigma, iterations)
         return _combine_masked(data, method, sigma, iterations)
+
+
+def _combine_weighted(data, weights, sigma, iterations):
+    # @args: data - (n, h, w) float32 with the invalid pixels already NaN,
+    #        weights - (n,) per-frame weights or None, sigma/iterations -
+    #        the same clip the "sigma" method uses
+    # @return: the combined (h, w) float32 image
+    # The clip first, the weighted average after: the star trails the clip
+    # removes are the same ones the plain "sigma" method removes, and the
+    # weight only decides how much each SURVIVING frame counts. Without
+    # weights it is exactly the plain sigma-clipped mean, so the method
+    # degrades into the proven one instead of into something new.
+    keep = _sigma_clip_keep(data, sigma, iterations)
+    w = _weight_row(weights, data.shape[0])
+    if w is None:
+        with np.errstate(invalid="ignore"):
+            return np.nanmean(np.where(keep, data, np.nan),
+                              axis=0).astype(np.float32)
+    ww = np.broadcast_to(w, data.shape)
+    num = np.nansum(np.where(keep, data * ww, np.nan), axis=0)
+    den = np.sum(np.where(keep, ww, 0.0), axis=0)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = np.where(den > 0, num / den, np.nan)
+    return out.astype(np.float32)
 
 
 def _combine_masked(data, method, sigma, iterations):
@@ -780,6 +872,19 @@ def _combine_masked(data, method, sigma, iterations):
     if method == "median":
         return np.nanmedian(data, axis=0).astype(np.float32)
     # sigma-clipped: clip around the median and average the survivors
+    keep = _sigma_clip_keep(data, sigma, iterations)
+    return np.nanmean(np.where(keep, data, np.nan), axis=0).astype(np.float32)
+
+
+def _sigma_clip_keep(data, sigma, iterations):
+    # @args: data - (n, h, w) with the invalid pixels already NaN,
+    #        sigma/iterations - the clip
+    # @return: the boolean (n, h, w) "this pixel survives the clip"
+    # The clip walks the median: it starts from the median of the frames
+    # and, each pass, keeps what is within sigma MAD of it and re-centres
+    # on the survivors. ONE implementation, because the plain sigma-clipped
+    # mean and the weighted one MUST reject the same pixels: the only
+    # difference between the two methods is how the survivors are averaged.
     med = np.nanmedian(data, axis=0)
     keep = np.isfinite(data)
     for _ in range(max(1, iterations)):
@@ -792,7 +897,7 @@ def _combine_masked(data, method, sigma, iterations):
             new_med = np.nansum(np.where(keep, data, np.nan), axis=0) \
                 / np.maximum(count, 1)
         med = np.where(count > 0, new_med, med)
-    return np.nanmean(np.where(keep, data, np.nan), axis=0).astype(np.float32)
+    return keep
 
 
 def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
@@ -825,6 +930,11 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         return None, report
     offsets = (track_offsets(frames, indices, q, shape) if track
                else [(0.0, 0.0)] * len(indices))
+    # the per-frame weights are a property of the FRAME, not of a strip, so
+    # they are computed once here and the RAM and the streaming paths use
+    # the same ones (the two are pinned to agree)
+    weights = (frame_weights([frames[i] for i in indices])
+               if method == "weighted" else None)
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
     n = len(indices)
@@ -838,7 +948,7 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
             stack[k] = warped
             masks[k] = valid
         return combine(stack, method, mask=masks, sigma=sigma,
-                       iterations=iterations), report
+                       iterations=iterations, weights=weights), report
     report.streamed = True
     out = np.empty((out_h, out_w), dtype=np.float32)
     strip_h = max(1, int(budget_bytes / max(1, n * out_w * 4)))
@@ -863,7 +973,7 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
             strip[k] = warped
             masks[k] = valid
         combined = combine(strip, method, mask=masks, sigma=sigma,
-                           iterations=iterations)
+                           iterations=iterations, weights=weights)
         out[y0:y1] = combined[y0 - py0:y1 - py0]
     return out, report
 

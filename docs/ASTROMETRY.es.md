@@ -63,8 +63,14 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    estrellas y desplaza cada frame para que el objeto caiga siempre en el
    mismo punto. Puedes elegir el método de combinación: **sigma-clipped**
    (el estándar profesional: casi toda la señal de la media y la limpieza de
-   la mediana), mediana (rápido, para probar), media o suma. La media y la
-   suma dan la misma señal salvo la escala. El apilado final de cada
+   la mediana), mediana (rápido, para probar), media, suma, o **ponderada
+   (1/σ²)**. La media y la suma dan la misma señal salvo la escala. La
+   ponderada es el mismo recorte sigma, y después cada toma cuenta según el
+   ruido de **su** cielo: en una noche estable sale lo mismo que el
+   sigma-clipped (medido: un 0,3 % en 2025 UR y un 2,2 % en 2026 PY9), y es
+   lo que salva una noche con nubes finas o Luna, donde una toma con el
+   triple de ruido arrastraría la media entera (modelado sobre esas mismas
+   tomas: hasta un 28 %). El apilado final de cada
    observación cubre por defecto el **fotograma completo**, que es lo que
    necesita la fotometría (comparsas alrededor); si vas justo de memoria o
    de tiempo puedes reducirlo a 1024, 512 o 256 px, y el barrido de

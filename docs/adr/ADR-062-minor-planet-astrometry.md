@@ -106,6 +106,19 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     fallaron y si la visita es en realidad **varias tandas**, con su salto y
     su hueco de tiempo. Medido en 2025 UR: de 78 a 139 tomas usables de 140,
     y el SNR del apilado de estrellas de 1.826 a 2.702 (×1,48).
+17. **Co-adición ponderada por 1/σ²**, como método **opcional** además de
+    suma/media/mediana/sigma (el defecto no cambia: la medida dice que en
+    una noche estable no compensa). El ruido de cada toma se mide de su
+    propio cielo (MAD escalada) **durante el registro**, que ya lee los
+    píxeles, y el peso es el inverso de su varianza, que es la combinación
+    lineal óptima de medidas con ruido distinto. El método nuevo es **el
+    mismo recorte sigma y después la media ponderada de las supervivientes**
+    (el recorte se comparte, así que ambos rechazan los mismos píxeles), y
+    sin pesos es idéntico al sigma-clipped probado. Medido: en 2025 UR el
+    ruido entre tomas varía un 4 % (ganancia 1,003×) y en 2026 PY9 un 11 %
+    (ganancia 1,022×); con una décima parte de las tomas al triple de ruido
+    la ganancia sería del 28 %. Es un seguro para la noche que se rompe, y
+    además es el modelo de ruido que el filtro adaptado necesita.
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el
@@ -124,6 +137,17 @@ pestañas nuevas en el UFE; y el bloque MPC de la visita gana un camino generado
 La validación real se hace contra Tycho-Tracker sobre el mismo set (residual
 < 0,3″, y < 0,1″ en el caso bueno), además de la secuencia sintética para el
 motor.
+
+**Revisión (2026-10-05): el stack dice lo que el run midió.** El stack que el run
+guarda lleva en su propia cabecera lo que la banda del editor (ADR-046) necesita para
+encabezar la placa: `NS_RATE` / `NS_PA` / `NS_MOT` (el movimiento del barrido de
+velocidad, o la predicción de la efeméride marcada `eph`), `NS_MAG` / `NS_MAGER` /
+`NS_MAGB` / `NS_MAGNC` / `NS_MAGOK` (la magnitud de esa observación con las señales que
+la colorean) y las tarjetas de la toma (`EXPTIME`, `DATE-OBS`, `FILTER`, `INSTRUME`,
+`TELESCOP`) junto a `NS_NFRAM`. La posición medida ya viajaba como `NS_RA` / `NS_DEC`
+(la anotación). El efecto: reabrir un stack meses después, sin el run en memoria ni la
+base de datos, muestra su magnitud, su velocidad y su PA en la banda, con los mismos
+colores que la fotometría.
 
 ## English
 
@@ -218,6 +242,19 @@ calibrate, stack following the motion, measure and report. The field's reference
     with its offset and its time gap. Measured on 2025 UR: from 78 to 139
     usable frames out of 140, and the star stack's SNR from 1826 to 2702
     (x1.48).
+17. **Inverse-variance (1/sigma^2) co-addition**, as an **optional** method
+    beside sum/mean/median/sigma (the default does not change: the
+    measurement says a stable night does not pay for it). Each frame's
+    noise is measured from its own sky (scaled MAD) **during registration**,
+    which already reads the pixels, and the weight is the inverse of its
+    variance, the optimal linear combination of measurements with different
+    noise. The new method is **the same sigma clip and then the weighted
+    average of the survivors** (the clip is shared, so both reject the same
+    pixels), and with no weights it is identical to the proven sigma clip.
+    Measured: on 2025 UR the frame-to-frame noise varies 4 % (gain 1.003x)
+    and on 2026 PY9 11 % (gain 1.022x); with a tenth of the frames at three
+    times the noise the gain would be 28 %. It is insurance for the night
+    that breaks, and it is also the noise model the matched filter needs.
 
 **Reopening ADR-022**: NightScribe **now does generate measurements**, bounded to
 known objects, with the user as reviewer and sender. ADR-022's validator and
@@ -234,3 +271,13 @@ installer (rejected for licence and weight).
 two new tabs in the UFE; and the visit's MPC block gains a generated path. Real
 validation is done against Tycho-Tracker on the same set (residual < 0.3″, and
 < 0.1″ in the good case), plus the synthetic sequence for the engine.
+
+**Revision (2026-10-05): the stack says what the run measured.** The stack the run
+saves carries in its own header what the editor's band (ADR-046) needs to head the
+plate: `NS_RATE` / `NS_PA` / `NS_MOT` (the velocity sweep's motion, or the ephemeris'
+prediction marked `eph`), `NS_MAG` / `NS_MAGER` / `NS_MAGB` / `NS_MAGNC` / `NS_MAGOK`
+(that observation's brightness with the signals that colour it) and the frame's cards
+(`EXPTIME`, `DATE-OBS`, `FILTER`, `INSTRUME`, `TELESCOP`) beside `NS_NFRAM`. The
+measured position already travelled as `NS_RA` / `NS_DEC` (the annotation). The effect:
+reopening a stack months later, with no run in memory and no database, shows its
+magnitude, its velocity and its PA in the band, in the same colours as the photometry.

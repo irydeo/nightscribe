@@ -44,7 +44,7 @@ vez de suponerla.
 | --- | --- | --- |
 | **P0** | Los fotogramas que se quedan en el suelo | **Hecho** (`p0-fotogramas-perdidos.md`) |
 | **P4** | Inyección y recuperación (el instrumento) | Pendiente |
-| **P1** | Co-adición con pesos y normalización | Pendiente |
+| **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
 | **P2** | Filtro adaptado y la estela | Pendiente |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | Pendiente |
 | **P5** | Pseudo-flat | Pendiente |

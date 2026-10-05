@@ -717,6 +717,11 @@ def test_the_band_reads_the_motion_and_brightness_of_a_stack(qapp, tmp_path):
     assert facts["measured"]["comps"] == 8
     assert facts["measured"]["check_ok"] is True
     assert facts["measured_pos"] == (30.0, 10.0)
+    # ... and the LIVE state's header (read before the annotate pass) says
+    # the same, so the band is right the moment the stack lands
+    live = tab.band_facts(dict(tab._stack_state.header))
+    assert live["measured_pos"] == (30.0, 10.0)
+    assert live["motion"]["rate_arcsec_min"] == pytest.approx(1.234)
     # a plain frame is not one of the run's stacks
     assert tab.band_facts({"OBJECT": "2025 UR"}) is None
 

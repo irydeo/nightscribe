@@ -119,7 +119,7 @@
         <item>
          <widget class="QComboBox" name="cmb_method">
           <property name="toolTip">
-           <string>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean's SNR while rejecting the trails (the default)</string>
+           <string>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean's SNR while rejecting the trails (the default); weighted is the same clip with each frame counting by 1/sigma^2 of its own sky, which is the same on a stable night and what saves a night with thin cloud or moon</string>
           </property>
          </widget>
         </item>

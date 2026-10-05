@@ -65,7 +65,13 @@ project). No visit, no series: that is the house rule.
    and shifts each frame so the object always lands on the same point. You
    can pick the combination: **sigma-clipped** (the professional standard:
    nearly all of the mean's signal with the median's cleanliness), median
-   (fast, for trying), mean or sum. Mean and sum differ only in scale. The
+   (fast, for trying), mean, sum, or **weighted (1/sigma^2)**. Mean and sum
+   differ only in scale. Weighted is the same sigma clip, and then each
+   frame counts by the noise of **its own** sky: on a stable night it comes
+   out the same as sigma-clipped (measured: 0.3 % on 2025 UR and 2.2 % on
+   2026 PY9), and it is what saves a night with thin cloud or moon, where a
+   frame with three times the noise would drag the whole mean (modelled on
+   those same frames: up to 28 %). The
    final stack of each observation covers the **whole frame** by default,
    which is what the photometry needs (comparison stars all around); short
    on memory or time you can shrink it to 1024, 512 or 256 px, and the

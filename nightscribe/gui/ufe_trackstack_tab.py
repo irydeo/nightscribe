@@ -217,12 +217,23 @@ class UfeTrackStackTab(QWidget):
         area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         area.setWidget(inner)
         lay.addWidget(area)
-        # the four combination methods of core/track_stack (D11), with the
+        # the combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
         self.cmb_method.addItem(self.tr("Mean"), "mean")
         self.cmb_method.addItem(self.tr("Median"), "median")
         self.cmb_method.addItem(self.tr("Sigma-clipped"), "sigma")
+        # P1: the same clip, and then each frame counts by 1/sigma^2 of its
+        # own sky. On a stable night it is the same as the sigma clip; on a
+        # night with thin cloud or moon it is what keeps one bad frame from
+        # dragging the stack, and it is the noise model the matched filter
+        # will stand on.
+        self.cmb_method.addItem(self.tr("Weighted (1/σ²)"), "weighted")
+        self.cmb_method.setItemData(
+            self.cmb_method.count() - 1,
+            self.tr("Each frame counts by 1/σ² of its own sky: the same as "
+                    "the sigma clip on a stable night, and what saves a "
+                    "night with thin cloud or moon"), Qt.ToolTipRole)
         # D11: the FINAL stack's field (0 = the whole frame) and the
         # detection/sweep cutout's margin. The whole frame is what the
         # photometry wants; a smaller window is faster.
@@ -1202,6 +1213,15 @@ class UfeTrackStackTab(QWidget):
                                     "ephemeris prediction, not measured")
             if stars:
                 return
+            # the position MEASURED on this stack (the astrometric
+            # centroid). It is the same pair the annotation pass writes, and
+            # writing it here too means the band reads it right away, without
+            # waiting for the annotate step that rewrites the file.
+            points = result.get("points") or []
+            sp = points[index][0] if 0 <= index < len(points) else None
+            if sp is not None and sp.ra is not None and sp.dec is not None:
+                header["NS_RA"] = float(sp.ra)
+                header["NS_DEC"] = float(sp.dec)
             phot = result.get("photometry") or {}
             per_obs = phot.get("per_obs") or []
             one = per_obs[index] if 0 <= index < len(per_obs) else None

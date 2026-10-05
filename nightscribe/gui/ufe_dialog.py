@@ -1700,7 +1700,12 @@ class UfeDialog(QWidget):
         last = tab._last
         from_visit = bool(getattr(tab, "_curve_from_visit", False))
         measured = None
-        if last is not None and last.get("mag") is not None and from_visit:
+        if str(header.get("NS_STACK") or "") in ("object", "stars"):
+            # On one of the astrometry run's stacks only the brightness the
+            # RUN measured on it counts: a stale measurement of the
+            # Photometry tab must not colour the band over it.
+            measured = facts.get("measured")
+        elif last is not None and last.get("mag") is not None and from_visit:
             measured = tab.measured_facts(last)
         else:
             point = None
@@ -1716,11 +1721,6 @@ class UfeDialog(QWidget):
                             "flags": point.get("flags")}
             elif last is not None and last.get("mag") is not None:
                 measured = tab.measured_facts(last)
-        if facts.get("measured") is not None:
-            # On one of the astrometry tab's stacks, the brightness the RUN
-            # measured on it is the truth: a stale measurement of the
-            # Photometry tab must not colour the band over it.
-            measured = facts["measured"]
         catalog_mag = None
         try:
             if obj.get("mag") is not None:

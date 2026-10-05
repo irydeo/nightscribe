@@ -390,6 +390,51 @@ def test_the_band_says_nothing_without_a_plate(dlg):
     assert dlg._chart_band() == {"lines": []}
 
 
+def test_the_band_says_the_motion_and_brightness_of_an_asteroid_stack(dlg):
+    # On one of the astrometry run's stacks the heading adds what the run
+    # measured: the motion (ink, because the sweep measured it), the
+    # brightness with its own colour and the position measured on the
+    # plate. It all comes from the stack's header, so a stack reopened
+    # later (with no run in memory) says the same.
+    dlg.state.load(MONO)
+    dlg.state.header.update({
+        "NS_STACK": "object", "NS_RUN": 7, "NS_NOBS": 1, "NS_NFRAM": 8,
+        "NS_RATE": 1.234, "NS_PA": 245.4, "NS_MOT": "sweep",
+        "NS_MAG": 18.05, "NS_MAGER": 0.04, "NS_MAGNC": 8, "NS_MAGOK": 1,
+        "NS_MAGB": "G", "NS_RA": 30.0, "NS_DEC": 10.0,
+    })
+    first, second = dlg._chart_band()["lines"]
+    motion = next(seg for seg in first if seg["field"] == "motion")
+    assert motion["role"] == "motion"
+    assert motion["text"] == "1.23″/min PA 245°"
+    mag = next(seg for seg in first if seg["field"] == "mag")
+    assert mag["role"] == "mag" and mag["text"] == "18.05 ± 0.04 (G)"
+    pos = next(seg for seg in first if seg["field"] == "pos")
+    assert pos["role"] == "pos"
+    assert "RA 02 00 00.0" in pos["text"]
+    assert "Dec +10 00 00.0" in pos["text"]
+    # and the context says how many frames the stack combines
+    assert any(seg["text"] == "8 × 10.0 s" for seg in second)
+
+
+def test_a_stack_never_borrows_a_stale_measurement(dlg):
+    # The run measured positions only (the brightness box was off): the band
+    # must NOT colour the stack with a measurement the Photometry tab left
+    # from another plate. The motion still shows, because the run did
+    # measure that.
+    dlg.state.load(MONO)
+    dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
+                             "col": 100.0, "row": 200.0,
+                             "used": [1, 2, 3, 4, 5],
+                             "check": {"ok": True}}
+    dlg.state.header.update({
+        "NS_STACK": "object", "NS_RUN": 7, "NS_NOBS": 1, "NS_NFRAM": 8,
+        "NS_RATE": 1.234, "NS_PA": 245.4, "NS_MOT": "sweep"})
+    first = dlg._chart_band()["lines"][0]
+    assert not any(seg["field"] == "mag" for seg in first)
+    assert any(seg["field"] == "motion" for seg in first)
+
+
 def test_the_band_toggle_default_comes_from_config(dlg, monkeypatch):
     # The plate's band says what it says by default (chart_data): the
     # corner boxes' own switch (chart_boxes) belongs to the OTHER charts

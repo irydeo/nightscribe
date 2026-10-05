@@ -1007,6 +1007,21 @@ class UfeDialog(QWidget):
             logger.warning("astrometry hook failed: %s", err)
             return None
 
+    def photometry_recipe(self):
+        # @return: the recipe the Photometry tab is holding RIGHT NOW (the
+        #          band, the apertures, the sky method, the centroid, the
+        #          colour term), or None
+        # The track & stack flow measures the brightness with the same
+        # recipe the observer has always edited in that tab. There is no
+        # second copy on purpose: one editor means the apertures the run
+        # used cannot drift away from the ones the observer sees.
+        try:
+            state = self.tab_photometry.capture_state() or {}
+        except Exception as err:
+            logger.warning("photometry recipe failed: %s", err)
+            return None
+        return state.get("measure") or None
+
     def set_mpc_send_hook(self, fn):
         # @args: fn - callable(text) -> True when the visit's MPC block
         #        received the report, or None

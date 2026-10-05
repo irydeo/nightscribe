@@ -37,8 +37,8 @@ now mount it embedded too.
 # Any of these marks the widget as the editor host (they live only on
 # UfeDialog). Checking several keeps the helper from depending on one.
 HOST_METHODS = ("open_plate", "series_context", "astrometry_context",
-                "notify_saved", "export_folder", "reset_state_local",
-                "notify_point", "notify_points")
+                "photometry_recipe", "notify_saved", "export_folder",
+                "reset_state_local", "notify_point", "notify_points")
 
 
 def _looks_like_host(widget):

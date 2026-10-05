@@ -1681,12 +1681,18 @@ def measure_plate(image, cfg):
         bv = (float(entry[3]) if len(entry) > 3 and entry[3] is not None
               else cfg.target_bv)
         if cfg.comp_image is not None:
-            # H2b: the target on the difference, the comps on the work frame
+            # H2b: the target on one image, the comps on another. When the
+            # two SHARE the plate scale (scale == 1: the object's stack and
+            # the star stack of the same frames) the camera's ceilings
+            # apply to the target too; on a resampled difference image they
+            # do not, because those ADU are not the sensor's.
             target = measure_point(
                 image, tx / scale, ty / scale,
                 r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
                 r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
-                sat_adu=None, sky_mode=cfg.sky_mode,
+                sat_adu=(sat if scale == 1.0 else None),
+                linear_adu=(lin if scale == 1.0 else None),
+                sky_mode=cfg.sky_mode,
                 centroid_mode=cfg.centroid_mode,
                 fwhm=(fwhm / scale if fwhm else None))
         else:

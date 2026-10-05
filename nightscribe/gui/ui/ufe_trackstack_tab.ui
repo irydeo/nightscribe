@@ -120,6 +120,46 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="row_brightness">
+     <item>
+      <widget class="QCheckBox" name="chk_brightness">
+       <property name="checked"><bool>true</bool></property>
+       <property name="text"><string>Measure the brightness</string></property>
+       <property name="toolTip">
+        <string>Measures each observation's magnitude on the stacks: the object on its own stack, where its light is concentrated, and the comparison stars on a second stack aligned on the stars, because on the object's stack they are streaks and a streak calibrates nothing. It costs one more stacking pass; without it the run reports positions only and says so</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_brightness">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_recipe">
+     <item>
+      <widget class="QLabel" name="lbl_recipe">
+       <property name="text"><string/></property>
+       <property name="wordWrap"><bool>true</bool></property>
+       <property name="toolTip">
+        <string>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term are edited there and nowhere else, so the app has one editor and the numbers cannot drift apart</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_recipe">
+       <property name="text"><string>Edit in Photometry…</string></property>
+       <property name="toolTip">
+        <string>Takes you to the Photometry tab, where the recipe lives. Come back and the line on the left shows what changed</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
     <widget class="QProgressBar" name="prg_stack">
      <property name="visible"><bool>false</bool></property>
     </widget>

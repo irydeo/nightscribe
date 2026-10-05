@@ -1227,3 +1227,25 @@ def test_the_crash_that_killed_the_run_does_not_come_back():
     # seeing, and above all no exception
     assert phot.estimate_fwhm(data, [(80.0, -20.0)]) is None
     assert phot.estimate_fwhm(data, [(80.0, 80.0), (80.0, -20.0)]) is None
+
+
+def test_a_paired_image_keeps_the_camera_ceiling_on_the_target():
+    # With comp_image the target reads on one image and the comps on
+    # another: that is how the track & stack measures the object on its own
+    # stack and the comparison stars on the star stack. When the two SHARE
+    # the plate scale the camera's ceiling still applies to the target,
+    # because those are the same sensor's ADU; on a resampled difference
+    # image they are not and the ceiling is dropped.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    bright = _plate(200, 200, [(_CONTRACT_TARGET[0], _CONTRACT_TARGET[1],
+                                60000.0)], sky=100.0)
+    header = {"SATURATE": 50000.0}
+    paired = phot.measure_plate(bright, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, header=header, comp_image=data,
+        comp_scale=1.0, **base))
+    solo = phot.measure_plate(bright, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, header=header, **base))
+    assert not paired.ok and not solo.ok
+    assert "saturat" in str(paired.reason).lower()
+    assert "saturat" in str(solo.reason).lower()

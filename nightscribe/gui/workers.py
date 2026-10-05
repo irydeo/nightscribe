@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 # Network and scoring never run on the GUI thread (see ARCHITECTURE).
 # Each worker emits a single "finished" signal with its payload.
 
+# How far from the plate's edge a comparison star may sit, in arcsec. The
+# night's drift and the pointing error move the field a little, and a comp
+# that walks off the plate on one frame breaks that frame's zero point (or
+# worse, is measured on the sky without saying so).
+_COMP_MARGIN_ARCSEC = 60.0
+
+# The target's magnitude is only used to pick comps of a similar
+# brightness, and the project usually knows it (its own card). When it does
+# not, this is the starting point, and the run SAYS the sequence was
+# proposed automatically: it is a guess, and it is labelled as one.
+_TARGET_MAG_GUESS = 18.0
+
 
 class _Cancelled(Exception):
     # Raised at a phase boundary when the worker was cancelled (never
@@ -989,7 +1001,8 @@ class TrackStackWorker(QThread):
 
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
                  obs_code="", site="", final_size=0, margin=64,
-                 comps=None, band=None, target_mag=None):
+                 comps=None, band=None, target_mag=None, recipe=None,
+                 phot_enabled=True):
         super().__init__()
         self._paths = list(paths)
         self._name = name
@@ -1002,13 +1015,15 @@ class TrackStackWorker(QThread):
         # detection/sweep cutout's margin, both from the tab's controls
         self._final_size = int(final_size or 0)
         self._margin = int(margin or 64)
-        # the NEO's photometry reuses the SERIES engine (ADR-048) with a
-        # moving target: the project's comp sequence when it has one, the
-        # band of the filter and the target's rough magnitude for the
-        # automatic proposal
+        # the NEO's brightness is measured on the stacks, against the
+        # project's comps (or an automatic proposal) and with the SAME
+        # recipe the Fotometria tab is holding: the apertures, the sky
+        # method, the centroid and the colour term are the observer's
         self._comps = list(comps or [])
         self._band = band
         self._target_mag = target_mag
+        self._recipe = dict(recipe or {})
+        self._phot_enabled = bool(phot_enabled)
         self._cancel = False
         self._solve_cancel = None   # SolveCancel while the solver runs
 
@@ -1027,115 +1042,208 @@ class TrackStackWorker(QThread):
             return default
         return self._cfg.get(key, default)
 
-    def _photometry(self, frames, w0, motion, target_xy):
-        # @args: frames - the sequence (with WCS), w0 - the reference WCS,
-        #        motion - callable(jd) -> (ra, dec), target_xy - the object
-        #        in the reference grid
-        # @return: {"mag","err","band","n_comps","n_frames","source"} or None
-        # The NEO's magnitude is measured FRAME BY FRAME against the field's
-        # comparison stars: on a track & stack the stars are TRAILS, so
-        # measuring them on the stack would be wrong. The series engine
-        # (ADR-048) already does per-frame zero points with an ensemble of
-        # comps, the MAD veto and honest errors, and it takes a moving
-        # target through cfg.target_motion. This is orchestration, not a
-        # second photometric recipe.
-        import math
-        from ..core import compstars, outliers, series_measure
+    # --------------------------------------------------------- brightness
+
+    def _photometry(self, frames, groups, boxes, qs, stacks, points, ref, w0):
+        # @args: frames - the sequence, groups - the observation split,
+        #        boxes - the output box per observation, qs - the object's
+        #        reference point per observation, stacks - the object's
+        #        stacks, points - [(sp, fp, flags)] per observation, ref -
+        #        the reference frame (its header carries the camera's
+        #        limits), w0 - the reference WCS
+        # @return: the run's brightness summary, or None when it cannot be
+        #          calibrated (no comps, no stacks, no measurable plate)
+        # The brightness is measured ON THE STACKS, never frame by frame:
+        # on a single frame a faint NEO has SNR 2 and its aperture ends up
+        # chasing noise. The object reads on ITS stack, where its light is
+        # concentrated, and the comparison stars read on a SECOND stack of
+        # the same frames aligned on the STARS, because on the object's
+        # stack they are streaks and a streak calibrates nothing.
+        # photometry.measure_plate already implements exactly that recipe
+        # (the comp_image hook, written for host subtraction): this is
+        # orchestration, not a second photometry.
+        import numpy as np
+        from ..core import astrometry as astrometry_mod
+        from ..core import compstars, photometry, track_stack
         from ..core import wcs as wcs_mod
+        recipe = dict(self._recipe or {})
         entries = list(self._comps)
         source = "project" if entries else "auto"
-        band = self._band or "G"
-        # the series engine speaks core.wcs.Wcs, not the astropy WCS the
-        # astrometry flow uses: convert once, here
-        engine_wcs = wcs_mod.Wcs.from_astropy(w0)
+        shape = (int(ref.header.get("NAXIS1", 0) or 0),
+                 int(ref.header.get("NAXIS2", 0) or 0))
+        if min(shape) < 1:
+            return None
         if not entries:
+            # the field the comps are looked for in comes from the PLATE:
+            # the WCS says what a pixel is worth and the frame says how
+            # many there are, so there is no field size to guess
             try:
-                ra, dec = w0.all_pix2world([[target_xy[0], target_xy[1]]], 0)[0]
+                ra, dec = w0.all_pix2world([[qs[0][0], qs[0][1]]], 0)[0]
             except Exception:
                 return None
-            naxis1 = int(frames[0].header.get("NAXIS1", 0)) or None
-            naxis2 = int(frames[0].header.get("NAXIS2", 0)) or None
-            field = compstars.load_field(
-                "gaia", float(ra), float(dec),
-                float(self._cfg_get("astrometry_phot_fov_arcmin", 20.0)),
-                naxis=(naxis1, naxis2), margin_arcsec=60.0)
+            fov_arcmin = (astrometry_mod.pixel_scale_arcsec(w0)
+                          * max(shape) / 60.0)
+            margin = float(self._cfg_get(
+                "astrometry_phot_comp_margin_arcsec", _COMP_MARGIN_ARCSEC))
+            field = compstars.load_field("gaia", float(ra), float(dec),
+                                         float(fov_arcmin), naxis=shape,
+                                         margin_arcsec=margin)
             if not field:
                 return None
             proposal = compstars.propose_comps(
-                field["stars"], float(self._target_mag or 18.0), n=8,
-                margin_arcsec=60.0)
+                field["stars"],
+                float(self._target_mag
+                      or self._cfg_get("astrometry_phot_target_mag",
+                                       _TARGET_MAG_GUESS)),
+                margin_arcsec=margin)
             entries = list((proposal or {}).get("comps") or [])
+            # the check star travels WITH the sequence: it never enters the
+            # zero point, it is the monitor that says whether the night
+            # behaved (the plate recipe measures it and reports a verdict)
+            check = (proposal or {}).get("check")
+            if check:
+                entries.append(check)
         if not entries:
             return None
-        cfg = series_measure.SeriesConfig(
-            wcs=engine_wcs, target_xy=tuple(target_xy),
-            comp_set=tuple(entries),
-            band=band, align="auto", target_motion=motion,
-            seeing_aperture=True,
-            site_gain=self._cfg_get("ccd_gain", None),
-            site_ron=self._cfg_get("ccd_read_noise", None),
-            site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,
-            site_saturate=self._cfg_get("ccd_saturate", None),
-            site_lon=self._cfg_get("lon", None),
-            site_lat=self._cfg_get("lat", None),
-            site_aperture_m=float(self._cfg_get("aperture_inches", 10.0) or 10.0)
-            * 0.0254,
-            site_height_m=float(self._cfg_get("height", 0) or 0.0),
-            site_linear=self._cfg_get("cam_linearity_adu", None),
-            site_dark=self._cfg_get("cam_dark_current_e_s", None))
-        label = self._name or "target"
-        try:
-            res = series_measure.measure_pass(
-                self._paths, cfg,
-                targets=[(label, float(target_xy[0]), float(target_xy[1]))],
-                progress=lambda d, t: self.progress.emit("photometry", d, t),
-                cancel=lambda: self._cancel)
-        except Exception as err:
-            logger.warning("NEO photometry failed: %s", err)
+        # The band comes from the COMPARISON CATALOG and not from a
+        # constant: the comps are Gaia's, so what this calibrates is a
+        # Gaia G. A Clear filter is white light, and white light against
+        # Gaia G is the honest description of what was measured.
+        band, _bands = photometry.pick_band(entries, recipe.get("band"), "G")
+        # --- the STAR stacks: same frames, same method, aligned on the sky
+        total = max(1, 2 * len(groups))
+        star_stacks = track_stack.stack_groups(
+            frames, groups, qs, self._method, boxes, shape, cfg=self._cfg,
+            track=False,
+            progress=lambda d, t, _l: self.progress.emit("photometry", d,
+                                                         total),
+            cancel=lambda: self._cancel)
+        if self._cancel or len(star_stacks) < len(groups):
             return None
-        targets = getattr(res, "targets", None) or []
-        if not targets:
-            return None
-        result = (targets[0] or {}).get("result") if isinstance(
-            targets[0], dict) else None
-        if result is None:
-            return None
-        import numpy as np
-        good = []
-        # Which flags really invalidate a magnitude: the flux is not
-        # proportional (saturated / nonlinear), the aperture caught a
-        # cosmic ray, the frame was not aligned, or the plate was refused.
-        # The QUALITY flags (cloud, seeing, guide_jump) are KEPT: they
-        # widen the scatter, and the median already absorbs that. Dropping
-        # guide_jump cost the whole curve, because on a faint NEO it fires
-        # on 27 of 30 frames (measured on 2025 UR): the object's own
-        # centroid wanders far more than a stationary guide's would.
-        bad = {"unusable", "saturated", "nonlinear", "cosmic",
-               "align_failed", "align_edge"}
-        for p in (result.points or []):
-            if p.mag is None or not math.isfinite(p.mag):
+        per_obs = []
+        for index, (stack, _rep) in enumerate(stacks):
+            self.progress.emit("photometry", len(groups) + index + 1, total)
+            star_stack = (star_stacks[index][0]
+                          if index < len(star_stacks) else None)
+            if stack is None or star_stack is None:
+                per_obs.append(None)
                 continue
-            if set(p.flags or []) & bad:
+            box = boxes[index]
+            sp = points[index][0] if index < len(points) else None
+            centre = self._object_centre(sp, qs[index], box)
+            if centre is None:
+                per_obs.append(None)
                 continue
-            good.append(float(p.mag))
+            wcs_box = wcs_mod.Wcs.from_astropy(_shift_wcs(w0, box))
+            fwhm = self._seeing(star_stack, entries, wcs_box)
+            cfg = photometry.PlateConfig(
+                target_xy=centre, entries=entries, header=ref.header,
+                wcs=wcs_box, band=band, fallback_band=band,
+                radii=self._radii(recipe, fwhm), fwhm=fwhm,
+                centroid_mode=("none" if recipe.get("manual_centre")
+                               else "gaussian"),
+                sigmaclip=bool(recipe.get("sigmaclip", True)),
+                sky_mode=recipe.get("sky") or "median",
+                color=bool(recipe.get("color", False)),
+                target_bv=float(recipe.get("target_bv") or 0.0),
+                comp_image=star_stack, comp_scale=1.0,
+                linear_adu=self._cfg_get("cam_linearity_adu", None),
+                site_gain=self._cfg_get("ccd_gain", None),
+                site_ron=self._cfg_get("ccd_read_noise", None),
+                site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,
+                site_saturate=self._cfg_get("ccd_saturate", None),
+                site_lon=self._cfg_get("lon", None),
+                site_lat=self._cfg_get("lat", None),
+                site_aperture_m=float(self._cfg_get("aperture_inches", 10.0)
+                                      or 10.0) * 0.0254,
+                site_height_m=float(self._cfg_get("height", 0) or 0.0),
+                site_dark=self._cfg_get("cam_dark_current_e_s", None))
+            res = photometry.measure_plate(stack, cfg)
+            if not res.ok or res.mag is None:
+                per_obs.append(None)
+                continue
+            per_obs.append({"mag": float(res.mag),
+                            "err": float(res.err_total or 0.0),
+                            "n_comps": len([1 for e, _r in (res.used or [])
+                                            if (e.get("kind") or "comp")
+                                            == "comp"]),
+                            "check": (res.check or {}).get("verdict")})
+            if sp is not None:
+                # one magnitude per observation: it is what the MPC
+                # publishes, and the point is the observation
+                sp.mag = float(res.mag)
+                sp.band = band
+        good = [p for p in per_obs if p is not None]
         if not good:
             return None
-        # The object is faint on a single frame, so its curve carries
-        # bright outliers (measured on 2025 UR: the per-frame magnitudes
-        # span 16.8 to 18.4 while the truth is 18.0). The inverse-variance
-        # MEAN is dragged by them (it returned 17.29, 0.7 mag off); the
-        # MEDIAN returns 18.10, and its error comes from the MAD, not from
-        # a Gaussian nobody promised.
-        arr = np.asarray(good, dtype=float)
-        mag = float(np.median(arr))
-        err = outliers.median_error(arr)
-        if not math.isfinite(err) or err <= 0.0:
-            errs = [float(p.err) for p in (result.points or []) if p.err]
-            err = (float(np.median(errs)) / math.sqrt(len(arr))
-                   if errs else 0.0)
-        return {"mag": mag, "err": err, "band": band,
-                "n_comps": len(entries), "n_frames": len(arr),
-                "source": source}
+        mags = np.asarray([p["mag"] for p in good], dtype=float)
+        return {"mag": float(np.median(mags)),
+                "err": float(np.median([p["err"] for p in good])),
+                "band": band,
+                "n_comps": max(p["n_comps"] for p in good),
+                "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
+                "n_obs": len(good), "source": source, "per_obs": per_obs}
+
+    def _object_centre(self, sp, q, box):
+        # @args: sp - the astrometric point of the observation (or None),
+        #        q - the object's reference point, box - the stack's box
+        # @return: (x, y) in the STACK's own pixels, or None
+        # The astrometric measurement already found the object on this
+        # very stack: reusing its centroid puts the aperture on the light
+        # instead of on the ephemeris, which can be a couple of pixels
+        # away. Without it (the position was not measured) the ephemeris
+        # is the honest fallback, and the flag on the point says so.
+        import math
+        if sp is not None and sp.x is not None and sp.y is not None \
+                and math.isfinite(sp.x) and math.isfinite(sp.y):
+            return (float(sp.x) - box[0], float(sp.y) - box[1])
+        if q is None:
+            return None
+        return (float(q[0]) - box[0], float(q[1]) - box[1])
+
+    def _seeing(self, star_stack, entries, wcs_box):
+        # @args: star_stack - the stack aligned on the stars, entries - the
+        #        comps, wcs_box - the reference WCS shifted to that stack
+        #        (a core.wcs.Wcs: the plate recipe's currency)
+        # @return: the FWHM in px, or None
+        # The seeing is measured on the STAR stack and nowhere else: the
+        # comps are points there, and an aperture that follows the seeing
+        # must be sized by the same PSF the comps have (the object shares
+        # it: both stacks are the same frames on the same grid).
+        from ..core import photometry
+        spots = []
+        for e in entries:
+            star = e.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                spots.append(wcs_box.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if not spots:
+            return None
+        # "radial" and not "moments": on a noisy plate the median-subtracted
+        # window keeps a noise pedestal, and the second moments integrate it
+        # into a FWHM three or four times too large (measured on 2025 UR,
+        # whose sky noise is 261 ADU: moments said 13 px, radial says 2.7).
+        # The radial profile finds the half-maximum crossing instead, which
+        # is what the aperture rule actually needs.
+        return photometry.estimate_fwhm(star_stack, spots, method="radial")
+
+    def _radii(self, recipe, fwhm):
+        # @args: recipe - the project's photometry recipe, fwhm - the
+        #        seeing measured on the star stack
+        # @return: (rap, rin, rout) or None for the recipe's own defaults
+        # The rule is the Fotometria tab's, applied to a stack instead of
+        # to a plate: the observer's radii win, and only when they never
+        # touched them does the aperture follow the seeing.
+        from ..core import photometry
+        if recipe.get("seeing") and not recipe.get("radii_manual") and fwhm:
+            return photometry.aperture_for_fwhm(fwhm)
+        radii = (recipe.get("rap"), recipe.get("rin"), recipe.get("rout"))
+        if any(r is None for r in radii):
+            return None
+        return tuple(float(r) for r in radii)
 
     def run(self):
         import math
@@ -1316,22 +1424,23 @@ class TrackStackWorker(QThread):
                        boxes=boxes, qs=q_by_group, mids=mids, w0=w0,
                        frames=frames)
 
-            # --- the NEO's photometry: a SERIES with a moving target ------
-            # The stack is for the POSITION; the magnitude comes from the
-            # frames, because on a track & stack the comparison stars are
-            # TRAILS (measuring them there would be wrong). The series
-            # engine (ADR-048) already does per-frame zero points with an
-            # ensemble of comps, the MAD veto and honest errors, and it
-            # takes a moving target through cfg.target_motion: this is
-            # orchestration, not a second photometric recipe.
-            self.progress.emit("photometry", 0, 1)
-            phot = self._photometry(frames, w0, motion, q_all)
-            if phot is not None:
-                out["photometry"] = phot
-                for sp, _fp, _fl in points:
-                    sp.mag = phot.get("mag")
-                    sp.band = phot.get("band")
-            self.progress.emit("photometry", 1, 1)
+            # --- the NEO's brightness, measured on the stacks (D11/D7) ----
+            # The object reads on ITS stack, where its light is
+            # concentrated, and the comparison stars on a SECOND stack
+            # aligned on the stars, because on the object's stack they are
+            # streaks and a streak calibrates nothing. The recipe is the
+            # Fotometria tab's, so the apertures, the sky method, the
+            # centroid and the colour term are the observer's own.
+            if self._phot_enabled:
+                self.progress.emit("photometry", 0, 1)
+                phot = self._photometry(frames, groups, boxes, q_by_group,
+                                        stacks, points, ref, w0)
+                if phot is not None:
+                    out["photometry"] = phot
+                self.progress.emit("photometry", 1, 1)
+            else:
+                out["photometry"] = None
+                out["phot_skipped"] = True
 
             # --- the check, delegated to Find_Orb (D25) -------------------
             self.progress.emit("check", 0, 1)

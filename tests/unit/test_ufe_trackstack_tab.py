@@ -361,3 +361,53 @@ def test_the_run_paints_the_strip_the_magnitude_and_the_brightness(qapp,
               for i in range(tab._thumbs._row.count())
               if tab._thumbs._row.itemAt(i).widget() is not None]
     assert len(panels) == 2
+
+
+def test_the_brightness_row_says_what_the_run_will_measure_with(qapp,
+                                                               tmp_path):
+    # The recipe is read LIVE from the Photometry tab and shown BEFORE the
+    # run: a magnitude measured with a recipe nobody saw is a number
+    # nobody can question. The button is the deep link to the one editor.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    host.photometry_recipe = lambda: {"band": "G", "rap": 5.0, "rin": 9.0,
+                                      "rout": 14.0, "seeing": False,
+                                      "sky": "median"}
+    shown = []
+    host.show_tab = lambda name: shown.append(name)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._sync_recipe_row()
+    text = tab.lbl_recipe.text()
+    assert "G" in text and "5.0/9.0/14.0" in text and "median" in text
+    tab.btn_recipe.click()
+    assert shown == ["measure"]
+    # with the box off the row says what the run will NOT do, and it is
+    # disarmed: there is nothing to edit for a measurement that is not run
+    tab.chk_brightness.setChecked(False)
+    assert "positions only" in tab.lbl_recipe.text()
+    assert not tab.btn_recipe.isEnabled()
+
+
+def test_the_brightness_row_handles_a_recipe_that_sizes_from_the_seeing(
+        qapp, tmp_path):
+    # "From the seeing" is a CHOICE, not a number: the recipe hands the
+    # radii to the measured FWHM, so there is no triple to print.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    host.photometry_recipe = lambda: {"band": None, "seeing": True,
+                                      "radii_manual": False, "sky": "plane"}
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._sync_recipe_row()
+    assert "from the seeing" in tab.lbl_recipe.text()
+    # and with no host answering, the row says so instead of inventing one
+    host.photometry_recipe = None
+    tab._sync_recipe_row()
+    assert "defaults" in tab.lbl_recipe.text()

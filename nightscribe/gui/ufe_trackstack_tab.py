@@ -112,6 +112,14 @@ class UfeTrackStackTab(QWidget):
         self._thumbs.picked.connect(self._show_group)
         self.btn_blink = self._ui.btn_blink
         self.btn_blink.clicked.connect(self._on_blink)
+        # the brightness is measured with the recipe the Fotometria tab is
+        # holding: one editor in the app, read live, shown before the run
+        self.chk_brightness = self._ui.chk_brightness
+        self.lbl_recipe = self._ui.lbl_recipe
+        self.btn_recipe = self._ui.btn_recipe
+        self.btn_recipe.clicked.connect(self._on_edit_recipe)
+        self.chk_brightness.toggled.connect(lambda _on: self._sync_recipe_row())
+        self._sync_recipe_row()
         # the four combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
@@ -153,6 +161,7 @@ class UfeTrackStackTab(QWidget):
         #          shared stage (it belongs to this tab).
         if flag:
             self._sync_context()
+            self._sync_recipe_row()
         elif self._view is not None:
             self._view.clear_overlays()
 
@@ -186,6 +195,67 @@ class UfeTrackStackTab(QWidget):
         except Exception as err:
             logger.warning("astrometry hook failed: %s", err)
             return None
+
+    def _recipe(self):
+        # @return: the photometry recipe the Fotometria tab is holding right
+        #          now (band, apertures, sky method, centroid, colour term),
+        #          or None when there is no host to ask
+        # There is deliberately NO second copy of the recipe: the tab that
+        # has always edited it is the only editor, so the apertures the
+        # brightness is measured with cannot drift away from the ones the
+        # observer sees.
+        ask = getattr(host_of(self), "photometry_recipe", None)
+        if not callable(ask):
+            return None
+        try:
+            return ask()
+        except Exception as err:
+            logger.warning("photometry recipe hook failed: %s", err)
+            return None
+
+    def _on_edit_recipe(self):
+        # @return: None. The recipe is edited in the Photometry tab: this is
+        #          the deep link to it, nothing more.
+        show = getattr(host_of(self), "show_tab", None)
+        if callable(show):
+            show("measure")
+
+    def _sync_recipe_row(self):
+        # @return: None. The line says what the brightness WILL be measured
+        #          with, before the run: a recipe read silently is a number
+        #          nobody can question.
+        recipe = self._recipe() or {}
+        on = bool(self.chk_brightness.isChecked())
+        self.lbl_recipe.setEnabled(on)
+        self.btn_recipe.setEnabled(on)
+        if not on:
+            self.lbl_recipe.setText(self.tr(
+                "The brightness is not measured: this run reports "
+                "positions only."))
+            return
+        if not recipe:
+            self.lbl_recipe.setText(self.tr(
+                "Photometry recipe: the editor's defaults (open the "
+                "Photometry tab to see or change them)."))
+            return
+        band = recipe.get("band") or self.tr("the comps' own band")
+        self.lbl_recipe.setText(self.tr(
+            "Photometry recipe: %1 · apertures %2 px · sky %3").replace(
+                "%1", str(band)).replace(
+                "%2", self._recipe_radii_text(recipe)).replace(
+                "%3", str(recipe.get("sky") or "median")))
+
+    def _recipe_radii_text(self, recipe):
+        # @args: recipe - the photometry recipe
+        # @return: how the aperture is sized, in words
+        # "From the seeing" is a CHOICE, not a number: the recipe hands the
+        # radii to the measured FWHM, so there is no triple to print.
+        if recipe.get("seeing") and not recipe.get("radii_manual"):
+            return self.tr("from the seeing")
+        vals = [recipe.get("rap"), recipe.get("rin"), recipe.get("rout")]
+        if any(v is None for v in vals):
+            return self.tr("the defaults")
+        return "/".join(f"{float(v):.1f}" for v in vals)
 
     def _say(self, text):
         # @args: text - the status line's text ("" hides it)
@@ -340,7 +410,9 @@ class UfeTrackStackTab(QWidget):
             site=str(config.get("mpc_code", "")),
             final_size=int(self.cmb_final_size.currentData() or 0),
             margin=int(self.spn_margin.value()),
-            comps=ctx.get("comps"), target_mag=ctx.get("target_mag"))
+            comps=ctx.get("comps"), target_mag=ctx.get("target_mag"),
+            recipe=self._recipe(),
+            phot_enabled=self.chk_brightness.isChecked())
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -495,22 +567,28 @@ class UfeTrackStackTab(QWidget):
                     "%1", f"{det.snr:.1f}").replace("%2", f"{gate:.1f}"))
         phot = self._result.get("photometry")
         if phot is not None and phot.get("mag") is not None:
-            # The magnitude is measured on the FRAMES against the comps
-            # (on a track & stack the stars are trails), so it is a series
-            # run and its error is honest (ADR-048). Saying where the comps
-            # came from matters: an automatic proposal is a first guess.
+            # The magnitude comes from the STACKS (the object on its own,
+            # the comps on a second one aligned on the stars) and one
+            # measurement is made per observation, which is what the MPC
+            # publishes. Saying where the comps came from matters: an
+            # automatic proposal is a first guess, not the observer's own.
             origin = (self.tr("the project's sequence")
                       if phot.get("source") == "project"
                       else self.tr("an automatic proposal"))
             notes.append(self.tr(
-                "Brightness %1 ± %2 %3 from %4 comparison stars on %5 "
-                "frames (%6)").replace(
+                "Brightness %1 ± %2 %3 per observation (%4 observations, "
+                "%5 frames each) from %6 comparison stars · %7").replace(
                     "%1", f"{phot['mag']:.3f}").replace(
                     "%2", f"{phot.get('err') or 0:.3f}").replace(
                     "%3", str(phot.get("band") or "")).replace(
-                    "%4", str(phot.get("n_comps") or 0)).replace(
+                    "%4", str(phot.get("n_obs") or 0)).replace(
                     "%5", str(phot.get("n_frames") or 0)).replace(
-                    "%6", origin))
+                    "%6", str(phot.get("n_comps") or 0)).replace(
+                    "%7", origin))
+        elif self._result.get("phot_skipped"):
+            notes.append(self.tr(
+                "The brightness was not measured (the box is off): this "
+                "run reports positions only"))
         self.lbl_notes.setVisible(bool(notes))
         self.lbl_notes.setText("\n".join("• " + n for n in notes))
         # the viewer: one entry per observation, the first one on stage

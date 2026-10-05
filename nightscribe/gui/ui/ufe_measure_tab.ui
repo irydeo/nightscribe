@@ -241,6 +241,15 @@
    <item>
     <layout class="QHBoxLayout" name="row_result_actions">
      <item>
+      <widget class="QPushButton" name="btn_manual_mag">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Use for the report</string></property>
+       <property name="toolTip">
+        <string>Writes the magnitude measured HERE into the observation this stack belongs to, so the MPC report uses it instead of the one the run measured. The run's own value is kept beside it (the audit says who wrote what), and it only makes sense on a stack that came from an astrometry run</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="btn_export_more">
        <property name="toolTip">
         <string>What leaves this measurement: the CSV of the measured points and the AAVSO EFF report. They are the same two buttons as always, one click away</string>

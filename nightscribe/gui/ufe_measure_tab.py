@@ -263,6 +263,11 @@ class UfeMeasureTab(QWidget):
         # living in the Designer file (ADR-005). Same mechanism as the
         # window's doors (U2) and the series' one (U6).
         self.btn_export_more = self._ui.btn_export_more
+        # D: the write-back of a magnitude measured by hand. The button only
+        # lives when the plate is an astrometry stack that knows its run and
+        # its observation (see _sync_manual_button).
+        self.btn_manual_mag = self._ui.btn_manual_mag
+        self.btn_manual_mag.clicked.connect(self._on_manual_magnitude)
         self.btn_reset_more = self._ui.btn_reset_more
         self._door(self.btn_export_more, (self.btn_csv, self.btn_eff))
         self._door(self.btn_reset_more, (self.btn_reset_state,
@@ -605,9 +610,64 @@ class UfeMeasureTab(QWidget):
         self.btn_csv.setEnabled(flag)
         self.btn_eff.setEnabled(flag)
         self.btn_export_more.setEnabled(flag)
+        # the manual write-back needs the same magnitude plus the run and the
+        # observation in the stack's header
+        self._sync_manual_button()
         # the door shows it at once, not only when it opens
         from .widgets.door_menu import refresh_door
         refresh_door(self.btn_export_more)
+
+    def _manual_target(self):
+        # @return: (run_id, group_index) when this plate is an astrometry
+        #          stack that knows which observation it is, or None
+        # The run's id and the observation travel in the stack's own header
+        # (NS_RUN / NS_NOBS): the tab never guesses from a file name.
+        header = getattr(self._state, "header", None) or {}
+        run = header.get("NS_RUN")
+        obs = header.get("NS_NOBS")
+        if run is None or obs is None:
+            return None
+        try:
+            return int(run), int(obs) - 1
+        except (TypeError, ValueError):
+            return None
+
+    def _sync_manual_button(self):
+        # @return: None. The button writes the measurement THIS plate shows
+        #          into the observation the stack belongs to, so it needs all
+        #          three: a calibrated measurement, the run and the
+        #          observation in the header, and a host to write it.
+        host = host_of(self)
+        can = (self._last is not None and self._last.get("mag") is not None
+               and self._manual_target() is not None
+               and callable(getattr(host, "manual_magnitude", None)))
+        self.btn_manual_mag.setEnabled(bool(can))
+
+    def _on_manual_magnitude(self):
+        # @return: None. The observer measured the brightness by hand and
+        #          says the report should use it: the tab asks the host (it
+        #          never touches the database) and says what happened.
+        target = self._manual_target()
+        if target is None or self._last is None:
+            return
+        write = getattr(host_of(self), "manual_magnitude", None)
+        if not callable(write):
+            return
+        run_id, group = target
+        mag = float(self._last.get("mag"))
+        band = self._last.get("band") or self._band
+        try:
+            done = bool(write(run_id, group, mag, band))
+        except Exception as err:
+            logger.warning("the manual magnitude failed: %s", err)
+            done = False
+        if done:
+            self._say(self.tr(
+                "The report will use this measurement: %1 %2").replace(
+                    "%1", f"{mag:.3f}").replace("%2", str(band or "")))
+        else:
+            self._say(self.tr(
+                "The measurement could not be written to the observation."))
 
     # -------------------------------------------------- resets (ADR-047)
 

@@ -2453,3 +2453,29 @@ def test_a_track_stack_reads_the_comps_on_its_pair(dlg, tmp_path):
     _click(dlg, *dlg._test_target)
     assert dlg.tab_measure._last is not None
     assert dlg.tab_measure._last.get("mag") is not None
+
+
+def test_the_measurement_can_be_sent_to_the_report(dlg):
+    # D: the observer measured the brightness by hand and says the report
+    # should use it. The button only lives on a stack that KNOWS its run and
+    # its observation (NS_RUN / NS_NOBS, written by the astrometry tab), and
+    # it asks the HOST to write it: the tab never touches the database.
+    dlg.state.header["NS_RUN"] = 8
+    dlg.state.header["NS_NOBS"] = 1
+    calls = []
+
+    def _write(run_id, group, mag, band):
+        calls.append((run_id, group, round(float(mag), 3), band))
+        return True
+
+    dlg.manual_magnitude = _write
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert dlg.tab_measure.btn_manual_mag.isEnabled()
+    dlg.tab_measure.btn_manual_mag.click()
+    assert calls and calls[0][0] == 8 and calls[0][1] == 0
+    assert "report will use" in dlg.tab_measure.lbl_status.text()
+    # a plate that is not an astrometry stack has no run to write to
+    dlg.state.header.pop("NS_RUN")
+    dlg.tab_measure._sync_manual_button()
+    assert not dlg.tab_measure.btn_manual_mag.isEnabled()

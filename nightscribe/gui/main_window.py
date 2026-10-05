@@ -10161,6 +10161,12 @@ class MainWindow(QMainWindow):
             undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
             if callable(undo_hook):
                 undo_hook(self._ufe_astrometry_undo)
+            # D: a brightness measured by hand in the Photometry tab can
+            # take over the one the report uses, with the run's own value
+            # kept beside it
+            manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
+            if callable(manual_hook):
+                manual_hook(self._ufe_manual_magnitude)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10227,6 +10233,9 @@ class MainWindow(QMainWindow):
             undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
             if callable(undo_hook):
                 undo_hook(None)
+            manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
+            if callable(manual_hook):
+                manual_hook(None)
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
@@ -10726,6 +10735,24 @@ class MainWindow(QMainWindow):
         logger.info("astrometry run %s persisted (%d points, %d frames)",
                     run_id, len(rows), len(frame_rows))
         return run_id
+
+    def _ufe_manual_magnitude(self, run_id, group_index, mag, band=None):
+        # @args: run_id - the execution, group_index - the observation,
+        #        mag - the magnitude measured by hand in the Photometry tab,
+        #        band - its band
+        # @return: True when the observation took it. The EFFECTIVE
+        #          magnitude moves and the run's own value stays in mag_auto:
+        #          the report uses the first, the audit keeps both, and
+        #          nothing is sent without its trace (D).
+        from ..core import astrometry_store as store
+        try:
+            return bool(store.set_manual_magnitude(db, int(run_id),
+                                                   int(group_index),
+                                                   float(mag), band))
+        except Exception as err:
+            logger.warning("the manual magnitude could not be stored: %s",
+                           err)
+            return False
 
     def _ufe_astrometry_undo(self, run_id):
         # ADR-062, phase 8 (D14): undo THIS execution, its points and its

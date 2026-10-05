@@ -524,7 +524,8 @@ def test_the_result_row_keeps_two_doors_and_the_buttons_are_reachable():
     row = t._ui.row_result_actions
     in_row = [row.itemAt(i).widget().objectName() for i in range(row.count())
               if row.itemAt(i).widget() is not None]
-    assert in_row == ["btn_export_more", "btn_reset_more", "btn_save_project"]
+    assert in_row == ["btn_manual_mag", "btn_export_more", "btn_reset_more",
+                    "btn_save_project"]
     assert [a.data() for a in t.btn_export_more.menu().actions()] == [
         "btn_csv", "btn_eff"]
     assert [a.data() for a in t.btn_reset_more.menu().actions()] == [

@@ -662,11 +662,14 @@ class UfeTrackStackTab(QWidget):
                       + str(self._result.get("error") or ""))
             return
         if status == "not_detected":
-            self._paint_not_detected()
+            # the run is persisted FIRST: its id is what the stacks carry in
+            # their NS_RUN card, and the stacks are written when the result
+            # is painted
             self._persist_run(self._result)
+            self._paint_not_detected()
             return
-        self._paint_run()
         self._persist_run(self._result)
+        self._paint_run()
 
     def _persist_run(self, payload):
         # ADR-062, phase 8: the HOST writes the run (the tab never touches
@@ -876,6 +879,11 @@ class UfeTrackStackTab(QWidget):
                 hdu.header["NS_NFRAM"] = (
                     int(groups[index][1] - groups[index][0]),
                     "frames in this stack")
+            # WHICH run this stack came from, so the Photometry tab can write
+            # a brightness measured by hand back to the right observation
+            if self._run_id is not None:
+                hdu.header["NS_RUN"] = (int(self._run_id),
+                                        "the astrometry run it belongs to")
             hdu.writeto(str(path), overwrite=True)
         except Exception as err:     # a stack that cannot be written says so
             logger.warning("group stack write failed: %s", err)
@@ -1028,6 +1036,9 @@ class UfeTrackStackTab(QWidget):
                 hdu.header["OBJECT"] = str(name)
             hdu.header["NS_NOBS"] = (int(index) + 1,
                                      "observation of the visit")
+            if self._run_id is not None:
+                hdu.header["NS_RUN"] = (int(self._run_id),
+                                        "the astrometry run it belongs to")
             hdu.writeto(str(path), overwrite=True)
         except Exception as err:
             logger.warning("star stack write failed: %s", err)

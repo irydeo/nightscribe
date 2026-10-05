@@ -1085,6 +1085,27 @@ class UfeDialog(QWidget):
             logger.warning("astrometry undo hook failed: %s", err)
             return None
 
+    def set_manual_magnitude_hook(self, fn):
+        # @args: fn - callable(run_id, group_index, mag, band) -> True when
+        #        the observation took it, or None
+        # @return: None. The host writes it into astrometry_points (the
+        #          effective magnitude moves, the automatic one stays), so
+        #          the tab never touches the database.
+        self._manual_magnitude_hook = fn if callable(fn) else None
+
+    def manual_magnitude(self, run_id, group_index, mag, band=None):
+        # @args: run_id - the execution, group_index - the observation,
+        #        mag - the magnitude measured by hand, band - its band
+        # @return: True when the observation took it
+        if self._manual_magnitude_hook is None:
+            return False
+        try:
+            return bool(self._manual_magnitude_hook(run_id, group_index, mag,
+                                                    band))
+        except Exception as err:
+            logger.warning("manual magnitude hook failed: %s", err)
+            return False
+
     # ----------------------------------------------------- visit frames
 
     def _wire_frame_nav(self):

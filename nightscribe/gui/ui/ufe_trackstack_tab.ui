@@ -179,6 +179,24 @@
        </layout>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="row_starstack">
+        <item>
+         <widget class="QCheckBox" name="chk_starstack">
+          <property name="text"><string>Keep the star stack</string></property>
+          <property name="toolTip">
+           <string>Saves a second stack of the same frames, aligned on the STARS, next to each observation's stack. It costs one more stacking pass and it is what the Photometry tab needs to measure the brightness by hand (there the object's stack has its stars as trails). The run measures with it too, so nothing is built twice</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="hsp_starstack">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
        <layout class="QHBoxLayout" name="row_recipe">
         <item>
          <widget class="QLabel" name="lbl_recipe">

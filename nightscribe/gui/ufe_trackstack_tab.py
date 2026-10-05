@@ -136,6 +136,7 @@ class UfeTrackStackTab(QWidget):
         # the brightness is measured with the recipe the Fotometria tab is
         # holding: one editor in the app, read live, shown before the run
         self.chk_brightness = self._ui.chk_brightness
+        self.chk_starstack = self._ui.chk_starstack
         self.lbl_recipe = self._ui.lbl_recipe
         self.btn_recipe = self._ui.btn_recipe
         self.btn_recipe.clicked.connect(self._on_edit_recipe)
@@ -592,7 +593,8 @@ class UfeTrackStackTab(QWidget):
             margin=int(self.spn_margin.value()),
             comps=ctx.get("comps"), target_mag=ctx.get("target_mag"),
             recipe=self._recipe(),
-            phot_enabled=self.chk_brightness.isChecked())
+            phot_enabled=self.chk_brightness.isChecked(),
+            save_star_stack=self.chk_starstack.isChecked())
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -627,6 +629,7 @@ class UfeTrackStackTab(QWidget):
             "sweep": self.tr("Sweeping the velocity…"),
             "groups": self.tr("Stacking each observation…"),
             "measure": self.tr("Measuring the positions…"),
+            "starstack": self.tr("Stacking the stars…"),
             "photometry": self.tr("Measuring the brightness…"),
             "check": self.tr("Checking against other observers…"),
         }.get(key, "")
@@ -896,9 +899,15 @@ class UfeTrackStackTab(QWidget):
             notify = getattr(host_of(self), "notify_saved", None)
             if callable(notify):
                 notify([str(path)], "stack")
+        # The star stack of the same observation, when the run kept one: it
+        # is the plate the Photometry tab needs to measure the pair by hand
+        # (on the object's stack the comps are trails). It is written when
+        # the observation is shown, like the object's stack, and registered
+        # in the visit with the same kind.
+        self._write_star_stack(index, result)
 
-    def _stack_path(self, index):
-        # @args: index - the group's index
+    def _stack_path(self, index, stars=False):
+        # @args: index - the group's index, stars - True for the star stack
         # @return: where the group's stack is written: the project's own
         #          folder when the host points at one (it lands next to the
         #          rest of the project and survives a restart), the system
@@ -916,9 +925,9 @@ class UfeTrackStackTab(QWidget):
             base.mkdir(parents=True, exist_ok=True)
         except OSError:
             base = Path(tempfile.gettempdir())
-        return base / self._stack_name(index)
+        return base / self._stack_name(index, stars=stars)
 
-    def _stack_name(self, index):
+    def _stack_name(self, index, stars=False):
         # @args: index - the group's index
         # @return: a file name that says what the stack IS: the object, the
         #          observation number and its mid time. "stack_obs2.fits"
@@ -933,9 +942,59 @@ class UfeTrackStackTab(QWidget):
         mjd = mids[index] if 0 <= index < len(mids) else None
         if mjd:
             from datetime import datetime, timedelta
-            ut = datetime(1858, 11, 17) + timedelta(days=float(mjd))
-            stamp = "_" + ut.strftime("%Y%m%dT%H%M%S")
-        return f"{slug}_obs{index + 1}{stamp}.fits"
+            # The run's mids are JULIAN dates (the engine's own currency) and
+            # the file name wants the UT, so the MJD offset comes off here.
+            # Using the JD as if it were an MJD named the stacks year 8596:
+            # the author's own files read 2025UR_obs1_85961010T094820.
+            try:
+                ut = datetime(1858, 11, 17) + timedelta(days=float(mjd)
+                                                        - 2400000.5)
+                stamp = "_" + ut.strftime("%Y%m%dT%H%M%S")
+            except (OverflowError, ValueError, OSError):
+                # a mid outside the calendar (a test fixture, a corrupt
+                # header) must not cost the stack its name: the stamp is a
+                # nicety, the object and the observation number are not
+                stamp = ""
+        return f"{slug}_obs{index + 1}{stamp}{'_stars' if stars else ''}.fits"
+
+    def _write_star_stack(self, index, result):
+        # @args: index - the observation, result - the run's payload
+        # @return: the path written, or None when the run kept no star stack
+        # The second alignment of the same frames, saved as its own file so
+        # the Photometry tab can read the comps on it. It carries the same
+        # WCS (same box, same grid) and says what it is, so opening it never
+        # asks a solver for stars that are, on the other stack, trails.
+        import numpy as np
+        stacks = result.get("star_stacks") or []
+        if index >= len(stacks) or stacks[index] is None:
+            return None
+        stack, _rep = stacks[index]
+        if stack is None:
+            return None
+        path = self._stack_path(index, stars=True)
+        try:
+            from astropy.io import fits
+            hdu = fits.PrimaryHDU(np.asarray(stack, dtype=np.float32))
+            wcss = result.get("wcs_by_group") or []
+            if index < len(wcss) and wcss[index] is not None:
+                hdu.header.update(wcss[index].to_header())
+            hdu.header["NS_STACK"] = (
+                "stars", "track & stack: the stars are points, the object "
+                "trails")
+            name = (self._context() or {}).get("object_name")
+            if name:
+                hdu.header["OBJECT"] = str(name)
+            hdu.header["NS_NOBS"] = (int(index) + 1,
+                                     "observation of the visit")
+            hdu.writeto(str(path), overwrite=True)
+        except Exception as err:
+            logger.warning("star stack write failed: %s", err)
+            return None
+        if self._view is not None:
+            notify = getattr(host_of(self), "notify_saved", None)
+            if callable(notify):
+                notify([str(path)], "stack")
+        return path
 
     def _on_blink(self):
         # @return: None. The figure is the honest way to look at a run

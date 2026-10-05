@@ -603,3 +603,46 @@ def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
     tab.txt_notes.setPlainText("\n".join("• note %d" % i for i in range(40)))
     qapp.processEvents()
     assert tab.txt_notes.height() <= tab.txt_notes.maximumHeight()
+
+
+def test_the_star_stack_is_saved_next_to_the_object_stack(qapp, tmp_path):
+    # C3: when the run kept the star stack (the observer asked for it to
+    # measure by hand in the Photometry tab), the tab writes it as its own
+    # file, with the same WCS and its own word about what it is, and
+    # registers it in the visit.
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2025 UR"}
+    host.export_folder = lambda: str(tmp_path)
+    saved = []
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", view=UfeImageView(state),
+                           parent=host)
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cd = [[-1e-4, 0.0], [0.0, 1e-4]]
+    w.pixel_shape = (16, 16)
+    obj = np.zeros((16, 16), dtype=np.float32)
+    stars = np.ones((16, 16), dtype=np.float32)
+    tab._result = {"stacks": [(obj, None)], "points": [], "n_failed": 0,
+                   "groups": [(0, 5)], "mids": [2460965.5],
+                   "wcs_by_group": [w], "star_stacks": [(stars, None)]}
+    tab._show_group(0)
+    # the name carries the observation's UT: the run's mids are JULIAN
+    # dates and the MJD offset is what turns 2460965.5 into 2025-10-17
+    star_path = tmp_path / "2025UR_obs1_20251017T000000_stars.fits"
+    assert star_path.exists()
+    header = fits.getheader(str(star_path))
+    assert header["NS_STACK"] == "stars"
+    assert header["CRVAL1"] == pytest.approx(30.0)
+    assert any(p.endswith("_stars.fits") and kind == "stack"
+               for paths, kind in saved for p in paths)

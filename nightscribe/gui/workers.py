@@ -1009,7 +1009,7 @@ class TrackStackWorker(QThread):
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
-                 phot_enabled=True):
+                 phot_enabled=True, save_star_stack=False):
         super().__init__()
         self._paths = list(paths)
         self._name = name
@@ -1031,6 +1031,10 @@ class TrackStackWorker(QThread):
         self._target_mag = target_mag
         self._recipe = dict(recipe or {})
         self._phot_enabled = bool(phot_enabled)
+        # the star stack, kept on demand: the observer wants to measure the
+        # brightness by hand in the Photometry tab later, and that needs the
+        # same frames aligned on the stars, saved next to the object's stack
+        self._save_star_stack = bool(save_star_stack)
         self._cancel = False
         self._solve_cancel = None   # SolveCancel while the solver runs
 
@@ -1051,7 +1055,8 @@ class TrackStackWorker(QThread):
 
     # --------------------------------------------------------- brightness
 
-    def _photometry(self, frames, groups, boxes, qs, stacks, points, ref, w0):
+    def _photometry(self, frames, groups, boxes, qs, stacks, points, ref, w0,
+                    star_stacks=None):
         # @args: frames - the sequence, groups - the observation split,
         #        boxes - the output box per observation, qs - the object's
         #        reference point per observation, stacks - the object's
@@ -1138,16 +1143,33 @@ class TrackStackWorker(QThread):
                 per_obs.append(None)
                 continue
             wcs_box = wcs_mod.Wcs.from_astropy(_shift_wcs(w0, box))
-            windows = self._comp_windows(frames, groups[index], entries,
-                                         wcs_box, shape)
-            if not windows:
-                per_obs.append(None)
-                continue
-            fwhm = self._seeing(windows)
+            star_stack = (star_stacks[index][0]
+                          if star_stacks and index < len(star_stacks)
+                          else None)
+            if star_stack is not None:
+                # The observer asked for the star stack to be KEPT (to
+                # measure by hand later), so the full one is already here:
+                # the comps read on it and the small windows are not built.
+                # Nothing is built twice.
+                comp_entries = list(entries)
+                comp_images = None
+                fwhm = self._seeing_on_stack(star_stack, comp_entries,
+                                             wcs_box)
+            else:
+                windows = self._comp_windows(frames, groups[index], entries,
+                                             wcs_box, shape)
+                if not windows:
+                    per_obs.append(None)
+                    continue
+                comp_entries = [w[0] for w in windows]
+                comp_images = [w[1:] for w in windows]
+                star_stack = None
+                fwhm = self._seeing(windows)
             cfg = photometry.PlateConfig(
                 target_xy=centre,
-                entries=[w[0] for w in windows],
-                comp_images=[w[1:] for w in windows],
+                entries=comp_entries,
+                comp_images=comp_images,
+                comp_image=star_stack,
                 header=ref.header, wcs=wcs_box, band=band,
                 fallback_band=band, radii=self._radii(recipe, fwhm),
                 fwhm=fwhm,
@@ -1258,6 +1280,27 @@ class TrackStackWorker(QThread):
         except (TypeError, ValueError):
             rout = 0
         return max(int(photometry.R_ANN_OUT), rout, _WINDOW_MIN_HALF)
+
+    def _seeing_on_stack(self, star_stack, entries, wcs_box):
+        # @args: star_stack - the full stack aligned on the stars, entries -
+        #        the comps, wcs_box - the reference WCS shifted to it
+        # @return: the FWHM in px (the median over the comps), or None
+        # Same job as _seeing, on the whole star stack instead of on the
+        # per-comp windows: used when the observer asked to KEEP the star
+        # stack, so there is no reason to build the windows as well.
+        from ..core import photometry
+        spots = []
+        for e in entries:
+            star = e.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                spots.append(wcs_box.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if not spots:
+            return None
+        return photometry.estimate_fwhm(star_stack, spots)
 
     def _seeing(self, windows):
         # @args: windows - [(entry, image, x, y), ...] as built by
@@ -1495,9 +1538,30 @@ class TrackStackWorker(QThread):
             # Fotometria tab's, so the apertures, the sky method, the
             # centroid and the colour term are the observer's own.
             if self._phot_enabled:
+                # --- the STAR stacks, when the observer wants to keep them
+                # The same frames, the same method, aligned on the stars:
+                # the only place the comps are POINTS, and what the
+                # Photometry tab needs to measure the pair by hand. They are
+                # built here, before the measurement, so the measurement can
+                # USE them and nothing is built twice.
+                star_stacks = []
+                if self._save_star_stack:
+                    self.progress.emit("starstack", 0, len(groups))
+                    star_stacks = track_stack.stack_groups(
+                        frames, groups, q_by_group, self._method, boxes,
+                        shape, cfg=self._cfg, track=False,
+                        progress=lambda d, t, _l: self.progress.emit(
+                            "starstack", d, t),
+                        cancel=lambda: self._cancel)
+                    if self._cancel or len(star_stacks) < len(groups):
+                        out["status"] = "cancelled"
+                        self.finished.emit(out)
+                        return
+                    out["star_stacks"] = star_stacks
                 self.progress.emit("photometry", 0, 1)
                 phot = self._photometry(frames, groups, boxes, q_by_group,
-                                        stacks, points, ref, w0)
+                                        stacks, points, ref, w0,
+                                        star_stacks=star_stacks)
                 if phot is not None:
                     out["photometry"] = phot
                 self.progress.emit("photometry", 1, 1)

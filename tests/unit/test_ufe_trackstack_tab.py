@@ -450,15 +450,15 @@ def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
 
 def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
     # ADR-038: three levels. The nightly flow stays in the column (the
-    # plan with its one-line SNR, the run, the result, the report) and the
-    # knobs most observers never touch go into blocks that say what they
-    # hold. The STACKING SETTINGS open by default (the method, the field,
-    # the margin, the brightness and the recipe are the planning
-    # decisions); the three that are READ, not chosen, start folded.
+    # plan with its one-line SNR and the run, and the result with the
+    # report) and the knobs most observers never touch go into blocks that
+    # say what they hold. The STACKING SETTINGS open by default (the
+    # method, the field, the margin, the brightness and the recipe are the
+    # planning decisions); the three that are READ, not chosen, start
+    # folded.
     tab, _host = _tab(qapp, tmp_path)
     assert tab.btn_stack.isVisibleTo(tab)          # the primary action
     assert tab.lbl_snr_line.isVisibleTo(tab)       # the plan, in one line
-    assert tab.btn_report.isVisibleTo(tab)         # the outcome
     assert len(tab._sections) == 4
     assert tab._sections["advanced"]._expanded
     for key in ("snr", "check", "report"):
@@ -474,12 +474,39 @@ def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
 
 
 def test_the_result_area_starts_hidden(qapp, tmp_path):
-    # An empty grid and a blank strip say nothing, and in a 380 px column
-    # they are noise: they appear WITH the result and go away with it.
+    # An empty grid and a blank strip say nothing, and neither does a check
+    # or a report about something that has not happened yet: before a run
+    # this column is the PLAN, and the result arrives whole or not at all.
     tab, _host = _tab(qapp, tmp_path)
     assert not tab.tbl_points.isVisibleTo(tab)
     assert not tab.lbl_points_title.isVisibleTo(tab)
     assert not tab._thumbs.isVisibleTo(tab)
+    assert not tab.cmb_group.isVisibleTo(tab)      # which stack to look at
+    assert not tab._check_section.isVisibleTo(tab)
+    assert not tab._ui.grp_report.isVisibleTo(tab)
+    assert not tab._sections["report"].isVisibleTo(tab)
+
+
+def test_nothing_absorbs_the_extra_height_of_a_tall_window(qapp, tmp_path):
+    # The column ends with a vertical STRETCH that collects the extra space
+    # of a tall window. Dropping it (a QSpacerItem is neither a widget nor
+    # a layout, and the move into the scroll area missed it) let Qt hand
+    # that space to whatever could grow: the observations row came out
+    # 141 px tall and pushed the Stack button out of sight, behind a black
+    # void. A tall, narrow window is where it shows.
+    tab, _host = _tab(qapp, tmp_path)
+    tab.resize(380, 900)
+    tab.show()
+    qapp.processEvents()
+    area = tab.layout().itemAt(0).widget()
+    inner = area.widget()
+    lay = inner.layout()
+    last = lay.itemAt(lay.count() - 1)
+    assert last.spacerItem() is not None, "the column must end with a stretch"
+    # and the primary action is inside the view, not behind the void
+    assert tab.btn_stack.y() + tab.btn_stack.height() \
+        < area.viewport().height()
+    tab.hide()
 
 
 def test_the_column_fits_the_narrow_panel_it_lives_in(qapp, tmp_path):

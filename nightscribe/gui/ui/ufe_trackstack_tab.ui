@@ -75,25 +75,6 @@
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="row_run">
-     <item>
-      <spacer name="hsp_run">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_stack">
-       <property name="enabled"><bool>false</bool></property>
-       <property name="text"><string>Stack the sequence</string></property>
-       <property name="toolTip">
-        <string>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
     <widget class="QWidget" name="sec_snr_content" native="true">
      <layout class="QVBoxLayout" name="vbox_snr">
       <property name="leftMargin"><number>0</number></property>
@@ -214,6 +195,25 @@
       </item>
      </layout>
     </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_run">
+     <item>
+      <spacer name="hsp_run">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_stack">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Stack the sequence</string></property>
+       <property name="toolTip">
+        <string>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item>
     <widget class="QProgressBar" name="prg_stack">

@@ -171,6 +171,9 @@ class UfeTrackStackTab(QWidget):
         self._check_section = self._sections["check"]
         from .widgets.door_menu import build_door
         build_door(self.btn_more, [self.btn_blink, self.btn_undo])
+        # before a run this column is the PLAN: the result arrives whole or
+        # not at all, and a check with no run is a paragraph about nothing
+        self._show_result_area(False)
         self._make_scrollable()
 
     def _make_scrollable(self):
@@ -189,9 +192,16 @@ class UfeTrackStackTab(QWidget):
             item = lay.takeAt(0)
             widget = item.widget()
             if widget is not None:
-                box.addWidget(widget)
-            elif item.layout() is not None:
-                box.addItem(item.layout())
+                box.addWidget(widget)      # reparents it into the inner
+            else:
+                # A nested layout OR a SPACER: both move as they are. The
+                # trailing spacer is the one that collects the extra space
+                # at the bottom of the column; dropping it (a QSpacerItem
+                # is neither a widget nor a layout) handed that space to
+                # whatever could grow, and the observations row came out
+                # 141 px tall in a tall window, pushing the Stack button
+                # out of sight behind a black void.
+                box.addItem(item)
         area = QScrollArea(self)
         area.setWidgetResizable(True)
         area.setFrameShape(QFrame.NoFrame)
@@ -231,12 +241,21 @@ class UfeTrackStackTab(QWidget):
 
     def _show_result_area(self, flag):
         # @args: flag - True when there is a result to show
-        # @return: None. The empty containers say nothing: an empty grid and
-        #          a blank strip are noise in a 380 px column, so they
-        #          appear WITH the result and go away with it.
+        # @return: None. The empty containers say nothing, and neither do
+        #          the ones that talk about something that has not happened
+        #          yet (a check with no run, a report with nothing in it):
+        #          before a run this column is the PLAN, and the result
+        #          arrives whole or not at all.
         self.lbl_points_title.setVisible(flag)
         self.tbl_points.setVisible(flag)
         self._thumbs.setVisible(flag)
+        # the row that chooses WHICH stack to look at is part of the result
+        # too (there is nothing to choose before the run)
+        self._ui.lbl_view.setVisible(flag)
+        self.cmb_group.setVisible(flag)
+        self._check_section.setVisible(flag)
+        self._ui.grp_report.setVisible(flag)
+        self._sections["report"].setVisible(flag)
 
     def _wrap_section(self, name, title, key, open_by_default=False):
         # @args: name - the .ui container's objectName, title - the block's

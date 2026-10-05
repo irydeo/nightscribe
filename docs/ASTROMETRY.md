@@ -55,23 +55,37 @@ project). No visit, no series: that is the house rule.
    and shifts each frame so the object always lands on the same point. You
    can pick the combination: **sigma-clipped** (the professional standard:
    nearly all of the mean's signal with the median's cleanliness), median
-   (fast, for trying), mean or sum. Mean and sum differ only in scale.
+   (fast, for trying), mean or sum. Mean and sum differ only in scale. The
+   final stack of each observation covers the **whole frame** by default,
+   which is what the photometry needs (comparison stars all around); short
+   on memory or time you can shrink it to 1024, 512 or 256 px, and the
+   velocity sweep keeps working on the object's own trail cutout.
 4. **Velocity sweep.** The ephemeris and the mount have real small drifts,
    so 25 combinations (±5 %) around the theoretical velocity are tried and
    the one that gives a brighter **and** rounder object is kept. That is the
    fine tuning.
 5. **Centred sequence.** A GIF or a montage of the N observations, all
    centred on the object: if it is there in every panel the detection is
-   solid; if one panel is empty, you see it.
+   solid; if one panel is empty, you see it. The tab also carries a **strip
+   of thumbnails** with the N observations at one stretch: clicking one
+   brings it to the main view to work on it.
 6. **Measurement.** The object is measured twice: on the final stack and
    frame by frame. Both use the same centroid, so their comparison means
    something. If they differ by more than 0.5″ or 3σ, the point is flagged.
-7. **Check.** NightScribe downloads the object's published observations (or
+7. **Brightness.** The magnitude is measured on the frames, **not** on the
+   stack: on a stack that follows the object the comparison stars are
+   trails, and measuring them there would be wrong. The series engine is
+   reused, so every frame is calibrated against a set of comps (with a MAD
+   veto) and the **median** of the curve is taken, with its error from the
+   MAD. The comps come from the sequence you have saved in the project; with
+   none, the app proposes one automatically and says so, because an
+   automatic proposal is a starting point, not your choice.
+8. **Check.** NightScribe downloads the object's published observations (or
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your
    residual with the others' cloud. Outside the cloud, the report is
    blocked by default.
-8. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
+9. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
    validated with the same validator as always and sent to the visit's MPC
    block. You do the sending.
 
@@ -92,6 +106,11 @@ project). No visit, no series: that is the house rule.
   timing).
 - **Magnitude limit**: how deep the stack went. It is useful even with no
   object: it says whether the night could have given more.
+- **Brightness**: the object's magnitude measured on the frames against the
+  comps, with its band (Gaia G when the comps are Gaia's, the usual case
+  with a Clear filter). It comes with the number of comps and frames behind
+  it, and with its error: if the object is very faint per frame, the error
+  says so instead of hiding it.
 - **Distinct observatories and last observation** (on the object card):
   many and recent means a live, well-determined object; one and months ago,
   a candidate to be lost.
@@ -104,6 +123,11 @@ project). No visit, no series: that is the house rule.
 - **The check filters, it does not prove**: the MPC itself warns that on a
   short arc a wrong observation fits just as well. The real proof is a high
   SNR and seeing the object in the centred sequence.
+- **A very faint object's brightness is noisy**: if the object barely shows
+  in a single frame (SNR of 2 or 3), its per-frame magnitude scatters widely
+  and the final figure depends on how many frames go in. The position
+  suffers less, because the stack does add signal. If the brightness really
+  matters, lengthen the sequence or ask for fewer observations.
 - **No reference does not block**: if the object is a discovery and nobody
   else has seen it, the check says there is nothing to compare with and does
   not block; the SNR and the sequence decide.

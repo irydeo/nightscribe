@@ -55,22 +55,36 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    mismo punto. Puedes elegir el método de combinación: **sigma-clipped**
    (el estándar profesional: casi toda la señal de la media y la limpieza de
    la mediana), mediana (rápido, para probar), media o suma. La media y la
-   suma dan la misma señal salvo la escala.
+   suma dan la misma señal salvo la escala. El apilado final de cada
+   observación cubre por defecto el **fotograma completo**, que es lo que
+   necesita la fotometría (comparsas alrededor); si vas justo de memoria o
+   de tiempo puedes reducirlo a 1024, 512 o 256 px, y el barrido de
+   velocidad seguirá trabajando sobre el recorte de la estela del objeto.
 4. **Barrido de velocidad.** La efeméride y la montura tienen pequeñas
    derivas reales, así que alrededor de la velocidad teórica se prueban 25
    combinaciones (±5 %) y se elige la que da un objeto más brillante **y**
    más redondo. Es el *fine-tuning*.
 5. **Secuencia centrada.** Se monta un GIF o un montaje con las N
    observaciones, todas centradas en el objeto: si está en todas, la
-   detección es sólida; si en alguna no, se ve.
+   detección es sólida; si en alguna no, se ve. En la pestaña tienes además
+   una **tira de miniaturas** con las N observaciones al mismo estirado:
+   pinchar una la lleva a la vista principal para trabajar sobre ella.
 6. **Medida.** El objeto se mide dos veces: sobre el stack final y frame a
    frame. Las dos usan el mismo centroide, así que su comparación dice algo.
    Si difieren más de 0,5″ o 3σ, el punto se marca.
-7. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
+7. **Brillo.** La magnitud se mide sobre las tomas, **no** sobre el stack: en
+   un apilado que sigue al objeto las estrellas de comparación son trazos, y
+   medirlas ahí sería un error. Se reutiliza el motor de series, que calibra
+   cada toma con un conjunto de comparsas (con veto por MAD), y se toma la
+   **mediana** de la curva, con su error del MAD. Las comparsas salen de la
+   secuencia que tengas guardada en el proyecto; si no hay, la app propone
+   una automáticamente y lo dice, porque una propuesta automática es un
+   punto de partida, no tu elección.
+8. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube
    de los demás. Si estás fuera de la nube, bloquea el reporte por defecto.
-8. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
+9. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
    con el mismo validador de siempre y se envía al bloque MPC de la visita.
    El envío lo haces tú.
 
@@ -91,6 +105,11 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   (centroide, WCS, tiempo).
 - **Magnitud límite**: hasta dónde llegaba la pila. Es útil aunque no haya
   objeto: dice si la noche daba para más.
+- **Brillo**: la magnitud del objeto medida sobre las tomas contra las
+  comparsas, con su banda (Gaia G cuando las comparsas son de Gaia, que es
+  lo normal con filtro Clear). Viene con el número de comparsas y de tomas
+  que la sostienen, y con su error: si el objeto es muy débil por toma, el
+  error lo dice y no se disimula.
 - **Observatorios distintos y última observación** (en la ficha del objeto):
   muchos y reciente significa objeto vivo y bien determinado; uno solo y
   hace meses, candidato a perderse.
@@ -108,6 +127,11 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   bloquea; deciden el SNR y la secuencia.
 - **Un objeto recuperado tras meses** puede tener la órbita derivada: un
   residuo grande puede ser de la órbita, no tuyo.
+- **El brillo de un objeto muy débil es ruidoso**: si el objeto apenas se ve
+  en una toma suelta (SNR de 2 o 3), su magnitud por toma tiene mucha
+  dispersión y la cifra final depende de cuántas tomas entren. La posición
+  no sufre tanto, porque el apilado sí suma señal. Si el brillo te importa
+  de verdad, alarga la secuencia o agrupa menos observaciones.
 
 ## 6. Find_Orb: instalación y configuración
 

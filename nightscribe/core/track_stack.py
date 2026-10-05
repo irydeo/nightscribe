@@ -44,7 +44,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import calibration, coords, fits_meta, register, solve
+from . import calibration, coords, fits_meta, outliers, register, solve
 
 logger = logging.getLogger(__name__)
 
@@ -607,7 +607,7 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3):
     keep = np.isfinite(data)
     for _ in range(max(1, iterations)):
         with np.errstate(invalid="ignore"):
-            mad = np.nanmedian(np.abs(data - med), axis=0) * 1.4826
+            mad = outliers.scaled_mad(data, axis=0, centre=med)
         mad = np.where(mad > 0, mad, np.inf)
         keep = keep & (np.abs(data - med) <= sigma * mad)
         count = keep.sum(axis=0)
@@ -744,7 +744,7 @@ def _score(stack, q_box, cfg=None):
     d = np.hypot(xx - x, yy - y)
     ann = (d >= 8.0) & (d <= 12.0)
     sky = float(np.median(stack[ann]))
-    sig = 1.4826 * float(np.median(np.abs(stack[ann] - sky))) or 1e-6
+    sig = float(outliers.scaled_mad(stack[ann], centre=sky)) or 1e-6
     ap = d <= 4.0
     snr = float(res["flux"]) / (sig * math.sqrt(ap.sum()))
     roundness = _roundness(stack, x, y)
@@ -902,7 +902,7 @@ def detect(stack, q_box, cfg=None, snr_sigma=3.5, zp=None, exptime_s=None):
         d = np.hypot(xx - q_box[0], yy - q_box[1])
         ann = (d >= 8.0) & (d <= 12.0)
         sky = float(np.median(stack[ann]))
-        sig = 1.4826 * float(np.median(np.abs(stack[ann] - sky))) or 1e-6
+        sig = float(outliers.scaled_mad(stack[ann], centre=sky)) or 1e-6
         limit_flux = snr_sigma * sig * math.sqrt((d <= 4.0).sum())
         if limit_flux > 0:
             report.mag_limit = float(zp - 2.5 * math.log10(limit_flux))

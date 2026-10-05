@@ -144,3 +144,68 @@ def test_points_helper_reads_the_series_objects():
     assert res["flags"].count(True) == 1
     assert res["flags"][9] is True
     assert res["n"] == 20
+
+
+# ------------------------------------------------------------ the scale
+
+def test_scaled_mad_is_the_mad_scaled_to_a_sigma():
+    # The MAD of gaussian noise is 0.6745 sigma, so the factor is
+    # 1/0.6745: it is a property of the normal, and the test pins it so a
+    # "small tweak" to the number is caught as the change of meaning it is.
+    vals = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    med = float(np.median(vals))
+    assert outliers.scaled_mad(vals) == pytest.approx(
+        outliers.MAD_TO_SIGMA * float(np.median(np.abs(vals - med))))
+    # the factor IS 1/0.6745 (the 75th percentile of the normal): 1.4826
+    # is its four-decimal form, so the test allows that rounding and no more
+    assert outliers.MAD_TO_SIGMA == pytest.approx(
+        1.0 / 0.6744897501960817, abs=1e-3)
+    # a known pair: +-1 about the median -> the MAD is 1
+    assert outliers.scaled_mad([-1.0, 0.0, 1.0]) == pytest.approx(
+        outliers.MAD_TO_SIGMA, abs=1e-9)
+
+
+def test_scaled_mad_measures_from_a_given_level():
+    # An iterative clip measures from its RUNNING level, which is no
+    # longer the median: passing it must be honoured, or the clip would
+    # quietly drift back to the median.
+    vals = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    # from the median (3) the deviations are [2, 1, 0, 1, 2] -> MAD 1
+    assert outliers.scaled_mad(vals) == pytest.approx(
+        outliers.MAD_TO_SIGMA, abs=1e-9)
+    # from level 1 they are [0, 1, 2, 3, 4] -> MAD 2: a different number,
+    # which is the whole point of passing the level
+    assert outliers.scaled_mad(vals, centre=1.0) == pytest.approx(
+        2.0 * outliers.MAD_TO_SIGMA, abs=1e-9)
+
+
+def test_scaled_mad_per_pixel_and_nan_aware():
+    # The pixel stack clips each pixel on its own column, and a masked
+    # frame is a NaN there: it must not poison the scale of the real ones.
+    stack = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])
+    got = outliers.scaled_mad(stack, axis=0)
+    # column 0 deviates by 1, column 1 by 10: each column its own scale
+    assert got == pytest.approx([outliers.MAD_TO_SIGMA,
+                                 10.0 * outliers.MAD_TO_SIGMA], abs=1e-9)
+    with_nan = np.array([[1.0], [2.0], [np.nan], [3.0]])
+    assert outliers.scaled_mad(with_nan) == pytest.approx(
+        outliers.scaled_mad(np.array([1.0, 2.0, 3.0])), abs=1e-9)
+
+
+def test_scaled_mad_of_nothing_is_zero():
+    # The callers compare against 0 to decide "no scale, no veto": an
+    # empty or all-NaN sample must answer 0.0 and never raise.
+    assert outliers.scaled_mad([]) == 0.0
+    assert outliers.scaled_mad([np.nan, np.nan]) == 0.0
+    assert outliers.scaled_mad(None) == 0.0
+
+
+def test_median_error_is_the_scatter_over_root_n():
+    # The standard error of the MEDIAN: the honest error where the mean
+    # cannot be trusted (a faint object's curve carries bright outliers).
+    vals = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0])
+    assert outliers.median_error(vals) == pytest.approx(
+        outliers.scaled_mad(vals) / math.sqrt(vals.size))
+    # one point has no error to speak of, and no point has none at all
+    assert outliers.median_error([3.0]) == 0.0
+    assert outliers.median_error([]) == 0.0

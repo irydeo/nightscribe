@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import coords, fits_meta, series
+from . import coords, fits_meta, outliers, series
 
 logger = logging.getLogger(__name__)
 
@@ -412,7 +412,7 @@ def calibrate_zero_point(inst_mags, cat_mags):
         zp_err = SINGLE_COMP_ZP_ERR
     else:
         mad = float(np.median(np.abs(values - zp)))
-        zp_err = 1.4826 * mad / math.sqrt(n)
+        zp_err = outliers.MAD_TO_SIGMA * mad / math.sqrt(n)
     if n < 3:
         logger.warning("only %d comparison star(s) on this plate; the "
                        "quoted uncertainty is floor-bounded", n)
@@ -860,7 +860,7 @@ def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
         resid = (cat - inst)[keep] - (zp + k * bv[keep])
         if len(resid) < 4:
             break
-        sig = 1.4826 * float(np.median(np.abs(resid - np.median(resid))))
+        sig = float(outliers.scaled_mad(resid))
         sig = max(sig, 0.02)          # the catalog noise floor (mag)
         # deviations are measured from the residuals' own median: a fit
         # pulled by an outlier must not condemn the honest majority
@@ -870,8 +870,7 @@ def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
         keep[np.where(keep)[0][worst]] = False
     resid = (cat - inst)[keep] - (zp + k * bv[keep])
     n = int(keep.sum())
-    sig = 1.4826 * float(np.median(np.abs(resid - np.median(resid)))) \
-        if n > 1 else 0.0
+    sig = float(outliers.scaled_mad(resid)) if n > 1 else 0.0
     zp_err = sig / math.sqrt(n) if n > 1 else SINGLE_COMP_ZP_ERR
     bv_spread = float(np.std(bv[keep])) if n > 1 else 0.0
     k_err = (sig / (math.sqrt(n) * bv_spread)) if bv_spread > 0 else None
@@ -943,8 +942,7 @@ def local_sources(data, k=4.0, min_sep=6, ring=4, max_sources=50):
         return []
     diffs = np.concatenate([np.diff(clean, axis=1).ravel(),
                             np.diff(clean, axis=0).ravel()])
-    noise = 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    noise = float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
     if noise <= 0:
         # a noiseless plate (synthetic fixtures are flat to the last bit):
         # fall back to the classic global estimator
@@ -1196,8 +1194,7 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None, robust=True):
         cap = _core_cap(resid, sx, sy, x0, y0)
         if cap > 0.0:
             resid = np.minimum(resid, cap)
-    mad = float(np.median(np.abs(resid - np.median(resid))))
-    noise = max(1.4826 * mad, 1e-9)
+    noise = max(float(outliers.scaled_mad(resid)), 1e-9)
     ys, xs = np.mgrid[y0:y1, x0:x1]
     # the deblending mask: a pixel closer to the neighbour than to us is
     # the neighbour's, and our template has no business integrating it
@@ -1309,8 +1306,7 @@ def refined_centroid(data, x, y, sky_pp=None, fwhm=None):
         else:
             sky = float(sky_pp)
         resid = sub - sky
-        mad = float(np.median(np.abs(resid - np.median(resid))))
-        sigma = 1.4826 * mad
+        sigma = float(outliers.scaled_mad(resid))
         keep = resid > max(2.0 * sigma, 0.0)
         if int(keep.sum()) < 5:
             return {"x": float(x), "y": float(y), "ok": False,

@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import coords, photometry, phototrans
+from . import coords, outliers, photometry, phototrans
 from .sources import vizier
 
 logger = logging.getLogger(__name__)
@@ -464,8 +464,7 @@ def local_sky_sigma(plate, x, y, r_ap):
         return None
     diffs = np.concatenate([np.diff(sub, axis=1).ravel(),
                             np.diff(sub, axis=0).ravel()])
-    return 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    return float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
 
 
 def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,

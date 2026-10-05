@@ -66,16 +66,49 @@ SIGMA = 4.5
 _MIN_POINTS = 7
 
 
-def _mad(values):
+# The MAD of gaussian noise is 0.6745 sigma (0.6745 is the 75th percentile
+# of the normal: the deviation below which three quarters of the noise
+# falls), so 1 / 0.6745 turns a MAD into a sigma equivalent. It is a
+# property of the normal distribution, NOT a tunable, so it is written
+# ONCE, here, with its origin, and read from here everywhere else: the
+# arithmetic of "how far is far" lives in one readable place.
+MAD_TO_SIGMA = 1.4826
+
+
+def scaled_mad(values, axis=None, centre=None):
     # Median absolute deviation, scaled to be comparable with a standard
-    # deviation for gaussian noise. Written here rather than imported so
-    # the arithmetic of "how far is far" lives in one readable place.
-    # @args: values - a 1-D numpy array (finite)
-    # @return: the scaled MAD (float, >= 0)
-    if values.size == 0:
+    # deviation for gaussian noise. NaN-aware on purpose: a masked pixel
+    # (or a frame left out) must not poison the scale of the real ones.
+    # @args: values - the sample, any shape, axis - the axis to reduce
+    #        (None: the whole array), centre - the level the deviations
+    #        are measured from (None: the sample's own median, the usual
+    #        case; an iterative clip passes its running level instead)
+    # @return: MAD_TO_SIGMA * median(|values - centre|), as a float when
+    #          axis is None; 0.0 for an empty or all-NaN sample
+    if values is None:
         return 0.0
-    med = float(np.median(values))
-    return 1.4826 * float(np.median(np.abs(values - med)))
+    arr = np.asarray(values, dtype=np.float64)
+    if arr.size == 0:
+        return 0.0
+    ref = np.nanmedian(arr, axis=axis) if centre is None else centre
+    if axis is None and not np.isfinite(ref):
+        return 0.0
+    return MAD_TO_SIGMA * np.nanmedian(np.abs(arr - ref), axis=axis)
+
+
+def median_error(values):
+    # The standard error of the MEDIAN of a sample: its robust scatter
+    # divided by the square root of the count. This is the honest error
+    # where the mean cannot be trusted, and a faint object's curve is
+    # exactly that case: it carries bright outliers and the mean is
+    # dragged by them while the median is not.
+    # @args: values - a 1-D sample
+    # @return: the standard error (0.0 when it cannot be computed)
+    arr = np.asarray(values, dtype=np.float64).ravel()
+    arr = arr[np.isfinite(arr)]
+    if arr.size < 2:
+        return 0.0
+    return float(scaled_mad(arr)) / math.sqrt(arr.size)
 
 
 def local_outliers(t, y, err=None, sigma=SIGMA, window=WINDOW):
@@ -122,7 +155,7 @@ def local_outliers(t, y, err=None, sigma=SIGMA, window=WINDOW):
     # the scale of the residuals, plus a fallback to the formal errors
     # when the residuals are degenerate (a perfectly smooth curve)
     finite = residuals[np.isfinite(residuals)]
-    scale = _mad(finite)
+    scale = float(scaled_mad(finite))
     if (not math.isfinite(scale) or scale <= 0.0) and err is not None:
         errors = np.asarray(err, dtype=np.float64)[ids]
         errors = errors[np.isfinite(errors) & (errors > 0)]

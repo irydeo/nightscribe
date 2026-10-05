@@ -43,7 +43,7 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 
-from . import fits_io, fits_meta, photometry, variables
+from . import fits_io, fits_meta, outliers, photometry, variables
 
 logger = logging.getLogger(__name__)
 
@@ -314,7 +314,7 @@ def _combine_fluxes(fluxes, errs, k=_GROUP_SIGMA):
     mad = float(np.median(np.abs(arr - med)))
     kept, rejected = [], []
     for i, f, e in pairs:
-        if mad > 0.0 and abs(f - med) > k * 1.4826 * mad:
+        if mad > 0.0 and abs(f - med) > k * outliers.MAD_TO_SIGMA * mad:
             rejected.append(i)
         else:
             kept.append((i, f, e))
@@ -348,7 +348,7 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA, names=None):
     # the veto's scale has a floor: without it a synthetic (or a very
     # quiet) ensemble scatter of a few micro-magnitudes turns the veto
     # into a lottery and drops good comps at random
-    scale = max(1.4826 * mad, _MAD_FLOOR)
+    scale = max(outliers.MAD_TO_SIGMA * mad, _MAD_FLOOR)
     kept = [p for p in pairs if abs(p[0] - med) <= k * scale]
     rejected = len(pairs) - len(kept)
     if not kept:
@@ -361,9 +361,7 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA, names=None):
     n_kept = len(kept)
     if n_kept > 0:
         arr_kept = np.asarray([r for r, _e, _i in kept], dtype=np.float64)
-        med_kept = float(np.median(arr_kept))
-        mad_kept = float(np.median(np.abs(arr_kept - med_kept)))
-        scatter_err = 1.4826 * mad_kept / math.sqrt(n_kept)
+        scatter_err = outliers.median_error(arr_kept)
     else:
         scatter_err = None
     if formal_err is None:
@@ -460,8 +458,7 @@ def _sky_sigma(data, x, y, r_ap):
         return None
     diffs = np.concatenate([np.diff(sub, axis=1).ravel(),
                             np.diff(sub, axis=0).ravel()])
-    return 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    return float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
 
 
 def _cosmic_hit(data, x, y, r_ap, sky_pp, sigma_sky, k):
@@ -1039,7 +1036,8 @@ def _flag_clouds(points, cfg):
         return
     for p in points:
         if p.zp is not None \
-                and abs(p.zp - med) > cfg.zp_outlier_sigma * 1.4826 * mad:
+                and abs(p.zp - med) > cfg.zp_outlier_sigma \
+                * outliers.MAD_TO_SIGMA * mad:
             if "seeing" in p.flags:
                 continue
             _add_flag(p, "cloud")
@@ -1073,7 +1071,8 @@ def _flag_seeing(points):
         # not news, a 1.5× step is.
         limit = med * _SEEING_FLAG_MIN
         if mad > 0.0:
-            limit = min(limit, med + _SEEING_FLAG_K * 1.4826 * mad)
+            limit = min(limit, med + _SEEING_FLAG_K * outliers.MAD_TO_SIGMA
+                        * mad)
         for i in ids:
             if points[i].fwhm > limit:
                 _add_flag(points[i], "seeing")
@@ -1129,7 +1128,7 @@ def _robust_std(values):
     if len(vals) < 2:
         return None
     arr = np.asarray(vals, dtype=np.float64)
-    return float(1.4826 * np.median(np.abs(arr - np.median(arr))))
+    return float(outliers.scaled_mad(arr))
 
 
 def _wls(y, cols, w):
@@ -1182,7 +1181,7 @@ def _fit_night(x, y, w, extra=None, sigma_clip=3.0):
     resid = y - yhat
     mad = float(np.median(np.abs(resid - np.median(resid))))
     if mad > 0.0:
-        keep = np.abs(resid) <= sigma_clip * 1.4826 * mad
+        keep = np.abs(resid) <= sigma_clip * outliers.MAD_TO_SIGMA * mad
         if max(3, len(y) // 2) <= int(keep.sum()) < len(y):
             cols, names = _columns(x[keep], a2, None if extra is None else
                                    {k: np.asarray(v)[keep]
@@ -2110,7 +2109,7 @@ def night_qc(points, zp_sigma=3.0):
         if mad > 0.0:
             for night, m in sorted(meds.items(),
                                    key=lambda kv: (kv[0] is None, kv[0])):
-                if abs(m - gm) > zp_sigma * 1.4826 * mad:
+                if abs(m - gm) > zp_sigma * outliers.MAD_TO_SIGMA * mad:
                     level = "warn"
                     msgs.append(_msg(
                         "la noche {} tiene el punto cero desplazado "

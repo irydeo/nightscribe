@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from . import outliers
+
 logger = logging.getLogger(__name__)
 
 # The aperture and the annulus of the centroid measurement, in FWHM units.
@@ -88,7 +90,7 @@ def _local_sky(win):
     h, w = win.shape
     rim = np.concatenate([win[0, :], win[-1, :], win[:, 0], win[:, -1]])
     sky = float(np.median(rim))
-    sigma = 1.4826 * float(np.median(np.abs(rim - sky)))
+    sigma = float(outliers.scaled_mad(rim, centre=sky))
     return sky, sigma
 
 

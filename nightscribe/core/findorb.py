@@ -211,9 +211,10 @@ def robust_scatter(values):
     if not clean:
         return None, None
     import numpy as np
+    from . import outliers
     arr = np.asarray(clean, dtype=float)
     med = float(np.median(arr))
-    mad = 1.4826 * float(np.median(np.abs(arr - med)))
+    mad = float(outliers.scaled_mad(arr, centre=med))
     return med, mad
 
 

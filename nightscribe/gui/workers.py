@@ -1040,7 +1040,7 @@ class TrackStackWorker(QThread):
         # target through cfg.target_motion. This is orchestration, not a
         # second photometric recipe.
         import math
-        from ..core import compstars, series_measure
+        from ..core import compstars, outliers, series_measure
         from ..core import wcs as wcs_mod
         entries = list(self._comps)
         source = "project" if entries else "auto"
@@ -1128,8 +1128,7 @@ class TrackStackWorker(QThread):
         # a Gaussian nobody promised.
         arr = np.asarray(good, dtype=float)
         mag = float(np.median(arr))
-        mad = float(np.median(np.abs(arr - mag))) * 1.4826
-        err = mad / math.sqrt(len(arr)) if len(arr) > 1 else 0.0
+        err = outliers.median_error(arr)
         if not math.isfinite(err) or err <= 0.0:
             errs = [float(p.err) for p in (result.points or []) if p.err]
             err = (float(np.median(errs)) / math.sqrt(len(arr))

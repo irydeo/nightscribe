@@ -42,6 +42,8 @@ import math
 
 import numpy as np
 
+from . import outliers
+
 logger = logging.getLogger(__name__)
 
 # Below this many paired stars the star verification cannot speak: the
@@ -182,7 +184,7 @@ def _corr_quality(corr):
     # The correlation peak against the robust scatter of the whole map:
     # a figure that only speaks when the frames really share structure.
     # @return: peak / (robust sigma of the map)
-    sigma = 1.4826 * float(np.median(np.abs(corr - np.median(corr))))
+    sigma = float(outliers.scaled_mad(corr))
     return float(corr.max()) / (sigma + 1e-12)
 
 
@@ -305,8 +307,7 @@ def detect_stars(src, nmax=60, k=8.0, margin=8, sat=None, factor=2):
         small = arr
     diffs = np.concatenate([np.diff(small, axis=1).ravel(),
                             np.diff(small, axis=0).ravel()])
-    noise = 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    noise = float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
     if not np.isfinite(noise) or noise <= 0.0:
         return empty
     loc = np.ones(small.shape, dtype=bool)

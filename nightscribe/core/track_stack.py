@@ -464,9 +464,6 @@ def cutout_box(frames, group, q, margin_px=64, shape=None):
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, margin_px - extra margin, shape - (naxis1, naxis2)
     # @return: (x0, y0, x1, y1) in the reference grid
-    # The object sits at q, but the stars move across the cutout, so the
-    # box must hold the whole trail. Its size comes from the object's own
-    # motion, never from a magic number.
     # The object sits at q, but the STARS trail: in the reference grid the
     # object's trail spans where each frame's object lands once warped, so
     # the box must hold src_to_ref(p_i) for every USABLE frame, plus the
@@ -491,6 +488,25 @@ def cutout_box(frames, group, q, margin_px=64, shape=None):
     return (x0, y0, x1, y1)
 
 
+def box_around(q, size, shape):
+    # @args: q - the point to centre on, size - the side in px (<= 0 means
+    #        the WHOLE frame), shape - (naxis1, naxis2)
+    # @return: (x0, y0, x1, y1) in the reference grid
+    # The FINAL stack of an observation is a fixed window around the object
+    # (or the whole frame), not the trail cutout the sweep uses: the
+    # photometry and the eye both want the field, and the object is frozen
+    # at q, so a fixed window is all that is needed.
+    if size is None or size <= 0:
+        return (0, 0, int(shape[0]), int(shape[1]))
+    side = min(int(size), int(shape[0]), int(shape[1]))
+    half = side // 2
+    x0 = int(round(q[0])) - half
+    y0 = int(round(q[1])) - half
+    x0 = max(0, min(x0, int(shape[0]) - side))
+    y0 = max(0, min(y0, int(shape[1]) - side))
+    return (x0, y0, x0 + side, y0 + side)
+
+
 def _ref_to_native_affine(tr, delta):
     # @args: tr - a register transform, delta - the object's offset (px)
     # @return: (A, b) with native = A @ ref + b
@@ -503,47 +519,56 @@ def _ref_to_native_affine(tr, delta):
 
 
 def _source_box(A, b, box, shape, pad=3):
-    # @args: A, b - the affine (native = A @ ref + b), box - the output box
-    #        in reference coords, shape - the native frame (naxis1, naxis2),
-    #        pad - extra pixels for the interpolation kernel (order 3 needs 2)
+    # @args: A, b - the affine in (row, col), box - (x0,y0,x1,y1), shape -
+    #        (naxis1, naxis2), pad - pixels for the interpolation kernel
     # @return: (x0, y0, x1, y1) in the native frame that the box needs
     x0, y0, x1, y1 = box
-    corners = [(x0, y0), (x1 - 1, y0), (x0, y1 - 1), (x1 - 1, y1 - 1)]
-    xs, ys = [], []
-    for cx, cy in corners:
-        px, py = A @ np.array([cx, cy]) + b
-        xs.append(px)
-        ys.append(py)
-    sx0 = max(0, int(math.floor(min(xs))) - pad)
-    sy0 = max(0, int(math.floor(min(ys))) - pad)
-    sx1 = min(shape[0], int(math.ceil(max(xs))) + pad)
-    sy1 = min(shape[1], int(math.ceil(max(ys))) + pad)
-    return (sx0, sy0, max(sx1, sx0 + 1), max(sy1, sy0 + 1))
+    corners = [(y0, x0), (y0, x1 - 1), (y1 - 1, x0), (y1 - 1, x1 - 1)]
+    rs, cs = [], []
+    for cr, cc in corners:
+        pr, pc = A @ np.array([cr, cc]) + b
+        rs.append(pr)
+        cs.append(pc)
+    sc0 = max(0, int(math.floor(min(cs))) - pad)
+    sr0 = max(0, int(math.floor(min(rs))) - pad)
+    sc1 = min(int(shape[0]), int(math.ceil(max(cs))) + pad)
+    sr1 = min(int(shape[1]), int(math.ceil(max(rs))) + pad)
+    return (sc0, sr0, max(sc1, sc0 + 1), max(sr1, sr0 + 1))
 
 
 def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3):
     # @args: path - the frame, tr - its transform, delta - the object's
-    #        offset, box - the output box in reference coords, shape - the
-    #        native frame size, loader - callable(path, box) -> array,
-    #        order - interpolation order
+    #        offset, box - the output box in reference (x0,y0,x1,y1),
+    #        shape - the native frame (naxis1, naxis2), loader -
+    #        callable(path, box) -> array, order - interpolation order
     # @return: (warped, valid) where valid is a boolean mask
     # Only the region the box needs is read from disk (D32): the affine
     # tells us its bounding box, so the frame is never loaded whole. The
-    # out-of-frame fill is ZERO and the mask says where it is, so the
-    # combination can drop it; using the sky instead would make the RAM
-    # and the strip paths disagree at the edges.
+    # out-of-frame fill is ZERO and the mask says where it is.
+    #
+    # ORDER MATTERS and it bit us: scipy's affine_transform works in
+    # (row, col), while the rest of the engine speaks (x, y). Passing the
+    # (x, y) matrix and offsets straight through swapped the two axes, and
+    # with a large box origin (the cutout) the error grew: the cutout stack
+    # and the full-frame stack of the SAME observation were not the same
+    # image (measured: max 257 ADU apart around the object). Everything
+    # below is in (row, col); P flips between the two.
     from scipy import ndimage
-    A, b = _ref_to_native_affine(tr, delta)
+    A_xy, b_xy = _ref_to_native_affine(tr, delta)
+    P = np.array([[0.0, 1.0], [1.0, 0.0]])
+    A = P @ A_xy @ P
+    b = P @ b_xy
+    x0, y0, x1, y1 = box
+    out_o = np.array([float(y0), float(x0)])          # (row, col)
     src_box = _source_box(A, b, box, shape)
     if loader is not None:
         data = loader(path, src_box)
     else:
         data, _header = calibration.read_image(path, src_box)
     data = np.asarray(data, dtype=np.float32)
-    src_o = np.array([src_box[0], src_box[1]], dtype=float)
-    out_o = np.array([box[0], box[1]], dtype=float)
+    src_o = np.array([float(src_box[1]), float(src_box[0])])   # (row, col)
     offset = A @ out_o + b - src_o
-    out_shape = (box[3] - box[1], box[2] - box[0])
+    out_shape = (y1 - y0, x1 - x0)
     warped = ndimage.affine_transform(data, A, offset=offset,
                                       output_shape=out_shape, order=order,
                                       mode="constant", cval=0.0)

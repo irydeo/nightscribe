@@ -109,6 +109,16 @@ class UfeTrackStackTab(QWidget):
         self.cmb_method.addItem(self.tr("Mean"), "mean")
         self.cmb_method.addItem(self.tr("Median"), "median")
         self.cmb_method.addItem(self.tr("Sigma-clipped"), "sigma")
+        # D11: the FINAL stack's field (0 = the whole frame) and the
+        # detection/sweep cutout's margin. The whole frame is what the
+        # photometry wants; a smaller window is faster.
+        self.cmb_final_size = self._ui.cmb_final_size
+        self.spn_margin = self._ui.spn_margin
+        self.cmb_final_size.addItem(self.tr("Whole frame"), 0)
+        self.cmb_final_size.addItem(self.tr("1024 px"), 1024)
+        self.cmb_final_size.addItem(self.tr("512 px"), 512)
+        self.cmb_final_size.addItem(self.tr("256 px"), 256)
+        self.cmb_final_size.setCurrentIndex(0)
         _mi = self.cmb_method.findData(
             config.get("astrometry_method", "sigma"))
         self.cmb_method.setCurrentIndex(_mi if _mi >= 0 else 3)
@@ -312,7 +322,9 @@ class UfeTrackStackTab(QWidget):
             paths, name, self.spn_nobs.value(),
             method=self.cmb_method.currentData() or "sigma", cfg=config,
             obs_code=str(config.get("mpc_code", "")),
-            site=str(config.get("mpc_code", "")))
+            site=str(config.get("mpc_code", "")),
+            final_size=int(self.cmb_final_size.currentData() or 0),
+            margin=int(self.spn_margin.value()))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

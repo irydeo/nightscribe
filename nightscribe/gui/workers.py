@@ -988,7 +988,7 @@ class TrackStackWorker(QThread):
     failed = Signal(str)              # an unexpected error, in English
 
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
-                 obs_code="", site=""):
+                 obs_code="", site="", final_size=0, margin=64):
         super().__init__()
         self._paths = list(paths)
         self._name = name
@@ -997,6 +997,10 @@ class TrackStackWorker(QThread):
         self._cfg = cfg
         self._obs_code = obs_code
         self._site = site
+        # D11: the final stack's window (0 = the whole frame) and the
+        # detection/sweep cutout's margin, both from the tab's controls
+        self._final_size = int(final_size or 0)
+        self._margin = int(margin or 64)
         self._cancel = False
         self._solve_cancel = None   # SolveCancel while the solver runs
 
@@ -1083,7 +1087,8 @@ class TrackStackWorker(QThread):
                 self.finished.emit(out)
                 return
             scale = astrometry.pixel_scale_arcsec(w0)
-            margin = int(self._cfg_get("astrometry_cutout_margin_px", 64))
+            margin = int(self._margin or self._cfg_get(
+                "astrometry_cutout_margin_px", 64))
             box_all = track_stack.cutout_box(frames, (0, len(frames)), q_all,
                                              margin_px=margin, shape=shape)
 
@@ -1146,8 +1151,12 @@ class TrackStackWorker(QThread):
                     q_g = q_all
                 q_by_group.append(q_g)
                 mids.append(t_mid)
-                boxes.append(track_stack.cutout_box(
-                    frames, group, q_g, margin_px=margin, shape=shape))
+                # D11: the FINAL stack of an observation is a fixed window
+                # around the object (the whole frame by default), not the
+                # trail cutout the detection and the sweep use. The field
+                # is what the photometry and the eye need.
+                boxes.append(track_stack.box_around(q_g, self._final_size,
+                                                    shape))
             self.progress.emit("groups", 0, len(groups))
             stacks = track_stack.stack_groups(
                 frames, groups, q_by_group, self._method, boxes, shape,

@@ -235,3 +235,27 @@ def test_a_group_with_no_usable_frame_returns_no_stack(tmp_path):
     box = ts.cutout_box(frames, (0, 3), q, margin_px=10, shape=(64, 64))
     stack, report = ts.stack_group(frames, (0, 3), q, "mean", box, (64, 64))
     assert stack is None and report.n_frames == 0
+
+
+def test_the_cutout_and_the_full_frame_are_the_same_image(tmp_path):
+    # The resampling must not depend on the output window. scipy's
+    # affine_transform works in (row, col) while the engine speaks (x, y),
+    # and passing the (x, y) matrix and offsets straight through shifted
+    # the frames by an amount that grew with the box origin: the cutout
+    # stack and the full-frame stack of the SAME observation were different
+    # images (measured on real data: 257 ADU apart around the object), so
+    # the astrometry and the photometry were reading a shifted sky. A
+    # rotation is needed to expose it (the identity hides the mix-up).
+    frames = _sequence(tmp_path, n=5, size=96, rate_px=1.2)
+    for frame in frames:
+        frame.transform = {"angle": 0.06, "dx": 3.0, "dy": -2.0,
+                           "quality": 100.0, "rms_px": 0.0}
+    q = (24.0 + 1.2 * 2.0, 34.0)
+    small = ts.box_around(q, 40, (96, 96))
+    full = ts.box_around(q, 0, (96, 96))
+    a, _ = ts.stack_group(frames, (0, 5), q, "mean", small, (96, 96))
+    b, _ = ts.stack_group(frames, (0, 5), q, "mean", full, (96, 96))
+    qx, qy = int(round(q[0])), int(round(q[1]))
+    xs, ys = qx - small[0], qy - small[1]
+    assert np.allclose(a[ys - 5:ys + 6, xs - 5:xs + 6],
+                       b[qy - 5:qy + 6, qx - 5:qx + 6])

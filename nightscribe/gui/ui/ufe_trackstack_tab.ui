@@ -86,6 +86,29 @@
       </widget>
      </item>
      <item>
+      <widget class="QLabel" name="lbl_final_field"><property name="text"><string>Final stack field</string></property></widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_final_size">
+       <property name="toolTip">
+        <string>How much sky the FINAL stack of each observation covers. The whole frame is what the photometry needs (comparison stars all around); a smaller window is faster and lighter, but it may leave the comparisons out. The velocity sweep always works on the object's own trail cutout, whatever this says.</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lbl_margin"><property name="text"><string>Trail margin (px)</string></property></widget>
+     </item>
+     <item>
+      <widget class="QSpinBox" name="spn_margin">
+       <property name="minimum"><number>8</number></property>
+       <property name="maximum"><number>1024</number></property>
+       <property name="value"><number>64</number></property>
+       <property name="toolTip">
+        <string>Extra pixels around the object's own trail in the cutout the detection and the velocity sweep use. Bigger is safer and slower; the final stack does not use it.</string>
+       </property>
+      </widget>
+     </item>
+     <item>
       <widget class="QPushButton" name="btn_stack">
        <property name="enabled"><bool>false</bool></property>
        <property name="text"><string>Stack the sequence</string></property>

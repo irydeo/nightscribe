@@ -240,14 +240,14 @@ class UfeTrackStackTab(QWidget):
             return
         band = recipe.get("band") or self.tr("the comps' own band")
         self.lbl_recipe.setText(self.tr(
-            "Photometry recipe: %1 · apertures %2 px · sky %3").replace(
+            "Photometry recipe: %1 · apertures %2 · sky %3").replace(
                 "%1", str(band)).replace(
                 "%2", self._recipe_radii_text(recipe)).replace(
                 "%3", str(recipe.get("sky") or "median")))
 
     def _recipe_radii_text(self, recipe):
         # @args: recipe - the photometry recipe
-        # @return: how the aperture is sized, in words
+        # @return: how the aperture is sized, in words or in px
         # "From the seeing" is a CHOICE, not a number: the recipe hands the
         # radii to the measured FWHM, so there is no triple to print.
         if recipe.get("seeing") and not recipe.get("radii_manual"):
@@ -255,7 +255,7 @@ class UfeTrackStackTab(QWidget):
         vals = [recipe.get("rap"), recipe.get("rin"), recipe.get("rout")]
         if any(v is None for v in vals):
             return self.tr("the defaults")
-        return "/".join(f"{float(v):.1f}" for v in vals)
+        return " ".join(("/".join(f"{float(v):.1f}" for v in vals), "px"))
 
     def _say(self, text):
         # @args: text - the status line's text ("" hides it)

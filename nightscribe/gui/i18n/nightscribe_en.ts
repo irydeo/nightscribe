@@ -11044,9 +11044,13 @@ not touched.</translation>
         <translation>the comps&apos; own band</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="243"/>
         <source>Photometry recipe: %1 · apertures %2 px · sky %3</source>
-        <translation>Photometry recipe: %1 · apertures %2 px · sky %3</translation>
+        <translation type="vanished">Photometry recipe: %1 · apertures %2 px · sky %3</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="243"/>
+        <source>Photometry recipe: %1 · apertures %2 · sky %3</source>
+        <translation>Photometry recipe: %1 · apertures %2 · sky %3</translation>
     </message>
     <message>
         <location filename="../ufe_trackstack_tab.py" line="254"/>

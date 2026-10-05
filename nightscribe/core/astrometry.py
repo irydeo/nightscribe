@@ -115,7 +115,15 @@ def centroid(data, xy, fwhm=None, radius=None):
     sky, sigma = _local_sky(win)
     clean = win - sky
     try:
-        cx, cy = centroid_2dg(clean)
+        import warnings
+        with warnings.catch_warnings():
+            # photutils warns "the fit may not have converged" on a faint
+            # source. That is the expected case on a per-frame measurement
+            # of a mag-19 object, the code handles it (the centroid stands,
+            # the error bar grows) and the warning would flood the log once
+            # per frame; it is silenced here, not hidden from the caller.
+            warnings.simplefilter("ignore")
+            cx, cy = centroid_2dg(clean)
     except Exception:
         cx, cy = radius, radius
     gx, gy = x0 + float(cx), y0 + float(cy)

@@ -27,8 +27,11 @@ se puede medir por separado:
    y motas y además normaliza el fondo.
 
 Y una cosa que **no** vamos a hacer: meter un denoiser de IA en el camino
-de la medida. La razón está medida y razonada en el ADR correspondiente
-(ruido correlacionado, incertidumbres que dejarían de ser ciertas).
+de la medida. La razón está medida y razonada en **ADR-063** (ruido
+correlacionado, incertidumbres que dejarían de ser ciertas, y el suelo del
+MPC existe justo para esto). Si algún día entra, es solo para presentación, y
+lo juzga la inyección-recuperación (P4) con el error de centroide y la tasa
+de recuperación, no la intuición.
 
 ## Orden, y por qué
 
@@ -49,7 +52,7 @@ vez de suponerla.
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |
 | **P5** | Pseudo-flat | Pendiente |
-| **P6** | Decisión sobre nxt (denoiser de IA) | Pendiente |
+| **P6** | Decisión sobre nxt (denoiser de IA) | **Hecho**: ADR-063 (no entra en la medida) |
 
 **B0** no es una fase del plan: es el arreglo de un fallo real que apareció
 al usar P0 sobre datos de verdad (un run abortado con un error de scipy).

@@ -103,6 +103,17 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 9. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
    con el mismo validador de siempre y se envía al bloque MPC de la visita.
    El envío lo haces tú.
+10. **Léelas después.** En la pestaña **Análisis** del proyecto, el bloque
+    **Ejecuciones de astrometría** lista cada pasada: la fecha, cuántas
+    observaciones midió, el movimiento que resolvió, el brillo, la
+    comprobación y el estado. La magnitud dice **quién la escribió**:
+    *automática* (la propia ejecución) o *a mano* (una medida que hiciste en
+    la pestaña Fotometría y enviaste al reporte con **«Usar para el
+    reporte»**; la de la ejecución se conserva al lado, para la auditoría).
+    Desde ahí puedes **abrir la visita en el editor** o **deshacer** una
+    ejecución entera (sus posiciones se van; la fila queda marcada como
+    deshecha). Una ejecución **sin detección** también se lista: «se buscó y
+    no había nada» es un dato, y la noche siguiente necesita saberlo.
 
 ## 4. Qué significa cada cifra
 

@@ -79,6 +79,16 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     de apilado, así que es opcional y, sin ella, la ejecución reporta solo
     posiciones y lo dice. Medido en 2025 UR (60 tomas, dos observaciones):
     **17,92 G** contra los 18,0 que el MPC publicó esa misma noche.
+15. **Lectura y corrección de las ejecuciones**: la pestaña **Análisis** del
+    proyecto lista las ejecuciones (fecha, observaciones, movimiento,
+    magnitud, comprobación, estado) con la magnitud diciendo **quién la
+    escribió** (`mag_auto` frente a `mag_source`, migración v18): la ejecución
+    escribe la suya como automática, y el observador puede **enviar** al
+    reporte la que midió a mano en la pestaña Fotometría, que pasa a ser la
+    efectiva mientras la automática se conserva al lado. Desde la lista se
+    abre la visita en el editor o se deshace una ejecución entera. Una
+    ejecución **sin detección** también se lista: «se buscó y no había nada»
+    es un dato, y la noche siguiente necesita saberlo.
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el
@@ -161,6 +171,20 @@ calibrate, stack following the motion, measure and report. The field's reference
 13. **Free space** (opt-in, never automatic): move the used originals to
     `procesados` inside the project (recoverable) and delete the exported
     calibrated copies separately, with a manifest in the database.
+14. **The brightness is measured on the stacks, not on the frames**: the object
+    on **its** stack, where its light is concentrated, and the comparisons on a
+    **second stack** of the same frames aligned on the stars, because on the
+    object's stack they are trails and a trail calibrates nothing. The recipe
+    (apertures, sky, centroid, colour) is the Photometry tab's, read **live**;
+    it costs one more stacking pass, so it is optional.
+15. **Reading and correcting the runs**: the project's **Analysis** tab lists
+    the runs (date, observations, motion, magnitude, check, state) with the
+    magnitude saying **who wrote it** (`mag_auto` against `mag_source`,
+    migration v18): the run writes its own as automatic, and the observer can
+    **send** the one they measured by hand in the Photometry tab to the report,
+    which becomes the effective one while the automatic is kept beside it. From
+    the list a visit opens in the editor or a whole run is undone. A run with
+    **no detection** is listed too: "we looked and there was nothing" is data.
 
 **Reopening ADR-022**: NightScribe **now does generate measurements**, bounded to
 known objects, with the user as reviewer and sender. ADR-022's validator and

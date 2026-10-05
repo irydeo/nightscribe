@@ -106,6 +106,17 @@ project). No visit, no series: that is the house rule.
 9. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
    validated with the same validator as always and sent to the visit's MPC
    block. You do the sending.
+10. **Read them back later.** In the project's **Analysis** tab, the
+    **Astrometry runs** block lists every pass: the date, how many
+    observations it measured, the motion it resolved, the brightness, the
+    check and the state. The magnitude says **who wrote it**: *automatic*
+    (the run itself) or *by hand* (a measurement you made in the Photometry
+    tab and sent to the report with **Use for the report**; the run's own
+    value is kept beside it, for the audit). From there you can **open the
+    visit in the editor** or **undo** a whole execution (its positions go;
+    the row stays marked as undone). A run with **no detection** is listed
+    too: "we looked and there was nothing" is data, and the next night
+    needs to know it.
 
 ## 4. What each figure means
 

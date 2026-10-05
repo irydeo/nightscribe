@@ -22,15 +22,17 @@ from PySide6 import Shiboken
 from PySide6.QtCore import (QCoreApplication, QEvent, QSize, Qt, Signal,
                             QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QDialog,
+                                QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
-                                QInputDialog, QLabel, QLineEdit,
+                                QHeaderView, QInputDialog, QLabel, QLineEdit,
                                 QListWidget, QListWidgetItem, QMainWindow,
                                 QMessageBox, QProgressBar, QProgressDialog,
                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
-                                QVBoxLayout, QWidget, QTableWidgetItem)
+                                QVBoxLayout, QWidget, QTableWidget,
+                                QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -5688,6 +5690,10 @@ class MainWindow(QMainWindow):
         pair.setStretch(1, 11)
         layout.addLayout(pair, 1)
         self._analysis_ribbon_refresh(p)
+        # ADR-062 (D): the astrometry runs of a moving object, where the
+        # observer reads them back without opening the editor
+        if kind in ("neo", "pccp", "comet"):
+            self._analysis_astrometry_block(layout, p, pid)
         if kind == "transit":
             self._analysis_transit_block(layout, pid)
         elif kind == "hads":
@@ -5699,6 +5705,240 @@ class MainWindow(QMainWindow):
         if kind in FOLLOWUP_KINDS:
             self._fu_science_blocks(layout, p, ctx, pid)
         layout.addStretch()
+
+    # ---------------- the astrometry runs of the project (ADR-062) ------
+
+    def _analysis_astrometry_block(self, layout, p, pid):
+        # The astrometry runs, listed in the Analysis tab. The numbers
+        # already live in astrometry_runs/points (phase 8); what was
+        # missing was a place to READ them without opening the editor, and
+        # to undo one execution without hunting for the right visit.
+        # @args: layout - the Analysis section content, p - project dict,
+        #        pid - project id
+        # @return: None
+        from .widgets.collapsible_section import CollapsibleSection
+        sec = CollapsibleSection(self.tr("Astrometry runs"))
+        inner = QWidget()
+        v = QVBoxLayout(inner)
+        v.setContentsMargins(12, 0, 0, 0)
+        sec.setContentWidget(inner)
+        layout.addWidget(sec)
+        hint = QLabel(self.tr(
+            "Each run is one pass of the track & stack: the positions it "
+            "measured, the motion it resolved and the brightness it read. "
+            "The magnitude says WHO wrote it: the run itself (automatic) or "
+            "a measurement you made by hand in the Photometry tab and sent "
+            "to the report. The MPC report is drafted in the editor."))
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        tbl = QTableWidget(0, 6)
+        tbl.setHorizontalHeaderLabels([
+            self.tr("Date"), self.tr("Observations"), self.tr("Motion"),
+            self.tr("Magnitude"), self.tr("Check"), self.tr("State")])
+        tbl.verticalHeader().setVisible(False)
+        tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # each column fits what it says ("17.98 G (by hand)" is the longest
+        # magnitude) and the last one takes the slack
+        header = tbl.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setStretchLastSection(True)
+        # a project with many nights must not push the curve off the page
+        tbl.setMaximumHeight(160)
+        tbl.itemSelectionChanged.connect(
+            lambda: self._analysis_astrometry_sync(tbl))
+        v.addWidget(tbl)
+        row = QHBoxLayout()
+        btn_open = QPushButton(self.tr("Open in the editor"))
+        btn_open.setToolTip(self.tr(
+            "Open the visit's frames in the editor with the track & stack "
+            "tab on stage, to re-measure or to draft the report"))
+        btn_open.clicked.connect(lambda: self._analysis_astrometry_open(tbl))
+        row.addWidget(btn_open)
+        btn_undo = QPushButton(self.tr("Undo this run"))
+        btn_undo.setToolTip(self.tr(
+            "Undo the execution whole: its positions and its frame manifest "
+            "go, and the run stays marked as undone for the audit"))
+        btn_undo.clicked.connect(lambda: self._analysis_astrometry_undo(tbl))
+        row.addWidget(btn_undo)
+        row.addStretch()
+        v.addLayout(row)
+        note = QLabel("")
+        note.setWordWrap(True)
+        v.addWidget(note)
+        w = self._project_widgets
+        w["astrometry_runs_sec"] = sec
+        w["astrometry_runs_tbl"] = tbl
+        w["astrometry_runs_btn_open"] = btn_open
+        w["astrometry_runs_btn_undo"] = btn_undo
+        w["astrometry_runs_note"] = note
+        self._analysis_astrometry_refresh(pid)
+
+    def _analysis_astrometry_refresh(self, pid):
+        # @args: pid - project id
+        # @return: None. The whole section hides itself when the project has
+        #          no run: an empty list of runs says nothing, and a folded
+        #          block with nothing inside is noise (ADR-038).
+        w = self._project_widgets
+        tbl = w.get("astrometry_runs_tbl")
+        if tbl is None:
+            return
+        from ..core import astrometry_store as store
+        runs = store.list_runs(db, pid) if pid is not None else []
+        sec = w.get("astrometry_runs_sec")
+        if sec is not None:
+            sec.setVisible(bool(runs))
+        tbl.setRowCount(len(runs))
+        # newest first: the run you just made is the one you are looking at
+        for row, run in enumerate(reversed(runs)):
+            points = store.points_for_run(db, run["id"])
+            # the STACK is the object's own measurement (the per-frame one
+            # is the other half of the double check): its magnitude and its
+            # check are what the report carries
+            stack = next((q for q in points
+                          if q.get("source") == "stack"), None)
+            cells = [self._astrometry_when(run),
+                     str(run.get("n_obs") or run.get("points") or 0),
+                     self._astrometry_motion(run),
+                     self._astrometry_magnitude(stack),
+                     self._astrometry_check(stack),
+                     self._astrometry_state(run)]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    item.setData(Qt.UserRole, run["id"])
+                    item.setToolTip(self.tr(
+                        "Run %1 of %2").replace(
+                            "%1", str(run["id"])).replace(
+                            "%2", run.get("object_name") or ""))
+                if col == 4 and stack is not None and stack.get("check_note"):
+                    # the check's own words, not a paraphrase of them
+                    item.setToolTip(str(stack["check_note"]))
+                tbl.setItem(row, col, item)
+        self._analysis_astrometry_sync(tbl)
+
+    def _astrometry_when(self, run):
+        # @args: run - a run dict
+        # @return: the run's timestamp, "YYYY-MM-DD HH:MM". `created` holds
+        #          epoch seconds and SQLite's TEXT affinity hands them back
+        #          as a string, so the number is PARSED: slicing it would
+        #          print "1791221326.12345" in the Date column.
+        raw = run.get("created")
+        try:
+            stamp = float(raw)
+        except (TypeError, ValueError):
+            return str(raw or "")
+        return datetime.datetime.fromtimestamp(stamp).strftime(
+            "%Y-%m-%d %H:%M")
+
+    def _astrometry_motion(self, run):
+        # @args: run - a run dict
+        # @return: the motion the run resolved, or a dash when it did not
+        rate = run.get("rate_arcsec_min")
+        if not rate:
+            return "—"
+        text = f"{rate:.2f}″/min"
+        if run.get("pa_deg") is not None:
+            text += f" · PA {run['pa_deg']:.0f}°"
+        return text
+
+    def _astrometry_magnitude(self, stack):
+        # @args: stack - the run's stack point, or None
+        # @return: the brightness AND who wrote it. The observer must never
+        #          read a magnitude without knowing whether the machine
+        #          measured it or they did (D).
+        if stack is None or stack.get("mag") is None:
+            return "—"
+        who = (self.tr("by hand") if stack.get("mag_source") == "manual"
+               else self.tr("automatic"))
+        band = stack.get("band") or ""
+        return f"{stack['mag']:.2f} {band} ({who})".strip()
+
+    def _astrometry_check(self, stack):
+        # @args: stack - the run's stack point, or None
+        # @return: the check against the other observers, in words
+        if stack is None or stack.get("check_ok") is None:
+            return self.tr("not checked")
+        return (self.tr("in order") if stack.get("check_ok")
+                else self.tr("see the note"))
+
+    def _astrometry_state(self, run):
+        # @args: run - a run dict
+        # @return: what became of the execution, in words
+        return {"complete": self.tr("complete"),
+                "not_detected": self.tr("not detected"),
+                "incomplete": self.tr("incomplete"),
+                "undone": self.tr("undone")}.get(
+                    run.get("status"), run.get("status") or "")
+
+    def _analysis_astrometry_sync(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None. Both buttons act on a selected run, so they follow
+        #          the selection: a button that can act on nothing is a trap
+        #          (U5).
+        has = bool(tbl.selectionModel().selectedRows())
+        for key in ("astrometry_runs_btn_open", "astrometry_runs_btn_undo"):
+            btn = self._project_widgets.get(key)
+            if btn is not None:
+                btn.setEnabled(has)
+
+    def _analysis_astrometry_selected(self, tbl):
+        # @args: tbl - the runs table
+        # @return: the selected run id, or None
+        rows = tbl.selectionModel().selectedRows()
+        if not rows:
+            return None
+        item = tbl.item(rows[0].row(), 0)
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _analysis_astrometry_run(self, run_id):
+        # @args: run_id - the execution
+        # @return: its run dict, or None
+        from ..core import astrometry_store as store
+        pid = (self._current_project or {}).get("id")
+        if pid is None:
+            return None
+        return next((r for r in store.list_runs(db, pid)
+                     if r["id"] == run_id), None)
+
+    def _analysis_astrometry_open(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None. The editor opens on the run's OWN visit: a run
+        #          belongs to one night, and that night is where its frames
+        #          are.
+        run = self._analysis_astrometry_run(
+            self._analysis_astrometry_selected(tbl))
+        if run is None:
+            return
+        if run.get("session_id") is None:
+            self.statusBar().showMessage(self.tr(
+                "This run has no visit behind it: open the editor from the "
+                "visit whose frames you want to re-measure."), 8000)
+            return
+        self._visit_astrometry(run["project_id"], run["session_id"])
+
+    def _analysis_astrometry_undo(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None
+        run = self._analysis_astrometry_run(
+            self._analysis_astrometry_selected(tbl))
+        if run is None:
+            return
+        if QMessageBox.question(
+                self, self.tr("Undo this run"),
+                self.tr("Undo run %1 whole? Its positions and its frame "
+                        "manifest go; the run stays marked as undone for "
+                        "the audit.").replace("%1", str(run["id"]))
+        ) != QMessageBox.Yes:
+            return
+        removed = self._ufe_astrometry_undo(run["id"])
+        self._analysis_astrometry_refresh(run["project_id"])
+        note = self._project_widgets.get("astrometry_runs_note")
+        if note is not None:
+            note.setText(self.tr(
+                "Run %1 undone: %2 positions removed.").replace(
+                    "%1", str(run["id"])).replace("%2", str(removed or 0)))
 
     def _selected_visit_id(self):
         # @return: the visits panel's selected visit id, or None
@@ -6251,6 +6491,10 @@ class MainWindow(QMainWindow):
         if chart is not None:
             # the curve follows the visit and the scope the observer chose
             self._fu_curve_refresh(pid)
+        if w.get("astrometry_runs_tbl") is not None:
+            # a visit changed: the runs list is the observer's own record of
+            # what they measured and it is never stale
+            self._analysis_astrometry_refresh(pid)
         camp = w.get("fu_campaign_text")
         if camp is not None:
             camp.setText(self._fu_campaign_text(p, pid))
@@ -10881,6 +11125,10 @@ class MainWindow(QMainWindow):
         store.add_frames(db, run_id, frame_rows)
         logger.info("astrometry run %s persisted (%d points, %d frames)",
                     run_id, len(rows), len(frame_rows))
+        # the Analysis tab's list of runs is live if that project is open:
+        # the run just measured shows up without reopening the project
+        if self._project_widgets.get("astrometry_runs_tbl") is not None:
+            self._analysis_astrometry_refresh(pid)
         return run_id
 
     def _ufe_manual_magnitude(self, run_id, group_index, mag, band=None):
@@ -10893,13 +11141,21 @@ class MainWindow(QMainWindow):
         #          nothing is sent without its trace (D).
         from ..core import astrometry_store as store
         try:
-            return bool(store.set_manual_magnitude(db, int(run_id),
+            done = bool(store.set_manual_magnitude(db, int(run_id),
                                                    int(group_index),
                                                    float(mag), band))
         except Exception as err:
             logger.warning("the manual magnitude could not be stored: %s",
                            err)
             return False
+        if done:
+            # the list says WHO wrote the magnitude: a measurement made by
+            # hand has to show up there at once
+            run = self._analysis_astrometry_run(int(run_id))
+            if run is not None and self._project_widgets.get(
+                    "astrometry_runs_tbl") is not None:
+                self._analysis_astrometry_refresh(run["project_id"])
+        return done
 
     def _ufe_astrometry_undo(self, run_id):
         # ADR-062, phase 8 (D14): undo THIS execution, its points and its

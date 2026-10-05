@@ -42,8 +42,9 @@ silencio ni inventa una calibración.
 Todo empieza en una **visita** (una noche de un proyecto NEO, cometa o
 PCCP). Sin visita no hay serie: es la regla de la casa.
 
-1. **Abre la pestaña Astrometría** desde la visita. Arriba verás el objeto
-   y su efeméride (velocidad aparente y ángulo de posición).
+1. **Abre la pestaña Astrometría** desde la visita. Arriba verás el objeto, sus
+   tomas y la ventana de la visita; la velocidad aparente y el ángulo de
+   posición los trae Horizons al arrancar y quedan en las notas del run.
 
    La pestaña está ordenada por lo que haces cada noche: el objeto, las
    **observaciones** con su SNR previsto en una línea, el botón de **apilar**,

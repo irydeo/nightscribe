@@ -200,7 +200,9 @@ def test_no_orphan_widgets(qapp, tmp_path):
         assert isinstance(w, QWidget), name
     assert not tab._ui.ph_stack_view.isVisibleTo(tab)
     assert not tab._ui.ph_thumbs.isVisibleTo(tab)
-    assert tab._stack_view.parentWidget() is tab
+    # the real view took the placeholder's slot, inside the tab's
+    # scrollable column (the column is taller than the panel)
+    assert tab.isAncestorOf(tab._stack_view)
     # and the tab's own viewer never touches the dialog's plate state
     assert tab._stack_state is not tab._state
 

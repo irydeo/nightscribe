@@ -20,17 +20,20 @@
      <item>
       <widget class="QLabel" name="lbl_object">
        <property name="text">
-        <string>Object and ephemeris: open the editor from a visit to arm the sequence.</string>
+        <string>Object and frames: open the editor from a visit to arm the sequence.</string>
        </property>
        <property name="toolTip">
-        <string>The object comes from the project and the ephemeris from Horizons; both are read-only here (the sequence is tracked with the full ephemeris, not a linear rate)</string>
+        <string>The object comes from the project and the frames from the visit. The rate and the position angle come from Horizons when the run starts, and its notes say what it measured</string>
        </property>
        <property name="wordWrap"><bool>true</bool></property>
       </widget>
      </item>
      <item>
       <widget class="QToolButton" name="btn_more">
+       <property name="minimumSize"><size><width>32</width><height>26</height></size></property>
+       <property name="font"><font><pointsize>14</pointsize></font></property>
        <property name="text"><string>⋯</string></property>
+       <property name="popupMode"><enum>QToolButton::InstantPopup</enum></property>
        <property name="toolTip">
         <string>The occasional actions, so they do not eat the panel: the blink figure of the observations, and undoing this run</string>
        </property>
@@ -51,7 +54,7 @@
        <property name="minimum"><number>1</number></property>
        <property name="maximum"><number>999</number></property>
        <property name="toolTip">
-        <string>How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal: the table below shows it before you accept</string>
+        <string>How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal, and the line beside this one shows what each would reach</string>
        </property>
       </widget>
      </item>
@@ -88,18 +91,10 @@
       <property name="rightMargin"><number>0</number></property>
       <property name="bottomMargin"><number>0</number></property>
       <item>
-       <widget class="QLabel" name="lbl_snr_title">
-        <property name="text"><string>Expected SNR per observation</string></property>
-        <property name="toolTip">
-         <string>Estimated from the frames each group gets (the SNR grows with the square root of n). A group below the MPC submission floor (SNR 20 by default) will be left out of the report, with its reason</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <widget class="QTableWidget" name="tbl_snr">
         <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
         <property name="toolTip">
-         <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach</string>
+         <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</string>
         </property>
         <column><property name="text"><string>Obs.</string></property></column>
         <column><property name="text"><string>Frames</string></property></column>
@@ -131,28 +126,39 @@
           </property>
          </widget>
         </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_field">
         <item>
-         <widget class="QLabel" name="lbl_final_field"><property name="text"><string>Final stack field</string></property></widget>
+         <widget class="QLabel" name="lbl_final_field"><property name="text"><string>Final field:</string></property></widget>
         </item>
         <item>
          <widget class="QComboBox" name="cmb_final_size">
           <property name="toolTip">
-           <string>How much sky the FINAL stack of each observation covers. The whole frame is what the eye wants (the field, with the comparison stars around); a smaller window is faster and lighter. The velocity sweep always works on the object's own trail cutout, whatever this says.</string>
+           <string>How much sky the FINAL stack of each observation covers. The whole frame is the field with the comparison stars around it; a smaller window is faster and lighter. The velocity sweep always works on the object's own trail cutout, whatever this says.</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="lbl_margin"><property name="text"><string>Trail margin (px)</string></property></widget>
+         <widget class="QLabel" name="lbl_margin"><property name="text"><string>Trail margin:</string></property></widget>
         </item>
         <item>
          <widget class="QSpinBox" name="spn_margin">
           <property name="minimum"><number>8</number></property>
           <property name="maximum"><number>1024</number></property>
           <property name="value"><number>64</number></property>
+          <property name="suffix"><string> px</string></property>
           <property name="toolTip">
            <string>Extra pixels around the object's own trail in the cutout the detection and the velocity sweep use. Bigger is safer and slower; the final stack does not use it.</string>
           </property>
          </widget>
+        </item>
+        <item>
+         <spacer name="hsp_field">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+         </spacer>
         </item>
        </layout>
       </item>
@@ -163,7 +169,7 @@
           <property name="checked"><bool>true</bool></property>
           <property name="text"><string>Measure the brightness</string></property>
           <property name="toolTip">
-           <string>Measures each observation's magnitude: the object on its own stack, where its light is concentrated, and the comparison stars on small stacks of the same frames aligned on the stars, because on the object's stack they are streaks and a streak calibrates nothing. Without it the run reports positions only and says so</string>
+           <string>Measures each observation's magnitude: the object on its own stack and the comparison stars on small stacks of the same frames aligned on the stars, because on the object's stack they are streaks. Without it the run reports positions only and says so</string>
           </property>
          </widget>
         </item>
@@ -182,7 +188,7 @@
           <property name="text"><string/></property>
           <property name="wordWrap"><bool>true</bool></property>
           <property name="toolTip">
-           <string>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term are edited there and nowhere else, so the app has one editor and the numbers cannot drift apart</string>
+           <string>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</string>
           </property>
          </widget>
         </item>
@@ -190,7 +196,7 @@
          <widget class="QPushButton" name="btn_recipe">
           <property name="text"><string>Edit in Photometry…</string></property>
           <property name="toolTip">
-           <string>Takes you to the Photometry tab, where the recipe lives. Come back and the line on the left shows what changed</string>
+           <string>Takes you to the Photometry tab, where the apertures, the sky and the centroid are edited</string>
           </property>
          </widget>
         </item>
@@ -216,7 +222,7 @@
      <property name="visible"><bool>false</bool></property>
      <property name="text"><string/></property>
      <property name="toolTip">
-      <string>Warnings of the run: dithering, the composed WCS quality and the velocity sweep result</string>
+      <string>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
     </widget>
@@ -225,7 +231,7 @@
     <layout class="QHBoxLayout" name="row_view">
      <item>
       <widget class="QLabel" name="lbl_view">
-       <property name="text"><string>Stack of the observation:</string></property>
+       <property name="text"><string>Observation:</string></property>
       </widget>
      </item>
      <item>
@@ -275,7 +281,7 @@
      <column><property name="text"><string>T_mid (UT)</string></property></column>
      <column><property name="text"><string>RA (stack)</string></property></column>
      <column><property name="text"><string>Dec (stack)</string></property></column>
-     <column><property name="text"><string>Δ ways (″)</string></property></column>
+     <column><property name="text"><string>Δ (″)</string></property></column>
      <column><property name="text"><string>SNR</string></property></column>
      <column><property name="text"><string>Mag</string></property></column>
      <column><property name="text"><string>Warnings</string></property></column>
@@ -290,7 +296,7 @@
       <property name="bottomMargin"><number>0</number></property>
       <item>
        <widget class="QLabel" name="lbl_check">
-        <property name="text"><string>Find_Orb fits the published observations without ours and predicts where ours should land; our residual against their dispersion decides.</string></property>
+        <property name="text"><string>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</string></property>
         <property name="wordWrap"><bool>true</bool></property>
        </widget>
       </item>
@@ -337,7 +343,7 @@
         <item>
          <widget class="QPushButton" name="btn_report">
           <property name="enabled"><bool>false</bool></property>
-          <property name="text"><string>Generate report</string></property>
+          <property name="text"><string>Generate</string></property>
           <property name="toolTip">
            <string>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</string>
           </property>
@@ -346,7 +352,7 @@
         <item>
          <widget class="QPushButton" name="btn_send_mpc">
           <property name="enabled"><bool>false</bool></property>
-          <property name="text"><string>Send to the visit's MPC block</string></property>
+          <property name="text"><string>Send to the MPC block</string></property>
           <property name="toolTip">
            <string>Fill the visit's MPC paste box with the report; the validator there has the last word before saving</string>
           </property>

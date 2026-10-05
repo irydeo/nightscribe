@@ -43,8 +43,9 @@ silently or invents a calibration.
 Everything starts in a **visit** (one night of a NEO, comet or PCCP
 project). No visit, no series: that is the house rule.
 
-1. **Open the Astrometry tab** from the visit. At the top you see the
-   object and its ephemeris (apparent rate and position angle).
+1. **Open the Astrometry tab** from the visit. At the top you see the object,
+   its frames and the visit's window; the apparent rate and the position
+   angle come from Horizons when the run starts and land in the run's notes.
 
    The tab is ordered by what you do every night: the object, the
    **observations** with their expected SNR on one line, the **Stack**

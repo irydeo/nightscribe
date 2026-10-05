@@ -30,7 +30,8 @@ import math
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QTableWidgetItem, QWidget
+from PySide6.QtWidgets import (QFrame, QScrollArea, QTableWidgetItem,
+                               QVBoxLayout, QWidget)
 
 from ..config import config
 from .ufe_state import UfeImageState
@@ -147,6 +148,33 @@ class UfeTrackStackTab(QWidget):
         self._check_section = self._sections["check"]
         from .widgets.door_menu import build_door
         build_door(self.btn_more, [self.btn_blink, self.btn_undo])
+        self._make_scrollable()
+
+    def _make_scrollable(self):
+        # The column is taller than the panel on a laptop, and a label that
+        # cannot be read is a label that does not exist: the content goes
+        # into a scroll area, the way the Photometry tab's forms already do.
+        # Every item moves into an inner widget (a layout does NOT drop its
+        # item by itself, so they are taken out one by one) and the scroll
+        # area takes the tab's only slot.
+        inner = QWidget(self)
+        box = QVBoxLayout(inner)
+        box.setContentsMargins(0, 0, 0, 0)
+        box.setSpacing(6)
+        lay = self.layout()
+        while lay.count():
+            item = lay.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                box.addWidget(widget)
+            elif item.layout() is not None:
+                box.addItem(item.layout())
+        area = QScrollArea(self)
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        area.setWidget(inner)
+        lay.addWidget(area)
         # the four combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
@@ -328,7 +356,7 @@ class UfeTrackStackTab(QWidget):
             self.spn_nobs.setEnabled(False)
             self.tbl_snr.setRowCount(0)
             self.lbl_object.setText(self.tr(
-                "Object and ephemeris: open the editor from a visit to arm "
+                "Object and frames: open the editor from a visit to arm "
                 "the sequence."))
             return
         if paths != self._ctx_paths:

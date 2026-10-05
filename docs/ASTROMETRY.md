@@ -128,6 +128,11 @@ project). No visit, no series: that is the house rule.
 9. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
    validated with the same validator as always and sent to the visit's MPC
    block. You do the sending.
+   When it finishes, the app also tells you **how far you got**: the night's
+   **5-sigma limiting magnitude**, measured with your own stars (and warning
+   when the field is not sky-limited, in which case the figure is not to be
+   quoted), and the **solution residuals**, with the worst cell of a 4x4
+   grid, which is where a wrong scale or a tilted chip shows up.
 10. **Read them back later.** In the project's **Analysis** tab, the
     **Astrometry runs** block lists every pass: the date, how many
     observations it measured, the motion it resolved, the brightness, the

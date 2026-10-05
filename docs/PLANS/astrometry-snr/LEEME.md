@@ -47,7 +47,7 @@ vez de suponerla.
 | **P4** | Inyección y recuperación (el instrumento) | Pendiente |
 | **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
-| **P3** | Diagnóstico: magnitud límite y calidad de la solución | Pendiente |
+| **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |
 | **P5** | Pseudo-flat | Pendiente |
 | **P6** | Decisión sobre nxt (denoiser de IA) | Pendiente |
 

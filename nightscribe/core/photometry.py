@@ -294,6 +294,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         sky_pp = 0.0
     flux = total - sky_pp * n_pix
     n_sky = int(ann_pixels.size)
+    # The sky's own noise per pixel, from the SAME annulus that is already
+    # in hand: it is the honest denominator of this star's signal-to-noise,
+    # and it is what the limiting-magnitude fit and the matched filter stand
+    # on. One robust median over a few hundred pixels, so it is cheap.
+    sigma_pp = sky_sigma(ann_pixels) if ann_pixels.size else None
     frame_max = float(np.nanmax(data))
     # A star that clipped the detector leaves a plateau: many pixels
     # stuck at exactly the frame maximum (a gaussian core has one
@@ -340,9 +345,17 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         return _fail("sin señal medible", "no measurable signal") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
             "n_pix": n_pix, "n_sky": n_sky}
+    snr = None
+    if sigma_pp and n_pix > 0:
+        # the aperture's signal-to-noise with the sky's noise only: the
+        # object's own shot noise is a second-order term for the faint
+        # sources this exists for, and it is the CCD equation (below) that
+        # carries it in the error budget
+        snr = float(flux) / (float(sigma_pp) * math.sqrt(float(n_pix)))
     return {"x": cx, "y": cy, "flux": flux, "sky_pp": sky_pp,
             "peak": peak, "n_pix": n_pix, "n_sky": n_sky, "saturated": False,
-            "ok": True, "reason": None, "cen_ok": cen_ok}
+            "ok": True, "reason": None, "cen_ok": cen_ok,
+            "sigma_pp": (float(sigma_pp) if sigma_pp else None), "snr": snr}
 
 
 # ------------------------------------------------- the point spread (P2)
@@ -521,8 +534,14 @@ def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
     sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
     yy, xx = np.mgrid[py0:py1, px0:px1]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
-    ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
-    sigma = sky_sigma(sub[ann_mask])
+    # The noise per pixel is the one the aperture already measured, on the
+    # SAME annulus (measure_point returns it), so both SNRs share the
+    # denominator and the comparison is about the WEIGHTING alone. The
+    # fallback recomputes it if an older caller did not pass it through.
+    sigma = ap.get("sigma_pp")
+    if sigma is None:
+        ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
+        sigma = sky_sigma(sub[ann_mask])
     if sigma is None:
         out = dict(ap)
         out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
@@ -557,7 +576,9 @@ def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
     # sky: this is what isolates the weighting (see the docstring)
     n_ap = float(ap.get("n_pix") or 0.0)
     flux_ap = float(ap.get("flux") or 0.0)
-    snr_ap = (flux_ap / (sigma * math.sqrt(n_ap))) if n_ap > 0 else None
+    snr_ap = ap.get("snr")
+    if snr_ap is None and n_ap > 0:
+        snr_ap = flux_ap / (sigma * math.sqrt(n_ap))
     return {"ok": True, "reason": None, "x": cx, "y": cy, "flux": flux,
             "flux_ap": flux_ap, "snr": snr, "snr_ap": snr_ap,
             "n_eff": 1.0 / gg, "n_pix": n_ap, "sky_pp": sky_pp,
@@ -666,6 +687,137 @@ def psf_elongation(data, x, y, fwhm_px=None, r_max=None, sky_pp=None,
             "fwhm_major_px": float(sigma_long * _FWHM_TO_SIGMA),
             "sky_pp": float(sky_pp),
             "sigma_pp": (float(sigma) if sigma else None)}
+
+
+# ------------------------------------------------- the night's diagnosis (P3)
+
+# The slope of log10(SNR) against magnitude for a sky-limited star. Every
+# magnitude is a factor 10^0.4 = 2.512 in flux, and the noise does not care
+# how bright the star is, so the SNR must fall with that same factor. It is
+# not a constant to trust blindly: it is a CHECK. A field measured under a
+# bright moon, with a very short exposure or with saturated comparisons
+# comes out far from it, and then the limiting magnitude is not quotable.
+SKY_LIMITED_SLOPE = -0.4
+# How far the fitted slope may sit from it and still be called sky-limited.
+# A slope of -0.3 means a factor 2.0 per magnitude instead of 2.512, i.e. a
+# quarter of the flux unaccounted for at every step: that is already a
+# broken field (a bright moon, saturation at the bright end, a very short
+# exposure) and the number is not to be quoted. Measured on the synthetic
+# cases of test_photometry_diagnostics: a clean sky-limited set lands within
+# 0.02 of -0.4, and a set with a factor 4 per magnitude lands at -0.6.
+_SLOPE_TOLERANCE = 0.15
+
+
+def limiting_magnitude(pairs, snr_target=5.0, sigma_clip=2.5):
+    # @args: pairs - [(magnitude, snr)] of the field stars, snr_target - the
+    #        signal-to-noise the limit is quoted at (5 by convention),
+    #        sigma_clip - how far a star may sit from the fitted line
+    # @return: {"ok", "reason", "mag", "slope", "intercept", "n", "used",
+    #          "mag_range"}
+    # "How faint can I go tonight?" answered with THIS night's own stars.
+    # For a sky-limited source the signal-to-noise falls as a power law:
+    #
+    #     log10(SNR) = a + b * mag          with b ~ -0.4
+    #
+    # and fitting that line to the stars actually measured on the stack, then
+    # solving it for SNR = 5, gives the limiting magnitude with the sky, the
+    # seeing, the exposure and the aperture all inside the two numbers. No
+    # table, no model: the night measures itself.
+    #
+    # The fit is a plain least squares with one outlier pass, because a
+    # single saturated comparison star or a cosmic ray would otherwise drag
+    # the line. And the SLOPE is checked against the physics: a fit far from
+    # -0.4 means the field is not sky-limited, and the reason says so rather
+    # than quoting a figure nobody should trust.
+    pts = [(float(m), float(s)) for m, s in (pairs or [])
+           if m is not None and s is not None and s > 0]
+    if len(pts) < 4:
+        return {"ok": False, "reason": "fewer than four stars to fit",
+                "mag": None, "slope": None, "intercept": None, "n": len(pts),
+                "used": [], "mag_range": None}
+    mags = np.asarray([p[0] for p in pts])
+    logs = np.log10(np.asarray([p[1] for p in pts]))
+    # Theil-Sen: the MEDIAN of the slopes of every PAIR of stars, and the
+    # median of the intercepts that slope implies. With a handful of
+    # comparisons this is the honest robust estimator and not a taste: a
+    # saturated star or a cosmic ray moves a least-squares line (measured on
+    # the seven-point case of the tests: it moved the limit by 0.5 mag and
+    # the clip could not repair it, because the dragged line inflates the
+    # MAD the clip is measured against), and it cannot move a median of 21
+    # pairs. It also needs no threshold to tune, which on five points is a
+    # guess dressed as a parameter.
+    slopes = []
+    for i in range(len(pts)):
+        for j in range(i + 1, len(pts)):
+            dm = mags[j] - mags[i]
+            if abs(dm) > 1e-6:
+                slopes.append((logs[j] - logs[i]) / dm)
+    if not slopes:
+        return {"ok": False, "reason": "every star has the same magnitude",
+                "mag": None, "slope": None, "intercept": None,
+                "n": len(pts), "used": [], "mag_range": None}
+    slope = float(np.median(slopes))
+    intercept = float(np.median(logs - slope * mags))
+    if not np.isfinite(slope) or slope >= 0:
+        return {"ok": False, "reason": "the signal-to-noise does not fall "
+                "with magnitude", "mag": None, "slope": None,
+                "intercept": None, "n": len(pts), "used": [],
+                "mag_range": None}
+    limit = (math.log10(float(snr_target)) - intercept) / slope
+    # `used` is a REPORT, not the fit: it says which stars sit on the line
+    # and which do not, so the interface can name the ones that were left
+    # out of the picture without having changed the answer.
+    resid = logs - (slope * mags + intercept)
+    mad = float(outliers.scaled_mad(resid))
+    used = ([True] * len(pts) if mad <= 0
+            else [bool(abs(r) <= sigma_clip * mad) for r in resid])
+    return {"ok": True, "reason": None, "mag": float(limit),
+            "slope": slope, "intercept": intercept, "n": len(pts),
+            "used": used, "mag_range": (float(mags.min()), float(mags.max())),
+            "sky_limited": bool(
+                abs(slope - SKY_LIMITED_SLOPE) <= _SLOPE_TOLERANCE)}
+
+
+def quality_grid(points, shape, n=4):
+    # @args: points - [(x, y, residual_arcsec)] of the measured stars,
+    #        shape - the plate (h, w) or (naxis1, naxis2), n - divisions per
+    #        axis
+    # @return: {"ok", "reason", "cells": [[median|None]], "median", "worst",
+    #          "spread", "n"}
+    # A plate solution can be good in the middle and bad at the corners
+    # (distortion, a wrong scale, a tilted chip), and one number for the
+    # whole plate hides exactly that. The median residual per cell of an
+    # n x n grid says WHERE, in one glance, and the spread between the cells
+    # says whether the solution is even. Tycho's Image Statistics draws the
+    # same map for the same reason.
+    #
+    # The MEDIAN per cell, not the mean: one bad match or a cosmic ray must
+    # not paint a corner red on its own.
+    pts = [(float(x), float(y), float(r)) for x, y, r in (points or [])
+           if x is not None and y is not None and r is not None
+           and np.isfinite(r)]
+    if len(pts) < 4:
+        return {"ok": False, "reason": "fewer than four stars to judge",
+                "cells": [], "median": None, "worst": None, "spread": None,
+                "n": len(pts)}
+    width = float(shape[1] if len(shape) > 1 else shape[0])
+    height = float(shape[0])
+    cells = [[None for _ in range(n)] for _ in range(n)]
+    for j in range(n):
+        for i in range(n):
+            sel = [p[2] for p in pts
+                   if (j / n) <= (p[1] / max(height, 1e-9)) < ((j + 1) / n)
+                   and (i / n) <= (p[0] / max(width, 1e-9)) < ((i + 1) / n)]
+            if sel:
+                cells[j][i] = float(np.median(sel))
+    filled = [c for row in cells for c in row if c is not None]
+    if not filled:
+        return {"ok": False, "reason": "no cell has a star in it",
+                "cells": cells, "median": None, "worst": None,
+                "spread": None, "n": len(pts)}
+    return {"ok": True, "reason": None, "cells": cells,
+            "median": float(np.median(filled)), "worst": float(max(filled)),
+            "spread": float(max(filled) - min(filled)), "n": len(pts)}
 
 
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,

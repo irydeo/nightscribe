@@ -126,6 +126,12 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 9. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
    con el mismo validador de siempre y se envía al bloque MPC de la visita.
    El envío lo haces tú.
+   Al terminar, la app te dice además **hasta dónde has llegado**: la
+   **magnitud límite** a 5σ de esa noche, medida con tus propias estrellas
+   (y avisando si el campo no está limitado por el cielo, en cuyo caso la
+   cifra no se debe citar), y los **residuos de la solución**, con la peor
+   celda de una rejilla 4×4, que es donde se ve una escala mal o un chip
+   inclinado.
 10. **Léelas después.** En la pestaña **Análisis** del proyecto, el bloque
     **Ejecuciones de astrometría** lista cada pasada: la fecha, cuántas
     observaciones midió, el movimiento que resolvió, el brillo, la

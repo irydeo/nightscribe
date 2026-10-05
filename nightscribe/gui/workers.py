@@ -1163,6 +1163,11 @@ class TrackStackWorker(QThread):
         # point is the same number for a fraction of the time.
         total = max(1, 2 * len(groups))
         per_obs = []
+        # P3: the night's diagnosis is built from the SAME comps the zero
+        # point uses: their (magnitude, signal-to-noise) gives how faint this
+        # night went, and their position against the catalogue gives whether
+        # the plate solution is even. Nothing extra is measured.
+        diag_pairs, diag_points, diag_shape = [], [], None
         for index, (stack, _rep) in enumerate(stacks):
             self.progress.emit("photometry", len(groups) + index + 1, total)
             if stack is None or index >= len(groups):
@@ -1255,6 +1260,30 @@ class TrackStackWorker(QThread):
                                             == "comp"]),
                             "check": (res.check or {}).get("verdict"),
                             "shape": shape, "matched": matched})
+            if diag_shape is None:
+                diag_shape = stack.shape
+            for entry, cres in (res.used or []):
+                if not cres.get("ok"):
+                    continue
+                star = entry.get("star") or {}
+                if star.get("mag") is not None and cres.get("snr"):
+                    diag_pairs.append((float(star["mag"]),
+                                       float(cres["snr"])))
+                if star.get("ra") is None or cres.get("x") is None:
+                    continue
+                try:
+                    ra, dec = wcs_box.pixel_to_sky(cres["x"], cres["y"])
+                except Exception:
+                    continue
+                # the small-angle separation: one arcsec of RA is
+                # cos(dec) arcsec on the sky, and at these fields the
+                # approximation is exact to well under the residuals being
+                # judged
+                dra = (float(ra) - float(star["ra"])) * math.cos(
+                    math.radians(float(star["dec"])))
+                ddec = float(dec) - float(star["dec"])
+                diag_points.append((float(cres["x"]), float(cres["y"]),
+                                    math.hypot(dra, ddec) * 3600.0))
             if sp is not None:
                 # one magnitude per observation: it is what the MPC
                 # publishes, and the point is the observation
@@ -1278,12 +1307,17 @@ class TrackStackWorker(QThread):
         gains = [float(p["matched"]["snr"]) / float(p["matched"]["snr_ap"])
                  for p in good
                  if p.get("matched") and p["matched"].get("snr_ap")]
+        # P3: the night's own diagnosis, measured on the same comps
+        limit = photometry.limiting_magnitude(diag_pairs)
+        grid = (photometry.quality_grid(diag_points, diag_shape)
+                if diag_shape else {"ok": False})
         return {"mag": float(np.median(mags)),
                 "err": float(np.median([p["err"] for p in good])),
                 "band": band,
                 "trail_px": (float(np.median(trails)) if trails else None),
                 "trail_pa_deg": (float(np.median(pas)) if pas else None),
                 "snr_gain": (float(np.median(gains)) if gains else None),
+                "limit": limit, "grid": grid,
                 "n_comps": max(p["n_comps"] for p in good),
                 "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
                 "n_obs": len(good), "source": source, "per_obs": per_obs,

@@ -841,3 +841,24 @@ def test_the_shape_note_says_the_trail(qapp, tmp_path):
     # a round object with nothing to gain says nothing at all
     assert tab._shape_note({"trail_px": None, "snr_gain": 1.0}) == ""
     assert tab._shape_note(None) == ""
+
+
+def test_the_diagnosis_note_says_the_night(qapp, tmp_path):
+    # P3: how faint the night went and whether the solution is even, both
+    # measured on the run's own comps.
+    tab, _host = _tab(qapp, tmp_path)
+    text = tab._diag_note({
+        "limit": {"ok": True, "mag": 19.8, "sky_limited": True},
+        "grid": {"ok": True, "median": 0.18, "worst": 0.9}})
+    assert "Limiting magnitude (5σ): 19.8" in text
+    assert "0.18" in text and "up to 0.90" in text
+    # a field that is not sky-limited says so instead of quoting the figure
+    text = tab._diag_note({"limit": {"ok": True, "mag": 21.0,
+                                     "sky_limited": False}, "grid": {}})
+    assert "do not trust it" in text
+    # an even solution does not shout about its worst cell
+    text = tab._diag_note({"limit": {"ok": False},
+                           "grid": {"ok": True, "median": 0.20,
+                                    "worst": 0.25}})
+    assert "worst cell" not in text
+    assert tab._diag_note(None) == ""

@@ -146,6 +146,18 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     reporte **sigue usando la magnitud de la apertura**; el filtro se
     reporta al lado, y la estela se dice en palabras para acortar la
     exposición siguiente.
+19. **Diagnóstico de la noche con sus propias estrellas**: la **magnitud
+    límite** sale de ajustar `log10(SNR) = a + b·mag` sobre las comparsas
+    medidas y resolver para SNR = 5, y el **pendiente es la comprobación**
+    (la física dice −0,4; medido en 2025 UR: −0,394), así que un campo que
+    no está limitado por el cielo se marca en vez de citarse. El ajuste es
+    **Theil-Sen** (la mediana de las pendientes de los pares) y no mínimos
+    cuadrados con recorte, porque con pocos puntos el recorte no repara una
+    recta arrastrada (medido: 0,5 mag de error con una comparsa saturada).
+    La **calidad de la solución** es la mediana del residual por celda de
+    una rejilla 4×4: un número para toda la placa esconde las esquinas, que
+    es donde se ve una escala mal o un chip inclinado, y una celda sin
+    estrellas queda vacía, nunca a cero.
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el
@@ -310,6 +322,18 @@ calibrate, stack following the motion, measure and report. The field's reference
     **still uses the aperture's magnitude**; the filter is reported beside
     it, and the trail is said in words so the next exposure can be
     shortened.
+19. **Diagnosing the night with its own stars**: the **limiting magnitude**
+    comes from fitting `log10(SNR) = a + b*mag` over the measured
+    comparisons and solving for SNR = 5, and the **slope is the check**
+    (physics says -0.4; measured on 2025 UR: -0.394), so a field that is
+    not sky-limited is flagged instead of quoted. The fit is
+    **Theil-Sen** (the median of the pairwise slopes), not least squares
+    with a clip, because with few points the clip does not repair a dragged
+    line (measured: 0.5 mag off with one saturated comparison). The
+    **quality of the solution** is the median residual per cell of a 4x4
+    grid: one number for the whole plate hides the corners, which is where
+    a wrong scale or a tilted chip shows up, and a cell with no stars is
+    left empty, never zero.
 
 **Reopening ADR-022**: NightScribe **now does generate measurements**, bounded to
 known objects, with the user as reviewer and sender. ADR-022's validator and

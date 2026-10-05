@@ -838,6 +838,9 @@ class UfeTrackStackTab(QWidget):
         shape = self._shape_note(self._result.get("photometry"))
         if shape:
             note += " " + shape
+        diag = self._diag_note(self._result.get("photometry"))
+        if diag:
+            note += " " + diag
         self._say(note)
 
     def _shape_note(self, phot):
@@ -866,6 +869,41 @@ class UfeTrackStackTab(QWidget):
             parts.append(self.tr(
                 "The matched filter would read %1x the aperture's SNR on "
                 "this stack.").replace("%1", f"{float(gain):.2f}"))
+        return " ".join(parts)
+
+    def _diag_note(self, phot):
+        # @args: phot - the run's photometry dict (or None)
+        # @return: the night's own diagnosis, in words (or "")
+        # P3: two questions the observer asks after a run, both answered with
+        # the stars of THIS stack. How faint the night went (the limiting
+        # magnitude), and whether the plate solution is even across the field
+        # (the median residual per cell of a 4x4 grid): one number for the
+        # whole plate hides the corners, which is where a wrong scale or a
+        # tilted chip shows up.
+        phot = phot or {}
+        parts = []
+        limit = phot.get("limit") or {}
+        if limit.get("ok") and limit.get("mag") is not None:
+            line = self.tr("Limiting magnitude (5σ): %1").replace(
+                "%1", f"{float(limit['mag']):.1f}")
+            if not limit.get("sky_limited"):
+                # the slope is the physics' own check: a field that is not
+                # sky-limited gives a number nobody should quote
+                line += self.tr(" (not sky-limited, do not trust it)")
+            parts.append(line)
+        grid = phot.get("grid") or {}
+        if grid.get("ok") and grid.get("median") is not None:
+            line = self.tr(
+                "Solution residuals: %1″ median").replace(
+                    "%1", f"{float(grid['median']):.2f}")
+            worst = grid.get("worst")
+            if worst is not None and float(worst) > 2.0 * max(
+                    float(grid["median"]), 0.05):
+                # a corner that is much worse than the middle is WHERE the
+                # solution is bad, and that is the useful half of the answer
+                line += self.tr(", up to %1″ in the worst cell").replace(
+                    "%1", f"{float(worst):.2f}")
+            parts.append(line)
         return " ".join(parts)
 
     def _register_note(self, report, off_frame=0):

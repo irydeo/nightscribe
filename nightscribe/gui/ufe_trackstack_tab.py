@@ -256,8 +256,10 @@ class UfeTrackStackTab(QWidget):
         # stays "–": an estimate without a measurement would be invented.
         # @return: None
         from ..core import track_stack
+        # the spinbox's floor is 1, but a tab whose visit was never armed
+        # can still be repainted: a zero would divide inside split_groups
         rows = track_stack.preview_groups(self._frames or [],
-                                          self.spn_nobs.value(),
+                                          max(1, self.spn_nobs.value()),
                                           base_snr=self._base_snr)
         floor = float(config.get("astrometry_submit_snr", 20.0))
         tbl = self.tbl_snr

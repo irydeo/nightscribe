@@ -392,6 +392,11 @@ def split_groups(frames, n_obs):
     # The user says how many observations; the software decides the cut.
     # Contiguous groups keep each observation's own T_mid meaningful.
     n = len(frames)
+    if n == 0:
+        # no frames, no observations: clamping n_obs to n below would leave
+        # it at ZERO and the division would blow up (a tab repainted with
+        # an empty visit crashed here)
+        return []
     if n_obs is None or n_obs < 1:
         n_obs = 1
     n_obs = min(n_obs, n)

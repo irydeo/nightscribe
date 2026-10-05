@@ -329,3 +329,35 @@ def test_the_blink_figure_is_written(qapp, tmp_path):
     assert path.name.endswith("_observations.png")
     assert "2026QX" in path.name
     assert saved and saved[0][1] == "sequence"
+
+
+def test_the_run_paints_the_strip_the_magnitude_and_the_brightness(qapp,
+                                                                   tmp_path):
+    # The strip, the magnitude column and the brightness note all come from
+    # the SAME payload: a run with photometry must show the three, and the
+    # note must say where the comparison stars came from (an automatic
+    # proposal is a first guess, not the observer's own sequence).
+    from nightscribe.core import astrometry, track_stack
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=15.2, mag=18.05, band="G")
+    tab._result = {
+        "status": "ok", "groups": [(0, 5), (5, 10)], "n_failed": 0,
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), None),
+                   (np.ones((16, 16), dtype=np.float32), None)],
+        "boxes": [(0, 0, 16, 16), (0, 0, 16, 16)],
+        "qs": [(8.0, 8.0), (8.0, 8.0)], "mids": [2461000.5, 2461000.6],
+        "points": [(sp, None, []), (sp, None, [])],
+        "detection": track_stack.DetectionReport(detected=True, snr=15.2),
+        "photometry": {"mag": 18.05, "err": 0.12, "band": "G",
+                       "n_comps": 8, "n_frames": 47, "source": "auto"},
+    }
+    tab._paint_run()
+    assert tab.tbl_points.item(0, 6).text() == "18.050"
+    assert "18.050" in tab.lbl_notes.text()
+    assert "an automatic proposal" in tab.lbl_notes.text()
+    assert tab.btn_blink.isEnabled()
+    panels = [tab._thumbs._row.itemAt(i).widget()
+              for i in range(tab._thumbs._row.count())
+              if tab._thumbs._row.itemAt(i).widget() is not None]
+    assert len(panels) == 2

@@ -75,6 +75,10 @@ def test_split_groups_is_contiguous_and_equal():
     assert groups == [(0, 4), (4, 7), (7, 10)]
     assert ts.split_groups(frames, 1) == [(0, 10)]
     assert ts.split_groups(frames, 99) == [(i, i + 1) for i in range(10)]
+    # an empty sequence has no observations: clamping n_obs to the frame
+    # count left it at ZERO and the division blew up (a tab repainted with
+    # an empty visit crashed here)
+    assert ts.split_groups([], 3) == []
 
 
 def test_preview_groups_snr_falls_with_more_observations():

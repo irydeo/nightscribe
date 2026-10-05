@@ -659,6 +659,22 @@ class UfeTrackStackTab(QWidget):
             wcss = result.get("wcs_by_group") or []
             if index < len(wcss) and wcss[index] is not None:
                 hdu.header.update(wcss[index].to_header())
+            # The app's own word about WHAT this file is. The stack follows
+            # the object, so its stars are TRAILS: without this card the
+            # Photometry tab would happily build a zero point out of
+            # streaks, and with it the tab can say why it will not.
+            hdu.header["NS_STACK"] = (
+                "object", "track & stack: the stars are trails")
+            name = (self._context() or {}).get("object_name")
+            if name:
+                hdu.header["OBJECT"] = str(name)
+            hdu.header["NS_NOBS"] = (int(index) + 1,
+                                     "observation of the visit")
+            groups = result.get("groups") or []
+            if index < len(groups):
+                hdu.header["NS_NFRAMES"] = (
+                    int(groups[index][1] - groups[index][0]),
+                    "frames in this stack")
             hdu.writeto(str(path), overwrite=True)
         except Exception as err:     # a stack that cannot be written says so
             logger.warning("group stack write failed: %s", err)

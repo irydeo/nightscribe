@@ -750,6 +750,41 @@ class UfeMeasureTab(QWidget):
 
     # -------------------------------------------------------- measuring
 
+    def _track_stack_plate(self):
+        # @return: "object" | "stars" when the open plate is a track & stack
+        #          (the astrometry tab writes NS_STACK when it saves one),
+        #          or None for an ordinary plate
+        header = getattr(self._state, "header", None) or {}
+        kind = header.get("NS_STACK")
+        return str(kind).strip().lower() if kind else None
+
+    def _track_stack_blocks_measure(self):
+        # @return: the reason this plate cannot set a zero point, or None
+        # On an object's stack the stars are TRAILS: a circular aperture on
+        # a 90 px streak measures a fraction of a flux, so the zero point
+        # it would set is a lie. On a star stack the comps are points but
+        # the OBJECT is the streak. Either way the measurement needs the
+        # pair, and until it is there the honest answer is to say why.
+        kind = self._track_stack_plate()
+        if kind is None:
+            return None
+        header = getattr(self._state, "header", None) or {}
+        if header.get("NS_PAIR"):
+            return None            # the pair is here: it can be measured
+        if kind == "object":
+            return self.tr(
+                "This plate is an object's track & stack: its stars are "
+                "TRAILS, so the comparison stars cannot set a zero point "
+                "here (a streak read with a circular aperture is not a "
+                "flux). The brightness is measured in the Astrometry tab, "
+                "which reads the comps on a second stack aligned on the "
+                "stars.")
+        return self.tr(
+            "This plate is the STAR stack of a track & stack: the comps are "
+            "points here, but the OBJECT is a trail, so it cannot be "
+            "measured on this plate. Open the object's stack and measure "
+            "there.")
+
     def _explain_no_wcs_measure(self):
         # The automatic solve did not land: the click cannot be measured.
         self._say(self.tr(
@@ -768,6 +803,14 @@ class UfeMeasureTab(QWidget):
 
     def _on_scene_clicked(self, scene_pt):
         if not self._active or not self._state.has_image:
+            return
+        # A track & stack cannot set a zero point out of its streaks (or
+        # measure an object that is one): say it BEFORE the solve, because
+        # the WCS is there and the measurement would otherwise proceed and
+        # produce a magnitude nobody could trust.
+        blocked = self._track_stack_blocks_measure()
+        if blocked:
+            self._say(blocked)
             return
         if self._state.wcs is None:
             # ADR-051: the plate is solved automatically and the click

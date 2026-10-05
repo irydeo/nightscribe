@@ -2402,3 +2402,32 @@ def test_the_passes_door_opens_with_room_to_read_it(dlg):
     assert door.tbl_passes.height() >= 200
     assert door.tbl_passes.horizontalHeader().stretchLastSection()
     door.close()
+
+
+# -------------------------------------------------- track & stack plates
+
+def test_a_track_stack_plate_says_why_it_cannot_calibrate_here(dlg):
+    # On an object's stack the stars are TRAILS: a circular aperture on a
+    # streak is not a flux, so the zero point it would set is a lie. Since
+    # the astrometry now writes the stack's WCS, nothing else would stop
+    # the measurement, so the tab has to say it and step aside.
+    dlg.state.header["NS_STACK"] = "object"
+    _click(dlg, *dlg._test_target)
+    text = dlg.tab_measure.lbl_status.text()
+    assert "track & stack" in text
+    assert "Astrometry" in text
+
+
+def test_the_star_stack_says_the_object_is_the_trail(dlg):
+    dlg.state.header["NS_STACK"] = "stars"
+    _click(dlg, *dlg._test_target)
+    assert "trail" in dlg.tab_measure.lbl_status.text()
+
+
+def test_a_track_stack_with_its_pair_is_not_blocked(dlg):
+    # With the star stack saved alongside (NS_PAIR), the pair IS
+    # measurable: the guard steps aside.
+    dlg.state.header["NS_STACK"] = "object"
+    dlg.state.header["NS_PAIR"] = "2025UR_obs1_20251018T214012_stars.fits"
+    _click(dlg, *dlg._test_target)
+    assert "track & stack" not in dlg.tab_measure.lbl_status.text()

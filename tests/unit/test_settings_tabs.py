@@ -61,17 +61,32 @@ def _tab_widgets(dlg, index):
 def test_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    # Interfaz 1.4 added the Interface tab (the Welcome motion switch), so
-    # the count went from four to five; it sits between Integrations and
-    # Development, which keep their order.
-    assert len(tabs) == 5
+    # Interfaz 1.4 added the Interface tab (the Welcome motion switch) and
+    # ADR-061 the Calibration tab (the master library), so the count went
+    # from four to six; Integrations, Interface and Development keep their
+    # order behind them.
+    assert len(tabs) == 6
     # the last tab is Development (the UFE default switch, ADR-044)
     assert tabs[-1] in ("Development", "Desarrollo")
     assert tabs[-2] in ("Interface", "Interfaz")
     assert tabs[-3] in ("Integrations", "Integraciones")
     # the first tab is the site page (language-aware)
     assert tabs[0] in ("Site & equipment", "Sitio y equipo")
+    # the master library sits right after Observing: it is equipment, not
+    # an external service, and it is what the editor's Calibration tab
+    # resolves its recipe against
+    assert tabs[1] in ("Observing", "Observación")
+    assert tabs[2] in ("Calibration", "Calibración")
     dlg.deleteLater()
+
+
+def _integrations_index(dlg):
+    # @return: the Integrations tab's index, whatever its position
+    names = _tab_names(dlg)
+    for i, name in enumerate(names):
+        if name in ("Integrations", "Integraciones"):
+            return i
+    raise AssertionError("no Integrations tab")
 
 
 def test_site_tab_widgets(qapp):
@@ -140,7 +155,7 @@ def test_kinds_grid_includes_hads(qapp):
 
 def test_integrations_tab_widgets(qapp):
     dlg = _dlg()
-    names = set(_tab_widgets(dlg, 2))
+    names = set(_tab_widgets(dlg, _integrations_index(dlg)))
     for w in ["edt_neofixer_key", "edt_astrometry_key",
               "edt_tns_bot", "edt_tns_bot_key"]:
         assert w in names, f"{w} expected on the Integrations tab"
@@ -200,10 +215,10 @@ def _is_descendant(widget, ancestor):
 
 
 def test_integrations_tab_contains_ccdciel(qapp):
-    # CCDciel widgets (ADR-030) now live inside the Integrations tab
-    # (tab index 2), not on their own tab
+    # CCDciel widgets (ADR-030) live inside the Integrations tab, not on
+    # their own tab (found by name: the tab list grows)
     dlg = _dlg()
-    names = set(_tab_widgets(dlg, 2))
+    names = set(_tab_widgets(dlg, _integrations_index(dlg)))
     for w in ["edt_ccdciel_host", "spn_ccdciel_port", "chk_ccdciel_auto"]:
         assert w in names, f"{w} expected on the Integrations tab"
     dlg.deleteLater()

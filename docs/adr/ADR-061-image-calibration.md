@@ -2,6 +2,18 @@
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-10-04
 
+> **Actualización (2026-10-05)**: la biblioteca de masters ya es
+> administrable en Ajustes. Se añade la pestaña **Calibración**
+> (`tab_calibration`), entre Observing e Integrations: la ayuda explica
+> qué es un master y para qué sirven los cuatro tipos, el combo fija el
+> tipo con el que se indexa un lote de ficheros y la tabla lista lo que
+> hay (fichero, tipo, cámara, ganancia, temperatura, exposición, filtro,
+> fecha) con su botón de quitar. Los ficheros se **enlazan, nunca se
+> copian ni se mueven**, y quitar una fila toca solo el índice: el fichero
+> en disco es dato del observador. Sin esta pestaña, `add_master` solo se
+> llamaba desde los tests y la pestaña Calibración del editor no podía
+> decir más que «falta».
+
 ## Español
 
 **Contexto**: NightScribe no calibra imágenes. Solo usa la corriente de oscuridad

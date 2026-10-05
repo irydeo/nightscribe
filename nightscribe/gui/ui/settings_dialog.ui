@@ -477,6 +477,45 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tab_calibration">
+      <attribute name="title"><string>Calibration</string></attribute>
+      <layout class="QVBoxLayout" name="vbox_calibration">
+       <item><widget class="QLabel" name="lblH_masters"><property name="text"><string>A master is a frame that cancels a pattern the sensor or the optics print on every shot: the bias (the read-out pedestal), the dark (that pedestal plus the thermal current, which grows with the exposure and the temperature) and the flat (the dust shadows and the vignetting). NightScribe picks the right one for each light from the camera, the gain, the sensor temperature, the exposure and the filter, and the editor's Calibration tab says which one it is using. Index here the masters you have already built: the file is linked, never copied or moved.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+       <item>
+        <layout class="QHBoxLayout" name="row_master_add">
+         <item><widget class="QLabel" name="lbl_master_kind"><property name="text"><string>Add as:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+         <item><widget class="QComboBox" name="cmb_master_kind"/></item>
+         <item><widget class="QPushButton" name="btn_master_add"><property name="text"><string>Add masters…</string></property><property name="toolTip"><string>Pick one or more master FITS files. The kind chosen here applies to all of them: a bias and a flat are different arithmetic, so the library has to know which is which</string></property></widget></item>
+         <item><spacer name="hsp_master_add"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+        </layout>
+       </item>
+       <item><widget class="QLabel" name="lblH_master_kind"><property name="text"><string>The four kinds, in the order of the night: Bias, the shortest exposure with no light at all; Dark, at the same exposure as the lights (it already carries the bias, so it is used alone); Dark of the flats, a dark at the flat's own exposure, which cleans the flat before dividing; and Flat, the illumination and the dust of the train, taken with the filter of the lights.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+       <item>
+        <widget class="QTableWidget" name="tbl_masters">
+         <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+         <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+         <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+         <property name="alternatingRowColors"><bool>true</bool></property>
+         <column><property name="text"><string>File</string></property></column>
+         <column><property name="text"><string>Kind</string></property></column>
+         <column><property name="text"><string>Camera</string></property></column>
+         <column><property name="text"><string>Gain</string></property></column>
+         <column><property name="text"><string>Temp (°C)</string></property></column>
+         <column><property name="text"><string>Exposure (s)</string></property></column>
+         <column><property name="text"><string>Filter</string></property></column>
+         <column><property name="text"><string>Added</string></property></column>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="row_master_actions">
+         <item><widget class="QPushButton" name="btn_master_remove"><property name="text"><string>Remove from the library</string></property><property name="toolTip"><string>Takes the master out of the index only: the file on disk is never deleted</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+         <item><spacer name="hsp_master_actions"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+        </layout>
+       </item>
+       <item><widget class="QLabel" name="lbl_master_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+       <item><spacer name="vspacer_calibration"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tab_integrations">
       <attribute name="title"><string>Integrations</string></attribute>
       <layout class="QVBoxLayout" name="vbox_integrations">

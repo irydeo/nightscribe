@@ -1,6 +1,17 @@
 # ADR-028: Settings as four tabs — el diálogo deja de crecer en vertical
 
-**Estado / Status**: Accepted (actualizado 2026-09-10) · **Fecha / Date**: 2026-08-29
+**Estado / Status**: Accepted (actualizado 2026-10-05) · **Fecha / Date**: 2026-08-29
+
+> **Actualización (2026-10-05)**: ADR-061 añade la pestaña **Calibración**
+> (`tab_calibration`), entre Observing e Integrations: la biblioteca de
+> masters que la pestaña Calibración del editor consulta para resolver su
+> receta. Es equipo y datos, no un servicio externo, por eso va pegada a
+> Observing. La página no lleva `QGroupBox`, así que
+> `_settings_two_columns` la deja como está: la tabla aprovecha el ancho.
+> El diálogo sigue dimensionado por la pestaña más grande (Site &
+> equipment), que no cambia. Vigencia hoy: **seis** pestañas (Site &
+> equipment / Observing / Calibration / Integrations / Interface /
+> Development).
 
 > **Actualización (2026-09-10)**: dos cambios de contenido y uno de UX sobre
 > la base de este ADR.

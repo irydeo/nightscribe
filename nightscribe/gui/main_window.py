@@ -208,6 +208,17 @@ def _settings_two_columns(dlg):
         old.addLayout(cols)
 
 
+def _master_num(value, fmt="{:.3g}"):
+    # @args: value - a master's gain, temperature or exposure (maybe None),
+    #        fmt - how a number is shown
+    # @return: the text for the master table's cell. None becomes an EMPTY
+    #          cell, not "None" and not "0": the library only knows what
+    #          the header said, and a blank says "the file did not say",
+    #          while a zero would be matched against a light as if it were
+    #          a real measurement.
+    return "" if value is None else fmt.format(float(value))
+
+
 # How much of an EXOTIC run log is read to report a failure (P2 #21): the
 # tail is where the error is, and a two-hour log can be big.
 _LOG_TAIL_BYTES = 64 * 1024
@@ -2009,6 +2020,10 @@ class MainWindow(QMainWindow):
             lambda: self._projects_browse_into(dlg))
         dlg.btn_projects_reset.clicked.connect(
             lambda: dlg.edt_projects_root.setText(""))
+        # the master library (ADR-061): the editor's Calibration tab
+        # resolves a recipe against it and names the master it uses, so
+        # the place that fills the library belongs in Settings
+        self._settings_masters_init(dlg)
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
@@ -2128,6 +2143,138 @@ class MainWindow(QMainWindow):
                 8000)
         else:
             self.statusBar().showMessage(self.tr("Settings saved"), 6000)
+
+    # ---------------- the master library (ADR-061) ----------------
+
+    def _settings_masters_init(self, dlg):
+        # The library of calibration masters lives in Settings. The
+        # editor's Calibration tab resolves a recipe against it and says
+        # which master each piece uses; before this, nothing in the GUI
+        # could put a master IN, so that tab could only ever report what
+        # was missing.
+        # @args: dlg - the settings dialog
+        # @return: None
+        from ..core import calibration
+        for kind in calibration.KINDS:
+            dlg.cmb_master_kind.addItem(self._master_kind_label(kind), kind)
+        dlg.btn_master_add.clicked.connect(
+            lambda: self._settings_master_add(dlg))
+        dlg.btn_master_remove.clicked.connect(
+            lambda: self._settings_master_remove(dlg))
+        dlg.tbl_masters.itemSelectionChanged.connect(
+            lambda: self._settings_masters_sync(dlg))
+        self._settings_masters_refresh(dlg)
+
+    def _master_kind_label(self, kind):
+        # @args: kind - one of core.calibration.KINDS
+        # @return: its name in the observer's language. The four kinds are
+        #          not synonyms: they are four different arithmetics, and
+        #          the help label above the table says what each one is.
+        return {"bias": self.tr("Bias"),
+                "dark": self.tr("Dark"),
+                "dark_flat": self.tr("Dark of the flats"),
+                "flat": self.tr("Flat")}.get(kind, kind)
+
+    def _settings_masters_refresh(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The table is filled from the database, newest
+        #          first, and the Remove button follows the selection: a
+        #          button that can act on nothing is a trap (U5).
+        from pathlib import Path
+        from ..core import calibration
+        masters = calibration.list_masters(db)
+        tbl = dlg.tbl_masters
+        tbl.setRowCount(len(masters))
+        for row, m in enumerate(masters):
+            cells = [Path(m.path).name, self._master_kind_label(m.kind),
+                     m.camera or "", _master_num(m.gain),
+                     _master_num(m.temp_c), _master_num(m.exptime_s),
+                     m.filter or "", (m.created or "")[:10]]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    # the file name is what fits; the whole path (and the
+                    # row's id, for the Remove button) travel with it
+                    item.setToolTip(m.path)
+                    item.setData(Qt.UserRole, m.id)
+                tbl.setItem(row, col, item)
+        self._settings_masters_sync(dlg)
+
+    def _settings_masters_sync(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None
+        selected = bool(dlg.tbl_masters.selectionModel().selectedRows())
+        dlg.btn_master_remove.setEnabled(selected)
+
+    def _settings_master_selected_id(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: the id of the selected master, or None
+        rows = dlg.tbl_masters.selectionModel().selectedRows()
+        if not rows:
+            return None
+        item = dlg.tbl_masters.item(rows[0].row(), 0)
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _settings_master_add(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The files are INDEXED, never copied or moved: a
+        #          master can be big and the library only needs to know
+        #          where it is and what makes it valid (camera, gain,
+        #          temperature, exposure, filter). Any of those the file's
+        #          own header carries is read from it.
+        from pathlib import Path
+        from ..core import calibration
+        files, _sel = QFileDialog.getOpenFileNames(
+            dlg, self.tr("Add masters"), "",
+            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
+        if not files:
+            return
+        kind = dlg.cmb_master_kind.currentData() or "dark"
+        known = {m.path for m in calibration.list_masters(db, kind=kind)}
+        added, repeated, failed = 0, 0, []
+        for path in files:
+            if str(path) in known:
+                repeated += 1
+                continue
+            try:
+                calibration.add_master(db, path, {"kind": kind})
+                added += 1
+            except Exception as err:
+                # one unreadable file must not lose the rest of the batch
+                failed.append((Path(path).name, str(err)))
+        self._settings_masters_refresh(dlg)
+        bits = [self.tr("Indexed %1 masters (%2).").replace(
+            "%1", str(added)).replace("%2", self._master_kind_label(kind))
+            if added else self.tr("Nothing new to index.")]
+        if repeated:
+            bits.append(self.tr("%1 were already in the library.").replace(
+                "%1", str(repeated)))
+        for name, why in failed[:3]:
+            bits.append(f"✕ {name}: {why}")
+        dlg.lbl_master_status.setText("  ".join(bits))
+
+    def _settings_master_remove(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. Only the INDEX entry goes: the file on disk is
+        #          the observer's own data and is never deleted from here.
+        from pathlib import Path
+        from ..core import calibration
+        mid = self._settings_master_selected_id(dlg)
+        if mid is None:
+            return
+        master = next((m for m in calibration.list_masters(db)
+                       if m.id == mid), None)
+        name = Path(master.path).name if master is not None else ""
+        if QMessageBox.question(
+                dlg, self.tr("Remove from the library"),
+                self.tr("Take %1 out of the master library? The file on "
+                        "disk is not touched.").replace("%1", name)
+        ) != QMessageBox.Yes:
+            return
+        calibration.delete_master(db, mid, delete_file=False)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self.tr("Removed %1 from the library.").replace("%1", name))
 
     def _horizon_browse_into(self, dlg):
         # @args: dlg - the settings dialog; fills its file field with a

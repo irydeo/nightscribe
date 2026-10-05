@@ -411,3 +411,34 @@ def test_the_brightness_row_handles_a_recipe_that_sizes_from_the_seeing(
     host.photometry_recipe = None
     tab._sync_recipe_row()
     assert "defaults" in tab.lbl_recipe.text()
+
+
+def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
+    # The stars on an object's stack are TRAILS, so a blind solve finds
+    # nothing and fails (that is what the observer sees when the stack is
+    # opened in the Photometry tab). But the plate is KNOWN: the reference
+    # WCS shifted by the cutout's origin. The file now carries it, so
+    # opening the stack needs no solver at all, and any external tool can
+    # read it too.
+    from astropy.wcs import WCS
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    host.export_folder = lambda: str(tmp_path)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", view=UfeImageView(state), parent=host)
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cd = [[-1e-4, 0.0], [0.0, 1e-4]]
+    w.pixel_shape = (16, 16)
+    tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+                   "points": [], "n_failed": 0, "wcs_by_group": [w]}
+    tab._show_group(0)
+    assert state.wcs is not None
+    assert state.wcs.crval1 == pytest.approx(30.0)
+    assert state.wcs.crval2 == pytest.approx(10.0)

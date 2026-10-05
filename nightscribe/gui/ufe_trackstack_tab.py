@@ -651,8 +651,15 @@ class UfeTrackStackTab(QWidget):
         path = self._stack_path(index)
         try:
             from astropy.io import fits
-            fits.PrimaryHDU(np.asarray(stack, dtype=np.float32)).writeto(
-                str(path), overwrite=True)
+            hdu = fits.PrimaryHDU(np.asarray(stack, dtype=np.float32))
+            # The stack's own WCS, from the reference WCS shifted by the
+            # cutout's origin: the plate is KNOWN, so nothing has to solve
+            # it. On this stack the stars are trails (it follows the
+            # object) and a blind solve finds no stars at all.
+            wcss = result.get("wcs_by_group") or []
+            if index < len(wcss) and wcss[index] is not None:
+                hdu.header.update(wcss[index].to_header())
+            hdu.writeto(str(path), overwrite=True)
         except Exception as err:     # a stack that cannot be written says so
             logger.warning("group stack write failed: %s", err)
             self._say(self.tr("The group's stack could not be written:")

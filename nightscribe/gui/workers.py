@@ -1440,6 +1440,13 @@ class TrackStackWorker(QThread):
                 boxes.append(track_stack.box_around(q_g, self._final_size,
                                                     shape))
             self.progress.emit("groups", 0, len(groups))
+            # The per-observation WCS travels with the payload: each stack
+            # is a cutout of the reference grid, and writing its WCS into
+            # the file is what lets ANY tool read it without solving a
+            # plate whose stars are TRAILS (ASTAP finds no stars there and
+            # the solve fails, which is the symptom the observer sees when
+            # the stack is opened in the Photometry tab).
+            out["wcs_by_group"] = [_shift_wcs(w0, b) for b in boxes]
             stacks = track_stack.stack_groups(
                 frames, groups, q_by_group, self._method, boxes, shape,
                 cfg=self._cfg,

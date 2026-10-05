@@ -73,6 +73,7 @@ class Frame:
     wcs: object = None                 # astropy WCS of this frame
     transform: dict | None = None      # register.estimate_transform result
     failed_register: bool = False
+    register_note: str = ""            # why it failed, or how it was saved
     object_ra: float | None = None
     object_dec: float | None = None
     object_xy: tuple | None = None
@@ -170,24 +171,57 @@ def solve_reference(frames, cfg=None, cancel=None, progress=None):
     return None, None
 
 
+def session_fwhm(ref_data, ref_stars, sat=None):
+    # @args: ref_data - the reference frame's pixels, ref_stars - its
+    #        detect_stars output, sat - saturation ceiling
+    # @return: the frame's median FWHM in pixels, or None when it cannot be
+    #          measured. One call per session: the point spread is what the
+    #          registration gate is judged against (register.rms_limit), so
+    #          it has to come from the DATA, never from a constant.
+    try:
+        from . import photometry
+        if ref_stars is None or len(ref_stars) == 0:
+            return None
+        return photometry.estimate_fwhm(ref_data, ref_stars[:, :2],
+                                        sat_adu=sat)
+    except Exception as err:
+        logger.warning("the session's FWHM could not be measured: %s", err)
+        return None
+
+
 def register_sequence(frames, ref_index=None, allow_rotation=False,
-                      progress=None, cancel=None):
+                      progress=None, cancel=None, fwhm_px=None, sat=None):
     # @args: frames - list[Frame] with a solved reference, ref_index -
     #        which frame is the grid (default: the solved one), allow_rotation
-    #        - also fit a rigid rotation (slower, for alt-az without derotator),
-    #        progress/cancel - as usual
+    #        - fit a rigid rotation on the FIRST attempt (slower, for alt-az
+    #        without derotator; the retry below does it anyway when needed),
+    #        progress/cancel - as usual, fwhm_px - the session's point
+    #        spread for the quality gate (measured here when None),
+    #        sat - saturation ceiling
     # @return: the reference Frame
     # The transform is ESTIMATED by core/register.py (star voting, proven);
     # the RESAMPLING is scipy's spline, which keeps the shape of a point
     # source better than the bilinear used for a quick look. A frame whose
     # registration is not trusted inherits the previous one and is marked;
     # it is never silently trusted.
+    #
+    # TWO ATTEMPTS PER FRAME, and the second one is what recovers a whole
+    # second run. A translation is tried first because it is the common
+    # case and the fastest; when it does not pass the gate, the same frame
+    # is tried again with a rigid rotation, and only then is it given up
+    # on. The reason is measured on the 2025 UR visit: its two runs are
+    # 884 px and 0.12 deg apart, the translation leaves 1.5 px of residual
+    # (rejected), the rigid fit leaves 0.80 px (accepted on a 3.56 px PSF),
+    # and without the retry 62 of the 140 frames were thrown away, which
+    # costs a factor sqrt(140/78) = 1.34 in the stack's SNR.
     ref = frames[ref_index] if ref_index is not None else None
     if ref is None or ref.wcs is None:
         # the grid has to be a frame we actually know the sky of
         ref = next((f for f in frames if f.wcs is not None), frames[0])
     ref_data, _ = calibration.read_image(ref.path)
     ref_stars = register.detect_stars(register.source_image(ref_data))
+    if fwhm_px is None:
+        fwhm_px = session_fwhm(ref_data, ref_stars, sat=sat)
     previous = None
     total = len(frames)
     for index, frame in enumerate(frames):
@@ -196,6 +230,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
         if frame is ref:
             frame.transform = {"angle": 0.0, "dx": 0.0, "dy": 0.0,
                                "quality": 100.0, "rms_px": 0.0}
+            frame.register_note = "reference"
         else:
             data, _ = calibration.read_image(frame.path)
             # the guess is the PREVIOUS frame's transform, never the
@@ -204,12 +239,44 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
             tr = register.estimate_transform(
                 ref_data, data, guess=previous, ref_stars=ref_stars,
                 allow_rotation=allow_rotation)
-            if register.trusted(tr):
+            # "Accepted" is not the same as "good": a translation that
+            # could not explain the stars is returned anyway when the
+            # rotation is not allowed, so the retry fires both when the
+            # gate rejects the answer AND when the answer merely passes
+            # while the estimator's own trigger says it did not fit.
+            # Measured on 2025 UR: one run-2 frame landed at 1.20 px as a
+            # translation (under the gate) where the rigid fit gives 0.6.
+            rms = tr.get("rms_px")
+            needs_rotation = (not register.trusted(tr, fwhm_px)
+                              or (rms is not None
+                                  and rms > register.ROTATE_TRIGGER_PX))
+            if needs_rotation and not allow_rotation:
+                retry = register.estimate_transform(
+                    ref_data, data, guess=previous, ref_stars=ref_stars,
+                    allow_rotation=True)
+                # The retry has to be PROVEN, not hinted: the stars must
+                # certify it (register.trusted's correlation fallback is
+                # not enough for a rotation, see require_stars), and the
+                # angle has to be a field rotation, not a re-point or a
+                # collapsed fit. MAX_STEP_DEG has been in register.py since
+                # the beginning and was never enforced; it is enforced
+                # here, which is where an angle can now be applied blind.
+                angle_deg = abs(float(retry.get("angle_deg") or 0.0))
+                if register.trusted(retry, fwhm_px, require_stars=True) \
+                        and angle_deg <= register.MAX_STEP_DEG:
+                    # the rotation EARNED its place (estimate_transform
+                    # only keeps it when it removes a quarter of the
+                    # residual), so the frame is kept and the fact is
+                    # recorded: the tab says how many were saved this way
+                    tr = retry
+                    frame.register_note = "rotation"
+            if register.trusted(tr, fwhm_px):
                 frame.transform = tr
                 previous = tr
             else:
                 frame.transform = dict(previous) if previous else tr
                 frame.failed_register = True
+                frame.register_note = _register_reason(tr)
         if frame.transform and frame.wcs is None:
             shape = (int(frame.header.get("NAXIS1", 1)),
                      int(frame.header.get("NAXIS2", 1)))
@@ -217,6 +284,96 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
         if progress is not None:
             progress(index + 1, total, frame.path)
     return ref
+
+
+def _register_reason(tr):
+    # @args: tr - a rejected transform
+    # @return: a short internal code for WHY the frame was left out, so the
+    #          observer reads a reason instead of a bare count. The codes
+    #          are turned into words at the edge (the GUI), never here: the
+    #          core speaks English keys, the interface speaks the language.
+    if tr is None:
+        return "no_fit"
+    stars = tr.get("stars") or {}
+    if int(tr.get("n") or 0) < register.MIN_MATCH:
+        return "few_stars" if (stars.get("src") or 0) else "no_stars"
+    return "rms"
+
+
+# A run boundary: the pointing or the field angle steps by more than this
+# between two consecutive frames. Inside a run the steps are ~1 px and
+# hundredths of a degree (measured on 2025 UR: 0.8 px and 0.01 deg), so the
+# thresholds sit an order of magnitude above the tracking and an order of
+# magnitude below a re-point (884 px and 0.12 deg in that same visit).
+BLOCK_STEP_PX = 40.0
+BLOCK_STEP_DEG = 0.5
+
+
+def _gap_seconds(a, b):
+    # @args: a, b - consecutive Frames
+    # @return: the seconds between their mid-exposure instants, or None
+    #          when either is unknown. The gap is what tells "the observer
+    #          paused" from "the pointing moved", and it goes in the words
+    #          the tab shows.
+    if a is None or b is None or a.t_mid_jd is None or b.t_mid_jd is None:
+        return None
+    return (float(b.t_mid_jd) - float(a.t_mid_jd)) * 86400.0
+
+
+def registration_report(frames):
+    # @args: frames - list[Frame] after register_sequence
+    # @return: the honest summary of the registration, for the tab to say
+    #          in words:
+    #            {"n_total", "n_ok", "n_failed", "n_rotation", "rms_median",
+    #             "blocks": [{"n", "dx", "dy", "angle_deg", "gap_s"}],
+    #             "multi_run"}
+    #          `blocks` is the RUN structure of the visit. A visit that
+    #          mixes two runs (the observer re-pointed, or stopped and
+    #          restarted the sequence) shows up as a step in the transform,
+    #          and that is what has to be said out loud instead of a bare
+    #          "N frames were left out": the frames of the second run are
+    #          perfectly good, they are simply pointing elsewhere.
+    ok = [f for f in frames if usable(f)]
+    report = {"n_total": len(frames), "n_ok": len(ok),
+              "n_failed": sum(1 for f in frames if f.failed_register),
+              "n_rotation": sum(1 for f in frames
+                                if f.register_note == "rotation"),
+              "rms_median": None, "blocks": [], "multi_run": False,
+              "reasons": {}}
+    # WHY the ones that were left out failed, counted: a bare number
+    # teaches nothing, and the fix is different for "too few stars" (a
+    # short exposure, a cloud) than for "the stars disagree" (a wrong
+    # guess, a trailed frame).
+    for frame in frames:
+        if frame.failed_register:
+            key = frame.register_note or "rms"
+            report["reasons"][key] = report["reasons"].get(key, 0) + 1
+    rms = [f.transform.get("rms_px") for f in ok
+           if f.transform and f.transform.get("rms_px") is not None]
+    if rms:
+        report["rms_median"] = float(np.median(rms))
+    blocks = []
+    prev = None
+    for frame in ok:
+        tr = frame.transform
+        step = turn = None
+        gap = _gap_seconds(prev, frame)
+        if prev is not None:
+            ptr = prev.transform
+            step = math.hypot(tr["dx"] - ptr["dx"], tr["dy"] - ptr["dy"])
+            turn = abs(tr.get("angle_deg", 0.0)
+                       - ptr.get("angle_deg", 0.0))
+        if prev is None or step > BLOCK_STEP_PX or turn > BLOCK_STEP_DEG:
+            # dx/dy are the block's offset from the reference grid, which
+            # is what the message needs ("the second run is 884 px away")
+            blocks.append({"n": 0, "dx": tr["dx"], "dy": tr["dy"],
+                           "angle_deg": tr.get("angle_deg", 0.0),
+                           "gap_s": gap})
+        blocks[-1]["n"] += 1
+        prev = frame
+    report["blocks"] = blocks
+    report["multi_run"] = len(blocks) > 1
+    return report
 
 
 def compose_wcs(w0, tr, shape=None):

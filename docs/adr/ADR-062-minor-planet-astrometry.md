@@ -96,6 +96,16 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     abre la visita en el editor o se deshace una ejecución entera. Una
     ejecución **sin detección** también se lista: «se buscó y no había nada»
     es un dato, y la noche siguiente necesita saberlo.
+16. **Ningún fotograma se tira en silencio**: la puerta de registro se juzga
+    como **fracción del FWHM medido** (0,25, con suelo en 0,5 px), no contra
+    un píxel fijo, porque lo que importa es cuánto ensancha el apilado, y eso
+    es una razón; y una traslación que no explica las estrellas se reintenta
+    con **rotación** (hasta 15°, y con las estrellas certificándola: el atajo
+    de correlación dice «es el mismo cielo», nunca «este es el mapeo»). El
+    informe dice cuántas tomas volvieron, cómo, **por qué** fallaron las que
+    fallaron y si la visita es en realidad **varias tandas**, con su salto y
+    su hueco de tiempo. Medido en 2025 UR: de 78 a 139 tomas usables de 140,
+    y el SNR del apilado de estrellas de 1.826 a 2.702 (×1,48).
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el
@@ -197,6 +207,17 @@ calibrate, stack following the motion, measure and report. The field's reference
     which becomes the effective one while the automatic is kept beside it. From
     the list a visit opens in the editor or a whole run is undone. A run with
     **no detection** is listed too: "we looked and there was nothing" is data.
+16. **No frame is dropped in silence**: the registration gate is judged as a
+    FRACTION of the measured FWHM (0.25, floored at 0.5 px), not against a
+    fixed pixel figure, because what matters is how much it broadens the
+    stack, and that is a ratio; and a translation that does not explain the
+    stars is retried with a ROTATION (up to 15 deg, certified by the stars:
+    the correlation fallback says "this is the same sky", never "this is the
+    mapping"). The report says how many frames came back, how, **why** the
+    ones that failed did, and whether the visit is really **several runs**,
+    with its offset and its time gap. Measured on 2025 UR: from 78 to 139
+    usable frames out of 140, and the star stack's SNR from 1826 to 2702
+    (x1.48).
 
 **Reopening ADR-022**: NightScribe **now does generate measurements**, bounded to
 known objects, with the user as reviewer and sender. ADR-022's validator and

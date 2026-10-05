@@ -1424,6 +1424,9 @@ class TrackStackWorker(QThread):
                 cancel=lambda: self._cancel)
             out["dither"] = track_stack.dither_check(frames)
             out["n_failed"] = sum(1 for f in frames if f.failed_register)
+            # the honest registration summary (P0): how many frames came
+            # back, how, and whether the visit is really two runs
+            out["register_report"] = track_stack.registration_report(frames)
             if self._cancel:
                 out["status"] = "cancelled"
                 self.finished.emit(out)

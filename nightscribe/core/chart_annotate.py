@@ -102,6 +102,37 @@ def format_exptime(exptime_s):
     return f"Exp: {exptime_s:.1f} s"
 
 
+def format_exposure(n_frames, exptime_s):
+    # A stack is not "one 3 s frame": it is the sum of the frames it
+    # combines, and saying only the exposure hides how much light there is.
+    # @args: n_frames - how many frames the stack combines (or None),
+    #        exptime_s - exposure time of each one, in seconds
+    # @return: "8 × 3.0 s" for a stack, "3.0 s" for a single frame, or None
+    single = format_exptime(exptime_s)
+    if single is None:
+        return None
+    text = single.split(": ", 1)[1]
+    try:
+        n = int(n_frames)
+    except (TypeError, ValueError):
+        n = 0
+    if n > 1:
+        return f"{n} × {text}"
+    return text
+
+
+def format_rate_pa(rate_arcsec_min, pa_deg=None):
+    # @args: rate_arcsec_min - apparent sky rate in arcsec/min, pa_deg -
+    #        position angle in degrees (north through east) or None
+    # @return: "1.23″/min PA 245°", or just the rate when the PA is unknown
+    # The same shape viz/motion_view uses, so the number reads the same in
+    # the motion figure and in the band.
+    line = f"{rate_arcsec_min:.2f}″/min"
+    if pa_deg is not None:
+        line += f" PA {pa_deg:.0f}°"
+    return line
+
+
 def format_pixel_scale(arcsec_px):
     # @args: arcsec_px - plate scale in arcsec/pixel
     # @return: "PSc: 1.07″/px"
@@ -217,6 +248,8 @@ ROLE_MAG = "mag"              # a CLEAN measurement of this plate (green)
 ROLE_MAG_FAIR = "mag-fair"    # usable, but not clean (orange)
 ROLE_MAG_DOUBT = "mag-doubt"  # not to report without looking (red)
 ROLE_MAG_CAT = "mag-cat"      # only a catalog value: not a measurement (white)
+ROLE_MOTION = "motion"        # the object's motion, MEASURED on this plate
+ROLE_MOTION_EPH = "motion-eph"  # only the ephemeris' prediction, not measured
 ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
 
 # The context fields, in the order they are DROPPED when the band runs out
@@ -224,9 +257,10 @@ ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
 # without a date is not a chart). The renderer walks this list, never a
 # half-drawn field.
 DROP_ORDER = ("fov", "psc", "equip", "filter", "stn", "date")
-# ... and the identity line, when even that does not fit: the magnitude
-# goes first, then the position, and only then is the name elided.
-DROP_ORDER_NAME = ("mag", "pos")
+# ... and the identity line, when even that does not fit: the motion goes
+# first (it is the story, not the identity), then the magnitude, and only
+# then is the position elided. The name is never dropped.
+DROP_ORDER_NAME = ("motion", "mag", "pos")
 
 # The two lines of the magnitude's colour code, in magnitudes of total
 # error. A single plate's honest error sits around 0.03-0.08, so 0.05 keeps
@@ -334,18 +368,22 @@ def _seg(text, role, field):
 
 
 def build_band(name=None, meta=None, wcs_info=None, measured=None,
-               catalog_mag=None, equipment=None, site=None, target=None):
+               catalog_mag=None, equipment=None, site=None, target=None,
+               motion=None, measured_pos=None):
     # The plate's heading, as two lines of segments.
     # @args: name - object name (always shown when known),
     #        meta - fits_meta.meta_from_header dict (date_obs, exptime_s,
-    #        filter), wcs_info - {"ra_deg", "dec_deg",
-    #        "scale_arcsec_px", "fov_arcmin": (w, h)} or None when the
-    #        plate is not solved, measured - a calibration of this plate
-    #        (see magnitude_role), catalog_mag - the project's/catalog
+    #        filter) plus "n_frames" for a stack, wcs_info - {"ra_deg",
+    #        "dec_deg", "scale_arcsec_px", "fov_arcmin": (w, h)} or None
+    #        when the plate is not solved, measured - a calibration of this
+    #        plate (see magnitude_role), catalog_mag - the project's/catalog
     #        magnitude or None, equipment - see equipment_from_header,
     #        site - see site_from_config (only the station is shown),
     #        target - (ra_deg, dec_deg) of the object, for the case where
-    #        there is no solution to place it on the plate
+    #        there is no solution to place it on the plate, motion -
+    #        {"rate_arcsec_min", "pa_deg", "measured"} of the object's
+    #        apparent motion or None, measured_pos - (ra_deg, dec_deg) of
+    #        the object MEASURED on this plate, which beats the catalogue's
     # @return: {"lines": [[segment, ...], [segment, ...]]}: the identity
     #          line is never empty (when there is a name), the context line
     #          can be
@@ -358,12 +396,17 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
     solved = wcs_info is not None
     if solved:
         ra, dec = wcs_info.get("ra_deg"), wcs_info.get("dec_deg")
-    if ra is None and target is not None:
+    if measured_pos is not None:
+        # The position MEASURED on this plate (the astrometry's centroid):
+        # it is this plate's own, so it wears the ink and not the (cat) of
+        # a catalogue value placed by the solution.
+        ra, dec = measured_pos
+    elif ra is None and target is not None:
         ra, dec = target
     if ra is not None and dec is not None:
         text = (f"RA {coords.ra_deg_to_hms(float(ra))} · "
                 f"Dec {coords.dec_deg_to_dms(float(dec))}")
-        if solved:
+        if solved or measured_pos is not None:
             identity.append(_seg(text, ROLE_POS, "pos"))
         else:
             # the catalog's position: it is NOT this plate's, and the colour
@@ -380,13 +423,23 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
                                  ROLE_MAG_CAT, "mag"))
         except (TypeError, ValueError):
             pass
+    # The object's motion: the velocity sweep's own answer when it was
+    # measured (ink), the ephemeris' prediction otherwise (dimmed and with
+    # the word, the same way a catalogue position says (cat)).
+    if motion and motion.get("rate_arcsec_min") is not None:
+        text = format_rate_pa(motion["rate_arcsec_min"],
+                              motion.get("pa_deg"))
+        if motion.get("measured"):
+            identity.append(_seg(text, ROLE_MOTION, "motion"))
+        else:
+            identity.append(_seg(text + " (eph)", ROLE_MOTION_EPH, "motion"))
     context = []
     date = format_date_ut(meta.get("date_obs"))
     if date:
         context.append(_seg(date, ROLE_CONTEXT, "date"))
-    exp = format_exptime(meta.get("exptime_s"))
+    exp = format_exposure(meta.get("n_frames"), meta.get("exptime_s"))
     if exp:
-        context.append(_seg(exp.split(": ", 1)[1], ROLE_CONTEXT, "exp"))
+        context.append(_seg(exp, ROLE_CONTEXT, "exp"))
     filt = str(meta.get("filter") or "").strip()
     if filt:
         context.append(_seg(filt, ROLE_CONTEXT, "filter"))

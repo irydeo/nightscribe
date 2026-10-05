@@ -11721,6 +11721,46 @@ tocan.</translation>
         <translation>No se midió el brillo (la casilla está apagada): esta ejecución solo reporta posiciones</translation>
     </message>
     <message>
+        <location filename="../ufe_trackstack_tab.py" line="840"/>
+        <source>%1 frames were saved by fitting the field&apos;s small rotation (they were being thrown away).</source>
+        <translation>%1 tomas se han salvado ajustando la pequeña rotación del campo (se estaban tirando).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="844"/>
+        <source>%1 frames could not be aligned</source>
+        <translation>%1 tomas no se han podido alinear</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="856"/>
+        <source>The visit looks like %1 runs: the second one is %2 px away</source>
+        <translation>La visita parece %1 tandas: la segunda está a %2 px</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="860"/>
+        <source> and starts %1 min later</source>
+        <translation>y empieza %1 min después</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="871"/>
+        <source>their stars did not agree on the fit</source>
+        <translation>sus estrellas no concuerdan con el ajuste</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="872"/>
+        <source>too few stars</source>
+        <translation>muy pocas estrellas</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="873"/>
+        <source>no stars detected</source>
+        <translation>no se detectan estrellas</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="874"/>
+        <source>no transform could be fitted</source>
+        <translation>no se ha podido ajustar ninguna transformación</translation>
+    </message>
+    <message>
         <source>Brightness %1 ± %2 %3 from %4 comparison stars on %5 frames (%6)</source>
         <translation type="vanished">Brillo %1 ± %2 %3 a partir de %4 estrellas de comparación en %5 tomas (%6)</translation>
     </message>
@@ -11731,152 +11771,147 @@ tocan.</translation>
     </message>
     <message>
         <location filename="../ufe_trackstack_tab.py" line="802"/>
-        <location filename="../ufe_trackstack_tab.py" line="1088"/>
+        <location filename="../ufe_trackstack_tab.py" line="1143"/>
         <source>Obs. %1</source>
         <translation>Obs. %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="822"/>
+        <location filename="../ufe_trackstack_tab.py" line="821"/>
         <source>Sequence stacked: %1 observations measured.</source>
         <translation>Secuencia apilada: %1 observaciones medidas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="826"/>
-        <source>%1 frames could not be aligned and were left out.</source>
-        <translation>%1 tomas no se pudieron alinear y quedaron fuera.</translation>
-    </message>
-    <message>
-        <location filename="../ufe_trackstack_tab.py" line="890"/>
+        <location filename="../ufe_trackstack_tab.py" line="945"/>
         <source>The group&apos;s stack could not be written:</source>
         <translation>No se pudo escribir el apilado del grupo:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="899"/>
+        <location filename="../ufe_trackstack_tab.py" line="954"/>
         <source>The group&apos;s stack could not be shown:</source>
         <translation>No se pudo mostrar la pila del grupo:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1060"/>
+        <location filename="../ufe_trackstack_tab.py" line="1115"/>
         <source>Blink (animated GIF)</source>
         <translation>Parpadeo (GIF animado)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1061"/>
+        <location filename="../ufe_trackstack_tab.py" line="1116"/>
         <source>Montage (still PNG)</source>
         <translation>Montaje (PNG fijo)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1110"/>
+        <location filename="../ufe_trackstack_tab.py" line="1165"/>
         <source>The blink figure could not be written:</source>
         <translation>No se pudo escribir la figura de parpadeo:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1118"/>
+        <location filename="../ufe_trackstack_tab.py" line="1173"/>
         <source>Blink figure written:</source>
         <translation>Figura de parpadeo escrita:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1157"/>
+        <location filename="../ufe_trackstack_tab.py" line="1212"/>
         <source>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</source>
         <translation>Separación entre la medida sobre el stack y la medida por frame (la misma receta de centroide en ambas)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1161"/>
+        <location filename="../ufe_trackstack_tab.py" line="1216"/>
         <source>The two measurements disagree: the point is flagged, nothing is chosen in silence</source>
         <translation>Las dos medidas no coinciden: el punto se marca, nada se elige en silencio</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1170"/>
+        <location filename="../ufe_trackstack_tab.py" line="1225"/>
         <source>The two measurements disagree</source>
         <translation>Las dos medidas no coinciden</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1172"/>
+        <location filename="../ufe_trackstack_tab.py" line="1227"/>
         <source>No per-frame centroid</source>
         <translation>Sin centroide por frame</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1186"/>
+        <location filename="../ufe_trackstack_tab.py" line="1241"/>
         <source>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</source>
         <translation>Find_Orb no está configurado: el chequeo no está disponible. Configúralo en Ajustes; mientras tanto, la secuencia centrada y el listón de envío son la red de seguridad.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1191"/>
+        <location filename="../ufe_trackstack_tab.py" line="1246"/>
         <source>The check is not available:</source>
         <translation>El chequeo no está disponible:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1195"/>
+        <location filename="../ufe_trackstack_tab.py" line="1250"/>
         <source>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</source>
         <translation>Sin otras observaciones para comparar: no se bloquea nada (un descubrimiento real no tiene referencia); deciden la secuencia centrada y el listón de envío.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1200"/>
+        <location filename="../ufe_trackstack_tab.py" line="1255"/>
         <source>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</source>
         <translation>Nuestro punto es un outlier contra los otros observadores: el reporte se bloquea por defecto. Forzarlo deja la decisión por escrito.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1205"/>
+        <location filename="../ufe_trackstack_tab.py" line="1260"/>
         <source>The check passes: our residual fits inside the published observations&apos; dispersion.</source>
         <translation>El chequeo pasa: nuestro residual cae dentro de la dispersión de las observaciones publicadas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1209"/>
+        <location filename="../ufe_trackstack_tab.py" line="1264"/>
         <source>Our residual: %1″ / %2″ · %3 distinct observatories</source>
         <translation>Nuestro residual: %1″ / %2″ · %3 observatorios distintos</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1217"/>
+        <location filename="../ufe_trackstack_tab.py" line="1272"/>
         <source>not available</source>
         <translation>no disponible</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1219"/>
+        <location filename="../ufe_trackstack_tab.py" line="1274"/>
         <source>nothing to compare</source>
         <translation>sin nada que comparar</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1221"/>
+        <location filename="../ufe_trackstack_tab.py" line="1276"/>
         <source>blocked</source>
         <translation>bloqueado</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1223"/>
+        <location filename="../ufe_trackstack_tab.py" line="1278"/>
         <source>passes</source>
         <translation>pasa</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1264"/>
+        <location filename="../ufe_trackstack_tab.py" line="1319"/>
         <source>Measure the sequence first.</source>
         <translation>Mide primero la secuencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1278"/>
+        <location filename="../ufe_trackstack_tab.py" line="1333"/>
         <source>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</source>
         <translation>Observación %1 fuera: no se midió SNR, así que no puede probarse que supere el listón de %2</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1283"/>
+        <location filename="../ufe_trackstack_tab.py" line="1338"/>
         <source>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</source>
         <translation>Observación %1 fuera: el SNR %2 está por debajo del listón de envío del MPC (%3); una detección marginal arriesga un tracklet falso</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1297"/>
+        <location filename="../ufe_trackstack_tab.py" line="1352"/>
         <source>Report generated: %1 observations kept.</source>
         <translation>Reporte generado: %1 observaciones conservadas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1307"/>
+        <location filename="../ufe_trackstack_tab.py" line="1362"/>
         <source>Generate the report first.</source>
         <translation>Genera primero el reporte.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1313"/>
+        <location filename="../ufe_trackstack_tab.py" line="1368"/>
         <source>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</source>
         <translation>Reporte enviado al bloque MPC de la visita: su validador tiene la última palabra antes de guardar.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1317"/>
+        <location filename="../ufe_trackstack_tab.py" line="1372"/>
         <source>The visit window is not open: open the visit to send the report to its MPC block.</source>
         <translation>La ventana de la visita no está abierta: abre la visita para enviar el reporte a su bloque MPC.</translation>
     </message>

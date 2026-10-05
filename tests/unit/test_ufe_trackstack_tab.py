@@ -659,3 +659,137 @@ def test_the_star_stack_is_saved_next_to_the_object_stack(qapp, tmp_path):
     assert header["CRVAL1"] == pytest.approx(30.0)
     assert any(p.endswith("_stars.fits") and kind == "stack"
                for paths, kind in saved for p in paths)
+
+
+def test_the_band_reads_the_motion_and_brightness_of_a_stack(qapp, tmp_path):
+    # The heading of an asteroid's stack says the motion the sweep measured
+    # and the brightness measured on it, written into the file so a stack
+    # reopened later says the same. band_facts reads exactly that, from the
+    # header alone (no run in memory, no database round trip).
+    from astropy.io import fits
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.core import astrometry, track_stack
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2025 UR"}
+    host.export_folder = lambda: str(tmp_path)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._run_id = 7
+    frame = track_stack.Frame(path="f.fits",
+                              header={"EXPTIME": 30.0, "FILTER": "Clear",
+                                      "INSTRUME": "TestCam"},
+                              exptime_s=30.0,
+                              date_obs="2026-09-20T23:30:00")
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+        "points": [(point, None, [])],
+        "groups": [(0, 4)], "mids": [2460965.5], "frames": [frame],
+        "sweep": track_stack.SweepResult(
+            best={"rate": 1.234, "pa": 245.4, "score": 3.0}, grid=[]),
+        "photometry": {"mag": 18.05, "err": 0.12, "band": "G",
+                       "n_comps": 8, "n_frames": 4,
+                       "per_obs": [{"mag": 18.05, "err": 0.12,
+                                    "n_comps": 8, "check": True}]},
+    }
+    tab._show_group(0)
+    path = tmp_path / "2025UR_obs1_20251017T000000.fits"
+    header = fits.getheader(str(path))
+    assert header["NS_RATE"] == pytest.approx(1.234)
+    assert header["NS_PA"] == pytest.approx(245.4)
+    assert header["NS_MOT"] == "sweep"
+    assert header["NS_MAG"] == pytest.approx(18.05)
+    assert header["NS_MAGER"] == pytest.approx(0.12)
+    assert header["NS_MAGNC"] == 8
+    assert header["NS_MAGOK"] == 1
+    assert header["NS_MAGB"] == "G"
+    assert header["NS_NFRAM"] == 4
+    assert header["EXPTIME"] == pytest.approx(30.0)
+    assert header["DATE-OBS"].startswith("2025-10-17")
+    # the tab hands the band the same facts, from the header alone
+    facts = tab.band_facts(dict(header))
+    assert facts["motion"] == {"rate_arcsec_min": 1.234, "pa_deg": 245.4,
+                               "measured": True}
+    assert facts["measured"]["mag"] == pytest.approx(18.05)
+    assert facts["measured"]["comps"] == 8
+    assert facts["measured"]["check_ok"] is True
+    assert facts["measured_pos"] == (30.0, 10.0)
+    # a plain frame is not one of the run's stacks
+    assert tab.band_facts({"OBJECT": "2025 UR"}) is None
+
+
+def test_the_band_marks_a_predicted_motion_and_the_star_stack_has_no_mag(
+        qapp, tmp_path):
+    # Without a sweep the ephemeris still gives the motion, marked (eph);
+    # and the star stack, where the object is a trail, carries the motion
+    # but never a brightness that was not measured there.
+    from astropy.io import fits
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.core import astrometry
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2025 UR"}
+    host.export_folder = lambda: str(tmp_path)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._run_id = 3
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    obj = np.zeros((16, 16), dtype=np.float32)
+    stars = np.ones((16, 16), dtype=np.float32)
+    tab._result = {
+        "stacks": [(obj, None)], "star_stacks": [(stars, None)],
+        "points": [(point, None, [])], "groups": [(0, 4)],
+        "mids": [2460965.5], "base_rate": 30.6, "base_pa": 90.0,
+    }
+    tab._show_group(0)
+    obj_header = fits.getheader(str(
+        tmp_path / "2025UR_obs1_20251017T000000.fits"))
+    star_header = fits.getheader(str(
+        tmp_path / "2025UR_obs1_20251017T000000_stars.fits"))
+    assert obj_header["NS_MOT"] == "eph"
+    assert obj_header["NS_RATE"] == pytest.approx(30.6)
+    assert "NS_MAG" not in star_header
+    facts = tab.band_facts(dict(star_header))
+    assert facts["motion"]["measured"] is False
+    assert "measured" not in facts and "measured_pos" not in facts
+
+
+def test_the_registration_note_says_what_happened(qapp, tmp_path):
+    # P0: the bare "N frames were left out" is gone. The tab says how many
+    # came back and how, why the rest failed, and whether the visit is
+    # really two runs (measured on 2025 UR: 47 saved by rotation, 2 runs,
+    # 884 px and 289 s apart).
+    tab, _host = _tab(qapp, tmp_path)
+    text = tab._register_note({
+        "n_total": 140, "n_ok": 139, "n_failed": 1, "n_rotation": 47,
+        "multi_run": True, "reasons": {"few_stars": 1},
+        "blocks": [{"n": 77, "dx": 0.0, "dy": 0.0, "angle_deg": 0.0,
+                    "gap_s": None},
+                   {"n": 62, "dx": -818.9, "dy": 334.7, "angle_deg": -0.118,
+                    "gap_s": 289.0}]})
+    import math as _math
+    assert "47 frames were saved" in text
+    assert "1 frames could not be aligned (too few stars)" in text
+    assert "2 runs" in text and "5 min later" in text
+    # the distance is the hypot of the block's offset, rounded for reading
+    assert f"{_math.hypot(-818.9, 334.7):.0f} px away" in text
+    # nothing to say, nothing said
+    assert tab._register_note({"n_total": 10, "n_ok": 10, "n_failed": 0,
+                               "n_rotation": 0, "multi_run": False,
+                               "blocks": [], "reasons": {}}) == ""
+
+
+def test_the_register_reasons_are_words_not_codes(qapp, tmp_path):
+    # The core speaks English keys; the interface speaks the language, and
+    # a code we do not know is passed through rather than hidden.
+    tab, _host = _tab(qapp, tmp_path)
+    assert tab._register_reasons({"few_stars": 3}) == "too few stars"
+    assert tab._register_reasons({"rms": 2, "few_stars": 1}) == \
+        "their stars did not agree on the fit: 2, too few stars: 1"
+    assert tab._register_reasons({"weird": 1}) == "weird"
+    assert tab._register_reasons({}) == ""

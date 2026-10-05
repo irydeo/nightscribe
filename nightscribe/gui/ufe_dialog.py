@@ -1628,6 +1628,9 @@ class UfeDialog(QWidget):
         # measured HERE, and coloured by its own numbers; the frame's date,
         # exposure, filter and kit; the station; the scale and the field of
         # what is shown, which need the solution).
+        # On one of the astrometry tab's stacks it also says the object's
+        # motion (measured by the sweep, or the ephemeris' prediction) and
+        # the position measured on that very plate.
         # @return: the band dict ({"lines": []} when nothing can be said)
         from ..config import config
         from ..core import chart_annotate, fits_meta
@@ -1639,7 +1642,24 @@ class UfeDialog(QWidget):
             name = self.tab_compare.edt_target.text().strip()
         if not name and self.state.path:
             name = Path(self.state.path).stem
-        meta = fits_meta.meta_from_header(self.state.header or {})
+        header = self.state.header or {}
+        meta = fits_meta.meta_from_header(header)
+        if header.get("NS_NFRAM") is not None:
+            # a stack is "N × T s": how many frames it combines
+            meta["n_frames"] = header.get("NS_NFRAM")
+        # What the astrometry tab knows about one of ITS stacks: the motion,
+        # the brightness measured on it and the position measured on it. It
+        # is read from the stack's own header, so the band says the same
+        # right after a run and when the file is reopened later.
+        facts = {}
+        tab_ts = getattr(self, "tab_trackstack", None)
+        ask = getattr(tab_ts, "band_facts", None)
+        if callable(ask):
+            try:
+                facts = ask(header) or {}
+            except Exception as err:
+                logger.warning("track&stack band facts failed: %s", err)
+                facts = {}
         wcs_info = None
         if self.state.wcs is not None:
             scale = self.state.wcs.pixel_scale()
@@ -1696,6 +1716,11 @@ class UfeDialog(QWidget):
                             "flags": point.get("flags")}
             elif last is not None and last.get("mag") is not None:
                 measured = tab.measured_facts(last)
+        if facts.get("measured") is not None:
+            # On one of the astrometry tab's stacks, the brightness the RUN
+            # measured on it is the truth: a stale measurement of the
+            # Photometry tab must not colour the band over it.
+            measured = facts["measured"]
         catalog_mag = None
         try:
             if obj.get("mag") is not None:
@@ -1711,6 +1736,8 @@ class UfeDialog(QWidget):
         return chart_annotate.build_band(
             name=name, meta=meta, wcs_info=wcs_info, measured=measured,
             catalog_mag=catalog_mag, target=target,
+            motion=facts.get("motion"),
+            measured_pos=facts.get("measured_pos"),
             equipment=chart_annotate.equipment_from_header(
                 self.state.header or {}, config),
             site=chart_annotate.site_from_config(config))

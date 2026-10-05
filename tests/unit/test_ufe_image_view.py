@@ -616,7 +616,7 @@ def test_every_role_of_the_band_has_its_colour(qapp):
     from nightscribe.gui.widgets.ufe_image_view import BAND_COLOURS
     for role in (ca.ROLE_NAME, ca.ROLE_POS, ca.ROLE_POS_CAT, ca.ROLE_MAG,
                  ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT,
-                 ca.ROLE_CONTEXT):
+                 ca.ROLE_MOTION, ca.ROLE_MOTION_EPH, ca.ROLE_CONTEXT):
         assert role in BAND_COLOURS, role
     # and the magnitude's scale is FOUR different colours (green, orange,
     # red and the catalogue's white): it has to be readable at a glance
@@ -628,3 +628,6 @@ def test_every_role_of_the_band_has_its_colour(qapp):
     assert BAND_COLOURS[ca.ROLE_MAG_FAIR] == palette.FAIR
     assert BAND_COLOURS[ca.ROLE_MAG_DOUBT] == palette.DANGER
     assert BAND_COLOURS[ca.ROLE_MAG_CAT] == palette.CATALOG
+    # the motion distinguishes measured (ink) from predicted (dimmed)
+    assert BAND_COLOURS[ca.ROLE_MOTION] == palette.FG
+    assert BAND_COLOURS[ca.ROLE_MOTION_EPH] == palette.MUTED

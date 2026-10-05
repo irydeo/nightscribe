@@ -818,14 +818,69 @@ class UfeTrackStackTab(QWidget):
         # the report buttons FOLLOW the run (they were only refreshed at
         # init and on reset, so a successful run left them disabled)
         self._sync_report_buttons()
-        failed = int(self._result.get("n_failed") or 0)
         note = self.tr("Sequence stacked: %1 observations measured."
                        ).replace("%1", str(n))
-        if failed:
-            note += " " + self.tr(
-                "%1 frames could not be aligned and were left out."
-                ).replace("%1", str(failed))
+        extra = self._register_note(self._result.get("register_report"))
+        if extra:
+            note += " " + extra
         self._say(note)
+
+    def _register_note(self, report):
+        # @args: report - track_stack.registration_report output (or None)
+        # @return: what the registration did, in plain language. This is the
+        #          honest half of a run: a frame left out is a factor in the
+        #          stack's SNR, and a visit that is really two runs is a
+        #          fact the observer needs BEFORE believing the result. It
+        #          replaces the old bare "N frames could not be aligned".
+        report = report or {}
+        parts = []
+        n_rot = int(report.get("n_rotation") or 0)
+        if n_rot:
+            parts.append(self.tr(
+                "%1 frames were saved by fitting the field's small rotation "
+                "(they were being thrown away).").replace("%1", str(n_rot)))
+        failed = int(report.get("n_failed") or 0)
+        if failed:
+            line = self.tr("%1 frames could not be aligned").replace(
+                "%1", str(failed))
+            reasons = self._register_reasons(report.get("reasons") or {})
+            if reasons:
+                line += f" ({reasons})"
+            parts.append(line + ".")
+        blocks = report.get("blocks") or []
+        if report.get("multi_run") and len(blocks) > 1:
+            second = blocks[1]
+            offset = (float(second.get("dx") or 0.0) ** 2
+                      + float(second.get("dy") or 0.0) ** 2) ** 0.5
+            text = self.tr(
+                "The visit looks like %1 runs: the second one is %2 px away"
+            ).replace("%1", str(len(blocks))).replace("%2", f"{offset:.0f}")
+            gap = second.get("gap_s")
+            if gap:
+                text += self.tr(" and starts %1 min later").replace(
+                    "%1", f"{float(gap) / 60.0:.0f}")
+            parts.append(text + ".")
+        return " ".join(parts)
+
+    def _register_reasons(self, reasons):
+        # @args: reasons - {internal code: count} from the report
+        # @return: the reasons in words, or "" when there are none. The
+        #          code is the core's English key; the words are here, one
+        #          per language, and a code we do not know is passed through
+        #          rather than hidden.
+        words = {"rms": self.tr("their stars did not agree on the fit"),
+                 "few_stars": self.tr("too few stars"),
+                 "no_stars": self.tr("no stars detected"),
+                 "no_fit": self.tr("no transform could be fitted")}
+        if not reasons:
+            return ""
+        if len(reasons) == 1:
+            key = next(iter(reasons))
+            return words.get(key, key)
+        return ", ".join(
+            f"{words.get(key, key)}: {count}"
+            for key, count in sorted(reasons.items(),
+                                     key=lambda kv: -kv[1]))
 
     def _show_group(self, index):
         # The group's stack goes to the MAIN stage (the shared state), so
@@ -884,6 +939,11 @@ class UfeTrackStackTab(QWidget):
             if self._run_id is not None:
                 hdu.header["NS_RUN"] = (int(self._run_id),
                                         "the astrometry run it belongs to")
+            # The band's own data, written into the file: the frame's date,
+            # exposure, filter and kit, and the run's motion and brightness,
+            # so reopening this stack says the same as the day it was made.
+            self._write_frame_meta(hdu.header, result, index)
+            self._write_band_cards(hdu.header, result, index)
             hdu.writeto(str(path), overwrite=True)
         except Exception as err:     # a stack that cannot be written says so
             logger.warning("group stack write failed: %s", err)
@@ -1005,6 +1065,176 @@ class UfeTrackStackTab(QWidget):
         except Exception as err:
             logger.warning("the stack could not be annotated: %s", err)
 
+    # ------------------------------------------------------------ the band
+
+    def band_facts(self, header):
+        # What the plate's heading (ADR-046) says about one of THIS tab's
+        # stacks. Everything comes from the stack's own header, written when
+        # the stack was saved, so the band says the same right after the run
+        # and when the file is reopened in another session (no run in
+        # memory, no database round trip).
+        # @args: header - the open plate's header dict
+        # @return: {"measured", "measured_pos", "motion"} or None when the
+        #          plate is not one of this run's stacks
+        header = header or {}
+        kind = str(header.get("NS_STACK") or "")
+        if kind not in ("object", "stars") or header.get("NS_RUN") is None:
+            return None
+        stars = kind == "stars"
+        facts = {}
+        motion = self._motion_from_header(header)
+        if motion is not None:
+            facts["motion"] = motion
+        if not stars:
+            ra, dec = header.get("NS_RA"), header.get("NS_DEC")
+            if ra is not None and dec is not None:
+                # the position MEASURED on this plate (the astrometric
+                # centroid), written by the annotation pass
+                facts["measured_pos"] = (float(ra), float(dec))
+            measured = self._measured_from_header(header)
+            if measured is not None:
+                facts["measured"] = measured
+        return facts or None
+
+    def _motion_from_header(self, header):
+        # @args: header - a stack's header
+        # @return: {"rate_arcsec_min", "pa_deg", "measured"} or None. The
+        #          word "measured" is what decides between the ink and the
+        #          dimmed (eph) colour: the sweep measured it, or it is only
+        #          the ephemeris' prediction.
+        rate = header.get("NS_RATE")
+        if rate is None:
+            return None
+        pa = header.get("NS_PA")
+        return {"rate_arcsec_min": float(rate),
+                "pa_deg": (float(pa) if pa is not None else None),
+                "measured": str(header.get("NS_MOT") or "sweep") == "sweep"}
+
+    def _measured_from_header(self, header):
+        # @args: header - the object stack's header
+        # @return: the brightness of this observation with the signals that
+        #          colour it (see chart_annotate.magnitude_role), or None
+        mag = header.get("NS_MAG")
+        if mag is None:
+            return None
+        chk = header.get("NS_MAGOK")
+        err = header.get("NS_MAGER")
+        comps = header.get("NS_MAGNC")
+        return {"mag": float(mag),
+                "err": (float(err) if err is not None else None),
+                "band": header.get("NS_MAGB"),
+                "comps": (int(comps) if comps is not None else None),
+                "check_ok": (bool(chk) if chk is not None else None),
+                "no_check": chk is None}
+
+    def _write_frame_meta(self, header, result, index):
+        # A stack is a combination of frames and it must say what they were.
+        # Without these cards the band over a stack had no date, no exposure
+        # and no filter at all: the header was born with the WCS and the NS_*
+        # cards only. Copying them is not a nicety, it is what lets the band
+        # read "8 × 3.0 s" and the night's own date.
+        # @args: header - the stack's header being built, result - the run's
+        #        payload, index - the observation
+        # @return: None
+        try:
+            frames = result.get("frames") or []
+            groups = result.get("groups") or []
+            ref = None
+            if 0 <= index < len(groups):
+                start, end = groups[index]
+                for i in range(int(start), min(int(end), len(frames))):
+                    if getattr(frames[i], "header", None):
+                        ref = frames[i]
+                        break
+            if ref is None and frames:
+                ref = frames[0]
+            if ref is None:
+                return
+            for key in ("EXPTIME", "FILTER", "INSTRUME", "TELESCOP"):
+                value = (ref.header or {}).get(key)
+                if isinstance(value, (str, int, float)):
+                    header[key] = value
+            # the date is the observation's own middle instant, so a visit
+            # that spans two hours is dated where it really happened
+            mids = result.get("mids") or []
+            jd = mids[index] if 0 <= index < len(mids) else None
+            if jd is not None:
+                from ..core import coords
+                header["DATE-OBS"] = coords.datetime_from_jd(
+                    float(jd)).strftime("%Y-%m-%dT%H:%M:%S")
+            elif getattr(ref, "date_obs", None):
+                header["DATE-OBS"] = str(ref.date_obs)
+        except Exception as err:      # a missing card never costs the stack
+            logger.warning("the stack's frame metadata failed: %s", err)
+
+    def _write_band_cards(self, header, result, index, stars=False):
+        # What the band says about this stack, written into the file so a
+        # stack reopened months later says exactly the same. The motion is
+        # the sweep's own answer when it was measured and the ephemeris'
+        # prediction, marked as such, otherwise; the brightness and the
+        # signals that colour it go only on the object's stack (on the
+        # stars' one the object is a trail and was not measured).
+        # @args: header - the stack's header being built, result - the run's
+        #        payload, index - the observation, stars - True for the star
+        #        stack
+        # @return: None
+        try:
+            best = None
+            sweep = result.get("sweep")
+            if sweep is not None:
+                best = getattr(sweep, "best", None)
+            if best and best.get("rate") is not None:
+                header["NS_RATE"] = (
+                    float(best["rate"]),
+                    "arcsec/min, measured by the velocity sweep")
+                if best.get("pa") is not None:
+                    header["NS_PA"] = (float(best["pa"]),
+                                       "deg north through east")
+                header["NS_MOT"] = ("sweep", "the sweep measured it")
+            elif result.get("base_rate") is not None:
+                header["NS_RATE"] = (
+                    float(result["base_rate"]),
+                    "arcsec/min, ephemeris prediction")
+                if result.get("base_pa") is not None:
+                    header["NS_PA"] = (float(result["base_pa"]),
+                                       "deg north through east")
+                header["NS_MOT"] = ("eph",
+                                    "ephemeris prediction, not measured")
+            if stars:
+                return
+            phot = result.get("photometry") or {}
+            per_obs = phot.get("per_obs") or []
+            one = per_obs[index] if 0 <= index < len(per_obs) else None
+            if one is not None and one.get("mag") is not None:
+                header["NS_MAG"] = (float(one["mag"]),
+                                    "measured on this stack")
+                if one.get("err") is not None:
+                    header["NS_MAGER"] = (float(one["err"]),
+                                          "total error, mag")
+                if one.get("n_comps") is not None:
+                    header["NS_MAGNC"] = (
+                        int(one["n_comps"]),
+                        "comparison stars holding the zero point")
+                if one.get("check") is not None:
+                    header["NS_MAGOK"] = (
+                        1 if one["check"] else 0,
+                        "the check star's verdict")
+            elif phot.get("mag") is not None:
+                header["NS_MAG"] = (float(phot["mag"]),
+                                    "median brightness of the run")
+                if phot.get("err") is not None:
+                    header["NS_MAGER"] = (float(phot["err"]),
+                                          "total error, mag")
+                if phot.get("n_comps") is not None:
+                    header["NS_MAGNC"] = (
+                        int(phot["n_comps"]),
+                        "comparison stars holding the zero point")
+            if phot.get("band"):
+                header["NS_MAGB"] = (
+                    str(phot["band"]), "band of the comparison stars")
+        except Exception as err:      # a missing card never costs the stack
+            logger.warning("the stack's band cards failed: %s", err)
+
     def _write_star_stack(self, index, result):
         # @args: index - the observation, result - the run's payload
         # @return: the path written, or None when the run kept no star stack
@@ -1036,9 +1266,19 @@ class UfeTrackStackTab(QWidget):
                 hdu.header["OBJECT"] = str(name)
             hdu.header["NS_NOBS"] = (int(index) + 1,
                                      "observation of the visit")
+            groups = result.get("groups") or []
+            if index < len(groups):
+                hdu.header["NS_NFRAM"] = (
+                    int(groups[index][1] - groups[index][0]),
+                    "frames in this stack")
             if self._run_id is not None:
                 hdu.header["NS_RUN"] = (int(self._run_id),
                                         "the astrometry run it belongs to")
+            # the same band data the object's stack carries (minus the
+            # brightness: here the object is a trail), so the heading of the
+            # star stack says the same date, "N × T s" and motion
+            self._write_frame_meta(hdu.header, result, index)
+            self._write_band_cards(hdu.header, result, index, stars=True)
             hdu.writeto(str(path), overwrite=True)
         except Exception as err:
             logger.warning("star stack write failed: %s", err)

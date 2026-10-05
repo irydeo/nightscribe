@@ -58,6 +58,20 @@ def test_format_exptime():
     assert ca.format_exptime(None) is None
 
 
+def test_format_exposure_says_how_many_frames_a_stack_combines():
+    # A stack is not "one 3 s frame": the N is the light it gathered, and a
+    # single frame keeps the bare exposure it always had.
+    assert ca.format_exposure(8, 3.0) == "8 × 3.0 s"
+    assert ca.format_exposure(1, 3.0) == "3.0 s"
+    assert ca.format_exposure(None, 3.0) == "3.0 s"
+    assert ca.format_exposure(8, None) is None
+
+
+def test_format_rate_pa_keeps_the_motion_view_shape():
+    assert ca.format_rate_pa(1.234, 245.4) == "1.23″/min PA 245°"
+    assert ca.format_rate_pa(1.234) == "1.23″/min"
+
+
 def test_format_pixel_scale_and_fov():
     assert ca.format_pixel_scale(1.0734) == "PSc: 1.07″/px"
     assert ca.format_fov((6.82, 6.78)) == "FOV: 6.8 × 6.8′"
@@ -264,9 +278,11 @@ def test_the_magnitude_wears_the_colour_its_numbers_deserve():
 
 def test_the_drop_order_goes_from_the_least_to_the_most_needed():
     # The renderer walks this list: the field of view first, the date last
-    # (a chart without a date is not a chart), and never half a field.
+    # (a chart without a date is not a chart), and never half a field. On
+    # the identity line the motion goes first (it is the story, not who the
+    # plate is), then the magnitude, and the position is the last to go.
     assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "date")
-    assert ca.DROP_ORDER_NAME == ("mag", "pos")
+    assert ca.DROP_ORDER_NAME == ("motion", "mag", "pos")
 
 
 def test_the_equipment_comes_from_the_plate_not_from_my_settings():
@@ -298,3 +314,36 @@ def test_a_band_with_nothing_to_say_is_an_empty_identity_line():
     # the band entirely), and the context line is simply empty.
     band = ca.build_band()
     assert band["lines"] == [[], []]
+
+
+def test_the_band_shows_the_measured_motion_and_position():
+    # The asteroid's heading: the position MEASURED on this plate (not the
+    # catalogue's placed by the solution), the brightness, and the velocity
+    # sweep's own rate and PA, in the ink that says "measured here".
+    band = ca.build_band(
+        name="2025 UR", meta={**_META, "n_frames": 8}, wcs_info=_WCS,
+        measured=_GOOD_MAG, measured_pos=(49.99038, 49.86875),
+        motion={"rate_arcsec_min": 1.234, "pa_deg": 245.4, "measured": True})
+    first, second = band["lines"]
+    assert _roles(first) == [
+        ("2025 UR", ca.ROLE_NAME),
+        ("RA 03 19 57.7 · Dec +49 52 07.5", ca.ROLE_POS),
+        ("12.34 ± 0.04 (V)", ca.ROLE_MAG),
+        ("1.23″/min PA 245°", ca.ROLE_MOTION)]
+    # the measured position is this plate's, so it never wears the (cat)
+    assert "(cat)" not in first[1]["text"]
+    assert [s["field"] for s in first] == ["name", "pos", "mag", "motion"]
+    # a stack says how many frames it combines, not just the exposure
+    assert ("8 × 40.0 s", ca.ROLE_CONTEXT) in _roles(second)
+
+
+def test_the_band_marks_a_motion_that_was_only_predicted():
+    # Without a sweep the ephemeris still gives a rate and a PA, but they
+    # are a prediction: the word (eph) and the dimmed colour say so, the
+    # same way a catalogue position says (cat).
+    band = ca.build_band(
+        name="2025 UR",
+        motion={"rate_arcsec_min": 30.6, "pa_deg": 90.0, "measured": False})
+    motion = band["lines"][0][-1]
+    assert motion["role"] == ca.ROLE_MOTION_EPH
+    assert motion["text"] == "30.60″/min PA 90° (eph)"

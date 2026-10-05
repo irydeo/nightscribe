@@ -53,10 +53,31 @@ MIN_MATCH = 6
 # A paired-star residual above this (px) is not an alignment: the fit and
 # the stars disagree, so the frame inherits the previous transform and is
 # flagged. A real series lands at a few tenths of a pixel.
+#
+# This is the FALLBACK gate, used when the caller does not know the
+# session's point spread. When it does (the astrometry path measures it),
+# the residual is judged as a FRACTION of the FWHM instead, because that
+# is what actually matters: a misregistration broadens the stacked PSF in
+# proportion to it, so 0.8 px is harmless on 3.5 px seeing and a lot on
+# 1.2 px. Measured on the 2025 UR visit: its second run (five minutes
+# later, field turned 0.12 deg, 884 px away) fits at 0.80 px against a
+# FWHM of 3.56 px, i.e. 0.22 FWHM, and this absolute 0.75 px gate threw
+# all 62 of its frames away.
 MAX_RMS_PX = 0.75
+# The residual as a fraction of the FWHM: a quarter of the point spread is
+# well aligned (it adds ~0.03 px^2 to a PSF of FWHM f), half already
+# shows. The floor keeps a very small PSF from demanding an impossible
+# precision: on a 1.2 px PSF a quarter is 0.3 px, which is star-noise
+# territory, so below the floor the ratio stops ruling.
+MAX_RMS_FWHM = 0.25
+MIN_RMS_PX = 0.5
 # Residual above which a translation is considered insufficient and the
-# rigid fit is tried (px). The point spread of a real star sits here.
-_ROTATE_TRIGGER_PX = 0.7
+# rigid fit is tried (px). The point spread of a real star sits here. It is
+# public because the CALLER needs the same line: estimate_transform returns
+# a translation it could not make fit when it is not allowed to rotate, and
+# the caller has to know that "accepted" is not the same as "good".
+ROTATE_TRIGGER_PX = 0.7
+_ROTATE_TRIGGER_PX = ROTATE_TRIGGER_PX
 # The rigid fit only wins if it removes this fraction of the residual; a
 # spurious rotation never does.
 _RIGID_IMPROVE = 0.25
@@ -639,20 +660,43 @@ def _pair_fit(ref_xy, src_xy, dx, dy, angle, tol, shape, rigid=True):
     return fit
 
 
-def trusted(tr):
+def rms_limit(fwhm_px=None):
+    # @args: fwhm_px - the session's point spread in pixels, or None
+    # @return: the largest paired-star residual (px) still called aligned.
+    #          The caller that knows the seeing passes it, so the gate
+    #          follows the night instead of a fixed number: this is what
+    #          recovers a whole second run whose frames fit at 0.8 px on a
+    #          3.5 px PSF (see MAX_RMS_FWHM).
+    if not fwhm_px or fwhm_px <= 0:
+        return MAX_RMS_PX
+    return max(MIN_RMS_PX, MAX_RMS_FWHM * float(fwhm_px))
+
+
+def trusted(tr, fwhm_px=None, require_stars=False):
     # The honest quality gate (D44): the transform is trusted when
     # enough stars verified it and they land close to where it said. A
     # star-poor field falls back to the correlation figure, and a frame
     # that fails both is flagged, never silently used.
-    # @args: tr - estimate_transform output
+    # @args: tr - estimate_transform output, fwhm_px - the session's point
+    #        spread (see rms_limit), or None for the absolute fallback,
+    #        require_stars - refuse the correlation fallback
     # @return: bool
+    #
+    # require_stars is for the answers that need PROOF, not a hint: the
+    # correlation figure compares the two frames as images, and two frames
+    # of the same field look alike whatever the transform between them, so
+    # it says "these are the same sky", never "this is the mapping".
+    # Measured on the 2025 UR visit: a frame whose star voting failed
+    # (n=0) was then handed a -106 deg rotation certified by TWO paired
+    # stars and a correlation of 635, and the fallback would have stacked
+    # it rotated. Two stars cannot certify a rotation.
     if tr is None:
         return False
     n = int(tr.get("n") or 0)
     rms = tr.get("rms_px")
-    if n >= MIN_MATCH and rms is not None and rms <= MAX_RMS_PX:
-        return True
     if n >= MIN_MATCH and rms is not None:
+        return rms <= rms_limit(fwhm_px)
+    if require_stars:
         return False
     return float(tr.get("quality") or 0.0) >= QUALITY_MIN
 

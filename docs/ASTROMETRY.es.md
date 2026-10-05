@@ -69,6 +69,15 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    necesita la fotometría (comparsas alrededor); si vas justo de memoria o
    de tiempo puedes reducirlo a 1024, 512 o 256 px, y el barrido de
    velocidad seguirá trabajando sobre el recorte de la estela del objeto.
+   Si la visita mezcla **dos tandas** (una pausa, un re-apuntado), la app
+   lo dice en el resultado: «la visita parece 2 tandas: la segunda está a
+   884 px y empieza 5 min después», con la rotación del campo. Esas tomas
+   **se apilan igual**: el registro ajusta la pequeña rotación del campo
+   (hasta 15°) y recupera los fotogramas que antes se tiraban. Las que de
+   verdad no encajan (una nube, una estela de satélite) se dejan fuera
+   **con su motivo**, nunca en silencio. Medido en una visita de 2025 UR:
+   recuperar la segunda tanda subió el SNR del apilado de estrellas de
+   **1.826 a 2.702 (×1,48)**.
 4. **Barrido de velocidad.** La efeméride y la montura tienen pequeñas
    derivas reales, así que alrededor de la velocidad teórica se prueban 25
    combinaciones (±5 %) y se elige la que da un objeto más brillante **y**
@@ -201,5 +210,14 @@ por separado los calibrados exportados. Solo los frames de una ejecución con
 - **El objeto no aparece**: revisa el SNR de cada grupo, prueba menos
   observaciones (más tomas por grupo) y comprueba que la secuencia está
   dithered.
+- **«N tomas no se han podido alinear»**: el resultado dice **por qué**.
+  *Muy pocas estrellas* suele ser una nube, niebla o una exposición
+  demasiado corta en esa toma; *sus estrellas no concuerdan con el ajuste*
+  suele ser una estela de satélite, un avión o un salto de guiado. Si el
+  mensaje añade que **la visita parece varias tandas**, es que hubo una
+  pausa o un re-apuntado: esas tomas se apilan igual, y solo conviene
+  partir la visita si las tandas son de noches distintas. Y recuerda que
+  las tandas solo se solapan en parte: las comparsas fuera de la zona
+  común no se pueden medir en todas las tomas.
 - **Residuos grandes en todos**: la órbita puede ser mala; mira la dispersión
   de los demás antes de culpar a tu medida.

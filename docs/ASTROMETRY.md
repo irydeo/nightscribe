@@ -70,6 +70,14 @@ project). No visit, no series: that is the house rule.
    which is what the photometry needs (comparison stars all around); short
    on memory or time you can shrink it to 1024, 512 or 256 px, and the
    velocity sweep keeps working on the object's own trail cutout.
+   If the visit mixes **two runs** (a pause, a re-point), the app says so
+   in the result: "the visit looks like 2 runs: the second one is 884 px
+   away and starts 5 min later", with the field's rotation. Those frames
+   **stack anyway**: the registration fits the field's small rotation (up
+   to 15 deg) and recovers frames that used to be thrown away. The ones
+   that really do not fit (a cloud, a satellite trail) are left out **with
+   their reason**, never silently. Measured on a 2025 UR visit: recovering
+   the second run took the star stack's SNR from **1826 to 2702 (x1.48)**.
 4. **Velocity sweep.** The ephemeris and the mount have real small drifts,
    so 25 combinations (±5 %) around the theoretical velocity are tried and
    the one that gives a brighter **and** rounder object is kept. That is the
@@ -205,5 +213,13 @@ a successful run, and nothing moves without your confirmation.
 - **The object does not appear**: check each group's SNR, try fewer
   observations (more frames per group) and make sure the sequence is
   dithered.
+- **"N frames could not be aligned"**: the result says **why**. *Too few
+  stars* is usually a cloud, fog or too short an exposure in that frame;
+  *their stars did not agree on the fit* is usually a satellite trail, an
+  aircraft or a guiding jump. If the message adds that **the visit looks
+  like several runs**, there was a pause or a re-point: those frames stack
+  anyway, and splitting the visit is only worth it when the runs are from
+  different nights. And remember the runs overlap only in part: comparison
+  stars outside the common area cannot be measured in every frame.
 - **Large residuals everywhere**: the orbit may be poor; look at the
   others' scatter before blaming your measurement.

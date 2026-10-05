@@ -72,14 +72,22 @@ project). No visit, no series: that is the house rule.
 6. **Measurement.** The object is measured twice: on the final stack and
    frame by frame. Both use the same centroid, so their comparison means
    something. If they differ by more than 0.5″ or 3σ, the point is flagged.
-7. **Brightness.** The magnitude is measured on the frames, **not** on the
-   stack: on a stack that follows the object the comparison stars are
-   trails, and measuring them there would be wrong. The series engine is
-   reused, so every frame is calibrated against a set of comps (with a MAD
-   veto) and the **median** of the curve is taken, with its error from the
-   MAD. The comps come from the sequence you have saved in the project; with
-   none, the app proposes one automatically and says so, because an
-   automatic proposal is a starting point, not your choice.
+7. **Brightness.** The magnitude is measured on the **stacks**, not on the
+   frames: on a single frame a faint NEO barely shows (SNR 2) and its
+   aperture ends up chasing noise. The object is measured on **its** stack,
+   where its light is concentrated, and the comparison stars on a **second
+   stack** of the same frames aligned on the stars, because on the object's
+   stack they are streaks and a streak calibrates nothing. It is the
+   Tycho-Tracker recipe, and it costs one more stacking pass: you can turn
+   it off with the **"Measure the brightness"** box, and then the run
+   reports positions only and says so. One measurement is made **per
+   observation**, which is what the MPC publishes. The comps come from the
+   sequence you have saved in the project; with none, the app proposes one
+   automatically and says so, because an automatic proposal is a starting
+   point, not your choice. The settings (apertures, sky method, centroid,
+   colour term) are the **Photometry tab's**: they are edited there and
+   nowhere else, and this tab's line tells you, before the run, what the
+   brightness will be measured with.
 8. **Check.** NightScribe downloads the object's published observations (or
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your
@@ -106,11 +114,12 @@ project). No visit, no series: that is the house rule.
   timing).
 - **Magnitude limit**: how deep the stack went. It is useful even with no
   object: it says whether the night could have given more.
-- **Brightness**: the object's magnitude measured on the frames against the
+- **Brightness**: the object's magnitude measured on the stacks against the
   comps, with its band (Gaia G when the comps are Gaia's, the usual case
-  with a Clear filter). It comes with the number of comps and frames behind
-  it, and with its error: if the object is very faint per frame, the error
-  says so instead of hiding it.
+  with a Clear filter). It comes with the number of comps and observations
+  behind it, and with its error. The star stack also brings a **check
+  star**: if it leaves its catalogue value, the night did not behave and
+  the run says so.
 - **Distinct observatories and last observation** (on the object card):
   many and recent means a live, well-determined object; one and months ago,
   a candidate to be lost.
@@ -123,11 +132,12 @@ project). No visit, no series: that is the house rule.
 - **The check filters, it does not prove**: the MPC itself warns that on a
   short arc a wrong observation fits just as well. The real proof is a high
   SNR and seeing the object in the centred sequence.
-- **A very faint object's brightness is noisy**: if the object barely shows
-  in a single frame (SNR of 2 or 3), its per-frame magnitude scatters widely
-  and the final figure depends on how many frames go in. The position
-  suffers less, because the stack does add signal. If the brightness really
-  matters, lengthen the sequence or ask for fewer observations.
+- **A faint object's brightness is demanding**: it comes from the stack, so
+  it no longer suffers a single frame's noise, but it does depend on the
+  field having comps of a similar brightness and on the object's stack not
+  being crossed by a bright star's streak. The tab tells you which
+  apertures and which sky the run will use before it starts: when something
+  does not add up, that is where to look.
 - **No reference does not block**: if the object is a discovery and nobody
   else has seen it, the check says there is nothing to compare with and does
   not block; the SNR and the sequence decide.

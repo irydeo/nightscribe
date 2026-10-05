@@ -66,6 +66,19 @@ documenta para el apilado de objetos débiles (synthetic tracking).
 13. **Liberar espacio** (opt-in, nunca automático): mover los originales usados a
     `procesados` dentro del proyecto (recuperable) y borrar aparte los calibrados
     exportados, con manifiesto en la base de datos.
+14. **El brillo se mide sobre los apilados, no sobre las tomas**: el objeto en
+    **su** apilado, donde su luz está concentrada, y las comparsas en un
+    **segundo apilado** de las mismas tomas alineado en las estrellas, porque en
+    el apilado del objeto son trazos y un trazo no calibra nada. Es la receta de
+    Tycho-Tracker, y se implementa reutilizando la receta de placa que ya
+    existía (`photometry.measure_plate`, con `comp_image`, una llamada por
+    observación): el punto cero, el término de color, el error y el veredicto de
+    la estrella de control no se escriben de nuevo. La receta (aperturas, método
+    de cielo, centroide, color) es la de la pestaña Fotometría, leída **en vivo**
+    y mostrada antes de lanzar: un solo editor en la app. Cuesta una pasada más
+    de apilado, así que es opcional y, sin ella, la ejecución reporta solo
+    posiciones y lo dice. Medido en 2025 UR (60 tomas, dos observaciones):
+    **17,92 G** contra los 18,0 que el MPC publicó esa misma noche.
 
 **Reapertura de ADR-022**: NightScribe **ahora sí genera medidas**, acotado a
 objetos conocidos, con el usuario como revisor y remitente. El validador y el

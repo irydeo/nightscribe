@@ -72,14 +72,21 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 6. **Medida.** El objeto se mide dos veces: sobre el stack final y frame a
    frame. Las dos usan el mismo centroide, así que su comparación dice algo.
    Si difieren más de 0,5″ o 3σ, el punto se marca.
-7. **Brillo.** La magnitud se mide sobre las tomas, **no** sobre el stack: en
-   un apilado que sigue al objeto las estrellas de comparación son trazos, y
-   medirlas ahí sería un error. Se reutiliza el motor de series, que calibra
-   cada toma con un conjunto de comparsas (con veto por MAD), y se toma la
-   **mediana** de la curva, con su error del MAD. Las comparsas salen de la
-   secuencia que tengas guardada en el proyecto; si no hay, la app propone
-   una automáticamente y lo dice, porque una propuesta automática es un
-   punto de partida, no tu elección.
+7. **Brillo.** La magnitud se mide sobre los **apilados**, no sobre las tomas:
+   en una toma suelta un NEO débil apenas tiene señal (SNR 2) y su apertura
+   acaba persiguiendo el ruido. El objeto se mide en **su** apilado, donde su
+   luz está concentrada, y las estrellas de comparación en un **segundo
+   apilado** de las mismas tomas alineado en las estrellas, porque en el
+   apilado del objeto son trazos y un trazo no calibra nada. Es la receta de
+   Tycho-Tracker, y cuesta una pasada más de apilado: puedes apagarla con la
+   casilla **«Medir el brillo»**, y entonces la ejecución solo reporta
+   posiciones y lo dice. Se hace **una medida por observación**, que es lo que
+   publica el MPC. Las comparsas salen de la secuencia que tengas guardada en
+   el proyecto; si no hay, la app propone una automáticamente y lo dice, porque
+   una propuesta automática es un punto de partida, no tu elección. Los ajustes
+   (aperturas, método de cielo, centroide, término de color) son **los de la
+   pestaña Fotometría**: se editan allí y ningún otro sitio, y la línea de esta
+   pestaña te dice, antes de lanzar, con qué se va a medir.
 8. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube
@@ -105,11 +112,12 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   (centroide, WCS, tiempo).
 - **Magnitud límite**: hasta dónde llegaba la pila. Es útil aunque no haya
   objeto: dice si la noche daba para más.
-- **Brillo**: la magnitud del objeto medida sobre las tomas contra las
+- **Brillo**: la magnitud del objeto medida sobre los apilados contra las
   comparsas, con su banda (Gaia G cuando las comparsas son de Gaia, que es
-  lo normal con filtro Clear). Viene con el número de comparsas y de tomas
-  que la sostienen, y con su error: si el objeto es muy débil por toma, el
-  error lo dice y no se disimula.
+  lo normal con filtro Clear). Viene con el número de comparsas y de
+  observaciones que la sostienen, y con su error. El apilado de estrellas
+  trae además una **estrella de control**: si ella se sale de su valor de
+  catálogo, la noche no se comportó y lo dice.
 - **Observatorios distintos y última observación** (en la ficha del objeto):
   muchos y reciente significa objeto vivo y bien determinado; uno solo y
   hace meses, candidato a perderse.
@@ -127,11 +135,12 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   bloquea; deciden el SNR y la secuencia.
 - **Un objeto recuperado tras meses** puede tener la órbita derivada: un
   residuo grande puede ser de la órbita, no tuyo.
-- **El brillo de un objeto muy débil es ruidoso**: si el objeto apenas se ve
-  en una toma suelta (SNR de 2 o 3), su magnitud por toma tiene mucha
-  dispersión y la cifra final depende de cuántas tomas entren. La posición
-  no sufre tanto, porque el apilado sí suma señal. Si el brillo te importa
-  de verdad, alarga la secuencia o agrupa menos observaciones.
+- **El brillo de un objeto débil es exigente**: sale del apilado, así que ya no
+  sufre el ruido de una toma suelta, pero depende de que el campo tenga
+  comparsas de brillo parecido y de que el cielo del apilado del objeto no
+  esté cruzado por el trazo de una estrella brillante. La pestaña te dice con
+  qué aperturas y qué cielo se va a medir antes de lanzar: si algo no cuadra,
+  ese es el sitio donde mirar.
 
 ## 6. Find_Orb: instalación y configuración
 

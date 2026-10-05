@@ -31,24 +31,9 @@ Designer file put it (ADR-005), hidden, and keeps its text, its tooltip, its
 checkable state and its slot: the door is a way in, not a second copy.
 """
 
-from PySide6.QtWidgets import (QLayout, QMenu, QToolButton, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import QMenu, QToolButton, QVBoxLayout, QWidget
 
-
-def _out_of_layout(widget):
-    # A layout does NOT drop its item when the widget is reparented: Qt keeps
-    # a QWidgetItem pointing at it and goes on setting geometry on a widget
-    # that now belongs elsewhere. Measured: the bar still held 22 items after
-    # its eighteen buttons had been moved out of it.
-    # @args: widget - the widget about to be reparented
-    # @return: None
-    parent = widget.parentWidget()
-    if parent is None:
-        return
-    for lay in [parent.layout()] + parent.findChildren(QLayout):
-        if lay is not None and lay.indexOf(widget) != -1:
-            lay.removeWidget(widget)
-            return
+from ..ui_loader import out_of_layout as _out_of_layout
 
 
 def build_door(tool, buttons):

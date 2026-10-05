@@ -44,6 +44,14 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 
 1. **Abre la pestaña Astrometría** desde la visita. Arriba verás el objeto
    y su efeméride (velocidad aparente y ángulo de posición).
+
+   La pestaña está ordenada por lo que haces cada noche: el objeto, las
+   **observaciones** con su SNR previsto en una línea, el botón de **apilar**,
+   el **resultado** (la tira, el visor y la tabla de medidas) y el **reporte**.
+   Lo que se toca de vez en cuando vive **plegado** en bloques con título
+   («Ajustes del apilado», «SNR previsto por observación», «Comprobación con
+   Find_Orb», «Texto del reporte»), y las acciones ocasionales (la figura de
+   parpadeo, deshacer la ejecución) detrás del menú **⋯** de la cabecera.
 2. **Elige cuántas observaciones quieres.** El MPC prefiere varias medidas
    repartidas en el tiempo antes que una sola. Dices un número y el
    software reparte la secuencia en grupos contiguos iguales. La tabla

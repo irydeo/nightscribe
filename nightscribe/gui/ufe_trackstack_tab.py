@@ -38,6 +38,7 @@ from .ufe_host import host_of
 from .ui_loader import adopt_ui, drop_in
 from .widgets.ufe_image_view import UfeImageView, cross_marker_items
 from .widgets.stack_strip import StackStrip
+from .widgets.collapsible_section import CollapsibleSection
 
 logger = logging.getLogger("nightscribe.gui.ufe_trackstack_tab")
 
@@ -120,6 +121,32 @@ class UfeTrackStackTab(QWidget):
         self.btn_recipe.clicked.connect(self._on_edit_recipe)
         self.chk_brightness.toggled.connect(lambda _on: self._sync_recipe_row())
         self._sync_recipe_row()
+        # ADR-038: three levels of prominence. The nightly flow stays in
+        # the column (the object, the plan, the run, the result and the
+        # report); the knobs most observers never touch go into collapsible
+        # blocks whose titles say what they hold, and the occasional
+        # ACTIONS go behind ⋯. The widgets keep their names, their tooltips
+        # and their slots: only their container changes.
+        self.btn_more = self._ui.btn_more
+        self.lbl_snr_line = self._ui.lbl_snr_line
+        self._sections = {
+            "snr": self._wrap_section(
+                "sec_snr_content", self.tr("Expected SNR per observation"),
+                "trackstack_snr_open"),
+            "advanced": self._wrap_section(
+                "sec_advanced_content", self.tr("Stacking settings"),
+                "trackstack_advanced_open"),
+            "check": self._wrap_section(
+                "sec_check_content",
+                self.tr("Check against other observers"),
+                "trackstack_check_open"),
+            "report": self._wrap_section(
+                "sec_report_content", self.tr("Report text"),
+                "trackstack_report_open"),
+        }
+        self._check_section = self._sections["check"]
+        from .widgets.door_menu import build_door
+        build_door(self.btn_more, [self.btn_blink, self.btn_undo])
         # the four combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
@@ -150,6 +177,25 @@ class UfeTrackStackTab(QWidget):
         self.btn_undo.clicked.connect(self._on_undo)
         self.btn_send_mpc.clicked.connect(self._on_send_mpc)
         self._sync_report_buttons()
+
+    def _wrap_section(self, name, title, key):
+        # @args: name - the .ui container's objectName, title - the block's
+        #        title in plain language (it says WHAT it holds), key - the
+        #        settings key that remembers whether it stays open
+        # @return: the CollapsibleSection
+        # The container comes OUT of the column and INTO the block, keeping
+        # every widget inside it: the Designer file still owns the
+        # structure, and the block only decides whether it is shown.
+        content = getattr(self._ui, name)
+        section = CollapsibleSection(title, self)
+        self.layout().replaceWidget(content, section)
+        content.setParent(None)
+        section.contentLayout().addWidget(content)
+        content.setVisible(True)
+        section.setCollapsed(not bool(config.get(key, 0)))
+        section.sectionToggled.connect(
+            lambda opened, k=key: config.set(k, 1 if opened else 0))
+        return section
 
     # ------------------------------------------------------- host wiring
 
@@ -348,6 +394,13 @@ class UfeTrackStackTab(QWidget):
                         "observation would be left out of the report"
                     ).replace("%1", f"{floor:.0f}"))
                 tbl.setItem(i, col, item)
+        # The plan row shows the same number in one line: the table is the
+        # detail and it lives folded, but the decision (how many
+        # observations) is taken from the row.
+        parts = [self._snr_text(row["snr_est"], floor) for row in rows]
+        self.lbl_snr_line.setText(
+            self.tr("Expected SNR: %1").replace("%1", " · ".join(parts))
+            if parts else "")
 
     def _snr_text(self, est, floor):
         # @args: est - the expected SNR or None, floor - the submission
@@ -672,7 +725,7 @@ class UfeTrackStackTab(QWidget):
                                      "observation of the visit")
             groups = result.get("groups") or []
             if index < len(groups):
-                hdu.header["NS_NFRAMES"] = (
+                hdu.header["NS_NFRAM"] = (
                     int(groups[index][1] - groups[index][0]),
                     "frames in this stack")
             hdu.writeto(str(path), overwrite=True)
@@ -910,6 +963,17 @@ class UfeTrackStackTab(QWidget):
                 "%2", f"{check.our_residual[1]:.2f}").replace(
                 "%3", str(check.n_stations))
         self.lbl_check.setText(text)
+        # the verdict rides the block's header, so it is read WITHOUT
+        # opening it (the block is folded by default)
+        if not check.available:
+            badge = self.tr("not available")
+        elif check.no_reference:
+            badge = self.tr("nothing to compare")
+        elif check.blocked:
+            badge = self.tr("blocked")
+        else:
+            badge = self.tr("passes")
+        self._check_section.setHeaderBadge(badge)
         self.chk_force.setEnabled(bool(check.blocked))
         if not check.blocked and self.chk_force.isChecked():
             self.chk_force.setChecked(False)
@@ -931,8 +995,11 @@ class UfeTrackStackTab(QWidget):
             ok and not blocked
             and bool(self.txt_report.toPlainText().strip()))
         # the run's own undo (phase 8): enabled while there is a persisted
-        # execution to take back
+        # execution to take back. The door follows its buttons: a door that
+        # opens onto a grey item is a lie (ADR-038).
         self.btn_undo.setEnabled(self._run_id is not None)
+        from .widgets.door_menu import refresh_door
+        refresh_door(self.btn_more)
 
     def _on_report(self):
         # The generator applies the submission floor itself (D26) and the

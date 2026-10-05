@@ -45,6 +45,15 @@ project). No visit, no series: that is the house rule.
 
 1. **Open the Astrometry tab** from the visit. At the top you see the
    object and its ephemeris (apparent rate and position angle).
+
+   The tab is ordered by what you do every night: the object, the
+   **observations** with their expected SNR on one line, the **Stack**
+   button, the **result** (the strip, the viewer and the measurement table)
+   and the **report**. What you touch once in a while lives **folded** in
+   blocks with a title ("Stacking settings", "Expected SNR per observation",
+   "Check against other observers", "Report text"), and the occasional
+   actions (the blink figure, undoing the run) behind the **⋯** menu in the
+   header.
 2. **Choose how many observations you want.** The MPC prefers several
    measurements spread in time over a single one. You give a number and the
    software splits the sequence into contiguous equal groups. The table

@@ -442,3 +442,41 @@ def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
     assert state.wcs is not None
     assert state.wcs.crval1 == pytest.approx(30.0)
     assert state.wcs.crval2 == pytest.approx(10.0)
+
+
+# ---------------------------------------------- prominence (ADR-038)
+
+def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
+    # ADR-038: three levels. The nightly flow stays in the column (the
+    # plan with its one-line SNR, the run, the result, the report) and the
+    # knobs most observers never touch go into blocks that say what they
+    # hold and start folded.
+    tab, _host = _tab(qapp, tmp_path)
+    assert tab.btn_stack.isVisibleTo(tab)          # the primary action
+    assert tab.lbl_snr_line.isVisibleTo(tab)       # the plan, in one line
+    assert tab.btn_report.isVisibleTo(tab)         # the outcome
+    # the four blocks exist, start folded, and their contents are hidden
+    assert len(tab._sections) == 4
+    for section in tab._sections.values():
+        assert not section._expanded
+    assert not tab.cmb_method.isVisibleTo(tab)
+    assert not tab.tbl_snr.isVisibleTo(tab)
+    assert not tab.chk_force.isVisibleTo(tab)
+    assert not tab.txt_report.isVisibleTo(tab)
+    # opening one brings its content back
+    tab._sections["advanced"]._toggle()
+    assert tab.cmb_method.isVisibleTo(tab)
+
+
+def test_the_door_holds_the_occasional_actions(qapp, tmp_path):
+    # The blink figure and the undo are not nightly actions: they live
+    # behind ⋯, and the items drive the very same buttons (so their text,
+    # state and slot are untouched).
+    tab, _host = _tab(qapp, tmp_path)
+    menu = tab.btn_more.menu()
+    assert menu is not None
+    names = [act.data() for act in menu.actions()]
+    assert names == ["btn_blink", "btn_undo"]
+    # the buttons left the column: no floating widget where they were
+    assert not tab.btn_blink.isVisibleTo(tab)
+    assert not tab.btn_undo.isVisibleTo(tab)

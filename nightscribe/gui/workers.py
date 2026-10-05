@@ -862,6 +862,38 @@ class PrepareExoticWorker(QThread):
         self.finished.emit(bool(ok), log or "")
 
 
+class FindOrbInstallWorker(QThread):
+    # Installs Find_Orb into a private environment (ADR-062, D31) off the
+    # GUI thread: a package manager download is minutes long, and the window
+    # has to stay alive and SHOW what it is doing, line by line, because
+    # that log is the only thing that explains a failure.
+
+    line = Signal(str)              # one line of the manager's own output
+    finished = Signal(object)       # {"ok", "path", "log"}
+    failed = Signal(str)            # an unexpected error, in English
+
+    def __init__(self, manager_path, target_dir):
+        super().__init__()
+        self._manager = manager_path
+        self._target = target_dir
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import findorb_install
+        try:
+            out = findorb_install.install(
+                self._manager, self._target,
+                on_log=self.line.emit, cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("find_orb install failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(out)
+
+
 class ProbeExoticWorker(QThread):
     # Detects and probes the EXOTIC interpreter off the GUI thread:
     # detect_python spawns subprocesses and the cold import of exotic

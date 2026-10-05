@@ -52,7 +52,14 @@ documenta para el apilado de objetos débiles (synthetic tracking).
    Linux/macOS, micromamba privado + `findorb` de conda-forge; en Windows, los
    binarios de Project Pluto. **No se empaqueta en el instalador** (GPLv2 con una
    cláusula extra de uso comercial, y el peso de las efemérides DE430t). Sin
-   Find_Orb, el chequeo **no está disponible** y se dice.
+   Find_Orb, el chequeo **no está disponible** y se dice. El botón **Instalar…**
+   de Ajustes (`core/findorb_install.py`) recorre el camino en el orden que
+   ahorra más trabajo: si `fo` ya está en el PATH apunta la ruta y lo dice (el
+   caso habitual), si hay **micromamba/mamba/conda** ofrece el comando exacto
+   (entorno privado con `-p`, dentro de una carpeta elegida por el observador) y
+   lo ejecuta con su log a la vista, y si no hay gestor **da la guía** y se
+   para: descargar y ejecutar un binario de internet no es una decisión que la
+   app tome por el usuario.
 10. **Reporte**: ADES PSV y MPC 80 columnas, con `T_mid`, magnitud calibrada
     **solo si hay comparsas** (si no se omite) e incertidumbres `rmsRA`/`rmsDec`
     propagadas. Se valida con el validador de ADR-022 (ida y vuelta).
@@ -154,7 +161,12 @@ calibrate, stack following the motion, measure and report. The field's reference
    to force. **The check filters, it does not prove** (the MPC itself warns that
    on a short arc a wrong observation fits just as well), and **without a
    reference it does not block**.
-9. **Find_Orb is external and installed guided** (ADR-052 pattern): on
+9. **Find_Orb is external and installed guided** (ADR-052 pattern): the
+   Settings **Install…** button walks the shortest road first (point the path
+   at an `fo` already on PATH), then offers the exact private-environment
+   command when a package manager is present, and otherwise **gives the
+   guide** and stops: downloading and running a binary from the internet is
+   not a decision the app makes for its user. On
    Linux/macOS, a private micromamba + `findorb` from conda-forge; on Windows, the
    Project Pluto binaries. **Not bundled in the installer** (GPLv2 with an extra
    commercial-use clause, and the DE430t ephemeris weight). Without Find_Orb, the

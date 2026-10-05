@@ -175,7 +175,15 @@ executable (`fo` on Linux/macOS, `fo64.exe` on Windows).
   `fo`, `find_orb` and the DE430t ephemerides). Or build from source.
 - **Windows**: `find_c64.zip` and `fo64.exe` from Project Pluto, in the
   same folder.
-- In **Settings**, point the Find_Orb field at `fo` and press "Test".
+- In **Settings**, point the Find_Orb field at `fo` and press "Test". The
+  **Install…** button does it for you: first it checks whether `fo` is
+  already on PATH (the common case: you installed it and the app was never
+  told) and points the path at it; if it is not there, it looks for
+  **micromamba**, **mamba** or **conda**, creates a **private** environment
+  with the conda-forge package `findorb` (inside the folder you choose,
+  touching nothing of your setup) and shows you what it is doing. With no
+  manager found it says what to install and what to type: the app does
+  **not** download a package manager on its own.
 
 NightScribe writes the observation file, runs `fo` in a temporary folder
 with its own environment (`-D`) and a CPU limit (`-r`), and reads the

@@ -172,7 +172,14 @@ detecta tu copia y la ejecuta. Necesita el ejecutable **no interactivo**
   `find_orb` y las efemérides DE430t). O compilar del código fuente.
 - **Windows**: `find_c64.zip` y `fo64.exe` de Project Pluto, en la misma
   carpeta.
-- En **Ajustes**, apunta el campo Find_Orb al `fo` y pulsa «Probar».
+- En **Ajustes**, apunta el campo Find_Orb al `fo` y pulsa «Probar». El botón
+  **«Instalar…»** te lo hace: primero mira si `fo` ya está en el PATH (el caso
+  habitual: lo instalaste y la app no lo sabía) y apunta la ruta a él; si no
+  está, busca **micromamba**, **mamba** o **conda**, crea un entorno **privado**
+  con el paquete de conda-forge `findorb` (dentro de la carpeta que elijas, sin
+  tocar nada de tu instalación) y te va enseñando lo que hace. Si no encuentra
+  ningún gestor, te dice qué instalar y qué escribir: la app **no** se descarga
+  un gestor de paquetes por su cuenta.
 
 NightScribe escribe el fichero de observaciones, lanza `fo` en una carpeta
 temporal con un entorno propio (`-D`) y un límite de CPU (`-r`), y lee los

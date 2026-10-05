@@ -1657,6 +1657,140 @@ class MainWindow(QMainWindow):
         _path, message = findorb.probe(dlg.edt_findorb_path.text().strip())
         QMessageBox.information(dlg, self.tr("Find_Orb"), message)
 
+    def _install_findorb(self, dlg):
+        # ADR-062, D31: the guided installation of Find_Orb. Three steps,
+        # in the order that saves the most work:
+        #   1. is `fo` already on PATH? Then the program is installed and
+        #      the app was never told, which is the common case: fill the
+        #      path and say so.
+        #   2. is there a package manager we can drive? Then offer the one
+        #      command that installs it in a PRIVATE environment.
+        #   3. otherwise, the guide: what to install and what to type.
+        # The app never downloads a package manager on its own: fetching
+        # and running a binary from the internet is the user's decision.
+        # @args: dlg - the settings dialog
+        # @return: None
+        from ..core import findorb_install as fi
+        worker = getattr(self, "_findorb_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            return
+        found = fi.find_on_path()
+        if found:
+            dlg.edt_findorb_path.setText(found)
+            QMessageBox.information(dlg, self.tr("Find_Orb"), self.tr(
+                "Find_Orb is already installed:\n%1\n\nThe path now points "
+                "at it.").replace("%1", found))
+            return
+        name, manager = fi.find_manager()
+        if manager is None:
+            QMessageBox.information(dlg, self.tr("Install Find_Orb"),
+                                    self._findorb_manual_text())
+            return
+        from .. import paths as paths_mod
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Folder for the Find_Orb environment"),
+            str(paths_mod.data_dir()))
+        if not folder:
+            return
+        target = str(Path(folder) / "findorb")
+        plan = fi.install_plan(name, manager, target)
+        if QMessageBox.question(
+                dlg, self.tr("Install Find_Orb"),
+                self.tr("Run this command?\n\n%1\n\nThe environment is "
+                        "private, inside the folder you chose, so nothing "
+                        "of your existing setup is touched. The download "
+                        "takes a few minutes.").replace(
+                            "%1", plan["what"])
+        ) != QMessageBox.Yes:
+            return
+        self._findorb_install_start(dlg, manager, target)
+
+    def _findorb_manual_text(self):
+        # @return: the guide, in plain language, for the case the app
+        #          cannot install Find_Orb for the observer
+        return self.tr(
+            "NightScribe did not find micromamba, mamba or conda, and it "
+            "does not download a package manager on its own.\n\n"
+            "The easy road on Linux and macOS is the conda-forge package "
+            "\"findorb\": it brings the precompiled binaries and the DE430t "
+            "ephemerides the perturbations need, in one command:\n\n"
+            "    micromamba create -p ~/findorb -c conda-forge findorb\n\n"
+            "On Windows, Project Pluto ships the binaries as zips: download "
+            "the console version and the non-interactive fo, unpack both in "
+            "the same folder (they share their configuration and the "
+            "ephemerides) and point the path above at fo64.exe.\n\n"
+            "The whole guide is in the documentation.")
+
+    def _findorb_install_start(self, dlg, manager_path, target):
+        # @args: dlg - the settings dialog, manager_path - the package
+        #        manager, target - the private environment
+        # @return: None. The manager's own output is streamed into the
+        #          dialog's label: when an install fails, that log is the
+        #          only thing that says why.
+        from PySide6.QtWidgets import QProgressDialog
+        from .workers import FindOrbInstallWorker
+        prog = QProgressDialog(self.tr("Installing Find_Orb…"),
+                               self.tr("Cancel"), 0, 0, dlg)
+        prog.setWindowTitle(self.tr("Install Find_Orb"))
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setAutoClose(False)
+        prog.setAutoReset(False)
+        worker = FindOrbInstallWorker(manager_path, target)
+        self._findorb_worker = worker
+        self._findorb_prog = prog
+        worker.line.connect(lambda text: prog.setLabelText(
+            text.strip()[-160:] or self.tr("Installing Find_Orb…")))
+        worker.finished.connect(
+            lambda out: self._findorb_install_done(dlg, target, out))
+        worker.failed.connect(
+            lambda message: self._findorb_install_failed(dlg, message))
+        prog.canceled.connect(worker.cancel)
+        self._keep(worker)
+        worker.start()
+        prog.show()
+
+    def _findorb_install_close(self):
+        # @return: None. The progress window goes, whatever the outcome.
+        prog = getattr(self, "_findorb_prog", None)
+        if prog is not None:
+            prog.reset()
+            prog.close()
+        self._findorb_prog = None
+        self._findorb_worker = None
+
+    def _findorb_install_done(self, dlg, target, out):
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        target - the environment, out - the worker's report
+        # @return: None
+        self._findorb_install_close()
+        out = out if isinstance(out, dict) else {}
+        path = out.get("path")
+        if not Shiboken.isValid(dlg):
+            return
+        if out.get("ok") and path:
+            dlg.edt_findorb_path.setText(path)
+            from ..core import findorb
+            _probe, message = findorb.probe(path)
+            QMessageBox.information(dlg, self.tr("Find_Orb"), message)
+            return
+        QMessageBox.warning(dlg, self.tr("Find_Orb"), self.tr(
+            "The installation did not finish. The last lines of the "
+            "package manager were:\n\n%1\n\nYou can still install Find_Orb "
+            "by hand (the guide is in the documentation) and point the "
+            "path above at it.").replace(
+                "%1", "\n".join(out.get("log") or [])[-700:]))
+
+    def _findorb_install_failed(self, dlg, message):
+        # @args: dlg - the settings dialog, message - the error (English)
+        # @return: None
+        self._findorb_install_close()
+        if Shiboken.isValid(dlg):
+            QMessageBox.warning(
+                dlg, self.tr("Find_Orb"),
+                self.tr("The installation failed:") + f" {message}")
+
     def _pick_exotic_python(self, dlg):
         # Browse for the Python <=3.10 interpreter that will host EXOTIC.
         from PySide6.QtWidgets import QFileDialog
@@ -1893,6 +2027,10 @@ class MainWindow(QMainWindow):
         dlg.btn_findorb_browse.clicked.connect(
             lambda: self._pick_findorb(dlg))
         dlg.btn_findorb_test.clicked.connect(lambda: self._test_findorb(dlg))
+        # the guided install (D31): the observer does not have to live in a
+        # terminal to get Find_Orb
+        dlg.btn_findorb_install.clicked.connect(
+            lambda: self._install_findorb(dlg))
         # EXOTIC orchestration (plan phase A): the external Python <=3.10
         # and its private environment
         dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))

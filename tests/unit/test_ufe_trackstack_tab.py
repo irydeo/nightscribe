@@ -199,6 +199,7 @@ def test_no_orphan_widgets(qapp, tmp_path):
         w = getattr(tab._ui, name, None)
         assert isinstance(w, QWidget), name
     assert not tab._ui.ph_stack_view.isVisibleTo(tab)
+    assert not tab._ui.ph_thumbs.isVisibleTo(tab)
     assert tab._stack_view.parentWidget() is tab
     # and the tab's own viewer never touches the dialog's plate state
     assert tab._stack_state is not tab._state
@@ -249,11 +250,12 @@ def test_the_group_stack_goes_to_the_main_stage(qapp, tmp_path):
     tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
                    "points": [(point, None, [])], "n_failed": 0}
     tab._show_group(0)
-    # the SHARED state now holds the stack, not a private one
-    assert state.path.endswith("stack_obs1.fits")
+    # the SHARED state now holds the stack, not a private one, and the
+    # file name says what the stack is (the object, the observation)
+    assert state.path.endswith("2026QX_obs1.fits")
     # and the stack was registered in the project (kind "stack")
     assert saved and saved[0][1] == "stack"
-    assert saved[0][0][0].endswith("stack_obs1.fits")
+    assert saved[0][0][0].endswith("2026QX_obs1.fits")
 
 
 def test_the_run_is_persisted_and_can_be_undone(qapp, tmp_path):
@@ -277,3 +279,53 @@ def test_the_run_is_persisted_and_can_be_undone(qapp, tmp_path):
     tab._on_undo()
     assert calls.get("undone") == 7
     assert tab._run_id is None and not tab.btn_undo.isEnabled()
+
+
+# ----------------------------------------------------- the strip and blink
+
+def test_the_strip_shows_every_observation_and_picks_one(qapp, tmp_path):
+    # D22: with two or three observations the eye wants them side by side
+    # at ONE stretch (auto-stretching each panel would make a faint one
+    # look as bright as a real one), and a click must bring that stack to
+    # the main view.
+    tab, _host = _tab(qapp, tmp_path)
+    shown = []
+    tab._show_group = lambda index: shown.append(index)
+    stack_a = np.zeros((24, 24), dtype=np.float32)
+    stack_a[12, 12] = 100.0
+    stack_b = np.zeros((24, 24), dtype=np.float32)
+    stack_b[12, 12] = 50.0
+    tab._thumbs.set_stacks([stack_a, stack_b],
+                           [(12.0, 12.0), (12.0, 12.0)],
+                           ["Obs. 1", "Obs. 2"])
+    panels = [tab._thumbs._row.itemAt(i).widget()
+              for i in range(tab._thumbs._row.count())
+              if tab._thumbs._row.itemAt(i).widget() is not None]
+    assert len(panels) == 2
+    tab._thumbs.picked.emit(1)
+    assert shown == [1]
+    # a new run empties it: a stale strip next to a fresh run is a lie
+    tab._thumbs.clear()
+    assert tab._thumbs._row.count() == 0
+
+
+def test_the_blink_figure_is_written(qapp, tmp_path):
+    # The figure lands in the project's folder with a name that says what
+    # it is, and every panel shares one stretch.
+    tab, host = _tab(qapp, tmp_path)
+    host.export_folder = lambda: str(tmp_path)
+    saved = []
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    state = tab._state
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    tab._view = UfeImageView(state)
+    tab._result = {"stacks": [(np.zeros((32, 32), dtype=np.float32), None),
+                              (np.ones((32, 32), dtype=np.float32), None)],
+                   "qs": [(16.0, 16.0), (16.0, 16.0)],
+                   "boxes": [(0, 0, 32, 32), (0, 0, 32, 32)],
+                   "mids": [61000.5, 61000.6]}
+    path = tab._write_blink("png")
+    assert path is not None and Path(path).exists()
+    assert path.name.endswith("_observations.png")
+    assert "2026QX" in path.name
+    assert saved and saved[0][1] == "sequence"

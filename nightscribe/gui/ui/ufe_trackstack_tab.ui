@@ -156,7 +156,24 @@
        </property>
       </widget>
      </item>
+     <item>
+      <widget class="QPushButton" name="btn_blink">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Blink / montage…</string></property>
+       <property name="toolTip">
+        <string>Writes one figure with every observation's stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</string>
+       </property>
+      </widget>
+     </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QWidget" name="ph_thumbs" native="true">
+     <property name="minimumSize"><size><width>0</width><height>86</height></size></property>
+     <property name="toolTip">
+      <string>Every observation's stack, centred on the object. Click one to bring it to the main view</string>
+     </property>
+    </widget>
    </item>
    <item>
     <widget class="QWidget" name="ph_stack_view" native="true">

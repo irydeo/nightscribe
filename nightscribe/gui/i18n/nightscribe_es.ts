@@ -3367,23 +3367,23 @@ Rp/Rs = {2}</translation>
         <translation>Aún no hay puntos guardados. Abre la placa de una visita en el editor o añade una magnitud a mano: el resumen se actualiza tras cada guardado.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10742"/>
-        <location filename="../main_window.py" line="10782"/>
+        <location filename="../main_window.py" line="10755"/>
+        <location filename="../main_window.py" line="10795"/>
         <source>Series saved: {} points</source>
         <translation>Serie guardada: {} puntos</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10796"/>
+        <location filename="../main_window.py" line="10809"/>
         <source>ExoClock submission prepared; outcome recorded.</source>
         <translation>Envío a ExoClock preparado; resultado registrado.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10825"/>
+        <location filename="../main_window.py" line="10838"/>
         <source>Run undone: {} points removed</source>
         <translation>Corrida deshecha: {} puntos eliminados</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10999"/>
+        <location filename="../main_window.py" line="11012"/>
         <source>The plate&apos;s saved state was cleared.</source>
         <translation>Estado guardado de la placa borrado.</translation>
     </message>
@@ -4431,22 +4431,22 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Pasada guardada. {0} proyecto(s) quedaron fuera: ver el diálogo.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10778"/>
+        <location filename="../main_window.py" line="10791"/>
         <source>Series saved: {} points over {} nights, one run each</source>
         <translation>Serie guardada: {} puntos en {} noches, una ejecución cada una</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10818"/>
+        <location filename="../main_window.py" line="10831"/>
         <source>Pass undone: {} points over {} nights</source>
         <translation>Pasada deshecha: {} puntos en {} noches</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10970"/>
+        <location filename="../main_window.py" line="10983"/>
         <source>The chart will show that pass of the visit.</source>
         <translation>La gráfica mostrará esa pasada de la visita.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10983"/>
+        <location filename="../main_window.py" line="10996"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed</source>
         <translation>Curva descartada: {0} pasada(s) deshecha(s), {1} puntos eliminados</translation>
     </message>
@@ -4682,203 +4682,252 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>NSKinds</name>
     <message>
+        <location filename="../../core/kinds.py" line="47"/>
         <source>Near-Earth objects (NEOs)</source>
-        <translation type="vanished">Objetos cercanos a la Tierra (NEOs)</translation>
+        <translation>Objetos cercanos a la Tierra (NEOs)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="48"/>
         <source>Asteroids and comets on paths that pass close to Earth: the confirmed ones with score, priority, apparent rate, sky uncertainty and flags (NEOCP, impact risk, radar, NHATS), plus the unconfirmed candidates with preliminary orbits computed from the MPC astrometry.</source>
-        <translation type="vanished">Asteroides y cometas en órbitas que pasarán cerca de la Tierra: los confirmados, con puntuación, prioridad, velocidad aparente, incertidumbre de posición y banderas (NEOCP, riesgo de impacto, radar, NHATS); más los candidatos sin confirmar, con órbitas provisionales calculadas sobre la astrometría del MPC.</translation>
+        <translation>Asteroides y cometas en órbitas que pasarán cerca de la Tierra: los confirmados, con puntuación, prioridad, velocidad aparente, incertidumbre de posición y banderas (NEOCP, riesgo de impacto, radar, NHATS); más los candidatos sin confirmar, con órbitas provisionales calculadas sobre la astrometría del MPC.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="54"/>
         <source>NEOfixer&apos;s site-specific list + NEOCP (MPC); positions from NASA Horizons</source>
-        <translation type="vanished">Lista de NEOfixer específica de tu sitio + NEOCP (MPC); posiciones por NASA Horizons</translation>
+        <translation>Lista de NEOfixer específica de tu sitio + NEOCP (MPC); posiciones por NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="61"/>
         <source>Supernovae</source>
-        <translation type="vanished">Supernovas</translation>
+        <translation>Supernovas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="62"/>
         <source>The newest discoveries, with the complete follow-up: a confirmation blink of your FITS against a PanSTARRS reference, the light curve drawn against the typical templates of each type, an evolution animation, exports and cadence reminders to know when to go back.</source>
-        <translation type="vanished">Los descubrimientos más recientes, con el seguimiento completo: un blink de confirmación de tus FITS contra una referencia de PanSTARRS, la curva de luz frente a las plantillas típicas de cada tipo, una animación de evolución, exportaciones y avisos de cadencia para saber cuándo volver.</translation>
+        <translation>Los descubrimientos más recientes, con el seguimiento completo: un blink de confirmación de tus FITS contra una referencia de PanSTARRS, la curva de luz frente a las plantillas típicas de cada tipo, una animación de evolución, exportaciones y avisos de cadencia para saber cuándo volver.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="68"/>
         <source>Rochester Astronomy discovery list + a PanSTARRS (MAST) reference for the blink</source>
-        <translation type="vanished">Lista de descubrimientos de Rochester Astronomy + una referencia de PanSTARRS (MAST) para el blink</translation>
+        <translation>Lista de descubrimientos de Rochester Astronomy + una referencia de PanSTARRS (MAST) para el blink</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="75"/>
         <source>Comets</source>
-        <translation type="vanished">Cometas</translation>
+        <translation>Cometas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="76"/>
         <source>Comets visible tonight with their live observed magnitude, perihelion date and activity flags, so you know how each one is doing now, not last month.</source>
-        <translation type="vanished">Cometas visibles esta noche con su magnitud observada en vivo, su fecha de perihelio y sus banderas de actividad, para que sepas cómo va cada uno ahora, no el mes pasado.</translation>
+        <translation>Cometas visibles esta noche con su magnitud observada en vivo, su fecha de perihelio y sus banderas de actividad, para que sepas cómo va cada uno ahora, no el mes pasado.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="80"/>
         <source>COBS (MPC) live magnitudes + NASA Horizons</source>
-        <translation type="vanished">Magnitudes en vivo de COBS (MPC) + NASA Horizons</translation>
+        <translation>Magnitudes en vivo de COBS (MPC) + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="85"/>
         <source>Comet candidates (PCCP)</source>
-        <translation type="vanished">Candidatos a cometa (PCCP)</translation>
+        <translation>Candidatos a cometa (PCCP)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="86"/>
         <source>Objects reported as asteroids that might actually be comets, with their comet score: the MPC&apos;s Possible Comet Confirmation Page. Getting there first matters.</source>
-        <translation type="vanished">Objetos reportados como asteroides que en realidad podrían ser cometas, con su puntuación de cometa: la página de confirmación de cometas del MPC. Llegar antes importa.</translation>
+        <translation>Objetos reportados como asteroides que en realidad podrían ser cometas, con su puntuación de cometa: la página de confirmación de cometas del MPC. Llegar antes importa.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="90"/>
         <source>MPC PCCP (minorplanetcenter.net) + NASA Horizons</source>
-        <translation type="vanished">MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
+        <translation>MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="96"/>
         <source>Exoplanet transits</source>
-        <translation type="vanished">Tránsitos de exoplanetas</translation>
+        <translation>Tránsitos de exoplanetas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="97"/>
         <source>Exoplanets crossing their star tonight from your site, with the transit time, how much the observed timing is drifting from the prediction (O-C), whether the whole transit fits in your night, the maximum trail-free exposure and a pre-filled export for EXOTIC.</source>
-        <translation type="vanished">Exoplanetas que cruzan su estrella esta noche vistos desde tu sitio, con la hora del tránsito, cuánto se desvía la hora observada de la predicha (O-C), si el tránsito entero cabe en tu noche, la exposición máxima sin estelas y una exportación pre-rellenada para EXOTIC.</translation>
+        <translation>Exoplanetas que cruzan su estrella esta noche vistos desde tu sitio, con la hora del tránsito, cuánto se desvía la hora observada de la predicha (O-C), si el tránsito entero cabe en tu noche, la exposición máxima sin estelas y una exportación pre-rellenada para EXOTIC.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="103"/>
         <source>ExoClock (ESA Ariel ephemeris programme) + NASA Exoplanet Archive; times from NASA Horizons (HJD)</source>
-        <translation type="vanished">ExoClock (programa de efemérides Ariel de la ESA) + Archivo de exoplanetas de la NASA; horas por NASA Horizons (HJD)</translation>
+        <translation>ExoClock (programa de efemérides Ariel de la ESA) + Archivo de exoplanetas de la NASA; horas por NASA Horizons (HJD)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="110"/>
         <source>Close approaches and alerts</source>
-        <translation type="vanished">Aproximaciones cercanas y alertas</translation>
+        <translation>Aproximaciones cercanas y alertas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="111"/>
         <source>Upcoming close approaches from ESA NEOCC (how the visitor gets by, roughly how big, how bright at the closest pass) to catch the week&apos;s fast mover, plus the AAVSO editorial channel: community alerts and the campaigns currently running.</source>
-        <translation type="vanished">Aproximaciones próximas de ESA NEOCC (cómo pasará el visitante, más o menos qué tamaño, qué brillo en el paso más cercano) para cazar al rápido de la semana; y el canal editorial de AAVSO: alertas de la comunidad y las campañas en curso.</translation>
+        <translation>Aproximaciones próximas de ESA NEOCC (cómo pasará el visitante, más o menos qué tamaño, qué brillo en el paso más cercano) para cazar al rápido de la semana; y el canal editorial de AAVSO: alertas de la comunidad y las campañas en curso.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="117"/>
         <source>ESA NEOCC + the AAVSO editorial channel (alerts and campaigns)</source>
-        <translation type="vanished">ESA NEOCC + el canal editorial de AAVSO (alertas y campañas)</translation>
+        <translation>ESA NEOCC + el canal editorial de AAVSO (alertas y campañas)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="124"/>
         <source>HADS stars</source>
-        <translation type="vanished">Estrellas HADS</translation>
+        <translation>Estrellas HADS</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="125"/>
         <source>High-amplitude delta Scuti variables: they pulse so fast and so strongly that you can watch them vary in a single session; your run folds by phase into the classic saw-tooth. Priorities are colour coded: period changes, never-observed stars, coverage gaps.</source>
-        <translation type="vanished">Variables delta Scuti de amplitud alta: pulsan tan rápido y tan fuerte que puedes seguirlas variar en una sola sesión; tu ejecución queda plegada por fase en el clásico diente de sierra. Las prioridades van coloreadas: cambios de periodo, estrellas nunca observadas, huecos de cobertura.</translation>
+        <translation>Variables delta Scuti de amplitud alta: pulsan tan rápido y tan fuerte que puedes seguirlas variar en una sola sesión; tu ejecución queda plegada por fase en el clásico diente de sierra. Las prioridades van coloreadas: cambios de periodo, estrellas nunca observadas, huecos de cobertura.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="131"/>
         <source>The living HADS catalogue maintained by P. Wils</source>
-        <translation type="vanished">El catálogo HADS vivo, mantenido por P. Wils</translation>
+        <translation>El catálogo HADS vivo, mantenido por P. Wils</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="137"/>
         <source>Variable stars and duties</source>
-        <translation type="vanished">Estrellas variables y deberes</translation>
+        <translation>Estrellas variables y deberes</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="138"/>
         <source>Your campaign members that are due by cadence, stars with an event in progress, stars nearing a predicted extremum, and your standing vigils (the T CrB eruption, the R CrB fade) checked day by day against the observatories and the community.</source>
-        <translation type="vanished">Los miembros de tus campañas que ya toca medir por cadencia, estrellas con un evento en curso, estrellas cerca de un extremo predicho, y tus vigilias de largo (la erupción de T CrB, el desvanecimiento de R CrB) revisadas día a día contra los observatorios y la comunidad.</translation>
+        <translation>Los miembros de tus campañas que ya toca medir por cadencia, estrellas con un evento en curso, estrellas cerca de un extremo predicho, y tus vigilias de largo (la erupción de T CrB, el desvanecimiento de R CrB) revisadas día a día contra los observatorios y la comunidad.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="144"/>
         <source>AAVSO VSX + AAVSO community photometry + a ZTF check for the vigils</source>
-        <translation type="vanished">AAVSO VSX + fotometría de la comunidad de AAVSO + una revisión de ZTF para las vigilias</translation>
+        <translation>AAVSO VSX + fotometría de la comunidad de AAVSO + una revisión de ZTF para las vigilias</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="241"/>
         <source>mag {value}</source>
-        <translation type="vanished">mag {value}</translation>
+        <translation>mag {value}</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="242"/>
         <source>{value}″/min</source>
-        <translation type="vanished">{value}″/min</translation>
+        <translation>{value}″/min</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="243"/>
         <source>MOID {value} au</source>
-        <translation type="vanished">MOID {value} ua</translation>
+        <translation>MOID {value} ua</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="244"/>
         <source>H {value}</source>
-        <translation type="vanished">H {value}</translation>
+        <translation>H {value}</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="245"/>
         <source>period {value} d</source>
-        <translation type="vanished">periodo {value} d</translation>
+        <translation>periodo {value} d</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="246"/>
         <source>depth {value} mmag</source>
-        <translation type="vanished">profundidad {value} mmag</translation>
+        <translation>profundidad {value} mmag</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="247"/>
         <source>amp {value} mag</source>
-        <translation type="vanished">amp {value} mag</translation>
+        <translation>amp {value} mag</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="248"/>
         <source>perihelion {value}</source>
-        <translation type="vanished">perihelio {value}</translation>
+        <translation>perihelio {value}</translation>
     </message>
 </context>
 <context>
     <name>NSMigrations</name>
     <message>
+        <location filename="../../core/db.py" line="557"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
-        <translation type="vanished">Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
+        <translation>Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="560"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
-        <translation type="vanished">El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
+        <translation>El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="563"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
-        <translation type="vanished">El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
+        <translation>El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="566"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
-        <translation type="vanished">Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
+        <translation>Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="569"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
-        <translation type="vanished">Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
+        <translation>Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="572"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
-        <translation type="vanished">Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
+        <translation>Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="575"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
-        <translation type="vanished">Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
+        <translation>Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="578"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
-        <translation type="vanished">El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
+        <translation>El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="581"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
-        <translation type="vanished">Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
+        <translation>Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="585"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
-        <translation type="vanished">Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
+        <translation>Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="588"/>
         <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
-        <translation type="vanished">Las mediciones recuerdan la placa en la que se tomaron: al reabrir esa placa en el editor unificado se restaura su estiramiento, la receta de medición y la secuencia de comparación.</translation>
+        <translation>Las mediciones recuerdan la placa en la que se tomaron: al reabrir esa placa en el editor unificado se restaura su estiramiento, la receta de medición y la secuencia de comparación.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="592"/>
         <source>Photometric series: each point keeps its raw magnitude, its quality flags and the run it belongs to, so a bad run can be undone without touching the rest of the visit.</source>
-        <translation type="vanished">Series fotométricas: cada punto conserva su magnitud cruda, sus marcas de calidad y la ejecución a la que pertenece, así una ejecución mala se deshace sin tocar el resto de la visita.</translation>
+        <translation>Series fotométricas: cada punto conserva su magnitud cruda, sus marcas de calidad y la ejecución a la que pertenece, así una ejecución mala se deshace sin tocar el resto de la visita.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="596"/>
         <source>Each photometric point now keeps its own photon error apart from the calibration systematic, so a light curve can be drawn (and judged) without the night&apos;s zero point swamping it.</source>
-        <translation type="vanished">Cada punto fotométrico guarda ahora su propio error de fotones, aparte del sistemático de la calibración, de modo que una curva de luz puede dibujarse (y juzgarse) sin que el punto cero de la noche la ahogue.</translation>
+        <translation>Cada punto fotométrico guarda ahora su propio error de fotones, aparte del sistemático de la calibración, de modo que una curva de luz puede dibujarse (y juzgarse) sin que el punto cero de la noche la ahogue.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="600"/>
         <source>Every point remembers the night it was measured on (its airmass and its position on the plate), so a curve read back from your project can explain that night without measuring again.</source>
-        <translation type="vanished">Cada punto recuerda la noche en que se midió (su masa de aire y su posición en la placa), así una curva releída de tu proyecto puede explicar esa noche sin volver a medir.</translation>
+        <translation>Cada punto recuerda la noche en que se midió (su masa de aire y su posición en la placa), así una curva releída de tu proyecto puede explicar esa noche sin volver a medir.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="604"/>
         <source>A visit&apos;s chart is one curve again: if you measured the same night several times, the visit remembers which pass it shows, and you can pick any other from &quot;Series &gt; Passes of this visit&quot;.</source>
-        <translation type="vanished">La gráfica de una visita vuelve a ser una sola curva: si mediste la misma noche varias veces, la visita recuerda qué pasada muestra y puedes elegir otra en «Serie &gt; Pasadas de esta visita».</translation>
+        <translation>La gráfica de una visita vuelve a ser una sola curva: si mediste la misma noche varias veces, la visita recuerda qué pasada muestra y puedes elegir otra en «Serie &gt; Pasadas de esta visita».</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="609"/>
         <source>Image calibration: a library of master frames (bias, dark, flat) that NightScribe uses to clean your lights before stacking them.</source>
-        <translation type="vanished">Calibración de imágenes: una biblioteca de masters (bias, dark, flat) que NightScribe usa para limpiar tus tomas antes de apilarlas.</translation>
+        <translation>Calibración de imágenes: una biblioteca de masters (bias, dark, flat) que NightScribe usa para limpiar tus tomas antes de apilarlas.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="613"/>
         <source>Minor-planet astrometry: the measured positions, the resolved motion and the frames of each run, tied to their visit and undoable as one execution.</source>
-        <translation type="vanished">Astrometría de cuerpos menores: las posiciones medidas, el movimiento resuelto y los frames de cada ejecución, atados a su visita y reversibles como una sola ejecución.</translation>
+        <translation>Astrometría de cuerpos menores: las posiciones medidas, el movimiento resuelto y los frames de cada ejecución, atados a su visita y reversibles como una sola ejecución.</translation>
     </message>
 </context>
 <context>
@@ -10930,278 +10979,344 @@ tocan.</translation>
 <context>
     <name>UfeTrackStackTab</name>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="108"/>
+        <location filename="../ufe_trackstack_tab.py" line="117"/>
         <source>Sum</source>
         <translation>Suma</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="109"/>
+        <location filename="../ufe_trackstack_tab.py" line="118"/>
         <source>Mean</source>
         <translation>Media</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="110"/>
+        <location filename="../ufe_trackstack_tab.py" line="119"/>
         <source>Median</source>
         <translation>Mediana</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="111"/>
+        <location filename="../ufe_trackstack_tab.py" line="120"/>
         <source>Sigma-clipped</source>
         <translation>Sigma-clipped</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="115"/>
+        <location filename="../ufe_trackstack_tab.py" line="126"/>
+        <source>Whole frame</source>
+        <translation>Fotograma completo</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="127"/>
+        <source>1024 px</source>
+        <translation>1024 px</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="128"/>
+        <source>512 px</source>
+        <translation>512 px</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="129"/>
+        <source>256 px</source>
+        <translation>256 px</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="134"/>
         <source>ADES PSV</source>
         <translation>ADES PSV</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="116"/>
+        <location filename="../ufe_trackstack_tab.py" line="135"/>
         <source>MPC 80 columns</source>
         <translation>MPC 80 columnas</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="196"/>
+        <location filename="../ufe_trackstack_tab.py" line="215"/>
         <location filename="../ui/ufe_trackstack_tab.ui" line="21"/>
         <source>Object and ephemeris: open the editor from a visit to arm the sequence.</source>
         <translation>Objeto y efeméride: abre el editor desde una visita para armar la secuencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="220"/>
+        <location filename="../ufe_trackstack_tab.py" line="239"/>
         <source>(unnamed)</source>
         <translation>(sin nombre)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="221"/>
+        <location filename="../ufe_trackstack_tab.py" line="240"/>
         <source>Object: %1 · %2 frames</source>
         <translation>Objeto: %1 · %2 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="228"/>
+        <location filename="../ufe_trackstack_tab.py" line="247"/>
         <source> · window %1–%2 UT</source>
         <translation> · ventana %1–%2 UT</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="256"/>
+        <location filename="../ufe_trackstack_tab.py" line="275"/>
         <source>Below the MPC submission floor of %1: this observation would be left out of the report</source>
         <translation>Por debajo del listón de envío del MPC (%1): esta observación quedaría fuera del reporte</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="290"/>
+        <location filename="../ufe_trackstack_tab.py" line="309"/>
         <source>Cancelling: the pipeline stops at the stage boundary it is at; nothing is kept from a cancelled run.</source>
         <translation>Cancelando: el pipeline se detiene en la frontera de etapa en la que esté; no se conserva nada de una ejecución cancelada.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="298"/>
+        <location filename="../ufe_trackstack_tab.py" line="317"/>
         <source>No visit with frames: open the editor from a visit to stack its sequence.</source>
         <translation>No hay visita con frames: abre el editor desde una visita para apilar su secuencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="303"/>
+        <location filename="../ufe_trackstack_tab.py" line="322"/>
         <source>The project has no object name: the ephemeris cannot be fetched, and without it there is no track.</source>
         <translation>El proyecto no tiene nombre de objeto: no se puede obtener la efeméride, y sin ella no hay traza.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="309"/>
+        <location filename="../ufe_trackstack_tab.py" line="328"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="336"/>
+        <location filename="../ufe_trackstack_tab.py" line="362"/>
         <source>Solving the reference frame…</source>
         <translation>Resolviendo el frame de referencia…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="337"/>
+        <location filename="../ufe_trackstack_tab.py" line="363"/>
         <source>Registering the frames…</source>
         <translation>Registrando los frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="338"/>
+        <location filename="../ufe_trackstack_tab.py" line="364"/>
         <source>Stacking the whole sequence…</source>
         <translation>Apilando la secuencia completa…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="339"/>
+        <location filename="../ufe_trackstack_tab.py" line="365"/>
         <source>Looking for the object…</source>
         <translation>Buscando el objeto…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="340"/>
+        <location filename="../ufe_trackstack_tab.py" line="366"/>
         <source>Sweeping the velocity…</source>
         <translation>Barriendo la velocidad…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="341"/>
+        <location filename="../ufe_trackstack_tab.py" line="367"/>
         <source>Stacking each observation…</source>
         <translation>Apilando cada observación…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="342"/>
+        <location filename="../ufe_trackstack_tab.py" line="368"/>
         <source>Measuring the positions…</source>
         <translation>Midiendo las posiciones…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="343"/>
+        <location filename="../ufe_trackstack_tab.py" line="369"/>
+        <source>Measuring the brightness…</source>
+        <translation>Midiendo el brillo…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="370"/>
         <source>Checking against other observers…</source>
         <translation>Chequeando contra otros observadores…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="358"/>
+        <location filename="../ufe_trackstack_tab.py" line="385"/>
         <source>The run failed:</source>
         <translation>La ejecución falló:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="367"/>
+        <location filename="../ufe_trackstack_tab.py" line="394"/>
         <source>Cancelled: nothing was kept from this run.</source>
         <translation>Cancelada: no se conservó nada de esta ejecución.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="370"/>
+        <location filename="../ufe_trackstack_tab.py" line="397"/>
         <source>The run could not finish:</source>
         <translation>La ejecución no pudo terminar:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="408"/>
+        <location filename="../ufe_trackstack_tab.py" line="437"/>
         <source>Run undone: %1 observations removed.</source>
         <translation>Ejecución deshecha: %1 observaciones eliminadas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="420"/>
+        <location filename="../ufe_trackstack_tab.py" line="449"/>
         <source>The object was not detected above the %1σ gate: the velocity sweep is not run, because measuring noise is how a false positive is manufactured.</source>
         <translation>El objeto no se detectó por encima de la puerta de %1σ: el barrido de velocidad no se ejecuta, porque medir ruido es como se fabrica un falso positivo.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="425"/>
+        <location filename="../ufe_trackstack_tab.py" line="454"/>
         <source>The stack&apos;s limit magnitude is %1: the night reached that deep.</source>
         <translation>La magnitud límite de la pila es %1: la noche llegó hasta ahí.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="443"/>
+        <location filename="../ufe_trackstack_tab.py" line="472"/>
         <source>The sequence is not dithered: pattern noise may stack up</source>
         <translation>La secuencia no está dithered: el ruido de patrón puede apilarse</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="447"/>
+        <location filename="../ufe_trackstack_tab.py" line="476"/>
         <source>The composed WCS is off by up to %1″ against a direct solve: the field&apos;s distortion is biting</source>
         <translation>La WCS compuesta se desvía hasta %1″ contra un solve directo: la distorsión del campo está mordiendo</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="453"/>
+        <location filename="../ufe_trackstack_tab.py" line="482"/>
         <source>Velocity sweep: %1″/min at PA %2° (%3 velocities scored; the score is SNR × roundness, which penalises a smeared object)</source>
         <translation>Barrido de velocidad: %1″/min a PA %2° (%3 velocidades puntuadas; el score es SNR × redondez, que penaliza un objeto emborronado)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="462"/>
+        <location filename="../ufe_trackstack_tab.py" line="491"/>
         <source>Detected on the base stack with SNR %1 (the gate is %2σ: below it nothing is measured)</source>
         <translation>Detectado en la pila base con SNR %1 (la puerta es %2σ: por debajo no se mide nada)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="472"/>
+        <location filename="../ufe_trackstack_tab.py" line="500"/>
+        <source>the project&apos;s sequence</source>
+        <translation>la secuencia del proyecto</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="502"/>
+        <source>an automatic proposal</source>
+        <translation>una propuesta automática</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="504"/>
+        <source>Brightness %1 ± %2 %3 from %4 comparison stars on %5 frames (%6)</source>
+        <translation>Brillo %1 ± %2 %3 a partir de %4 estrellas de comparación en %5 tomas (%6)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="519"/>
         <source>Observation %1 (%2 frames)</source>
         <translation>Observación %1 (%2 frames)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="492"/>
+        <location filename="../ufe_trackstack_tab.py" line="528"/>
+        <location filename="../ufe_trackstack_tab.py" line="684"/>
+        <source>Obs. %1</source>
+        <translation>Obs. %1</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="547"/>
         <source>Sequence stacked: %1 observations measured.</source>
         <translation>Secuencia apilada: %1 observaciones medidas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="496"/>
+        <location filename="../ufe_trackstack_tab.py" line="551"/>
         <source>%1 frames could not be aligned and were left out.</source>
         <translation>%1 tomas no se pudieron alinear y quedaron fuera.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="523"/>
+        <location filename="../ufe_trackstack_tab.py" line="578"/>
         <source>The group&apos;s stack could not be written:</source>
         <translation>No se pudo escribir el apilado del grupo:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="532"/>
+        <location filename="../ufe_trackstack_tab.py" line="587"/>
         <source>The group&apos;s stack could not be shown:</source>
         <translation>No se pudo mostrar la pila del grupo:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="610"/>
+        <location filename="../ufe_trackstack_tab.py" line="656"/>
+        <source>Blink (animated GIF)</source>
+        <translation>Parpadeo (GIF animado)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="657"/>
+        <source>Montage (still PNG)</source>
+        <translation>Montaje (PNG fijo)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="706"/>
+        <source>The blink figure could not be written:</source>
+        <translation>No se pudo escribir la figura de parpadeo:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="714"/>
+        <source>Blink figure written:</source>
+        <translation>Figura de parpadeo escrita:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="753"/>
         <source>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</source>
         <translation>Separación entre la medida sobre el stack y la medida por frame (la misma receta de centroide en ambas)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="614"/>
+        <location filename="../ufe_trackstack_tab.py" line="757"/>
         <source>The two measurements disagree: the point is flagged, nothing is chosen in silence</source>
         <translation>Las dos medidas no coinciden: el punto se marca, nada se elige en silencio</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="623"/>
+        <location filename="../ufe_trackstack_tab.py" line="766"/>
         <source>The two measurements disagree</source>
         <translation>Las dos medidas no coinciden</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="625"/>
+        <location filename="../ufe_trackstack_tab.py" line="768"/>
         <source>No per-frame centroid</source>
         <translation>Sin centroide por frame</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="639"/>
+        <location filename="../ufe_trackstack_tab.py" line="782"/>
         <source>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</source>
         <translation>Find_Orb no está configurado: el chequeo no está disponible. Configúralo en Ajustes; mientras tanto, la secuencia centrada y el listón de envío son la red de seguridad.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="644"/>
+        <location filename="../ufe_trackstack_tab.py" line="787"/>
         <source>The check is not available:</source>
         <translation>El chequeo no está disponible:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="648"/>
+        <location filename="../ufe_trackstack_tab.py" line="791"/>
         <source>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</source>
         <translation>Sin otras observaciones para comparar: no se bloquea nada (un descubrimiento real no tiene referencia); deciden la secuencia centrada y el listón de envío.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="653"/>
+        <location filename="../ufe_trackstack_tab.py" line="796"/>
         <source>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</source>
         <translation>Nuestro punto es un outlier contra los otros observadores: el reporte se bloquea por defecto. Forzarlo deja la decisión por escrito.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="658"/>
+        <location filename="../ufe_trackstack_tab.py" line="801"/>
         <source>The check passes: our residual fits inside the published observations&apos; dispersion.</source>
         <translation>El chequeo pasa: nuestro residual cae dentro de la dispersión de las observaciones publicadas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="662"/>
+        <location filename="../ufe_trackstack_tab.py" line="805"/>
         <source>Our residual: %1″ / %2″ · %3 distinct observatories</source>
         <translation>Nuestro residual: %1″ / %2″ · %3 observatorios distintos</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="703"/>
+        <location filename="../ufe_trackstack_tab.py" line="846"/>
         <source>Measure the sequence first.</source>
         <translation>Mide primero la secuencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="717"/>
+        <location filename="../ufe_trackstack_tab.py" line="860"/>
         <source>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</source>
         <translation>Observación %1 fuera: no se midió SNR, así que no puede probarse que supere el listón de %2</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="722"/>
+        <location filename="../ufe_trackstack_tab.py" line="865"/>
         <source>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</source>
         <translation>Observación %1 fuera: el SNR %2 está por debajo del listón de envío del MPC (%3); una detección marginal arriesga un tracklet falso</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="735"/>
+        <location filename="../ufe_trackstack_tab.py" line="878"/>
         <source>Report generated: %1 observations kept.</source>
         <translation>Reporte generado: %1 observaciones conservadas.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="745"/>
+        <location filename="../ufe_trackstack_tab.py" line="888"/>
         <source>Generate the report first.</source>
         <translation>Genera primero el reporte.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="751"/>
+        <location filename="../ufe_trackstack_tab.py" line="894"/>
         <source>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</source>
         <translation>Reporte enviado al bloque MPC de la visita: su validador tiene la última palabra antes de guardar.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="755"/>
+        <location filename="../ufe_trackstack_tab.py" line="898"/>
         <source>The visit window is not open: open the visit to send the report to its MPC block.</source>
         <translation>La ventana de la visita no está abierta: abre la visita para enviar el reporte a su bloque MPC.</translation>
     </message>
@@ -11237,7 +11352,7 @@ tocan.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_trackstack_tab.ui" line="68"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="154"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="194"/>
         <source>Obs.</source>
         <translation>Obs.</translation>
     </message>
@@ -11248,7 +11363,7 @@ tocan.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_trackstack_tab.ui" line="70"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="155"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="195"/>
         <source>T_mid (UT)</source>
         <translation>T_mid (UT)</translation>
     </message>
@@ -11268,137 +11383,172 @@ tocan.</translation>
         <translation>Cómo se combinan los frames de cada grupo: suma y media se diferencian solo en la escala; la mediana rechaza de entrada las trazas de estrellas; el sigma-clipped conserva casi todo el SNR de la media rechazando las trazas (el predeterminado)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="91"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="89"/>
+        <source>Final stack field</source>
+        <translation>Campo del apilado final</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="94"/>
+        <source>How much sky the FINAL stack of each observation covers. The whole frame is what the photometry needs (comparison stars all around); a smaller window is faster and lighter, but it may leave the comparisons out. The velocity sweep always works on the object&apos;s own trail cutout, whatever this says.</source>
+        <translation>Cuánto cielo cubre el apilado FINAL de cada observación. El fotograma completo es lo que necesita la fotometría (estrellas de comparación alrededor); una ventana menor es más rápida y ligera, pero puede dejar fuera las comparsas. El barrido de velocidad trabaja siempre sobre el recorte de la estela del objeto, diga lo que diga esto.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="99"/>
+        <source>Trail margin (px)</source>
+        <translation>Margen de la estela (px)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="107"/>
+        <source>Extra pixels around the object&apos;s own trail in the cutout the detection and the velocity sweep use. Bigger is safer and slower; the final stack does not use it.</source>
+        <translation>Píxeles extra alrededor de la estela del propio objeto en el recorte que usan la detección y el barrido de velocidad. Más grande es más seguro y más lento; el apilado final no lo usa.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="114"/>
         <source>Stack the sequence</source>
         <translation>Apilar la secuencia</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="93"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="116"/>
         <source>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</source>
         <translation>Ejecuta todo el pipeline: resolver la referencia, registrar los frames, apilar, detectar, barrer la velocidad, apilar cada observación, medir y chequear. Mientras corre, este botón es el Cancelar</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="116"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="139"/>
         <source>Warnings of the run: dithering, the composed WCS quality and the velocity sweep result</source>
         <translation>Avisos de la ejecución: dithering, calidad de la WCS compuesta y resultado del barrido de velocidad</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="125"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="148"/>
         <source>Stack of the observation:</source>
         <translation>Pila de la observación:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="132"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="155"/>
         <source>Which observation&apos;s stack is shown below, with the measured position marked</source>
         <translation>Qué pila de observación se muestra abajo, con la posición medida marcada</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="145"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="162"/>
+        <source>Blink / montage…</source>
+        <translation>Parpadeo / montaje…</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="164"/>
+        <source>Writes one figure with every observation&apos;s stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</source>
+        <translation>Escribe una figura con el apilado de cada observación centrado en el objeto, todos con el MISMO estirado: un GIF que parpadea o un montaje fijo. Estirar cada panel por separado haría que uno tenue pareciera tan brillante como uno real</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="174"/>
+        <source>Every observation&apos;s stack, centred on the object. Click one to bring it to the main view</source>
+        <translation>El apilado de cada observación, centrado en el objeto. Haz clic en uno para llevarlo a la vista principal</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="185"/>
         <source>Measurement per observation</source>
         <translation>Medida por observación</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="147"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="187"/>
         <source>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</source>
         <translation>La posición se mide dos veces con la misma receta de centroide: sobre el stack y por frame. Un desacuerdo más allá de 0,5″ o 3 sigma se marca, nunca se resuelve en silencio</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="156"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="196"/>
         <source>RA (stack)</source>
         <translation>AR (stack)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="157"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="197"/>
         <source>Dec (stack)</source>
         <translation>Dec (stack)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="158"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="198"/>
         <source>Δ ways (″)</source>
         <translation>Δ vías (″)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="159"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="199"/>
         <source>SNR</source>
         <translation>SNR</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="160"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="200"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="161"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="201"/>
         <source>Warnings</source>
         <translation>Avisos</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="166"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="206"/>
         <source>Check against other observers</source>
         <translation>Chequeo contra otros observadores</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="170"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="210"/>
         <source>Find_Orb fits the published observations without ours and predicts where ours should land; our residual against their dispersion decides.</source>
         <translation>Find_Orb ajusta las observaciones publicadas sin las nuestras y predice dónde deberían caer las nuestras; nuestro residual contra su dispersión decide.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="176"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="216"/>
         <source>The check filters, it does not prove: fitting a short arc is not proof of a detection.</source>
         <translation>El chequeo filtra, no demuestra: encajar en un arco corto no prueba una detección.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="183"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="223"/>
         <source>Force the report even if the check blocks it (it will be recorded)</source>
         <translation>Forzar el reporte aunque el chequeo lo bloquee (quedará constancia)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="185"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="225"/>
         <source>An outlier blocks the report by default; forcing it leaves the decision on record</source>
         <translation>Un outlier bloquea el reporte por defecto; forzarlo deja la decisión por escrito</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="194"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="234"/>
         <source>Report</source>
         <translation>Reporte</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="200"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="240"/>
         <source>Format:</source>
         <translation>Formato:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="206"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="246"/>
         <source>ADES PSV is the modern machine-readable format the MPC prefers; the 80-column format is the classic one, readable by every program</source>
         <translation>ADES PSV es el formato moderno legible por máquina que el MPC prefiere; el de 80 columnas es el clásico, legible por cualquier programa</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="217"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="257"/>
         <source>Generate report</source>
         <translation>Generar reporte</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="219"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="259"/>
         <source>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</source>
         <translation>Genera el reporte con los instantes de media de exposición, las incertidumbres propagadas y la magnitud solo cuando hay estrellas de comparación; cada observación por debajo del listón de envío queda fuera con su motivo</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="226"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="266"/>
         <source>Send to the visit&apos;s MPC block</source>
         <translation>Enviar al bloque MPC de la visita</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="228"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="268"/>
         <source>Fill the visit&apos;s MPC paste box with the report; the validator there has the last word before saving</source>
         <translation>Rellena la caja de pegado MPC de la visita con el reporte; el validador de ahí tiene la última palabra antes de guardar</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="235"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="275"/>
         <source>Undo this run</source>
         <translation>Deshacer esta ejecución</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="237"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="277"/>
         <source>Remove this execution&apos;s observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</source>
         <translation>Quita del proyecto las observaciones de esta ejecución (la ejecución queda marcada como deshecha, para la auditoría); las demás ejecuciones y la visita no se tocan</translation>
     </message>

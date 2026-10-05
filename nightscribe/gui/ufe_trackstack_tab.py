@@ -37,6 +37,7 @@ from .ufe_state import UfeImageState
 from .ufe_host import host_of
 from .ui_loader import adopt_ui, drop_in
 from .widgets.ufe_image_view import UfeImageView, cross_marker_items
+from .widgets.stack_strip import StackStrip
 
 logger = logging.getLogger("nightscribe.gui.ufe_trackstack_tab")
 
@@ -103,6 +104,14 @@ class UfeTrackStackTab(QWidget):
             placeholder = getattr(self._ui, "ph_stack_view", None)
             if placeholder is not None:
                 placeholder.hide()
+        # the strip of observation stacks: the same evidence the combo
+        # lists, but visible and comparable at a glance, all at ONE
+        # stretch (auto-stretching each panel would fake a faint one)
+        self._thumbs = StackStrip()
+        drop_in(self.layout(), self._ui.ph_thumbs, self._thumbs)
+        self._thumbs.picked.connect(self._show_group)
+        self.btn_blink = self._ui.btn_blink
+        self.btn_blink.clicked.connect(self._on_blink)
         # the four combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
@@ -317,6 +326,10 @@ class UfeTrackStackTab(QWidget):
         self.prg_stack.setVisible(True)
         self.prg_stack.setRange(0, 0)          # busy until a stage counts
         self.btn_stack.setText(self.tr("Cancel"))
+        # the previous run's evidence goes before the new one starts: a
+        # stale strip next to a fresh run is a lie
+        self._thumbs.clear()
+        self.btn_blink.setEnabled(False)
         self._say("")
         self._worker = TrackStackWorker(
             paths, name, self.spn_nobs.value(),
@@ -418,6 +431,8 @@ class UfeTrackStackTab(QWidget):
         self.cmb_group.setEnabled(False)
         self.tbl_points.setRowCount(0)
         self.txt_report.clear()
+        self._thumbs.clear()
+        self.btn_blink.setEnabled(False)
         self._sync_report_buttons()
         self._say(self.tr("Run undone: %1 observations removed."
                           ).replace("%1", str(removed if removed is not None
@@ -506,6 +521,14 @@ class UfeTrackStackTab(QWidget):
                 i)
         self.cmb_group.blockSignals(False)
         self.cmb_group.setEnabled(self.cmb_group.count() > 0)
+        # the strip: the same stacks, visible side by side at ONE stretch,
+        # so a faint observation cannot hide behind a bright one
+        stacks = self._result.get("stacks") or []
+        qs = self._result.get("qs") or []
+        labels = [self.tr("Obs. %1").replace("%1", str(i + 1))
+                  for i in range(len(stacks))]
+        self._thumbs.set_stacks([s for s, _rep in stacks], qs, labels)
+        self.btn_blink.setEnabled(any(s is not None for s, _rep in stacks))
         if self.cmb_group.count():
             self.cmb_group.setCurrentIndex(0)
             self._show_group(0)
@@ -601,7 +624,95 @@ class UfeTrackStackTab(QWidget):
             base.mkdir(parents=True, exist_ok=True)
         except OSError:
             base = Path(tempfile.gettempdir())
-        return base / f"stack_obs{index + 1}.fits"
+        return base / self._stack_name(index)
+
+    def _stack_name(self, index):
+        # @args: index - the group's index
+        # @return: a file name that says what the stack IS: the object, the
+        #          observation number and its mid time. "stack_obs2.fits"
+        #          said nothing once the run was forgotten, and a visit
+        #          holds several of them.
+        ctx = self._context() or {}
+        raw = (ctx.get("object_name") or "object").strip() or "object"
+        slug = "".join(ch if (ch.isalnum() or ch in "-_") else "_"
+                       for ch in raw.replace(" ", "")) or "object"
+        stamp = ""
+        mids = (self._result or {}).get("mids") or []
+        mjd = mids[index] if 0 <= index < len(mids) else None
+        if mjd:
+            from datetime import datetime, timedelta
+            ut = datetime(1858, 11, 17) + timedelta(days=float(mjd))
+            stamp = "_" + ut.strftime("%Y%m%dT%H%M%S")
+        return f"{slug}_obs{index + 1}{stamp}.fits"
+
+    def _on_blink(self):
+        # @return: None. The figure is the honest way to look at a run
+        #          whose observations do not agree: the eye catches a panel
+        #          that is not the same sky far faster than a table. The
+        #          menu picks the flavour; the work lives in _write_blink so
+        #          it can be exercised without a modal menu.
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        act_gif = menu.addAction(self.tr("Blink (animated GIF)"))
+        act_png = menu.addAction(self.tr("Montage (still PNG)"))
+        chosen = menu.exec(self.btn_blink.mapToGlobal(
+            self.btn_blink.rect().bottomLeft()))
+        if chosen is None:
+            return
+        self._write_blink("gif" if chosen is act_gif else "png")
+
+    def _write_blink(self, fmt):
+        # @args: fmt - "gif" (blinking) or "png" (still montage)
+        # @return: the written path, or None
+        result = self._result or {}
+        import numpy as np
+        stacks = result.get("stacks") or []
+        qs = result.get("qs") or []
+        boxes = result.get("boxes") or []
+        images, centers, labels = [], [], []
+        for i, (stack, _rep) in enumerate(stacks):
+            if stack is None or i >= len(qs):
+                continue
+            box = boxes[i] if i < len(boxes) else (0, 0, 0, 0)
+            cx = qs[i][0] - box[0]
+            cy = qs[i][1] - box[1]
+            # the figure follows the app's screen orientation (data flipped
+            # vertically): a blink that is upside down against the main
+            # view is a blink nobody trusts
+            images.append(np.flipud(np.asarray(stack, dtype=np.float32)))
+            centers.append((cx, stack.shape[0] - 1 - cy))
+            labels.append(self.tr("Obs. %1").replace("%1", str(i + 1)))
+        if not images:
+            return None
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        from ..core.viz import sequence_view
+        folder = None
+        ask = getattr(host_of(self), "export_folder", None)
+        if callable(ask):
+            try:
+                folder = ask()
+            except Exception:
+                folder = None
+        import tempfile
+        base = Path(folder) if folder else Path(tempfile.gettempdir())
+        path = base / (self._stack_name(0).rsplit("_obs", 1)[0]
+                       + "_observations." + fmt)
+        try:
+            sequence_view.centered_sequence(images, centers, path, fmt=fmt,
+                                            label=labels)
+        except Exception as err:
+            logger.warning("blink figure failed: %s", err)
+            self._say(self.tr("The blink figure could not be written:")
+                      + f" {err}")
+            return None
+        if self._view is not None:
+            notify = getattr(host_of(self), "notify_saved", None)
+            if callable(notify):
+                notify([str(path)], "sequence")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self._say(self.tr("Blink figure written:") + f" {path.name}")
+        return path
 
     # ------------------------------------------------------ measurement
 

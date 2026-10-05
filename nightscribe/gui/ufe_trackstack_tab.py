@@ -831,7 +831,8 @@ class UfeTrackStackTab(QWidget):
         self._sync_report_buttons()
         note = self.tr("Sequence stacked: %1 observations measured."
                        ).replace("%1", str(n))
-        extra = self._register_note(self._result.get("register_report"))
+        extra = self._register_note(self._result.get("register_report"),
+                                    self._result.get("n_off_frame") or 0)
         if extra:
             note += " " + extra
         shape = self._shape_note(self._result.get("photometry"))
@@ -867,8 +868,11 @@ class UfeTrackStackTab(QWidget):
                 "this stack.").replace("%1", f"{float(gain):.2f}"))
         return " ".join(parts)
 
-    def _register_note(self, report):
+    def _register_note(self, report, off_frame=0):
         # @args: report - track_stack.registration_report output (or None)
+        # @args: report - track_stack.registration_report output (or None),
+        #        off_frame - how many registered frames do NOT contain the
+        #        object (the worker counts them once the ephemeris is known)
         # @return: what the registration did, in plain language. This is the
         #          honest half of a run: a frame left out is a factor in the
         #          stack's SNR, and a visit that is really two runs is a
@@ -881,6 +885,15 @@ class UfeTrackStackTab(QWidget):
             parts.append(self.tr(
                 "%1 frames were saved by fitting the field's small rotation "
                 "(they were being thrown away).").replace("%1", str(n_rot)))
+        off = int(off_frame or 0)
+        if off:
+            # registered, but the object is not on the sensor: a shifted
+            # field (the second run of a visit) leaves the object outside
+            # the frame, and stacking those frames would only add noise
+            # where the object is measured
+            parts.append(self.tr(
+                "%1 frames do not contain the object and were left out.").replace(
+                    "%1", str(off)))
         failed = int(report.get("n_failed") or 0)
         if failed:
             line = self.tr("%1 frames could not be aligned").replace(

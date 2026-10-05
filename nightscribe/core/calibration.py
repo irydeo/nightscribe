@@ -112,7 +112,19 @@ def read_image(path, box=None):
         else:
             raw = hdu.data
         header = dict(hdu.header)
-    data = np.asarray(raw).astype(np.float32)
+    data = np.asarray(raw)
+    if data.ndim != 2:
+        # A region that does not touch the frame comes back from astropy's
+        # section as a 1-D EMPTY array, and a 1-D "image" breaks the caller
+        # three layers away: scipy sees input.ndim + 1 == 2, takes our 2x2
+        # rotation for a HOMOGENEOUS matrix, finds the bottom row is not
+        # [0, 1] and refuses it with "Expected homogeneous transformation
+        # matrix with shape (2, 2) for image shape (0,)" (measured on a
+        # real visit). An empty 2-D array says the same thing (there is no
+        # data here) without the trap, and every caller already handles a
+        # zero-sized array.
+        data = data.reshape((0, 0))
+    data = data.astype(np.float32)
     bscale = _num(header.get("BSCALE"), 1.0)
     bzero = _num(header.get("BZERO"), 0.0)
     if bscale != 1.0:

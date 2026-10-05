@@ -224,6 +224,11 @@ por separado los calibrados exportados. Solo los frames de una ejecución con
 - **El objeto no aparece**: revisa el SNR de cada grupo, prueba menos
   observaciones (más tomas por grupo) y comprueba que la secuencia está
   dithered.
+- **«N tomas no contienen el objeto y se han dejado fuera»**: la visita
+  mezcla dos tandas y en la segunda el campo apunta a otro sitio, así que el
+  objeto cae fuera del sensor en esas tomas. Se dejan fuera **a propósito**:
+  apilarlas añadiría ruido justo donde se mide el objeto. Si son muchas y no
+  esperabas dos tandas, revisa que la efeméride sea la del objeto correcto.
 - **«N tomas no se han podido alinear»**: el resultado dice **por qué**.
   *Muy pocas estrellas* suele ser una nube, niebla o una exposición
   demasiado corta en esa toma; *sus estrellas no concuerdan con el ajuste*

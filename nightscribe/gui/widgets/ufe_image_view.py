@@ -605,6 +605,45 @@ class UfeImageView(ChartView):
         corner = self.mapToScene(0, vp_h - 6)
         return corner.x() + 10.0 / scale, corner.y() - br.height()
 
+    def _readout_height(self):
+        # @return: the hover readout's height in scene units, or 0 when it
+        #          is not showing. It is what the scale bar steps up by, so
+        #          a change here is a change in WHERE the bar is painted.
+        if self._tooltip is None:
+            return 0.0
+        return float(self._tooltip.boundingRect().height())
+
+    def _repaint_hud(self):
+        # @return: None. A FULL viewport repaint. The scale bar is a
+        #          device-space HUD piece with no scene rect, so under the
+        #          default MinimalViewportUpdate a partial repaint leaves the
+        #          OLD bar behind and the corner shows two bars, one above
+        #          the other (reported). It is the same trap the pick reticle
+        #          documents; the reticle lives in pick mode only, the bar is
+        #          always there.
+        self.viewport().update()
+
+    def _show_tooltip(self, viewport_pos, text):
+        # The readout appears, disappears or gains a line: the scale bar
+        # moves with its height, so the HUD is repainted whole. The full
+        # repaint happens ONLY when the height really changed, never on every
+        # mouse move (which would repaint the plate continuously).
+        # @args: viewport_pos - QPoint in the viewport, text - str or list
+        # @return: None
+        before = self._readout_height()
+        super()._show_tooltip(viewport_pos, text)
+        if self._readout_height() != before:
+            self._repaint_hud()
+
+    def _hide_tooltip(self):
+        # @return: None. The readout goes: the bar drops back to the corner,
+        #          so the old (raised) bar has to be erased with a full
+        #          repaint. A call with nothing showing costs nothing.
+        before = self._readout_height()
+        super()._hide_tooltip()
+        if before:
+            self._repaint_hud()
+
     def mouseMoveEvent(self, event):
         # The probe stays as always; in pick mode the cursor position is
         # remembered for the reticle and a snap recompute is coalesced.

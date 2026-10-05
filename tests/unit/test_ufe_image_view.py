@@ -435,6 +435,47 @@ def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
     view.set_pick_cursor(False)
 
 
+def test_the_scale_bar_repaints_whole_when_the_readout_moves_it(qapp):
+    # The scale bar is a device-space HUD piece with no scene rect: under
+    # MinimalViewportUpdate a partial repaint left the OLD bar behind and
+    # the bottom-left showed two bars, one above the other (reported). The
+    # view now repaints the HUD whole, but ONLY when the readout's height
+    # changes (it appears, disappears or gains a line), never on every move.
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+
+    class _View(UfeImageView):
+        def __init__(self, state):
+            super().__init__(state)
+            self.hud_repaints = 0
+
+        def _repaint_hud(self):
+            self.hud_repaints += 1
+
+    state = UfeImageState()
+    v = _View(state)
+    v.resize(600, 400)
+    state.load(MONO)
+    assert v.hud_repaints == 0
+    # the readout appears: the bar steps up, so the HUD is repainted whole
+    v._show_tooltip(QPointF(10, 10), ["(1, 1)  DN 5.0"])
+    assert v.hud_repaints == 1
+    # the same text again, only repositioned: the bar does not move
+    v._show_tooltip(QPointF(20, 20), ["(1, 1)  DN 5.0"])
+    assert v.hud_repaints == 1
+    # one more line: the readout grows and the bar moves with it
+    v._show_tooltip(QPointF(20, 20), ["(1, 1)  DN 5.0", "RA 00 00 00"])
+    assert v.hud_repaints == 2
+    # it goes: the bar drops back to the corner, another full repaint
+    v._hide_tooltip()
+    assert v.hud_repaints == 3
+    # hiding again costs nothing (nothing was showing)
+    v._hide_tooltip()
+    assert v.hud_repaints == 3
+    v._render_timer.stop()
+    v.deleteLater()
+
+
 # ------------------------------------------------- global object mark
 
 def _plate_centre_sky(view):

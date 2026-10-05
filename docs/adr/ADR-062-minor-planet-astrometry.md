@@ -106,6 +106,16 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     fallaron y si la visita es en realidad **varias tandas**, con su salto y
     su hueco de tiempo. Medido en 2025 UR: de 78 a 139 tomas usables de 140,
     y el SNR del apilado de estrellas de 1.826 a 2.702 (×1,48).
+    **Y un fotograma que no contiene el objeto se deja fuera y se cuenta**
+    (`track_stack.inside_frame`): registrado no es lo mismo que útil, y
+    apilar un campo desplazado añade ruido justo donde se mide. Recuperar
+    las dos tandas hizo visible un fallo que antes era inalcanzable: la
+    región fuente de una caja podía caer entera fuera del sensor,
+    `calibration.read_image` devolvía un array 1-D vacío y scipy tomaba la
+    rotación 2×2 por una matriz homogénea («Expected homogeneous
+    transformation matrix with shape (2, 2) for image shape (0,)»). Ahora
+    `_source_box` dice que no hay solape, `_warp_to_box` devuelve un marco
+    inválido **sin leer**, y la lectura nunca devuelve 1-D.
 17. **Co-adición ponderada por 1/σ²**, como método **opcional** además de
     suma/media/mediana/sigma (el defecto no cambia: la medida dice que en
     una noche estable no compensa). El ruido de cada toma se mide de su
@@ -258,7 +268,17 @@ calibrate, stack following the motion, measure and report. The field's reference
     ones that failed did, and whether the visit is really **several runs**,
     with its offset and its time gap. Measured on 2025 UR: from 78 to 139
     usable frames out of 140, and the star stack's SNR from 1826 to 2702
-    (x1.48).
+    (x1.48). **And a frame that does not contain the object is left out and
+    counted** (`track_stack.inside_frame`): registered is not the same as
+    useful, and stacking a shifted field adds noise exactly where the
+    measurement happens. Recovering both runs made a failure visible that
+    used to be unreachable: a box's source region could fall entirely off
+    the sensor, `calibration.read_image` returned a 1-D empty array and
+    scipy took the 2x2 rotation for a homogeneous matrix ("Expected
+    homogeneous transformation matrix with shape (2, 2) for image shape
+    (0,)"). Now `_source_box` says there is no overlap, `_warp_to_box`
+    returns an invalid frame **without reading**, and a read never returns
+    1-D.
 17. **Inverse-variance (1/sigma^2) co-addition**, as an **optional** method
     beside sum/mean/median/sigma (the default does not change: the
     measurement says a stable night does not pay for it). Each frame's

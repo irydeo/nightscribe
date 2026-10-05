@@ -227,6 +227,12 @@ a successful run, and nothing moves without your confirmation.
 - **The object does not appear**: check each group's SNR, try fewer
   observations (more frames per group) and make sure the sequence is
   dithered.
+- **"N frames do not contain the object and were left out"**: the visit
+  mixes two runs and the second one points elsewhere, so the object falls
+  off the sensor in those frames. They are left out **on purpose**:
+  stacking them would add noise exactly where the object is measured. If
+  there are many and you did not expect two runs, check that the ephemeris
+  is for the right object.
 - **"N frames could not be aligned"**: the result says **why**. *Too few
   stars* is usually a cloud, fog or too short an exposure in that frame;
   *their stars did not agree on the fit* is usually a satellite trail, an

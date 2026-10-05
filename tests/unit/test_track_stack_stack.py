@@ -420,3 +420,61 @@ def test_the_two_paths_agree_with_weights(tmp_path):
                                       budget_bytes=1)
     assert report.streamed is True
     assert np.allclose(ram, streamed, atol=1e-4, equal_nan=True)
+
+
+# ------------------------------- a frame that does not cover the observation
+
+def test_source_box_says_none_when_the_box_is_off_the_frame():
+    # The box is 1024..1359 in x on a 2048 frame; a transform that pushes it
+    # 3000 px away leaves NOTHING of it on the sensor, and that is a real
+    # answer, not a failure: the frame does not contain this observation.
+    A, b = ts._ref_to_native_affine({"angle": 0.0, "dx": -3000.0,
+                                     "dy": 0.0}, (0.0, 0.0))
+    assert ts._source_box(A, b, (1024, 1024, 1359, 1359), (2048, 2048)) is None
+    # and a box that only PARTLY falls off keeps its overlap: what is off
+    # the frame is clamped away and the box stays ON the sensor
+    A, b = ts._ref_to_native_affine({"angle": 0.0, "dx": -1000.0,
+                                     "dy": 0.0}, (0.0, 0.0))
+    box = ts._source_box(A, b, (1024, 1024, 1359, 1359), (2048, 2048))
+    assert box is not None
+    assert 0 <= box[0] < box[2] <= 2048
+    assert 0 <= box[1] < box[3] <= 2048
+
+
+def test_warping_a_box_off_the_frame_does_not_read_or_crash():
+    # The real bug, in one call: the path does NOT exist on purpose, so if
+    # anything tried to read it the test would fail with a file error
+    # instead of a wrong answer. Measured on a real visit: the read came
+    # back 1-D and scipy took the 2x2 rotation for a homogeneous matrix and
+    # refused it ("...for image shape (0,)").
+    tr = {"angle": 0.0, "dx": -3000.0, "dy": 0.0}
+    warped, valid = ts._warp_to_box("/no/such/frame.fits", tr, (0.0, 0.0),
+                                    (1024, 1024, 1359, 1359), (2048, 2048))
+    assert warped.shape == (335, 335)
+    assert not warped.any()
+    assert not valid.any()
+
+
+def test_a_frame_whose_object_is_off_the_sensor_is_left_out(tmp_path):
+    # A visit with two runs points the second one at a shifted field, and
+    # the object can fall off the sensor. Such a frame registered, but it
+    # has sky where the object should be: stacking it adds noise to the very
+    # place being measured, so it is left out AND counted.
+    frames = _sequence(tmp_path, n=6, rate_px=1.5)
+    frames[2].object_xy = (-40.0, 30.0)          # off the 64x64 sensor
+    assert ts.inside_frame(frames[2]) is False
+    assert ts.inside_frame(frames[0]) is True
+    q = (24.0 + 1.5 * 2.5, 34.0)
+    stack, report = ts.stack_group(frames, (0, 6), q, "mean",
+                                   (0, 0, 64, 64), (64, 64))
+    assert stack is not None
+    assert report.n_frames == 5                  # the off-sensor one is out
+    assert ts._indices(frames, (0, 6)) == [0, 1, 3, 4, 5]
+
+
+def test_a_frame_without_an_object_position_is_still_left_out(tmp_path):
+    # The old rule has to survive: no object position, no stack entry.
+    frames = _sequence(tmp_path, n=4)
+    frames[1].object_xy = None
+    assert ts.inside_frame(frames[1]) is False
+    assert ts._indices(frames, (0, 4)) == [0, 2, 3]

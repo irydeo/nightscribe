@@ -42,6 +42,7 @@ vez de suponerla.
 
 | Fase | Qué | Estado |
 | --- | --- | --- |
+| **B0** | Arreglo: el fotograma que no contiene la observación | **Hecho** (`bug-fotograma-fuera-de-campo.md`) |
 | **P0** | Los fotogramas que se quedan en el suelo | **Hecho** (`p0-fotogramas-perdidos.md`) |
 | **P4** | Inyección y recuperación (el instrumento) | Pendiente |
 | **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
@@ -49,6 +50,11 @@ vez de suponerla.
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | Pendiente |
 | **P5** | Pseudo-flat | Pendiente |
 | **P6** | Decisión sobre nxt (denoiser de IA) | Pendiente |
+
+**B0** no es una fase del plan: es el arreglo de un fallo real que apareció
+al usar P0 sobre datos de verdad (un run abortado con un error de scipy).
+Va primero en la tabla porque **se encontró y se arregló antes de seguir**:
+un fallo que impide medir manda sobre cualquier mejora.
 
 ## Reglas de la casa
 

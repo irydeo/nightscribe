@@ -1482,6 +1482,14 @@ class TrackStackWorker(QThread):
                 self.finished.emit(out)
                 return
             track_stack.object_positions(frames, motion)
+            # Frames that registered but do NOT contain the object (a visit
+            # with two runs points the second one at a shifted field, and
+            # the object can fall off the sensor): they are left out of the
+            # stack and COUNTED, because a silent hole in the stack is worse
+            # than a number the observer can act on.
+            out["n_off_frame"] = sum(
+                1 for f in frames
+                if track_stack.usable(f) and not track_stack.inside_frame(f))
             t_all, q_all = track_stack.group_q(frames, (0, len(frames)),
                                                w0, motion)
             if q_all is None or t_all is None:

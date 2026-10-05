@@ -41,7 +41,7 @@ def test_v15_walks_to_v16(tmp_path):
     db_file = tmp_path / "old.db"
     _v15_database(db_file)
     db = Database(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert {"kind", "path", "camera", "gain", "temp_c", "exptime_s",
             "filter", "created", "meta"} <= _columns(db)
     # The index the matching leans on.
@@ -55,7 +55,7 @@ def test_v16_is_idempotent(tmp_path):
     Database(db_file).close()
     Database(db_file).close()          # reopening must be a no-op
     db = Database(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
 
 
 def test_calibration_module_uses_the_new_table(tmp_db, tmp_path):

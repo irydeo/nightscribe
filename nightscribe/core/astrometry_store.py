@@ -82,7 +82,7 @@ def add_points(db, rows):
     #        session_id (the VISIT), group_index, mjd, ra, dec, rms_ra,
     #        rms_dec, mag, band, x, y, n_frames, snr, mag_limit, source,
     #        method, flags, check_residual_ra, check_residual_dec,
-    #        check_scatter, check_ok, check_note]
+    #        check_scatter, check_ok, check_note, mag_auto, mag_source]
     # @return: the list of new point ids
     ids = []
     for r in rows:
@@ -94,19 +94,38 @@ def add_points(db, rows):
             " group_index, mjd, ra, dec, rms_ra, rms_dec, mag, band, x, y,"
             " n_frames, snr, mag_limit, source, method, flags,"
             " check_residual_ra, check_residual_dec, check_scatter,"
-            " check_ok, check_note)"
+            " check_ok, check_note, mag_auto, mag_source)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            " ?, ?, ?, ?, ?, ?)",
+            " ?, ?, ?, ?, ?, ?, ?, ?)",
             (r.get("run_id"), r.get("project_id"), r.get("session_id"),
              r.get("group_index"), r.get("mjd"), r.get("ra"), r.get("dec"),
              r.get("rms_ra"), r.get("rms_dec"), r.get("mag"), r.get("band"),
              r.get("x"), r.get("y"), r.get("n_frames"), r.get("snr"),
              r.get("mag_limit"), r.get("source"), r.get("method"), flags,
              r.get("check_residual_ra"), r.get("check_residual_dec"),
-             r.get("check_scatter"), r.get("check_ok"), r.get("check_note")))
+             r.get("check_scatter"), r.get("check_ok"), r.get("check_note"),
+             r.get("mag_auto", r.get("mag")), r.get("mag_source", "auto")))
         ids.append(cur.lastrowid)
     db.commit()
     return ids
+
+
+def set_manual_magnitude(db, run_id, group_index, mag, band=None):
+    # The observer measured the brightness by hand and says the report should
+    # use it (D). The EFFECTIVE magnitude moves; the automatic one stays in
+    # mag_auto and mag_source records who wrote what, so nothing reaches the
+    # MPC without its trace. Only the point of the STACK is touched: the
+    # per-frame one is the other half of the double measurement.
+    # @args: db - Database, run_id - the execution, group_index - which
+    #        observation, mag - the magnitude to use, band - its band
+    # @return: how many points were updated (0 or 1)
+    cur = db.execute(
+        "UPDATE astrometry_points SET mag=?, band=COALESCE(?, band),"
+        " mag_source='manual' WHERE run_id=? AND group_index=?"
+        " AND source='stack'",
+        (float(mag), band, int(run_id), int(group_index)))
+    db.commit()
+    return cur.rowcount
 
 
 def add_frames(db, run_id, rows):
@@ -195,7 +214,7 @@ def points_for_run(db, run_id):
         "SELECT id, run_id, project_id, session_id, group_index, mjd, ra,"
         " dec, rms_ra, rms_dec, mag, band, x, y, n_frames, snr, mag_limit,"
         " source, method, flags, check_residual_ra, check_residual_dec,"
-        " check_scatter, check_ok, check_note"
+        " check_scatter, check_ok, check_note, mag_auto, mag_source"
         " FROM astrometry_points WHERE run_id=?"
         " ORDER BY group_index, id",
         (run_id,)).fetchall()
@@ -207,7 +226,7 @@ def points_for_run(db, run_id):
              "source": r[17], "method": r[18], "flags": _flags_in(r[19]),
              "check_residual_ra": r[20], "check_residual_dec": r[21],
              "check_scatter": r[22], "check_ok": _bool_in(r[23]),
-             "check_note": r[24]}
+             "check_note": r[24], "mag_auto": r[25], "mag_source": r[26]}
             for r in rows]
 
 

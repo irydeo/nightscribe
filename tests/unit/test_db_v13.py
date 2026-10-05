@@ -89,7 +89,7 @@ def _columns(db, table):
 def test_upgrade_from_v12_adds_err_internal(tmp_path):
     f = _v12_database(tmp_path / "v12.db")
     db = Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert "err_internal" in _columns(db, "photometry_points")
     row = db.execute("SELECT mag, err, err_internal, mag_raw FROM"
                      " photometry_points WHERE id=1").fetchone()
@@ -103,7 +103,7 @@ def test_reopen_is_idempotent(tmp_path):
     f = tmp_path / "t.db"
     Database(str(f)).close()
     db = Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert "err_internal" in _columns(db, "photometry_points")
     db.close()
 

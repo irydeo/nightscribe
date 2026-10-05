@@ -544,6 +544,25 @@ def _migrate(conn):
         );
         """)
         conn.execute("PRAGMA user_version = 17")
+    if v < 18:
+        # D: the magnitude the pipeline measured, and WHO wrote the one the
+        # report uses. The observer can measure the brightness by hand in the
+        # Photometry tab and say "use this one"; the automatic value is kept
+        # beside it, so the audit never loses what the machine said.
+        #
+        # The columns are added only when they are missing: a database can
+        # walk a version number backwards (a test fixture, a restored backup)
+        # while the tables are still there, and an ALTER would die on the
+        # duplicate instead of finishing the walk.
+        cols = {row[1] for row in conn.execute(
+            "PRAGMA table_info(astrometry_points)")}
+        if "mag_auto" not in cols:
+            conn.execute(
+                "ALTER TABLE astrometry_points ADD COLUMN mag_auto REAL")
+        if "mag_source" not in cols:
+            conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
+                         " mag_source TEXT DEFAULT 'auto'")
+        conn.execute("PRAGMA user_version = 18")
     conn.commit()
 
 
@@ -614,6 +633,10 @@ MIGRATION_NOTES = {
         "Minor-planet astrometry: the measured positions, the resolved "
         "motion and the frames of each run, tied to their visit and "
         "undoable as one execution."),
+    18: QT_TRANSLATE_NOOP("NSMigrations",
+        "Astrometry: the magnitude the run measured is kept beside the one "
+        "the report uses, so a brightness measured by hand can replace it "
+        "without losing what the machine said."),
 }
 
 

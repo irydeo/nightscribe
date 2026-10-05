@@ -16,6 +16,8 @@ astrometry_frames tables appear additively, idempotently and without losing
 anything, and the store writes and undoes one execution without touching the
 others. A hand-built v16 database walks to v17 untouched."""
 
+import pytest
+
 from nightscribe.core import astrometry_store as ast
 from nightscribe.core.db import Database
 
@@ -29,6 +31,7 @@ _POINT_COLS = {
     "dec", "rms_ra", "rms_dec", "mag", "band", "x", "y", "n_frames", "snr",
     "mag_limit", "source", "method", "flags", "check_residual_ra",
     "check_residual_dec", "check_scatter", "check_ok", "check_note",
+    "mag_auto", "mag_source",
 }
 _FRAME_COLS = {
     "id", "run_id", "path", "size", "filter", "exptime_s", "date_obs",
@@ -82,7 +85,7 @@ def _seed(db):
 def test_v16_walks_to_v17_without_loss(tmp_path):
     pid = _v16_database(tmp_path / "v16.db")
     db = Database(str(tmp_path / "v16.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert _columns(db, "astrometry_runs") == _RUN_COLS
     assert _columns(db, "astrometry_points") == _POINT_COLS
     assert _columns(db, "astrometry_frames") == _FRAME_COLS
@@ -95,7 +98,7 @@ def test_v16_walks_to_v17_without_loss(tmp_path):
 
 def test_fresh_db_is_v17(tmp_path):
     db = Database(str(tmp_path / "fresh.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     tables = {r[0] for r in db.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"astrometry_runs", "astrometry_points",
@@ -107,7 +110,7 @@ def test_reopen_is_idempotent(tmp_path):
     f = tmp_path / "t.db"
     Database(str(f)).close()
     db = Database(str(f))               # reopening must be a no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 17
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert _columns(db, "astrometry_runs") == _RUN_COLS
     db.close()
 
@@ -203,3 +206,31 @@ def test_delete_run_only_touches_its_own(tmp_db):
         (run_b,)).fetchone()[0] == 1
     assert tmp_db.execute("SELECT COUNT(*) FROM photometry_points"
                           " WHERE project_id=?", (pid,)).fetchone()[0] == 1
+
+
+def test_a_manual_magnitude_replaces_the_effective_one(tmp_path):
+    # D: the observer measured the brightness by hand in the Photometry tab
+    # and says the report should use it. The EFFECTIVE magnitude moves, the
+    # automatic one stays in mag_auto, and mag_source records who wrote
+    # what: nothing reaches the MPC without its trace.
+    store = ast
+    db = Database(str(tmp_path / "t.db"))
+    pid = db.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context) VALUES ('neo', '2025 UR', 'active', 1.0, 1.0, '{}')"
+    ).lastrowid
+    run = ast.create_run(db, pid, None, {}, status="complete")
+    ast.add_points(db, [{"run_id": run, "project_id": pid, "session_id":
+                           None, "group_index": 0, "mag": 18.05, "band": "G",
+                           "source": "stack"}])
+    # the run's own value is the automatic one, and it says so
+    p = ast.points_for_run(db, run)[0]
+    assert p["mag"] == pytest.approx(18.05)
+    assert p["mag_auto"] == pytest.approx(18.05)
+    assert p["mag_source"] == "auto"
+    # the observer's measurement takes over the effective magnitude
+    assert ast.set_manual_magnitude(db, run, 0, 17.98, "G") == 1
+    p = ast.points_for_run(db, run)[0]
+    assert p["mag"] == pytest.approx(17.98)
+    assert p["mag_auto"] == pytest.approx(18.05)   # what the machine said
+    assert p["mag_source"] == "manual"

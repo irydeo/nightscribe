@@ -4845,89 +4845,94 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>NSMigrations</name>
     <message>
-        <location filename="../../core/db.py" line="557"/>
+        <location filename="../../core/db.py" line="576"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
         <translation>Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="560"/>
+        <location filename="../../core/db.py" line="579"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
         <translation>El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="563"/>
+        <location filename="../../core/db.py" line="582"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
         <translation>El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="566"/>
+        <location filename="../../core/db.py" line="585"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
         <translation>Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="569"/>
+        <location filename="../../core/db.py" line="588"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
         <translation>Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="572"/>
+        <location filename="../../core/db.py" line="591"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
         <translation>Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="575"/>
+        <location filename="../../core/db.py" line="594"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
         <translation>Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="578"/>
+        <location filename="../../core/db.py" line="597"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
         <translation>El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="581"/>
+        <location filename="../../core/db.py" line="600"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
         <translation>Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="585"/>
+        <location filename="../../core/db.py" line="604"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
         <translation>Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="588"/>
+        <location filename="../../core/db.py" line="607"/>
         <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
         <translation>Las mediciones recuerdan la placa en la que se tomaron: al reabrir esa placa en el editor unificado se restaura su estiramiento, la receta de medición y la secuencia de comparación.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="592"/>
+        <location filename="../../core/db.py" line="611"/>
         <source>Photometric series: each point keeps its raw magnitude, its quality flags and the run it belongs to, so a bad run can be undone without touching the rest of the visit.</source>
         <translation>Series fotométricas: cada punto conserva su magnitud cruda, sus marcas de calidad y la ejecución a la que pertenece, así una ejecución mala se deshace sin tocar el resto de la visita.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="596"/>
+        <location filename="../../core/db.py" line="615"/>
         <source>Each photometric point now keeps its own photon error apart from the calibration systematic, so a light curve can be drawn (and judged) without the night&apos;s zero point swamping it.</source>
         <translation>Cada punto fotométrico guarda ahora su propio error de fotones, aparte del sistemático de la calibración, de modo que una curva de luz puede dibujarse (y juzgarse) sin que el punto cero de la noche la ahogue.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="600"/>
+        <location filename="../../core/db.py" line="619"/>
         <source>Every point remembers the night it was measured on (its airmass and its position on the plate), so a curve read back from your project can explain that night without measuring again.</source>
         <translation>Cada punto recuerda la noche en que se midió (su masa de aire y su posición en la placa), así una curva releída de tu proyecto puede explicar esa noche sin volver a medir.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="604"/>
+        <location filename="../../core/db.py" line="623"/>
         <source>A visit&apos;s chart is one curve again: if you measured the same night several times, the visit remembers which pass it shows, and you can pick any other from &quot;Series &gt; Passes of this visit&quot;.</source>
         <translation>La gráfica de una visita vuelve a ser una sola curva: si mediste la misma noche varias veces, la visita recuerda qué pasada muestra y puedes elegir otra en «Serie &gt; Pasadas de esta visita».</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="609"/>
+        <location filename="../../core/db.py" line="628"/>
         <source>Image calibration: a library of master frames (bias, dark, flat) that NightScribe uses to clean your lights before stacking them.</source>
         <translation>Calibración de imágenes: una biblioteca de masters (bias, dark, flat) que NightScribe usa para limpiar tus tomas antes de apilarlas.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="613"/>
+        <location filename="../../core/db.py" line="632"/>
         <source>Minor-planet astrometry: the measured positions, the resolved motion and the frames of each run, tied to their visit and undoable as one execution.</source>
         <translation>Astrometría de cuerpos menores: las posiciones medidas, el movimiento resuelto y los frames de cada ejecución, atados a su visita y reversibles como una sola ejecución.</translation>
+    </message>
+    <message>
+        <location filename="../../core/db.py" line="636"/>
+        <source>Astrometry: the magnitude the run measured is kept beside the one the report uses, so a brightness measured by hand can replace it without losing what the machine said.</source>
+        <translation>Astrometría: la magnitud que midió la ejecución se guarda junto a la que usa el reporte, para que un brillo medido a mano pueda sustituirla sin perder lo que dijo la máquina.</translation>
     </message>
 </context>
 <context>

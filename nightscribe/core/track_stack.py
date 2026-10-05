@@ -619,11 +619,14 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3):
 
 
 def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
-                budget_bytes=MEMORY_BUDGET_BYTES, sigma=3.0, iterations=3):
+                budget_bytes=MEMORY_BUDGET_BYTES, sigma=3.0, iterations=3,
+                track=True):
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, method - one of METHODS, box - the output box,
     #        shape - the native frame size, cfg - Config, loader - array
-    #        reader, budget_bytes - the RAM budget
+    #        reader, budget_bytes - the RAM budget, track - True freezes the
+    #        OBJECT (the stars trail), False freezes the STARS (the object
+    #        trails)
     # @return: (stack, report)
     # In RAM when the warped frames fit the budget (the cutout path always
     # does); otherwise the output is walked in strips and only the region
@@ -631,12 +634,20 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     # a streaming that does not match the RAM is a silent source of error.
     # Frames that could not be registered are LEFT OUT (usable): stacking
     # them misaligned only adds noise.
+    #
+    # The two alignments are both needed and they answer different
+    # questions: the object's stack is where its light is concentrated (so
+    # a faint NEO can be measured at all), and the STAR stack is where the
+    # comparison stars are points instead of streaks, which is the only
+    # way their flux can set a zero point. Measuring a streak with a
+    # circular aperture calibrates nothing.
     indices = _indices(frames, group)
     report = StackReport(method=method, n_frames=len(indices), box=box,
                          sigma=sigma, iterations=iterations)
     if not indices:
         return None, report
-    offsets = track_offsets(frames, indices, q, shape)
+    offsets = (track_offsets(frames, indices, q, shape) if track
+               else [(0.0, 0.0)] * len(indices))
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
     n = len(indices)
@@ -681,9 +692,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
 
 
 def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
-                 loader=None, progress=None, cancel=None):
+                 loader=None, progress=None, cancel=None, track=True):
     # @args: frames, groups, q_by_group (one q per group), method, boxes
-    #        (one box per group), shape, cfg, loader, progress, cancel
+    #        (one box per group), shape, cfg, loader, progress, cancel,
+    #        track - as stack_group (False gives the star stacks)
     # @return: list[(stack, report)] one per observation
     out = []
     total = len(groups)
@@ -691,7 +703,8 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
         if solve.is_cancelled(cancel):
             break
         stack, report = stack_group(frames, group, q_by_group[index], method,
-                                    boxes[index], shape, cfg=cfg, loader=loader)
+                                    boxes[index], shape, cfg=cfg,
+                                    loader=loader, track=track)
         if progress is not None:
             progress(index + 1, total, f"observation {index + 1}")
         # one entry PER GROUP even when it is empty, so the caller's index

@@ -263,3 +263,53 @@ def test_the_cutout_and_the_full_frame_are_the_same_image(tmp_path):
     xs, ys = qx - small[0], qy - small[1]
     assert np.allclose(a[ys - 5:ys + 6, xs - 5:xs + 6],
                        b[qy - 5:qy + 6, qx - 5:qx + 6])
+
+
+def test_the_star_stack_freezes_the_stars_and_the_object_stack_the_object(
+        tmp_path):
+    # Two alignments, two jobs (ADR-062). The object's stack concentrates
+    # its light, which is the only way a faint NEO can be measured at all;
+    # the STAR stack is the only place the comparison stars are points,
+    # and a zero point cannot be set from a streak. Same frames, same
+    # method: what changes is what the frames are aligned on.
+    frames = _sequence(tmp_path, n=12, size=64, rate_px=1.5)
+    q = (24.0 + 1.5 * 5.5, 34.0)          # the object at the middle instant
+    box = (0, 0, 64, 64)
+    tracked, _ = ts.stack_group(frames, (0, 12), q, "mean", box, (64, 64))
+    stars, _ = ts.stack_group(frames, (0, 12), q, "mean", box, (64, 64),
+                              track=False)
+    assert not np.allclose(tracked, stars)
+    yy, xx = np.mgrid[0:64, 0:64]
+    # the sky is the same in both (same frames): what is compared is the
+    # light ABOVE it, or the background would drown the difference
+    sky_t = float(np.median(tracked))
+    sky_s = float(np.median(stars))
+    # ON the object: tracking concentrates it, the star stack spreads it
+    # along the 16.5 px trail
+    ap = np.hypot(xx - q[0], yy - q[1]) <= 2.0
+    obj_t = tracked[ap].sum() - sky_t * ap.sum()
+    obj_s = stars[ap].sum() - sky_s * ap.sum()
+    assert obj_t > 3.0 * obj_s
+    # and a STAR away from the trail is the other way round
+    far = np.abs(yy - 34.0) > 10.0
+    sy, sx = np.unravel_index(int(np.argmax(np.where(far, stars, -np.inf))),
+                              stars.shape)
+    star_ap = np.hypot(xx - sx, yy - sy) <= 2.0
+    star_s = stars[star_ap].sum() - sky_s * star_ap.sum()
+    star_t = tracked[star_ap].sum() - sky_t * star_ap.sum()
+    assert star_s > 3.0 * star_t
+
+
+def test_stack_groups_carries_the_alignment_to_every_observation(tmp_path):
+    # The per-observation star stacks are what the photometry reads, so
+    # the flag has to travel through the plural entry point too.
+    frames = _sequence(tmp_path, n=8, size=64, rate_px=1.5)
+    groups = ts.split_groups(frames, 2)
+    qs = [(24.0 + 1.5 * 1.5, 34.0), (24.0 + 1.5 * 5.5, 34.0)]
+    boxes = [(0, 0, 64, 64)] * 2
+    tracked = ts.stack_groups(frames, groups, qs, "mean", boxes, (64, 64))
+    stars = ts.stack_groups(frames, groups, qs, "mean", boxes, (64, 64),
+                            track=False)
+    assert len(stars) == len(tracked) == 2
+    assert not np.allclose(stars[0][0], tracked[0][0])
+    assert not np.allclose(stars[1][0], tracked[1][0])

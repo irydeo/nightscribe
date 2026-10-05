@@ -179,6 +179,24 @@
        </layout>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="row_calibrate">
+        <item>
+         <widget class="QCheckBox" name="chk_calibrate">
+          <property name="text"><string>Calibrate the frames</string></property>
+          <property name="toolTip">
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves (needs the sequence to be dithered, and the run says so); a real flat always wins</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="hsp_calibrate">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
        <layout class="QHBoxLayout" name="row_starstack">
         <item>
          <widget class="QCheckBox" name="chk_starstack">

@@ -60,6 +60,13 @@ project). No visit, no series: that is the house rule.
    "Check against other observers", "Report text"), and the occasional
    actions (the blink figure, undoing the run) behind the **⋯** menu in the
    header.
+   Before stacking, the **Calibrate the frames** checkbox applies the
+   Calibration tab's recipe (dark/bias and flat) to each frame **as it is
+   read**, with no copies on disk. For a faint object it matters for the
+   magnitude: without a flat the object and the comparisons fall in different
+   parts of the vignetting, and that is **0.087 mag** measured on a real
+   visit. If you have no flat, the app builds one from the frames themselves
+   (it needs dither and tells you).
 2. **Choose how many observations you want.** The MPC prefers several
    measurements spread in time over a single one. You give a number and the
    software splits the sequence into contiguous equal groups. The table

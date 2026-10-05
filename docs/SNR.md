@@ -69,6 +69,16 @@ percentile over the frames, while the stars move and do not. It needs the
 sequence to be dithered, and it tells you when it is not. A real flat always
 wins.
 
+**7. Calibrate the frames before stacking them.** The **Calibrate the
+frames** checkbox in the Astrometry tab applies the recipe (the masters of
+the Calibration tab: dark/bias and flat) to each frame **as it is read**, so
+the stacking never needs calibrated copies on disk. It matters more than it
+looks: without a flat the object and the comparisons fall in different parts
+of the vignetting, and **measured on a real visit that is worth 0.087 mag**
+of systematic error in the magnitude. If you have no flat, the app builds
+one from the frames themselves (it needs dither, and it tells you); a real
+flat always wins.
+
 ## What you can do, which is what gains the most
 
 - **More frames, not longer exposures.** SNR goes with the square root of the
@@ -228,7 +238,23 @@ It does not replace a real flat: it measures the train's response **times**
 the sky's shape, so the flat-field error is larger. It is the honest
 fallback, and the recipe says which one was used.
 
-## T7. What measures the result: injection and recovery
+## T7. The calibration, inside the stacking
+
+A stack of uncalibrated frames keeps the pedestal, the thermal current, the
+dust and the vignetting. For the **position** it matters little (the centroid
+is local), but for the **magnitude** it matters a lot: the zero point is
+measured on the comparisons, and if the object falls in a zone with a
+different transmission than they do, the error goes straight in. Measured on
+a real visit, the smooth part of the vignetting is worth **0.087 mag**, and a
+dust spot under the object much more.
+
+The recipe is ADR-061's and it is applied **on read** (`FrameCalibrator`),
+not into copies: the engine reads each frame many times and in pieces, and a
+calibrated copy per frame would be gigabytes of I/O. Measured with the P4
+instrument, the same injection with and without the pseudo-flat: **0.0707
+mag** of correction and the SNR from 32.9 to 34.0.
+
+## T8. What measures the result: injection and recovery
 
 Everything above is a claim. The instrument that measures it puts a source of
 **known** flux, at a known place, moving at a known rate, into **copies** of

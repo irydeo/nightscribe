@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import calibration, coords, fits_meta, outliers, register, solve
+from . import calibration, coords, fits_meta, outliers, parallel, register, solve
 
 logger = logging.getLogger(__name__)
 
@@ -223,8 +223,23 @@ def session_fwhm(ref_data, ref_stars, sat=None):
         return None
 
 
+def read_pixels(loader, path, box=None):
+    # @args: loader - callable(path, box) -> array, or None for
+    #        calibration.read_image (which gives (array, header)), path -
+    #        the frame, box - optional (x0, y0, x1, y1) region
+    # @return: the pixels as an array
+    # Both conventions are accepted because the engine grew up with
+    # read_image and the calibration loader (calibration.FrameCalibrator)
+    # gives pixels only: accepting both is cheaper than migrating every call
+    # site, and the ambiguity is closed HERE, once, instead of in each of
+    # them.
+    loaded = (loader or calibration.read_image)(path, box)
+    return loaded[0] if isinstance(loaded, tuple) else loaded
+
+
 def register_sequence(frames, ref_index=None, allow_rotation=False,
-                      progress=None, cancel=None, fwhm_px=None, sat=None):
+                      progress=None, cancel=None, fwhm_px=None, sat=None,
+                      loader=None):
     # @args: frames - list[Frame] with a solved reference, ref_index -
     #        which frame is the grid (default: the solved one), allow_rotation
     #        - fit a rigid rotation on the FIRST attempt (slower, for alt-az
@@ -252,7 +267,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     if ref is None or ref.wcs is None:
         # the grid has to be a frame we actually know the sky of
         ref = next((f for f in frames if f.wcs is not None), frames[0])
-    ref_data, _ = calibration.read_image(ref.path)
+    ref_data = read_pixels(loader, ref.path)
     # ONE source image of the reference for the whole sequence: it is the
     # same frame every time, and rebuilding it per frame was ~140 ms of
     # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
@@ -272,7 +287,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
                                "quality": 100.0, "rms_px": 0.0}
             frame.register_note = "reference"
         else:
-            data, _ = calibration.read_image(frame.path)
+            data = read_pixels(loader, frame.path)
             # the frame's own noise, measured here because the pixels are
             # already in hand: the weighted combination needs it and the
             # robust MAD does not care about the stars or the object
@@ -575,6 +590,10 @@ def sequence_motion(frames, name, site="", lat=None, lon=None):
 MEMORY_BUDGET_BYTES = 2 * 1024 ** 3
 # Combination methods, in the order the UI offers them.
 METHODS = ("sum", "mean", "median", "sigma", "weighted")
+# The combine only goes parallel when there is enough work to share: a small
+# cube (a unit test, a tiny cutout) stays serial, which keeps the tested path
+# and the fast path the same code.
+_COMBINE_PARALLEL_MIN = 1_000_000
 
 
 @dataclass
@@ -789,11 +808,31 @@ def _source_box(A, b, box, shape, pad=3):
     return (sc0, sr0, max(sc1, sc0 + 1), max(sr1, sr0 + 1))
 
 
-def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3):
+def _slice_region(preloaded, src_box):
+    # @args: preloaded - (array, (x0, y0, x1, y1)) covering a region,
+    #        src_box - the exact region wanted
+    # @return: the sub-array, or None when the preloaded region does NOT
+    #          contain src_box (the caller then reads: a wrong slice would be
+    #          a silent error, never a fallback)
+    arr, (dx0, dy0, dx1, dy1) = preloaded
+    x0, y0, x1, y1 = src_box
+    if x0 < dx0 or y0 < dy0 or x1 > dx1 or y1 > dy1:
+        return None
+    sub = arr[y0 - dy0:y1 - dy0, x0 - dx0:x1 - dx0]
+    if sub.shape != (y1 - y0, x1 - x0):
+        return None
+    return sub
+
+
+def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3,
+                 preloaded=None):
     # @args: path - the frame, tr - its transform, delta - the object's
     #        offset, box - the output box in reference (x0,y0,x1,y1),
     #        shape - the native frame (naxis1, naxis2), loader -
-    #        callable(path, box) -> array, order - interpolation order
+    #        callable(path, box) -> array, order - interpolation order,
+    #        preloaded - optional (array, box) already in RAM that covers
+    #        what this warp needs (the sweep reads each frame once and slices
+    #        its box per candidate)
     # @return: (warped, valid) where valid is a boolean mask
     # Only the region the box needs is read from disk (D32): the affine
     # tells us its bounding box, so the frame is never loaded whole. The
@@ -823,10 +862,9 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3):
         # should be. Nothing is read from disk.
         return (np.zeros(out_shape, dtype=np.float32),
                 np.zeros(out_shape, dtype=bool))
-    if loader is not None:
-        data = loader(path, src_box)
-    else:
-        data, _header = calibration.read_image(path, src_box)
+    data = _slice_region(preloaded, src_box) if preloaded is not None else None
+    if data is None:
+        data = read_pixels(loader, path, src_box)
     data = np.asarray(data, dtype=np.float32)
     src_o = np.array([float(src_box[1]), float(src_box[0])])   # (row, col)
     offset = A @ out_o + b - src_o
@@ -837,6 +875,41 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3):
                                     output_shape=out_shape, order=1,
                                     mode="constant", cval=0.0)
     return warped, ones > 0.5
+
+
+def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
+                preloaded=None):
+    # Warps a list of frames onto the box, in PARALLEL, keeping the order.
+    # @args: frame_list - list[Frame], offsets - one (dx, dy) per frame (same
+    #        order), box/shape - the warp's output box and the native frame,
+    #        loader - optional array reader, cfg - Config (the thread
+    #        override), preloaded - optional list of (array, box) already in
+    #        RAM, one per frame (the sweep)
+    # @return: (stack (n, h, w) float32, masks (n, h, w) bool)
+    # The warps are INDEPENDENT (each frame reads its own region and writes
+    # its own slice), so this is where the pipeline uses the machine's
+    # cores: measured, scipy's warp scales x9.7 over 16 threads because it
+    # releases the GIL. The order is kept because the combination reduces
+    # along the frame axis.
+    n = len(frame_list)
+    out_h = box[3] - box[1]
+    out_w = box[2] - box[0]
+    # one warp holds its output plus a mask and one temporary of the same
+    # size, and that is what bounds the thread count on a big box
+    per_task = max(1, out_h * out_w * 4 * 3)
+    workers = parallel.worker_count(per_task_bytes=per_task, cfg=cfg)
+    results = parallel.map_parallel(
+        lambda k: _warp_to_box(
+            frame_list[k].path, frame_list[k].transform, offsets[k], box,
+            shape, loader=loader,
+            preloaded=(preloaded[k] if preloaded is not None else None)),
+        range(n), workers=workers)
+    stack = np.empty((n, out_h, out_w), dtype=np.float32)
+    masks = np.empty((n, out_h, out_w), dtype=bool)
+    for k, (warped, valid) in enumerate(results):
+        stack[k] = warped
+        masks[k] = valid
+    return stack, masks
 
 
 def frame_weights(frames):
@@ -872,10 +945,27 @@ def _weight_row(weights, n):
     return w.reshape((-1, 1, 1))
 
 
-def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None):
+def _combine_slice(data, method, weights, sigma, iterations):
+    # @args: data - (n, h, w) with the invalid pixels already NaN, method,
+    #        weights, sigma/iterations - as combine
+    # @return: the combined (h, w) float32 slice
+    # The reduction is along the FRAME axis, so a slice of columns is a
+    # complete problem on its own: this is what makes the parallel path
+    # exact, not an approximation.
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="All-NaN slice.*")
+        warnings.filterwarnings("ignore", message="Mean of empty slice.*")
+        if method == "weighted":
+            return _combine_weighted(data, weights, sigma, iterations)
+        return _combine_masked(data, method, sigma, iterations)
+
+
+def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None,
+            cfg=None):
     # @args: stack - (n, h, w) float32, method - one of METHODS, mask -
     #        optional (n, h, w) validity, sigma/iterations - for sigma-clip,
-    #        weights - optional (n,) per-frame weights (see frame_weights)
+    #        weights - optional (n,) per-frame weights (see frame_weights),
+    #        cfg - Config (the thread override)
     # @return: the combined (h, w) float32 image
     # sum and mean are equivalent in signal (mean is sum / n); both are
     # offered because the user will see them in the concept, but the app
@@ -891,11 +981,30 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None):
     # The answer there is NaN, which is exactly what those pixels deserve,
     # so the warnings are silenced HERE, where they are expected: a real
     # all-NaN frame somewhere else still shows up in the log.
+    #
+    # The reduction is PER PIXEL (along the frame axis), so the image is cut
+    # into columns and each column combined on its own thread: the answer is
+    # identical, pixel by pixel. It is the second place the machine's cores
+    # are used (after the warps), and it matters because the sigma clip walks
+    # the whole cube several times. A small cube stays serial: the threads
+    # only pay when there is work to share.
     if stack.size == 0:
         return stack.reshape(stack.shape[1:]) if stack.ndim == 3 else stack
     data = stack
     if mask is not None:
         data = np.where(mask, stack, np.nan)
+    if data.ndim == 3 and data.shape[0] * data.shape[1] * data.shape[2] \
+            >= _COMBINE_PARALLEL_MIN:
+        per_task = max(1, data.shape[0] * data.shape[1]
+                       * max(1, data.shape[2] // 4) * 4)
+        workers = parallel.worker_count(per_task_bytes=per_task, cfg=cfg)
+        if workers > 1 and data.shape[2] >= 2 * workers:
+            chunks = np.array_split(np.arange(data.shape[2]), workers)
+            parts = parallel.map_parallel(
+                lambda cols: _combine_slice(data[:, :, cols], method,
+                                            weights, sigma, iterations),
+                chunks, workers=workers)
+            return np.concatenate(parts, axis=1).astype(np.float32)
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="All-NaN slice.*")
         warnings.filterwarnings("ignore", message="Mean of empty slice.*")
@@ -939,7 +1048,7 @@ def _combine_masked(data, method, sigma, iterations):
     if method == "mean":
         return np.nanmean(data, axis=0).astype(np.float32)
     if method == "median":
-        return np.nanmedian(data, axis=0).astype(np.float32)
+        return outliers.nanmedian_axis0(data).astype(np.float32)
     # sigma-clipped: clip around the median and average the survivors
     keep = _sigma_clip_keep(data, sigma, iterations)
     return np.nanmean(np.where(keep, data, np.nan), axis=0).astype(np.float32)
@@ -954,7 +1063,7 @@ def _sigma_clip_keep(data, sigma, iterations):
     # on the survivors. ONE implementation, because the plain sigma-clipped
     # mean and the weighted one MUST reject the same pixels: the only
     # difference between the two methods is how the survivors are averaged.
-    med = np.nanmedian(data, axis=0)
+    med = outliers.nanmedian_axis0(data)
     keep = np.isfinite(data)
     for _ in range(max(1, iterations)):
         with np.errstate(invalid="ignore"):
@@ -1009,15 +1118,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     n = len(indices)
     need = n * out_h * out_w * 4
     if need <= budget_bytes:
-        stack = np.empty((n, out_h, out_w), dtype=np.float32)
-        masks = np.empty((n, out_h, out_w), dtype=bool)
-        for k, i in enumerate(indices):
-            warped, valid = _warp_to_box(frames[i].path, frames[i].transform,
-                                         offsets[k], box, shape, loader=loader)
-            stack[k] = warped
-            masks[k] = valid
+        stack, masks = _warp_batch([frames[i] for i in indices], offsets, box,
+                                   shape, loader=loader, cfg=cfg)
         return combine(stack, method, mask=masks, sigma=sigma,
-                       iterations=iterations, weights=weights), report
+                       iterations=iterations, weights=weights, cfg=cfg), report
     report.streamed = True
     out = np.empty((out_h, out_w), dtype=np.float32)
     strip_h = max(1, int(budget_bytes / max(1, n * out_w * 4)))
@@ -1033,16 +1137,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         py0 = max(0, y0 - pad)
         py1 = min(out_h, y1 + pad)
         sub_box = (box[0], box[1] + py0, box[2], box[1] + py1)
-        strip = np.empty((n, py1 - py0, out_w), dtype=np.float32)
-        masks = np.empty((n, py1 - py0, out_w), dtype=bool)
-        for k, i in enumerate(indices):
-            warped, valid = _warp_to_box(frames[i].path, frames[i].transform,
-                                         offsets[k], sub_box, shape,
-                                         loader=loader)
-            strip[k] = warped
-            masks[k] = valid
+        strip, masks = _warp_batch([frames[i] for i in indices], offsets,
+                                   sub_box, shape, loader=loader, cfg=cfg)
         combined = combine(strip, method, mask=masks, sigma=sigma,
-                           iterations=iterations, weights=weights)
+                           iterations=iterations, weights=weights, cfg=cfg)
         out[y0:y1] = combined[y0 - py0:y1 - py0]
     return out, report
 
@@ -1112,12 +1210,51 @@ def _score(stack, q_box, cfg=None):
     yy, xx = np.mgrid[0:stack.shape[0], 0:stack.shape[1]]
     d = np.hypot(xx - x, yy - y)
     ann = (d >= 8.0) & (d <= 12.0)
-    sky = float(np.median(stack[ann]))
-    sig = float(outliers.scaled_mad(stack[ann], centre=sky)) or 1e-6
+    # the local sky and its sigma over the FINITE pixels only: the stack has
+    # NaN on the footprint's border, and one NaN poisons a median
+    sky = _local_sky(stack, ann)
+    sig = _local_sigma(stack, ann, sky)
+    if sky is None or sig is None:
+        return 0.0, 0.0, 0.0
     ap = d <= 4.0
     snr = float(res["flux"]) / (sig * math.sqrt(ap.sum()))
     roundness = _roundness(stack, x, y)
+    if not math.isfinite(snr) or not math.isfinite(roundness):
+        # A candidate that cannot be scored scores ZERO: a NaN would win the
+        # `score > best` comparison by accident (every comparison against NaN
+        # is False, so the first candidate would be kept) and the sweep would
+        # report a velocity nobody measured.
+        return 0.0, 0.0, 0.0
     return snr * roundness, snr, roundness
+
+
+def _local_sky(stack, mask):
+    # @args: stack - the combined image, mask - which pixels to use
+    # @return: the median of the FINITE pixels in the mask, or None
+    # The stack carries NaN where a frame did not cover the box (the
+    # footprint's border, which exists whenever the sequence was dithered),
+    # and np.median of an array with ONE NaN is NaN. Every sky of this
+    # module goes through here so that cannot happen again: it happened once
+    # and the symptom was a DETECTION failing in silence (measured on the
+    # synthetic case of test_injection: 4 NaN pixels out of 16384 made the
+    # roundness NaN and _score threw the whole candidate away).
+    values = stack[mask]
+    values = values[np.isfinite(values)]
+    if values.size == 0:
+        return None
+    return float(np.median(values))
+
+
+def _local_sigma(stack, mask, sky):
+    # @args: stack - the combined image, mask - which pixels to use,
+    #        sky - their median (see _local_sky)
+    # @return: the robust sigma of the finite pixels, or None
+    values = stack[mask]
+    values = values[np.isfinite(values)]
+    if values.size < 5 or sky is None:
+        return None
+    sigma = float(outliers.scaled_mad(values, centre=sky))
+    return sigma if np.isfinite(sigma) and sigma > 0 else None
 
 
 def _roundness(stack, x, y, radius=4.0):
@@ -1126,8 +1263,11 @@ def _roundness(stack, x, y, radius=4.0):
     yy, xx = np.mgrid[0:stack.shape[0], 0:stack.shape[1]]
     d = np.hypot(xx - x, yy - y)
     win = d <= radius
-    sky = float(np.median(stack[~win])) if (~win).any() else 0.0
-    w = np.where(win, stack - sky, 0.0)
+    sky = _local_sky(stack, ~win)
+    if sky is None:
+        return 0.0
+    finite = np.isfinite(stack)
+    w = np.where(win & finite, stack - sky, 0.0)
     w = np.clip(w, 0, None)
     total = w.sum()
     if total <= 0:
@@ -1160,72 +1300,143 @@ def sweep(frames, q, base_rate, base_pa, box, shape, pct=5.0, steps=5,
     # by 5 position-angle offsets. Modulus and PA are used, not RA/Dec
     # components, because the real errors are of speed and heading (the
     # mount and the ephemeris fail on those two axes).
-    grid = []
-    best = None
+    #
+    # THE ROI IS READ ONCE (D12). The 25 candidates move the object by a few
+    # pixels at most, so the frames are read a single time into the union of
+    # the regions every candidate needs, and each candidate then slices its
+    # own box from RAM. Before this, `_rescore` re-read and re-warped every
+    # frame for every candidate: 25 x N FITS reads for a number that changes
+    # by a couple of pixels. The base offsets, the elapsed minutes and the
+    # plate scale are computed once too, for the same reason.
     factors = np.linspace(1.0 - pct / 100.0, 1.0 + pct / 100.0, steps)
     pas = np.linspace(-pct / 100.0, pct / 100.0, steps) * 180.0
-    total = len(factors) * len(pas)
-    done = 0
-    for factor in factors:
-        for dpa in pas:
-            if solve.is_cancelled(cancel):
-                break
-            rate = base_rate * factor
-            pa = base_pa + dpa
-            # move each frame's object from the base position along the
-            # new velocity, relative to the base one
-            _rescore(frames, q, base_rate, base_pa, rate, pa, box, shape,
-                     method, cfg, loader, sigma, iterations, grid, best)
-            done += 1
-            if progress is not None:
-                progress(done, total, f"rate {rate:.2f} PA {pa:.1f}")
+    base, t0, scale = _sweep_base(frames, q, shape)
+    cands = [(float(base_rate * factor), float(base_pa + dpa))
+             for factor in factors for dpa in pas]
+    if not base:
+        grid = [{"rate": rate, "pa": pa, "score": 0.0, "snr": 0.0,
+                 "roundness": 0.0} for rate, pa in cands]
+        return SweepResult(best=None, grid=grid, method=method)
+    deltas = _sweep_deltas(base, base_rate, base_pa, cands, scale)
+    preloaded = _sweep_regions(base, deltas, box, shape, loader)
+    grid = []
+    best = None
+    total = len(cands)
+    for index, (rate, pa) in enumerate(cands):
+        if solve.is_cancelled(cancel):
+            break
+        _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
+                 loader, sigma, iterations, grid, preloaded)
+        if progress is not None:
+            progress(index + 1, total, f"rate {rate:.2f} PA {pa:.1f}")
     for item in grid:
         if best is None or item["score"] > best["score"]:
             best = item
     return SweepResult(best=best, grid=grid, method=method)
 
 
-def _rescore(frames, q, base_rate, base_pa, rate, pa, box, shape, method,
-             cfg, loader, sigma, iterations, grid, _best):
-    # @args: internal: shifts the object along (rate, pa) instead of the
-    #        ephemeris, stacks the box and scores it
-    # @return: None (appends to grid)
-    # The per-frame displacement is the difference between the new and the
-    # base velocity over the elapsed time, in pixels.
+def _sweep_base(frames, q, shape):
+    # The part of the sweep that does NOT depend on the candidate: which
+    # frames can be stacked, the object's base offset in each one and how
+    # long after the sequence's middle it was taken.
+    # @args: frames - list[Frame], q - the reference point, shape - the
+    #        native frame (naxis1, naxis2)
+    # @return: (base, t0, scale) with base = [(frame, (dx, dy), dt_min)]
     t0 = group_mid_jd(frames, (0, len(frames))) or 0.0
     scale = _arcsec_per_pixel_guess(frames)
-    usable_frames = [f for f in frames if usable(f) and f.object_xy is not None]
-    offsets = []
-    for frame in usable_frames:
+    base = []
+    for frame in frames:
+        if not usable(frame) or frame.object_xy is None:
+            continue
         tx, ty = register.ref_to_src_point(frame.transform, q,
-                                            (shape[1], shape[0]))
+                                           (shape[1], shape[0]))
         base_delta = (frame.object_xy[0] - tx, frame.object_xy[1] - ty)
         dt_min = ((frame.t_mid_jd or t0) - t0) * 1440.0
-        d_rate = (rate - base_rate) * dt_min
-        d_pa = math.radians(pa - base_pa)
-        dra = d_rate * math.sin(d_pa) / max(scale, 1e-6)
-        ddec = d_rate * math.cos(d_pa) / max(scale, 1e-6)
-        offsets.append((base_delta[0] - dra, base_delta[1] + ddec))
-    if not usable_frames:
-        grid.append({"rate": rate, "pa": pa, "score": 0.0, "snr": 0.0,
-                     "roundness": 0.0})
-        return
-    # stack with the candidate offsets (only the frames that registered)
-    n = len(usable_frames)
-    out_h = box[3] - box[1]
-    out_w = box[2] - box[0]
-    stack = np.empty((n, out_h, out_w), dtype=np.float32)
-    masks = np.empty((n, out_h, out_w), dtype=bool)
-    for k, frame in enumerate(usable_frames):
-        warped, valid = _warp_to_box(frame.path, frame.transform,
-                                     offsets[k], box, shape, loader=loader)
-        stack[k] = warped
-        masks[k] = valid
+        base.append((frame, base_delta, dt_min))
+    return base, t0, scale
+
+
+def _sweep_deltas(base, base_rate, base_pa, cands, scale):
+    # The per-frame object offset of every candidate, computed ONCE.
+    # @args: base - _sweep_base's list, base_rate/base_pa - the ephemeris
+    #        velocity, cands - [(rate, pa)] of the grid, scale - arcsec/px
+    # @return: deltas[k][c] = (dx, dy) for frame k and candidate c
+    # The per-frame displacement is the difference between the candidate and
+    # the base velocity over the elapsed time, in pixels: speed along the
+    # PA's sine (RA) and cosine (Dec), which is why modulus and PA are the
+    # grid's axes and not RA/Dec components.
+    out = []
+    for _frame, base_delta, dt_min in base:
+        row = []
+        for rate, pa in cands:
+            d_rate = (rate - base_rate) * dt_min
+            d_pa = math.radians(pa - base_pa)
+            dra = d_rate * math.sin(d_pa) / max(scale, 1e-6)
+            ddec = d_rate * math.cos(d_pa) / max(scale, 1e-6)
+            row.append((base_delta[0] - dra, base_delta[1] + ddec))
+        out.append(row)
+    return out
+
+
+def _union_box(a, b):
+    # @args: a, b - (x0, y0, x1, y1) boxes, either may be None
+    # @return: the box that holds both
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return (min(a[0], b[0]), min(a[1], b[1]), max(a[2], b[2]), max(a[3], b[3]))
+
+
+def _sweep_regions(base, deltas, box, shape, loader):
+    # ONE read per frame, of the union of the source regions every candidate
+    # will need. The candidates move the object by a few pixels, so the union
+    # is barely larger than a single candidate's box and the read cost is
+    # paid once instead of 25 times.
+    # @args: base/deltas - as returned by _sweep_base/_sweep_deltas, box -
+    #        the output box, shape - the native frame, loader - optional
+    #        array reader (tests), None reads the FITS
+    # @return: [(array, (x0, y0, x1, y1)), ...] one per base frame, or None
+    #          for a frame no candidate touches
+    P = np.array([[0.0, 1.0], [1.0, 0.0]])
+
+    def one(item):
+        frame, row = item
+        union = None
+        for delta in row:
+            A_xy, b_xy = _ref_to_native_affine(frame.transform, delta)
+            A = P @ A_xy @ P
+            b = P @ b_xy
+            union = _union_box(union, _source_box(A, b, box, shape))
+        if union is None:
+            return None
+        data = read_pixels(loader, frame.path, union)
+        return (np.asarray(data, dtype=np.float32), union)
+
+    # The reads are independent and mostly I/O: a handful of threads hide the
+    # disk latency without touching the CPU.
+    workers = parallel.worker_count()
+    return parallel.map_parallel(one, list(zip([b[0] for b in base], deltas)),
+                                 workers=workers)
+
+
+def _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
+             loader, sigma, iterations, grid, preloaded):
+    # @args: internal: stacks the box with candidate `index`'s offsets and
+    #        scores it. The offsets and the pixels are already computed: this
+    #        only warps, combines and measures. rate/pa are recorded in the
+    #        grid entry (they are the candidate's own axes).
+    # @return: None (appends to grid)
+    frame_list = [b[0] for b in base]
+    offsets = [deltas[k][index] for k in range(len(base))]
+    stack, masks = _warp_batch(frame_list, offsets, box, shape, loader=loader,
+                               cfg=cfg, preloaded=preloaded)
     combined = combine(stack, method, mask=masks, sigma=sigma,
-                       iterations=iterations)
+                       iterations=iterations, cfg=cfg)
     score, snr, roundness = _score(combined, (q[0] - box[0], q[1] - box[1]), cfg)
     grid.append({"rate": rate, "pa": pa, "score": score, "snr": snr,
                  "roundness": roundness})
+
 
 
 def _arcsec_per_pixel_guess(frames):
@@ -1270,9 +1481,10 @@ def detect(stack, q_box, cfg=None, snr_sigma=3.5, zp=None, exptime_s=None):
         yy, xx = np.mgrid[0:stack.shape[0], 0:stack.shape[1]]
         d = np.hypot(xx - q_box[0], yy - q_box[1])
         ann = (d >= 8.0) & (d <= 12.0)
-        sky = float(np.median(stack[ann]))
-        sig = float(outliers.scaled_mad(stack[ann], centre=sky)) or 1e-6
-        limit_flux = snr_sigma * sig * math.sqrt((d <= 4.0).sum())
+        sky = _local_sky(stack, ann)
+        sig = _local_sigma(stack, ann, sky)
+        limit_flux = (snr_sigma * sig * math.sqrt((d <= 4.0).sum())
+                      if sig is not None else 0.0)
         if limit_flux > 0:
             report.mag_limit = float(zp - 2.5 * math.log10(limit_flux))
     if not report.detected:

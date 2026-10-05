@@ -1057,9 +1057,20 @@ class TrackStackWorker(QThread):
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
-                 phot_enabled=True, save_star_stack=False):
+                 phot_enabled=True, save_star_stack=False, calibrate=False):
         super().__init__()
         self._paths = list(paths)
+        # ADR-061 applied where the faint object is: calibrate the frames AS
+        # THEY ARE READ (dark/bias and flat), because a stack of uncalibrated
+        # frames keeps the train's dust and the sensor's vignetting, and the
+        # object and the comparisons do not sit in the same place: measured
+        # on a real visit, the smooth vignetting alone is worth 0.087 mag of
+        # systematic error. When the library has no flat for the filter, one
+        # is built from the frames themselves (P5), and that is what the
+        # observer asked to be OPTIONAL: the tab's checkbox, off by default.
+        self._calibrate = bool(calibrate)
+        self._loader = None
+        self._pseudo_info = None
         self._name = name
         self._n_obs = max(1, int(n_obs))
         self._method = method
@@ -1386,7 +1397,7 @@ class TrackStackWorker(QThread):
                 continue
             small, _rep = track_stack.stack_group(
                 frames, group, (cx, cy), self._method, box, shape,
-                cfg=self._cfg, track=False)
+                cfg=self._cfg, track=False, loader=self._loader)
             if small is None:
                 continue
             out.append((e, small, cx - box[0], cy - box[1]))
@@ -1470,12 +1481,51 @@ class TrackStackWorker(QThread):
             return None
         return tuple(float(r) for r in radii)
 
+    def _build_calibrator(self):
+        # @return: a calibration.FrameCalibrator ready to be used as the
+        #          engine's loader, or None when it cannot be built
+        # The recipe is the Calibration tab's (the library of masters). When
+        # the library has NO flat for the visit's filter, a pseudo-flat is
+        # built from the frames themselves, and ONLY then: it is the
+        # fallback, opt-in (the setting), and a real flat always wins.
+        from ..core import calibration
+        from ..core.db import db
+        try:
+            header = calibration.read_header(self._paths[0])
+        except Exception as err:
+            logger.warning("calibration skipped: %s", err)
+            return None
+        meta = calibration.meta_from_header(header)
+        tol = None
+        if self._cfg is not None:
+            tol = self._cfg.get("calib_temp_tol_c", None)
+        recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        flat = None
+        want_pseudo = bool(self._cfg_get("calib_pseudo_flat", False))
+        if recipe.flat is None and want_pseudo:
+            self.progress.emit("pseudoflat", 0, len(self._paths))
+            flat, info = calibration.pseudo_flat(
+                self._paths, cancel=lambda: self._cancel,
+                progress=lambda d, t: self.progress.emit("pseudoflat", d, t))
+            self._pseudo_info = info
+        return calibration.FrameCalibrator(db, self._cfg, pseudo_flat=flat)
+
     def run(self):
         import math
         from ..core import astrometry, findorb, mpc_astrometry, track_stack
         out = {"status": "ok", "name": self._name, "method": self._method,
                "n_obs": self._n_obs}
         try:
+            # --- calibration, when the observer asked for it (ADR-061) ----
+            # The frames are calibrated AS THEY ARE READ, so the engine's
+            # many passes (the registration, the sweep's candidates, the
+            # comps' windows) all see calibrated pixels without writing a
+            # single calibrated copy to disk.
+            if self._calibrate:
+                self.progress.emit("calibrate", 0, 1)
+                self._loader = self._build_calibrator()
+                self.progress.emit("calibrate", 1, 1)
+
             # --- solve: the grid every frame is registered on -------------
             self.progress.emit("solve", 0, 1)
             frames = track_stack.load_sequence(self._paths, self._cfg)
@@ -1511,7 +1561,7 @@ class TrackStackWorker(QThread):
             track_stack.register_sequence(
                 frames,
                 progress=lambda d, t, _l: self.progress.emit("register", d, t),
-                cancel=lambda: self._cancel)
+                cancel=lambda: self._cancel, loader=self._loader)
             out["dither"] = track_stack.dither_check(frames)
             out["n_failed"] = sum(1 for f in frames if f.failed_register)
             # the honest registration summary (P0): how many frames came
@@ -1558,7 +1608,7 @@ class TrackStackWorker(QThread):
             self.progress.emit("base", 0, 1)
             base_stack, _rep = track_stack.stack_group(
                 frames, (0, len(frames)), q_all, self._method, box_all,
-                shape, cfg=self._cfg)
+                shape, cfg=self._cfg, loader=self._loader)
             q_all_box = (q_all[0] - box_all[0], q_all[1] - box_all[1])
             self.progress.emit("detect", 0, 1)
             detection = track_stack.detect(base_stack, q_all_box, self._cfg)
@@ -1585,6 +1635,7 @@ class TrackStackWorker(QThread):
                     frames, q_all, base_rate, base_pa, box_all, shape,
                     pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
                     steps=steps, method="median", cfg=self._cfg,
+                    loader=self._loader,
                     progress=lambda d, t, _l: self.progress.emit(
                         "sweep", d, t),
                     cancel=lambda: self._cancel)
@@ -1629,7 +1680,7 @@ class TrackStackWorker(QThread):
             out["wcs_by_group"] = [_shift_wcs(w0, b) for b in boxes]
             stacks = track_stack.stack_groups(
                 frames, groups, q_by_group, self._method, boxes, shape,
-                cfg=self._cfg,
+                cfg=self._cfg, loader=self._loader,
                 progress=lambda d, t, _l: self.progress.emit("groups", d, t),
                 cancel=lambda: self._cancel)
             if self._cancel or len(stacks) < len(groups):
@@ -1656,7 +1707,7 @@ class TrackStackWorker(QThread):
                 res = astrometry.measure_groups(
                     [stack], [q_box], _shift_wcs(w0, box),
                     frames=frames, groups=[groups[index]], cfg=self._cfg,
-                    mjd_by_group=[mjd])
+                    mjd_by_group=[mjd], loader=self._loader)
                 sp, fp, flags = res[0]
                 sp.group_index = index      # measure_groups counts from 0
                 if fp is not None:          # on every call: restore the
@@ -1687,6 +1738,7 @@ class TrackStackWorker(QThread):
                     star_stacks = track_stack.stack_groups(
                         frames, groups, q_by_group, self._method, boxes,
                         shape, cfg=self._cfg, track=False,
+                        loader=self._loader,
                         progress=lambda d, t, _l: self.progress.emit(
                             "starstack", d, t),
                         cancel=lambda: self._cancel)
@@ -1727,6 +1779,13 @@ class TrackStackWorker(QThread):
                                             note="disabled in the settings")
             out["check"] = check
             self.progress.emit("check", 1, 1)
+            # what the magnitude was measured with: the observer must never
+            # read a brightness without knowing whether the frames were
+            # calibrated and with which masters
+            if self._loader is not None:
+                summary = self._loader.summary()
+                summary["pseudo_flat"] = getattr(self, "_pseudo_info", None)
+                out["calibration"] = summary
             self.finished.emit(out)
         except Exception as err:      # never crash the GUI thread
             logger.exception("track&stack worker failed: %s", err)

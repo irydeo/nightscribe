@@ -2163,11 +2163,16 @@ class MainWindow(QMainWindow):
         # the master library (ADR-061): the editor's Calibration tab
         # resolves a recipe against it and names the master it uses, so
         # the place that fills the library belongs in Settings
+        # the pseudo-flat's default lives WITH the library it belongs to:
+        # a setting without a widget is a setting nobody can find
+        dlg.chk_calib_pseudo_flat.setChecked(
+            bool(config.get("calib_pseudo_flat", False)))
         self._settings_masters_init(dlg)
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
             return
+        config.set("calib_pseudo_flat", dlg.chk_calib_pseudo_flat.isChecked())
         config.set("mpc_code", dlg.edt_mpc_code.text().strip().upper())
         config.set("observatory_name", dlg.edt_obs_name.text().strip())
         config.set("lat", dlg.spn_lat.value())

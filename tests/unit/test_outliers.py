@@ -33,6 +33,43 @@ def _curve(n=120, amp=0.1, noise=0.01, seed=1):
     return t, y
 
 
+def test_nanmedian_axis0_matches_numpy():
+    # The sort-with-sentinel median has to give EXACTLY what numpy's
+    # nanmedian gives, NaN columns included: it is the fast path the
+    # stacking clip stands on, and a wrong median would move the clip.
+    rng = np.random.default_rng(3)
+    cube = rng.normal(100.0, 5.0, (7, 20, 15))       # odd count
+    cube[rng.random(cube.shape) > 0.85] = np.nan     # 15 % invalid
+    got = outliers.nanmedian_axis0(cube)
+    expected = np.nanmedian(cube, axis=0)
+    np.testing.assert_allclose(got, expected, equal_nan=True, rtol=0, atol=0)
+    # even count: the two middle ones are averaged, as numpy does
+    cube2 = cube[:6]
+    np.testing.assert_allclose(outliers.nanmedian_axis0(cube2),
+                               np.nanmedian(cube2, axis=0), equal_nan=True)
+    # a whole column invalid stays NaN
+    cube3 = cube.copy()
+    cube3[:, 0, 0] = np.nan
+    assert np.isnan(outliers.nanmedian_axis0(cube3)[0, 0])
+    # a 1-D sample falls back to numpy (axis 0 of a vector is the whole thing)
+    vec = np.array([3.0, np.nan, 1.0, 2.0])
+    assert outliers.nanmedian_axis0(vec) == np.nanmedian(vec)
+
+
+def test_scaled_mad_axis0_uses_the_fast_median():
+    # The clip passes axis=0: the MAD there must come from the same median,
+    # so the clip and the scale cannot disagree.
+    rng = np.random.default_rng(4)
+    cube = rng.normal(10.0, 2.0, (9, 8, 6))
+    cube[rng.random(cube.shape) > 0.9] = np.nan
+    centre = np.nanmedian(cube, axis=0)
+    got = outliers.scaled_mad(cube, axis=0, centre=centre)
+    expected = outliers.MAD_TO_SIGMA * np.nanmedian(np.abs(cube - centre),
+                                                    axis=0)
+    np.testing.assert_allclose(got, expected, equal_nan=True, rtol=0,
+                               atol=1e-12)
+
+
 def test_a_clean_curve_has_no_outliers():
     # The local median follows the star's own shape, so a variable curve
     # is never "full of outliers": this is the property a global median

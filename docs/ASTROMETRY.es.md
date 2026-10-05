@@ -58,6 +58,12 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    («Ajustes del apilado», «SNR previsto por observación», «Comprobación con
    Find_Orb», «Texto del reporte»), y las acciones ocasionales (la figura de
    parpadeo, deshacer la ejecución) detrás del menú **⋯** de la cabecera.
+   Antes de apilar, la casilla **Calibrar las tomas** aplica la receta de la
+   pestaña Calibración (dark/bias y flat) a cada toma **según se lee**, sin
+   copias en disco. Con un objeto débil importa para la magnitud: sin flat, el
+   objeto y las comparsas caen en zonas distintas del viñeteado, y eso vale
+   **0,087 mag** medidos en una visita real. Si no tienes flat, la app
+   construye uno de las propias tomas (necesita dither y te avisa).
 2. **Elige cuántas observaciones quieres.** El MPC prefiere varias medidas
    repartidas en el tiempo antes que una sola. Dices un número y el
    software reparte la secuencia en grupos contiguos iguales. La tabla

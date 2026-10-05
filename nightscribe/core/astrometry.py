@@ -266,7 +266,12 @@ def measure_frames(frames, group, wcs_of, mjd=None, fwhm=None,
             continue
         box = _box_around(frame.object_xy, fwhm)
         try:
-            data, _hdr = (loader or calibration.read_image)(frame.path, box)
+            # the loader may be calibration.read_image (pixels AND header) or
+            # a calibrating loader (pixels only): both are accepted here,
+            # like in track_stack.read_pixels, so a calibrated run and a raw
+            # one use the same code path
+            loaded = (loader or calibration.read_image)(frame.path, box)
+            data = loaded[0] if isinstance(loaded, tuple) else loaded
         except Exception:
             continue
         local = (frame.object_xy[0] - box[0], frame.object_xy[1] - box[1])

@@ -255,20 +255,23 @@ def truth_of(paths):
 
 
 def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
-            cancel=None, progress=None):
+            cancel=None, progress=None, loader=None):
     # @args: paths - the frames to measure (the injected copies), motion -
     #        callable(jd) -> (ra, dec) (the truth's own motion), ref_wcs -
     #        the reference frame's astropy WCS (the solve is NOT part of what
     #        is being measured, see the module docstring), cfg - Config,
     #        n_obs - how many observations to split into, method - the
-    #        combination, cancel/progress - as usual
+    #        combination, cancel/progress - as usual, loader - a
+    #        calibrating loader (calibration.FrameCalibrator) when the run
+    #        being measured is calibrated: the SAME chain then sees the same
+    #        pixels the observer's run would
     # @return: {"detected", "snr", "x", "y", "n_frames", "note"}
     # The real chain, minus the plate solve: register, place the object with
     # the ephemeris, stack along the motion, and ask the detection gate.
     from . import track_stack
     frames = track_stack.load_sequence(paths, cfg)
     frames[0].wcs = ref_wcs
-    track_stack.register_sequence(frames, cancel=cancel)
+    track_stack.register_sequence(frames, cancel=cancel, loader=loader)
     track_stack.object_positions(frames, motion)
     shape = (int(frames[0].header.get("NAXIS1", 1)),
              int(frames[0].header.get("NAXIS2", 1)))
@@ -286,7 +289,7 @@ def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
                                                            ref_wcs, motion)[1]
                                        for g in groups],
                                       method, boxes, shape, cfg=cfg,
-                                      cancel=cancel)
+                                      cancel=cancel, loader=loader)
     det = None
     used_box = None
     used_jd = None
@@ -311,9 +314,26 @@ def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
     # is what the first version of this test did (it read 11 px of error
     # where there was a fraction of a pixel).
     box = used_box or (0, 0, 0, 0)
+    # The FLUX at the detected position, measured on the stack it was found
+    # in. It is what a treatment changes: the detection and the position are
+    # relative and survive almost anything, while the flux is the number the
+    # flat moves. Without it, "calibrating" could not be measured at all.
+    flux = None
+    try:
+        from . import photometry
+        if stacks:
+            st = stacks[-1][0]
+            if st is not None:
+                res = photometry.measure_point(
+                    st, det.x, det.y, r_ap=6.0, r_ann_in=10.0, r_ann_out=15.0)
+                if res.get("ok"):
+                    flux = float(res["flux"])
+    except Exception as err:
+        logger.warning("the injected source's flux could not be measured: %s",
+                       err)
     return {"detected": bool(det.detected), "snr": float(det.snr or 0.0),
             "x": float(det.x) + float(box[0]),
-            "y": float(det.y) + float(box[1]),
+            "y": float(det.y) + float(box[1]), "flux": flux,
             "t_mid_jd": used_jd,
             "n_frames": sum(1 for f in frames if track_stack.usable(f)),
             "note": (det.notes or None) if not det.detected else None}
@@ -361,7 +381,7 @@ def completeness(paths, fluxes, ref_wcs, motion=None, trials=3, cfg=None,
                     err = math.hypot(res["x"] - tx, res["y"] - ty)
             rows.append({"detected": bool(res["detected"]),
                          "snr": res["snr"], "err_px": err,
-                         "note": res.get("note")})
+                         "flux": res.get("flux"), "note": res.get("note")})
             if folder is not None and folder.exists():
                 shutil.rmtree(folder, ignore_errors=True)
         hits = [r for r in rows if r["detected"]]
@@ -371,6 +391,10 @@ def completeness(paths, fluxes, ref_wcs, motion=None, trials=3, cfg=None,
             "rate": (len(hits) / len(rows)) if rows else 0.0,
             "snr_median": (float(np.median([r["snr"] for r in hits]))
                            if hits else None),
+            "flux_median": (float(np.median([r["flux"] for r in hits
+                                             if r.get("flux") is not None]))
+                            if any(r.get("flux") is not None
+                                   for r in hits) else None),
             "err_px_median": (float(np.median(errs)) if errs else None),
             "err_px_max": (float(max(errs)) if errs else None)})
     return out

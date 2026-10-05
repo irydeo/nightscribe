@@ -478,3 +478,97 @@ def test_a_frame_without_an_object_position_is_still_left_out(tmp_path):
     frames[1].object_xy = None
     assert ts.inside_frame(frames[1]) is False
     assert ts._indices(frames, (0, 4)) == [0, 2, 3]
+
+
+# ---------------------------------------------------------------- sweep
+
+def _counting_loader(reads):
+    # A loader that records the boxes it is asked for and reads like the
+    # real one, so the sweep can be exercised without re-reading the disk.
+    from nightscribe.core import calibration
+
+    def loader(path, box):
+        reads.append(box)
+        return calibration.read_image(path, box)[0]
+    return loader
+
+
+def test_the_sweep_reads_each_frame_once_not_once_per_candidate(tmp_path):
+    # D12: the 25 candidates move the object a couple of pixels, so the
+    # frame is read ONCE into the union of their regions. Re-reading per
+    # candidate was 25x the disk traffic for the same answer (measured on a
+    # real visit: the whole sweep was the second cost of the run).
+    frames = _sequence(tmp_path, n=6, size=64, rate_px=1.5)
+    reads = []
+    result = ts.sweep(frames, frames[0].object_xy, 1.5, 90.0, (8, 18, 40, 50),
+                      (64, 64), pct=5.0, steps=5, method="median",
+                      loader=_counting_loader(reads))
+    assert len(reads) == len(frames)          # one read per frame, not 25
+    assert len(result.grid) == 25
+
+
+def test_the_parallel_combine_is_the_serial_one():
+    # The columns of the cube are INDEPENDENT problems (the reduction is
+    # along the frame axis), so cutting the image must not move a single
+    # pixel. The cube is over the parallel threshold on purpose; forcing one
+    # worker gives the serial answer to compare against.
+    rng = np.random.default_rng(11)
+    n, h, w = 24, 200, 220            # 1.056 M pixels: over the threshold
+    cube = rng.normal(100.0, 5.0, (n, h, w)).astype(np.float32)
+    cube[3, 10, 10] += 400.0          # a trail the clip must reject
+    mask = np.ones_like(cube, dtype=bool)
+    mask[0, :5, :] = False            # a masked edge
+    for method in ("mean", "median", "sigma", "weighted"):
+        fast = ts.combine(cube, method, mask=mask)
+        slow = ts.combine(cube, method, mask=mask,
+                          cfg={"astrometry_threads": 1})
+        np.testing.assert_array_equal(fast, slow)
+
+
+def test_the_sweep_centre_reproduces_the_direct_stack(tmp_path):
+    # The cache must be TRANSPARENT: the sweep's centre candidate (the
+    # ephemeris velocity, which freezes the object exactly as track_offsets
+    # does) has to score EXACTLY what a direct stack of the same frames with
+    # the known freezing offsets scores. That is the test that reading the
+    # ROI once and slicing it per candidate does not change the answer.
+    frames = _sequence(tmp_path, n=12, size=96, rate_px=2.0)
+    q = frames[0].object_xy
+    box = (4, 22, 44, 58)
+    result = ts.sweep(frames, q, 2.0, 90.0, box, (96, 96), pct=5.0, steps=5,
+                      method="median", loader=_counting_loader([]))
+    center = [it for it in result.grid
+              if it["rate"] == 2.0 and it["pa"] == 90.0][0]
+    stack, _report = ts.stack_group(frames, (0, len(frames)), q, "median",
+                                    box, (96, 96))
+    direct = ts._score(stack, (q[0] - box[0], q[1] - box[1]))
+    assert center["score"] == pytest.approx(direct[0])
+    assert center["snr"] == pytest.approx(direct[1])
+    assert center["roundness"] == pytest.approx(direct[2])
+    # and the reported best is the argmax of the grid
+    assert result.best["score"] == max(item["score"] for item in result.grid)
+
+
+def test_a_stack_with_nan_pixels_is_still_scorable(tmp_path):
+    # The stack carries NaN where a frame did not cover the box, which is
+    # the footprint's border and exists whenever the sequence was DITHERED.
+    # np.median of an array with ONE NaN is NaN, so the roundness came out
+    # NaN and _score threw the whole candidate away: a detection failing in
+    # silence (measured on the synthetic case of test_injection: 4 NaN
+    # pixels out of 16384 were enough). Every sky of the module now ignores
+    # the NaN, and this is the test that says so.
+    frames = _sequence(tmp_path, n=6, rate_px=1.5, amp=3000.0)
+    q = (24.0 + 1.5 * 2.5, 34.0)
+    stack, _rep = ts.stack_group(frames, (0, 6), q, "mean",
+                                 (0, 0, 64, 64), (64, 64))
+    assert stack is not None
+    # the footprint's border, as a dithered sequence leaves it
+    stack = stack.copy()
+    stack[:2, :] = np.nan
+    stack[-2:, :] = np.nan
+    score, snr, roundness = ts._score(stack, (q[0], q[1]), None)
+    assert np.isfinite(snr) and snr > 0.0
+    assert np.isfinite(roundness) and 0.0 < roundness <= 1.0
+    assert score > 0.0
+    det = ts.detect(stack, (q[0], q[1]), None)
+    assert det.detected is True
+    assert np.isfinite(det.roundness)

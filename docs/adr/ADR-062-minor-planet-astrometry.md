@@ -360,3 +360,50 @@ prediction marked `eph`), `NS_MAG` / `NS_MAGER` / `NS_MAGB` / `NS_MAGNC` / `NS_M
 measured position already travelled as `NS_RA` / `NS_DEC` (the annotation). The effect:
 reopening a stack months later, with no run in memory and no database, shows its
 magnitude, its velocity and its PA in the band, in the same colours as the photometry.
+
+**Revisión (2026-10-05): el apilado usa la máquina que tiene**. La campaña
+`docs/PLANS/astrometry-perf/` bajó el tiempo de pared sin tocar el resultado y sin
+ninguna dependencia nueva:
+
+- **El barrido lee la ROI UNA vez** (D12 lo pedía): los 25 candidatos mueven el objeto
+  unos píxeles, así que cada fotograma se lee en la unión de sus regiones y cada
+  candidato recorta de RAM. Los desplazamientos base se calculan una vez.
+- **La mediana del clip y del método `median`** es una ordenación con los no válidos al
+  final (`+inf`) y el recuento decidiendo el centro: el mismo número, x4,8 más rápido.
+- **El registro no repite la `source_image` de la referencia** por fotograma, y el fondo
+  por bloques se vectoriza cuando el frame divide por el bloque.
+- **El combine se paraleliza por columnas** (la reducción es por píxel, así que el
+  resultado es idéntico píxel a píxel) y **los hilos se calculan** en `core/parallel.py`
+  desde los núcleos que el proceso puede usar y la memoria que una tarea necesita, en
+  Windows y Linux. Ajuste `astrometry_threads` (0 = automático).
+- **Medido** (Ryzen 9 5950X, 60 x 1024²): barrido 6348 → 1272 ms (x5,0), `stack_group`
+  sigma a frame completo 10143 → 2716 ms (x3,7), combine sigma 957 → 298 ms (x3,2),
+  registro 360 → 204 ms por fotograma (x1,8).
+- **GPU descartada**, medida y razonada: tras paralelizar el CPU, la ganancia marginal
+  de una GPU es x1,5-2 a cambio de una dependencia, kernels por dispositivo y
+  empaquetado, y el suelo que no acelera (FITS, ASTAP, Find_Orb) ya es el 30-40 %.
+  Queda como decisión escrita, no como deuda implícita.
+
+**Revision (2026-10-05): the stacking uses the machine it has**. The
+`docs/PLANS/astrometry-perf/` campaign cut wall-clock time without touching the result
+and with no new dependency:
+
+- **The sweep reads the ROI ONCE** (D12 asked for it): the 25 candidates move the object
+  a few pixels, so each frame is read into the union of their regions and every candidate
+  slices from RAM. The base offsets are computed once.
+- **The clip's and the `median` method's median** is a sort with the invalid values
+  pushed to the end (`+inf`) and the count picking the middle: the same number, x4.8
+  faster.
+- **The registration does not rebuild the reference's `source_image`** per frame, and the
+  block background is vectorised when the frame divides by the block.
+- **The combine is parallelised by columns** (the reduction is per pixel, so the result is
+  identical pixel by pixel) and **the threads are computed** in `core/parallel.py` from
+  the cores the process may use and the memory one task needs, on Windows and Linux.
+  Setting `astrometry_threads` (0 = automatic).
+- **Measured** (Ryzen 9 5950X, 60 x 1024²): sweep 6348 → 1272 ms (x5.0), `stack_group`
+  sigma full frame 10143 → 2716 ms (x3.7), combine sigma 957 → 298 ms (x3.2),
+  registration 360 → 204 ms per frame (x1.8).
+- **GPU ruled out**, measured and reasoned: after parallelising the CPU, the marginal
+  gain of a GPU is x1.5-2 in exchange for a dependency, per-device kernels and packaging,
+  and the floor it cannot accelerate (FITS, ASTAP, Find_Orb) is already 30-40 %. It stays
+  a written decision, not an implicit debt.

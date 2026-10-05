@@ -52,6 +52,7 @@ vez de suponerla.
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |
 | **P5** | Pseudo-flat | **Hecho** (`p5-pseudo-flat.md`) |
+| **P5b** | La calibración, dentro de la astrometría | **Hecho** (`p5b-calibracion-en-la-astrometria.md`) |
 | **P6** | Decisión sobre nxt (denoiser de IA) | **Hecho**: ADR-063 (no entra en la medida) |
 
 **B0** no es una fase del plan: es el arreglo de un fallo real que apareció

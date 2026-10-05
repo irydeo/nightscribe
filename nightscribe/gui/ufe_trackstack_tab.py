@@ -137,6 +137,13 @@ class UfeTrackStackTab(QWidget):
         # holding: one editor in the app, read live, shown before the run
         self.chk_brightness = self._ui.chk_brightness
         self.chk_starstack = self._ui.chk_starstack
+        # ADR-061 where the faint object is: calibrating the frames is
+        # OPTIONAL and off by default, because it costs a pass over the
+        # visit and because the observer may already have calibrated
+        # copies. Its default is the setting, so the choice survives
+        self.chk_calibrate = self._ui.chk_calibrate
+        self.chk_calibrate.setChecked(bool(config.get("calib_astrometry",
+                                                      False)))
         self.lbl_recipe = self._ui.lbl_recipe
         self.btn_recipe = self._ui.btn_recipe
         self.btn_recipe.clicked.connect(self._on_edit_recipe)
@@ -605,7 +612,8 @@ class UfeTrackStackTab(QWidget):
             comps=ctx.get("comps"), target_mag=ctx.get("target_mag"),
             recipe=self._recipe(),
             phot_enabled=self.chk_brightness.isChecked(),
-            save_star_stack=self.chk_starstack.isChecked())
+            save_star_stack=self.chk_starstack.isChecked(),
+            calibrate=self.chk_calibrate.isChecked())
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -633,6 +641,8 @@ class UfeTrackStackTab(QWidget):
         # @args: key - one of TrackStackWorker's stage keys
         # @return: the human text for the status line
         return {
+            "calibrate": self.tr("Calibrating the frames…"),
+            "pseudoflat": self.tr("Building a flat from the frames…"),
             "solve": self.tr("Solving the reference frame…"),
             "register": self.tr("Registering the frames…"),
             "base": self.tr("Stacking the whole sequence…"),
@@ -841,7 +851,38 @@ class UfeTrackStackTab(QWidget):
         diag = self._diag_note(self._result.get("photometry"))
         if diag:
             note += " " + diag
+        cal = self._calibration_note(self._result.get("calibration"))
+        if cal:
+            note += " " + cal
         self._say(note)
+
+    def _calibration_note(self, cal):
+        # @args: cal - the run's calibration summary (or None)
+        # @return: what the magnitude was measured with (or "")
+        # ADR-061: a brightness never goes out without saying whether the
+        # frames were calibrated and with which masters. The observer asked
+        # for the calibration to be OPTIONAL, so the note also has to say
+        # when it was not applied.
+        cal = cal or {}
+        if not cal:
+            return ""
+        bits = []
+        if cal.get("offsets"):
+            bits.append(self.tr("dark/bias: %1").replace(
+                "%1", ", ".join(cal["offsets"])))
+        if cal.get("flats"):
+            bits.append(self.tr("flat: %1").replace(
+                "%1", ", ".join(cal["flats"])))
+        text = self.tr("Calibrated %1 frames").replace(
+            "%1", str(cal.get("n") or 0))
+        if bits:
+            text += " (" + " · ".join(bits) + ")"
+        else:
+            text += " (" + self.tr("no master matched") + ")"
+        info = cal.get("pseudo_flat") or {}
+        if info.get("note"):
+            text += ". " + self.tr("Warning:") + " " + info["note"]
+        return text + "."
 
     def _shape_note(self, phot):
         # @args: phot - the run's photometry dict (or None)

@@ -114,6 +114,11 @@ DEFAULTS = {
     # library has no flat for. Off by default: a real flat always wins, and
     # a pseudo-flat needs the sequence to be dithered.
     "calib_pseudo_flat": False,
+    # The astrometry's own switch for ADR-061: calibrate the frames as they
+    # are read (dark/bias and flat) before stacking them. Off by default: it
+    # costs a pass over the visit, and the observer may already have
+    # calibrated copies.
+    "calib_astrometry": False,
     # Track & stack (ADR-062): the detection gate and the submission bar
     # are DIFFERENT thresholds on purpose. The MPC recommends SNR >= 20 to
     # submit and forbids marginal detections, but that is a recommendation:
@@ -129,6 +134,11 @@ DEFAULTS = {
     "astrometry_method": "sigma",
     "astrometry_cutout_margin_px": 64,
     "astrometry_full_frame_final": True,
+    # Worker threads for the CPU-bound stages (register, warp, combine): 0 is
+    # AUTOMATIC, computed from the cores the process may use and capped by the
+    # memory one task needs (core/parallel.py). A positive value caps it by
+    # hand for a machine that is busy with something else.
+    "astrometry_threads": 0,
     "astrometry_disagree_arcsec": 0.5,
     "astrometry_disagree_sigma": 3.0,
     "astrometry_astcat": "Gaia2",

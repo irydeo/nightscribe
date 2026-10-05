@@ -47,6 +47,7 @@ import datetime
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import numpy as np
 
@@ -627,6 +628,78 @@ def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
     return flat, info
 
 
+class FrameCalibrator:
+    # A LOADER that calibrates on the way in. The stacking engine reads each
+    # frame many times and in pieces (the registration wants the whole frame,
+    # the warp wants a box per candidate of the sweep), so writing calibrated
+    # copies to disk first would cost gigabytes of I/O per visit; applying
+    # the recipe as the pixels are read costs one division per read and keeps
+    # ADR-061's promise (calibration works in memory).
+    #
+    # The recipe is resolved from EACH frame's own header, because the
+    # camera, the gain, the temperature, the exposure and the filter are what
+    # make a master valid; the resolution is CACHED by that key rounded to
+    # the tolerance the recipe itself uses, so a visit (one camera, one
+    # filter, one temperature within a degree) is one database query and not
+    # one hundred.
+    #
+    # @args: db - Database, cfg - Config (for the temperature tolerance),
+    #        pseudo_flat - a flat built from the frames themselves (see
+    #        pseudo_flat), used when the library has no flat for the filter
+
+    def __init__(self, db, cfg=None, pseudo_flat=None):
+        self._db = db
+        self._cfg = cfg
+        self._pseudo_flat = pseudo_flat
+        self._tol = (cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
+                     if cfg is not None else _DEFAULT_TEMP_TOL_C)
+        self._cache = {}
+        self.reports = []          # one (path, report) per frame read
+
+    def __call__(self, path, box=None):
+        # @args: path - the frame, box - optional (x0, y0, x1, y1) region
+        # @return: the calibrated float32 array, in the shape the caller
+        #          asked for. The header is NOT returned: the callers that
+        #          need it read it themselves, and calibrating does not
+        #          change it.
+        data, header = read_image(path, box)
+        meta = meta_from_header(header)
+        temp = meta.get("temp_c")
+        key = (meta.get("camera"), meta.get("gain"), meta.get("exptime_s"),
+               meta.get("filter"),
+               (None if temp is None
+                else int(round(float(temp) / max(self._tol, 1e-6)))))
+        recipe = self._cache.get(key)
+        if recipe is None:
+            recipe = resolve_recipe(self._db, meta, tol_c=self._tol)
+            self._cache[key] = recipe
+        out, report = calibrate(data, recipe, box=box,
+                                pseudo_flat=self._pseudo_flat)
+        self.reports.append((path, report))
+        return out
+
+    def summary(self):
+        # @return: what was applied, for the run's note: the masters' names
+        #          and the warnings, deduplicated. The observer has to know
+        #          what the magnitude was measured with.
+        offsets, flats, warnings = set(), set(), []
+        for _path, report in self.reports:
+            if report.offset_path:
+                offsets.add(Path(report.offset_path).name
+                            if report.offset_path != "pseudo-flat"
+                            else report.offset_path)
+            if report.flat_path:
+                flats.add(Path(report.flat_path).name
+                          if report.flat_path != "pseudo-flat"
+                          else report.flat_path)
+            for note in report.warnings:
+                if note not in warnings:
+                    warnings.append(note)
+        return {"n": len(self.reports),
+                "offsets": sorted(offsets), "flats": sorted(flats),
+                "warnings": warnings[:4]}
+
+
 def calibrate(data, recipe, loader=None, box=None, pseudo_flat=None):
     # @args: data - the light (raw, 2D), recipe - Recipe,
     #        loader - callable(path, box) -> array, box - optional region,
@@ -666,6 +739,13 @@ def calibrate(data, recipe, loader=None, box=None, pseudo_flat=None):
         out = out / flat
         report.flat_path = flat_path
         report.flat_norm = flat_norm
+        if flat_path == "pseudo-flat":
+            # The recipe warned "no flat for this filter" and it was right:
+            # there was none. The pseudo-flat is what stands in for it, so
+            # repeating the warning beside it would be a lie in the same
+            # line (measured: the run's summary said both at once).
+            report.warnings = [w for w in report.warnings
+                               if "no flat for this filter" not in w]
     elif flat is not None:
         report.warnings.append(
             "the flat does not match the frame size; not applied")

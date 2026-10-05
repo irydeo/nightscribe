@@ -69,6 +69,16 @@ sobreviven a un percentil bajo entre tomas, mientras que las estrellas se
 mueven y no. Necesita que la secuencia esté dithered, y si no lo está te
 avisa. Un flat de verdad siempre gana.
 
+**7. Calibra las tomas antes de apilarlas.** La casilla **Calibrar las
+tomas** de la pestaña Astrometría aplica la receta (los masters de la pestaña
+Calibración: dark/bias y flat) a cada toma **según se lee**, así que el
+apilado nunca necesita copias calibradas en disco. Importa más de lo que
+parece: sin flat, el objeto y las comparsas caen en zonas distintas del
+viñeteado, y **medido en una visita real eso vale 0,087 mag** de error
+sistemático en la magnitud. Si no tienes flat, la app construye uno de las
+propias tomas (necesita dither, y te lo dice); un flat de verdad siempre
+gana.
+
 ## Lo que puedes hacer tú, que es lo que más gana
 
 - **Más tomas, no más exposición.** El SNR va con la raíz del número de
@@ -230,7 +240,22 @@ No sustituye a un flat de verdad: mide la respuesta del tren **por** la
 forma del cielo, así que el error de flat es mayor. Es el respaldo honesto, y
 la receta dice cuál se usó.
 
-## T7. Lo que mide el resultado: inyección y recuperación
+## T7. La calibración, dentro del apilado
+
+Un apilado de tomas sin calibrar conserva el pedestal, la corriente térmica,
+las motas y el viñeteado. Para la **posición** importa poco (el centroide es
+local), pero para la **magnitud** importa mucho: el cero punto se mide con
+las comparsas, y si el objeto cae en una zona con distinta transmisión que
+ellas, el error entra directo. Medido en una visita real, la parte suave del
+viñeteado vale **0,087 mag**, y una mota bajo el objeto mucho más.
+
+La receta es la de ADR-061 y se aplica **al leer** (`FrameCalibrator`), no en
+copias: el motor lee cada toma muchas veces y en trozos, y una copia
+calibrada por toma serían gigabytes de I/O. Medido con el instrumento de P4,
+la misma inyección con y sin el pseudo-flat: **0,0707 mag** de corrección y
+el SNR de 32,9 a 34,0.
+
+## T8. Lo que mide el resultado: inyección y recuperación
 
 Todo lo de arriba son afirmaciones. El instrumento que las mide mete una
 fuente de flujo **conocido**, en un sitio conocido, moviéndose a una

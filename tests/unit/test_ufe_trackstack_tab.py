@@ -862,3 +862,35 @@ def test_the_diagnosis_note_says_the_night(qapp, tmp_path):
                                     "worst": 0.25}})
     assert "worst cell" not in text
     assert tab._diag_note(None) == ""
+
+
+def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
+    # The observer asked for it explicitly: applying a pseudo-flat (and the
+    # calibration at all) has to be a choice, visible in the tab where the
+    # faint object is measured, and off unless it is asked for.
+    tab, _host = _tab(qapp, tmp_path)
+    assert tab.chk_calibrate.text()
+    assert tab.chk_calibrate.isChecked() is False
+    assert "0.087" in tab.chk_calibrate.toolTip()      # the why, measured
+    assert "dithered" in tab.chk_calibrate.toolTip()
+
+
+def test_the_calibration_note_says_what_the_magnitude_was_measured_with(
+        qapp, tmp_path):
+    # ADR-061: a brightness never goes out without saying whether the frames
+    # were calibrated and with which masters.
+    tab, _host = _tab(qapp, tmp_path)
+    text = tab._calibration_note({"n": 139, "offsets": ["dark120.fits"],
+                                  "flats": ["flatR.fits"], "warnings": []})
+    assert "Calibrated 139 frames" in text
+    assert "dark120.fits" in text and "flatR.fits" in text
+    # the pseudo-flat says so, and repeats its own warning when it has one
+    text = tab._calibration_note({"n": 12, "offsets": [],
+                                  "flats": ["pseudo-flat"],
+                                  "pseudo_flat": {"note": "the flat still "
+                                                  "carries the stars"}})
+    assert "pseudo-flat" in text and "carries the stars" in text
+    # no masters at all: it says that too, instead of pretending
+    assert "no master matched" in tab._calibration_note(
+        {"n": 3, "offsets": [], "flats": []})
+    assert tab._calibration_note(None) == ""

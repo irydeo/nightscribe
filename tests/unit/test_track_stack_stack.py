@@ -18,6 +18,7 @@ the sweep's score, the detection gate and the memory discipline. All
 offline and synthetic: the object is injected with a known motion."""
 
 import math
+import warnings
 
 import numpy as np
 import pytest
@@ -313,3 +314,29 @@ def test_stack_groups_carries_the_alignment_to_every_observation(tmp_path):
     assert len(stars) == len(tracked) == 2
     assert not np.allclose(stars[0][0], tracked[0][0])
     assert not np.allclose(stars[1][0], tracked[1][0])
+
+
+def test_the_stack_does_not_warn_about_its_own_footprint():
+    # The pixels outside the frames' footprint are all-NaN by construction
+    # (the mask says so), and the NaN-aware reductions warned about them on
+    # every stack: two lines of noise per stack that hid the warnings that
+    # do matter. The answer there is NaN, which is what those pixels
+    # deserve, so the warning is silenced where it is expected.
+    data = np.full((4, 6, 6), 100.0, dtype=np.float32)
+    mask = np.ones((4, 6, 6), dtype=bool)
+    mask[:, 0, :] = False                 # a row outside the footprint
+    for method in ("sum", "mean", "median", "sigma"):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            out = ts.combine(data, method, mask=mask)
+        noisy = [w for w in caught
+                 if "NaN" in str(w.message) or "empty" in str(w.message)]
+        assert not noisy, (method, [str(w.message) for w in noisy])
+        # inside the footprint: the sum adds the four frames, the other
+        # three average them
+        assert out[3, 3] == pytest.approx(400.0 if method == "sum" else 100.0)
+        if method != "sum":
+            # nansum treats NaN as zero, so outside the footprint it gives
+            # 0; the other three propagate the NaN, which is the honest
+            # answer for a pixel no frame ever covered
+            assert np.isnan(out[0, 0]), method

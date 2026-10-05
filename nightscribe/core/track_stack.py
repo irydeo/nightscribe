@@ -40,6 +40,7 @@ as int16 with BZERO, and astropy refuses to memory-map that, so
 import datetime
 import logging
 import math
+import warnings
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -591,11 +592,30 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3):
     # offered because the user will see them in the concept, but the app
     # says they differ only in scale. sigma-clipped keeps almost all of
     # the mean's SNR while rejecting the star trails like the median.
+    #
+    # The pixels OUTSIDE the frames' footprint are all-NaN BY CONSTRUCTION
+    # (the mask says so), so every NaN-aware reduction warns about them on
+    # every stack: "All-NaN slice encountered" and "Mean of empty slice".
+    # The answer there is NaN, which is exactly what those pixels deserve,
+    # so the warnings are silenced HERE, where they are expected: a real
+    # all-NaN frame somewhere else still shows up in the log.
     if stack.size == 0:
         return stack.reshape(stack.shape[1:]) if stack.ndim == 3 else stack
     data = stack
     if mask is not None:
         data = np.where(mask, stack, np.nan)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="All-NaN slice.*")
+        warnings.filterwarnings("ignore", message="Mean of empty slice.*")
+        return _combine_masked(data, method, sigma, iterations)
+
+
+def _combine_masked(data, method, sigma, iterations):
+    # @args: data - (n, h, w) float32 with the invalid pixels already NaN,
+    #        method - one of METHODS, sigma/iterations - for sigma-clip
+    # @return: the combined (h, w) float32 image
+    # The arithmetic of the four methods, with no mask left to apply: the
+    # caller has already turned the invalid pixels into NaN.
     if method == "sum":
         return np.nansum(data, axis=0).astype(np.float32)
     if method == "mean":

@@ -114,3 +114,25 @@ def test_events_carry_project_links(db):
 def test_kind_labels_bilingual():
     assert journal.kind_label(journal.K_SESSION, "es") == "Visitas"
     assert journal.kind_label(journal.K_SESSION, "en") == "Visits"
+
+
+def test_every_kind_a_tab_sends_has_a_registry_kind():
+    # project_files.kind is NOT NULL, and an unmapped kind used to become
+    # None and die against it: the astrometry stacks were written and then
+    # silently left out of the visit (the log said "NOT NULL constraint
+    # failed: project_files.kind"). This is the list of kinds the feature
+    # tabs hand to the host through notify_saved, plus the two the registry
+    # itself uses; every one of them needs an entry.
+    from nightscribe.core import journal
+    sent_by_tabs = ("fits", "chart", "report", "stack", "sequence")
+    for kind in sent_by_tabs:
+        if kind == "sequence":
+            # the host resolves it from the payload (a PNG is a chart, the
+            # CSV is a report): it never reaches the map
+            continue
+        assert kind in journal.FILE_KINDS, kind
+        assert journal.FILE_KINDS[kind], kind
+    # and the readable label exists for each of them too
+    for kind in ("fits", "chart", "report", "stack"):
+        es, en = journal._FILE_LABELS.get(kind, (kind, kind))
+        assert es and en, kind

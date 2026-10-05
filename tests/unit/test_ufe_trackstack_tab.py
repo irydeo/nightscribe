@@ -567,3 +567,43 @@ def test_the_whole_column_is_inside_the_scroll_area(qapp, tmp_path):
         widget = getattr(tab._ui, name, None)
         assert widget is not None, name
         assert inner.isAncestorOf(widget), f"{name} no vive en la columna"
+
+
+def test_a_single_operation_stage_shows_a_busy_bar(qapp, tmp_path):
+    # The base stack, the comparison windows and the check's round trip are
+    # ONE operation each: they report total=1, and a determinate bar pinned
+    # at 0 for their whole duration reads as a freeze. It goes BUSY instead,
+    # with the status line saying what is happening.
+    tab, _host = _tab(qapp, tmp_path)
+    tab._on_progress("base", 0, 1)
+    assert tab.prg_stack.minimum() == 0 and tab.prg_stack.maximum() == 0
+    assert "Stacking the whole sequence" in tab.lbl_status.text()
+    # a stage with an inside to count stays determinate
+    tab._on_progress("sweep", 3, 25)
+    assert tab.prg_stack.maximum() == 25 and tab.prg_stack.value() == 3
+    assert "(3/25)" in tab.lbl_status.text()
+
+
+def test_a_long_wrapped_note_is_not_clipped(qapp, tmp_path):
+    # A wrapped QLabel does not always ask for the height its text needs
+    # (the sizeHint is computed for a width that changes later) and every
+    # line comes out clipped. The app already hit this twice (the measure
+    # tab and the manual window) and fixed it the same way: ask the label
+    # itself, at the width it has.
+    tab, _host = _tab(qapp, tmp_path)
+    tab.resize(380, 700)
+    tab.show()
+    qapp.processEvents()
+    lab = tab.lbl_notes
+    lab.setVisible(True)
+    tab._set_wrapped(lab, "Sequence stacked: 1 observations measured. 85 "
+                          "frames could not be aligned and were left out.\n"
+                          "• The sequence is not dithered: pattern noise may "
+                          "stack up\n"
+                          "• The composed WCS is off by up to 0.59″ against a "
+                          "direct solve: the field's distortion is biting\n"
+                          "• Detected on the base stack with SNR 17.2 (the "
+                          "gate is 3.5σ: below it nothing is measured)")
+    qapp.processEvents()
+    assert lab.height() >= lab.heightForWidth(lab.width())
+    tab.hide()

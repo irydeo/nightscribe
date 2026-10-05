@@ -45,6 +45,19 @@ _KIND_LABELS = {
     K_OBSERVATION: {"es": "Marcas manuales", "en": "Manual marks"},
 }
 
+# project_files.kind for the files a tab hands to the host. The registry
+# column is NOT NULL, and an unmapped kind used to become None and die
+# against it: the astrometry stacks were written and then silently left out
+# of the visit (the warning said "NOT NULL constraint failed"). "sequence"
+# is not here because the host resolves it from the payload: a sequence
+# export is a chart when it is a PNG and a report otherwise.
+FILE_KINDS = {
+    "fits": "fits",
+    "chart": "chart",
+    "report": "report",
+    "stack": "stack",
+}
+
 # project_files.kind -> readable pair (fallback: the raw kind)
 _FILE_LABELS = {
     "sequence": ("Secuencia exportada", "Sequence exported"),
@@ -55,6 +68,7 @@ _FILE_LABELS = {
     "report": ("Informe generado", "Report written"),
     "animation": ("Animación generada", "Animation rendered"),
     "image": ("Imagen registrada", "Image registered"),
+    "stack": ("Apilado del objeto", "Object stack"),
 }
 
 

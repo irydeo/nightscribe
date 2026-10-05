@@ -366,11 +366,13 @@ class UfeTrackStackTab(QWidget):
             self.lbl_recipe.setText(self.tr(
                 "The brightness is not measured: this run reports "
                 "positions only."))
+            self._fit_label(self.lbl_recipe)
             return
         if not recipe:
             self.lbl_recipe.setText(self.tr(
                 "Photometry recipe: the editor's defaults (open the "
                 "Photometry tab to see or change them)."))
+            self._fit_label(self.lbl_recipe)
             return
         band = recipe.get("band") or self.tr("the comps' own band")
         self.lbl_recipe.setText(self.tr(
@@ -378,6 +380,7 @@ class UfeTrackStackTab(QWidget):
                 "%1", str(band)).replace(
                 "%2", self._recipe_radii_text(recipe)).replace(
                 "%3", str(recipe.get("sky") or "median")))
+        self._fit_label(self.lbl_recipe)
 
     def _recipe_radii_text(self, recipe):
         # @args: recipe - the photometry recipe
@@ -395,7 +398,41 @@ class UfeTrackStackTab(QWidget):
         # @args: text - the status line's text ("" hides it)
         # @return: None
         self.lbl_status.setVisible(bool(text))
-        self.lbl_status.setText(text or "")
+        self._set_wrapped(self.lbl_status, text or "")
+
+    def _set_wrapped(self, label, text):
+        # @args: label - a QLabel with wordWrap, text - its new text
+        # @return: None
+        label.setText(text)
+        self._fit_label(label)
+
+    def _fit_label(self, label):
+        # @args: label - a QLabel with wordWrap whose text just changed
+        # @return: None. Setting the text is not enough for a wrapped label:
+        #          it does not always ask for the height its text needs (the
+        #          sizeHint is computed for a width that changes later), and
+        #          then every line comes out clipped at the top and the
+        #          bottom. Asking the label itself, at the width it has NOW,
+        #          is the fix the measure tab and the manual window already
+        #          carry. A few pixels is not a width: at 1 px a wrapped
+        #          label would want one line per word.
+        if label is None or label.width() < 50:
+            return
+        need = label.heightForWidth(label.width())
+        if need and need > 0:
+            label.setMinimumHeight(int(need))
+
+    def resizeEvent(self, event):
+        # @args: event - the resize event, passed on
+        # @return: None. A wider or narrower column needs another number of
+        #          lines, so the wrapped labels are refitted here, where
+        #          the width is known.
+        super().resizeEvent(event)
+        for name in ("lbl_object", "lbl_notes", "lbl_status", "lbl_recipe",
+                     "lbl_check"):
+            label = getattr(self._ui, name, None)
+            if label is not None and label.isVisible():
+                self._fit_label(label)
 
     # ------------------------------------------------------------- visit
 
@@ -418,6 +455,7 @@ class UfeTrackStackTab(QWidget):
             self.lbl_object.setText(self.tr(
                 "Object and frames: open the editor from a visit to arm "
                 "the sequence."))
+            self._fit_label(self.lbl_object)
             return
         if paths != self._ctx_paths:
             from ..core import track_stack
@@ -452,6 +490,7 @@ class UfeTrackStackTab(QWidget):
             line += self.tr(" · window %1–%2 UT").replace(
                 "%1", t0.strftime("%H:%M")).replace("%2", t1.strftime("%H:%M"))
         self.lbl_object.setText(line)
+        self._fit_label(self.lbl_object)
         self._refresh_preview()
 
     def _refresh_preview(self):
@@ -565,8 +604,15 @@ class UfeTrackStackTab(QWidget):
         #        stage
         # @return: None. The human text is a literal self.tr() table (the
         #          way TonightWorker's phases do it, CONTRIBUTING rule 5).
-        self.prg_stack.setRange(0, max(1, total))
-        self.prg_stack.setValue(done)
+        # A stage that is ONE long operation (the base stack, the comparison
+        # windows, the check's round trip to the MPC and Find_Orb) has no
+        # inside to count: a bar pinned at 0 reads as a freeze, so it goes
+        # BUSY (indeterminate) and the status line says what is happening.
+        if total > 1:
+            self.prg_stack.setRange(0, total)
+            self.prg_stack.setValue(done)
+        else:
+            self.prg_stack.setRange(0, 0)
         text = self._stage_text(stage)
         if text:
             self._say(text + (f" ({done}/{total})" if total > 1 else ""))
@@ -671,7 +717,7 @@ class UfeTrackStackTab(QWidget):
                 "The stack's limit magnitude is %1: the night reached "
                 "that deep.").replace("%1", f"{det.mag_limit:.2f}")
         self.lbl_notes.setVisible(True)
-        self.lbl_notes.setText(text)
+        self._set_wrapped(self.lbl_notes, text)
         self.cmb_group.setEnabled(False)
         self._sync_report_buttons()
         self._say("")
@@ -734,6 +780,7 @@ class UfeTrackStackTab(QWidget):
                 "run reports positions only"))
         self.lbl_notes.setVisible(bool(notes))
         self.lbl_notes.setText("\n".join("• " + n for n in notes))
+        self._fit_label(self.lbl_notes)
         # the viewer: one entry per observation, the first one on stage
         self.cmb_group.blockSignals(True)
         self.cmb_group.clear()
@@ -1054,6 +1101,7 @@ class UfeTrackStackTab(QWidget):
                 "%2", f"{check.our_residual[1]:.2f}").replace(
                 "%3", str(check.n_stations))
         self.lbl_check.setText(text)
+        self._fit_label(self.lbl_check)
         # the verdict rides the block's header, so it is read WITHOUT
         # opening it (the block is folded by default)
         if not check.available:
@@ -1134,6 +1182,7 @@ class UfeTrackStackTab(QWidget):
         self.lbl_notes.setVisible(bool(notes))
         if notes:
             self.lbl_notes.setText("\n".join("• " + n for n in notes))
+        self._fit_label(self.lbl_notes)
         self._sync_report_buttons()
         kept = len(rep.get("kept") or [])
         self._say(self.tr("Report generated: %1 observations kept."

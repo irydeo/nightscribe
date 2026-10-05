@@ -35,8 +35,8 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (attention, dates, ephemeris, kinds, mpc_report, orbits,
-                    project, sequence, suggest)
+from ..core import (attention, dates, ephemeris, journal, kinds, mpc_report,
+                    orbits, project, sequence, suggest)
 from ..core.db import db
 from . import pretty, theme
 from .overview import ObjectPanel
@@ -10276,8 +10276,13 @@ class MainWindow(QMainWindow):
         if not p:
             return
         for path in paths:
-            fkind = {"fits": "fits", "chart": "chart",
-                     "report": "report"}.get(kind)
+            # Every kind a tab can send has to be mapped: an unmapped one
+            # becomes None and the INSERT dies against NOT NULL, so the
+            # file is written and then silently left out of the visit (the
+            # astrometry stacks did exactly that). The map lives in
+            # core/journal.py, next to the readable labels, so a test can
+            # walk the kinds the tabs send and demand one for each.
+            fkind = journal.FILE_KINDS.get(kind)
             if kind == "sequence":
                 fkind = "chart" if payload.get("which") == "png" \
                     else "report"

@@ -85,6 +85,20 @@ class UfeTrackStackTab(QWidget):
         self.lbl_notes = self._ui.lbl_notes
         self.cmb_group = self._ui.cmb_group
         self.tbl_points = self._ui.tbl_points
+        # The headers are short because the column is 380 px wide: the long
+        # name travels in the tooltip, where there is room for it.
+        for col, tip in enumerate((
+                self.tr("Which observation"),
+                self.tr("Middle-of-exposure instant (UT)"),
+                self.tr("Right ascension, from the stack's own centroid"),
+                self.tr("Declination, from the stack's own centroid"),
+                self.tr("Separation between the two measurements (″)"),
+                self.tr("Signal-to-noise of the measured point"),
+                self.tr("Calibrated magnitude"),
+                self.tr("Warnings and flags of the point"))):
+            header = self.tbl_points.horizontalHeaderItem(col)
+            if header is not None:
+                header.setToolTip(tip)
         self.lbl_check = self._ui.lbl_check
         self.chk_force = self._ui.chk_force
         self.cmb_format = self._ui.cmb_format
@@ -112,6 +126,11 @@ class UfeTrackStackTab(QWidget):
         self._thumbs = StackStrip()
         drop_in(self.layout(), self._ui.ph_thumbs, self._thumbs)
         self._thumbs.picked.connect(self._show_group)
+        # the result area (the strip, the points table) starts HIDDEN: an
+        # empty grid and a blank strip say nothing, and in a 380 px column
+        # they are noise. It appears with the result and goes with it.
+        self.lbl_points_title = self._ui.lbl_points_title
+        self._thumbs.setVisible(False)
         self.btn_blink = self._ui.btn_blink
         self.btn_blink.clicked.connect(self._on_blink)
         # the brightness is measured with the recipe the Fotometria tab is
@@ -136,7 +155,11 @@ class UfeTrackStackTab(QWidget):
                 "trackstack_snr_open"),
             "advanced": self._wrap_section(
                 "sec_advanced_content", self.tr("Stacking settings"),
-                "trackstack_advanced_open"),
+                # a FRESH key on purpose: the block is open by default now
+                # (the method, the field, the margin, the brightness and the
+                # recipe are the planning decisions), and an old stored
+                # "closed" from the previous design would keep it shut
+                "trackstack_settings_open", open_by_default=True),
             "check": self._wrap_section(
                 "sec_check_content",
                 self.tr("Check against other observers"),
@@ -206,10 +229,20 @@ class UfeTrackStackTab(QWidget):
         self.btn_send_mpc.clicked.connect(self._on_send_mpc)
         self._sync_report_buttons()
 
-    def _wrap_section(self, name, title, key):
+    def _show_result_area(self, flag):
+        # @args: flag - True when there is a result to show
+        # @return: None. The empty containers say nothing: an empty grid and
+        #          a blank strip are noise in a 380 px column, so they
+        #          appear WITH the result and go away with it.
+        self.lbl_points_title.setVisible(flag)
+        self.tbl_points.setVisible(flag)
+        self._thumbs.setVisible(flag)
+
+    def _wrap_section(self, name, title, key, open_by_default=False):
         # @args: name - the .ui container's objectName, title - the block's
         #        title in plain language (it says WHAT it holds), key - the
-        #        settings key that remembers whether it stays open
+        #        settings key that remembers whether it stays open,
+        #        open_by_default - the state before the observer chooses
         # @return: the CollapsibleSection
         # The container comes OUT of the column and INTO the block, keeping
         # every widget inside it: the Designer file still owns the
@@ -220,7 +253,8 @@ class UfeTrackStackTab(QWidget):
         content.setParent(None)
         section.contentLayout().addWidget(content)
         content.setVisible(True)
-        section.setCollapsed(not bool(config.get(key, 0)))
+        section.setCollapsed(
+            not bool(config.get(key, 1 if open_by_default else 0)))
         section.sectionToggled.connect(
             lambda opened, k=key: config.set(k, 1 if opened else 0))
         return section
@@ -371,6 +405,7 @@ class UfeTrackStackTab(QWidget):
             self.cmb_group.setEnabled(False)
             self.txt_report.clear()
             self.lbl_notes.setVisible(False)
+            self._show_result_area(False)
             self._sync_report_buttons()
         n = len(self._frames)
         self.spn_nobs.setEnabled(True)
@@ -588,6 +623,7 @@ class UfeTrackStackTab(QWidget):
         self.txt_report.clear()
         self._thumbs.clear()
         self.btn_blink.setEnabled(False)
+        self._show_result_area(False)
         self._sync_report_buttons()
         self._say(self.tr("Run undone: %1 observations removed."
                           ).replace("%1", str(removed if removed is not None
@@ -690,6 +726,7 @@ class UfeTrackStackTab(QWidget):
                   for i in range(len(stacks))]
         self._thumbs.set_stacks([s for s, _rep in stacks], qs, labels)
         self.btn_blink.setEnabled(any(s is not None for s, _rep in stacks))
+        self._show_result_area(True)
         if self.cmb_group.count():
             self.cmb_group.setCurrentIndex(0)
             self._show_group(0)

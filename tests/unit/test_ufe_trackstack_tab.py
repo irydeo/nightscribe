@@ -452,22 +452,55 @@ def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
     # ADR-038: three levels. The nightly flow stays in the column (the
     # plan with its one-line SNR, the run, the result, the report) and the
     # knobs most observers never touch go into blocks that say what they
-    # hold and start folded.
+    # hold. The STACKING SETTINGS open by default (the method, the field,
+    # the margin, the brightness and the recipe are the planning
+    # decisions); the three that are READ, not chosen, start folded.
     tab, _host = _tab(qapp, tmp_path)
     assert tab.btn_stack.isVisibleTo(tab)          # the primary action
     assert tab.lbl_snr_line.isVisibleTo(tab)       # the plan, in one line
     assert tab.btn_report.isVisibleTo(tab)         # the outcome
-    # the four blocks exist, start folded, and their contents are hidden
     assert len(tab._sections) == 4
-    for section in tab._sections.values():
-        assert not section._expanded
-    assert not tab.cmb_method.isVisibleTo(tab)
+    assert tab._sections["advanced"]._expanded
+    for key in ("snr", "check", "report"):
+        assert not tab._sections[key]._expanded
+    # the open block shows its knobs; the folded ones hide theirs
+    assert tab.cmb_method.isVisibleTo(tab)
     assert not tab.tbl_snr.isVisibleTo(tab)
     assert not tab.chk_force.isVisibleTo(tab)
     assert not tab.txt_report.isVisibleTo(tab)
-    # opening one brings its content back
+    # folding one takes its content away with it
     tab._sections["advanced"]._toggle()
-    assert tab.cmb_method.isVisibleTo(tab)
+    assert not tab.cmb_method.isVisibleTo(tab)
+
+
+def test_the_result_area_starts_hidden(qapp, tmp_path):
+    # An empty grid and a blank strip say nothing, and in a 380 px column
+    # they are noise: they appear WITH the result and go away with it.
+    tab, _host = _tab(qapp, tmp_path)
+    assert not tab.tbl_points.isVisibleTo(tab)
+    assert not tab.lbl_points_title.isVisibleTo(tab)
+    assert not tab._thumbs.isVisibleTo(tab)
+
+
+def test_the_column_fits_the_narrow_panel_it_lives_in(qapp, tmp_path):
+    # The editor is a splitter: the stage takes ~880 px and the tabs 380,
+    # so the astrometry column has to FIT there. A widget whose text cannot
+    # wrap (a checkbox label) once demanded 404 px, and the content came
+    # out 52 px wider than the scroll viewport with the horizontal bar off,
+    # so the right edge was unreachable (half the Stack button with it).
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    tab = UfeTrackStackTab(UfeImageState(host), "en", parent=host)
+    tab.resize(380, 617)
+    tab.show()
+    qapp.processEvents()
+    area = tab.layout().itemAt(0).widget()
+    inner = area.widget()
+    assert inner.minimumSizeHint().width() <= area.viewport().width()
+    tab.hide()
 
 
 def test_the_door_holds_the_occasional_actions(qapp, tmp_path):

@@ -45,7 +45,7 @@
     <layout class="QHBoxLayout" name="row_nobs">
      <item>
       <widget class="QLabel" name="lbl_nobs">
-       <property name="text"><string>Number of observations:</string></property>
+       <property name="text"><string>Observations:</string></property>
       </widget>
      </item>
      <item>
@@ -68,6 +68,16 @@
      </item>
      <item>
       <spacer name="hsp_nobs">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_run">
+     <item>
+      <spacer name="hsp_run">
        <property name="orientation"><enum>Qt::Horizontal</enum></property>
        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
       </spacer>
@@ -131,7 +141,7 @@
       <item>
        <layout class="QHBoxLayout" name="row_field">
         <item>
-         <widget class="QLabel" name="lbl_final_field"><property name="text"><string>Final field:</string></property></widget>
+         <widget class="QLabel" name="lbl_final_field"><property name="text"><string>Field:</string></property></widget>
         </item>
         <item>
          <widget class="QComboBox" name="cmb_final_size">
@@ -141,7 +151,7 @@
          </widget>
         </item>
         <item>
-         <widget class="QLabel" name="lbl_margin"><property name="text"><string>Trail margin:</string></property></widget>
+         <widget class="QLabel" name="lbl_margin"><property name="text"><string>Margin:</string></property></widget>
         </item>
         <item>
          <widget class="QSpinBox" name="spn_margin">
@@ -268,6 +278,7 @@
    </item>
    <item>
     <widget class="QLabel" name="lbl_points_title">
+     <property name="visible"><bool>false</bool></property>
      <property name="text"><string>Measurement per observation</string></property>
      <property name="toolTip">
       <string>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</string>
@@ -276,15 +287,16 @@
    </item>
    <item>
     <widget class="QTableWidget" name="tbl_points">
+     <property name="visible"><bool>false</bool></property>
      <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
      <column><property name="text"><string>Obs.</string></property></column>
-     <column><property name="text"><string>T_mid (UT)</string></property></column>
-     <column><property name="text"><string>RA (stack)</string></property></column>
-     <column><property name="text"><string>Dec (stack)</string></property></column>
-     <column><property name="text"><string>Δ (″)</string></property></column>
+     <column><property name="text"><string>T_mid</string></property></column>
+     <column><property name="text"><string>RA</string></property></column>
+     <column><property name="text"><string>Dec</string></property></column>
+     <column><property name="text"><string>Δ″</string></property></column>
      <column><property name="text"><string>SNR</string></property></column>
      <column><property name="text"><string>Mag</string></property></column>
-     <column><property name="text"><string>Warnings</string></property></column>
+     <column><property name="text"><string>!</string></property></column>
     </widget>
    </item>
    <item>
@@ -309,9 +321,9 @@
       <item>
        <widget class="QCheckBox" name="chk_force">
         <property name="enabled"><bool>false</bool></property>
-        <property name="text"><string>Force the report even if the check blocks it (it will be recorded)</string></property>
+        <property name="text"><string>Force the report</string></property>
         <property name="toolTip">
-         <string>An outlier blocks the report by default; forcing it leaves the decision on record</string>
+         <string>An outlier blocks the report by default; forcing it leaves the decision on record (the check's verdict and the report's own note say it was forced)</string>
         </property>
        </widget>
       </item>

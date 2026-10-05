@@ -998,11 +998,16 @@ class TrackStackWorker(QThread):
         self._obs_code = obs_code
         self._site = site
         self._cancel = False
+        self._solve_cancel = None   # SolveCancel while the solver runs
 
     def cancel(self):
         # Every engine call takes the same callable: the run stops at the
         # next boundary and the payload says "cancelled" (D18's spirit).
+        # The live SOLVE gets its own SolveCancel too, so Cancel kills
+        # ASTAP now instead of waiting for the next stage boundary.
         self._cancel = True
+        if self._solve_cancel is not None:
+            self._solve_cancel.set()
 
     # @return: cfg value by key with a fallback (cfg may be None in tests)
     def _cfg_get(self, key, default):
@@ -1024,9 +1029,15 @@ class TrackStackWorker(QThread):
                            error="the visit needs at least two frames")
                 self.finished.emit(out)
                 return
+            # the live solve gets a SolveCancel so Cancel kills ASTAP now
+            from ..core import solve as solve_mod
+            self._solve_cancel = solve_mod.SolveCancel()
+            if self._cancel:
+                self._solve_cancel.set()
             ref, w0 = track_stack.solve_reference(
-                frames, self._cfg, cancel=lambda: self._cancel,
+                frames, self._cfg, cancel=self._solve_cancel,
                 progress=lambda d, t, _l: self.progress.emit("solve", d, t))
+            self._solve_cancel = None
             if w0 is None:
                 out.update(status="error",
                            error="no frame could be solved: no WCS, no sky")

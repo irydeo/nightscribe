@@ -30,6 +30,14 @@
     </widget>
    </item>
    <item>
+    <widget class="QCheckBox" name="chk_pseudo_flat">
+     <property name="text"><string>Build a flat from the frames when the library has none</string></property>
+     <property name="toolTip">
+      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It needs the sequence to be dithered: without dithering the stars survive the percentile and the app says so</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QCheckBox" name="chk_export">
      <property name="text"><string>Export the calibrated frames (FITS copies)</string></property>
      <property name="toolTip">

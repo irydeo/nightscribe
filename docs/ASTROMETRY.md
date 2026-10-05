@@ -1,5 +1,10 @@
 # Minor-planet astrometry: user guide
 
+> The techniques that raise the signal-to-noise (stacking both runs,
+> weighting by 1/sigma^2, the matched filter, the trail, the diagnosis and
+> the pseudo-flat) are explained at three levels, observer, astronomer and
+> developer, in `docs/SNR.md`.
+
 *How to measure a faint asteroid with NightScribe and report it to the MPC.*
 
 ---

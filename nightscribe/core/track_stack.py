@@ -253,7 +253,12 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
         # the grid has to be a frame we actually know the sky of
         ref = next((f for f in frames if f.wcs is not None), frames[0])
     ref_data, _ = calibration.read_image(ref.path)
-    ref_stars = register.detect_stars(register.source_image(ref_data))
+    # ONE source image of the reference for the whole sequence: it is the
+    # same frame every time, and rebuilding it per frame was ~140 ms of
+    # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
+    # read from it too, so nothing is computed twice.
+    ref_src = register.source_image(ref_data)
+    ref_stars = register.detect_stars(ref_src)
     ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:
         fwhm_px = session_fwhm(ref_data, ref_stars, sat=sat)
@@ -278,7 +283,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
             # into a bad minimum (measured: a 2 px shift read as -29 px)
             tr = register.estimate_transform(
                 ref_data, data, guess=previous, ref_stars=ref_stars,
-                allow_rotation=allow_rotation)
+                ref_src=ref_src, allow_rotation=allow_rotation)
             # "Accepted" is not the same as "good": a translation that
             # could not explain the stars is returned anyway when the
             # rotation is not allowed, so the retry fires both when the
@@ -293,7 +298,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
             if needs_rotation and not allow_rotation:
                 retry = register.estimate_transform(
                     ref_data, data, guess=previous, ref_stars=ref_stars,
-                    allow_rotation=True)
+                    ref_src=ref_src, allow_rotation=True)
                 # The retry has to be PROVEN, not hinted: the stars must
                 # certify it (register.trusted's correlation fallback is
                 # not enough for a rotation, see require_stars), and the

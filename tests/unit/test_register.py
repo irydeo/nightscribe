@@ -127,3 +127,47 @@ def test_a_frame_with_no_stars_falls_back_to_the_correlation():
     assert tr["source"] == "correlation"
     assert tr["dx"] == pytest.approx(12.0, abs=1.5)
     assert tr["dy"] == pytest.approx(-7.0, abs=1.5)
+
+
+def test_the_vectorised_background_grid_is_the_block_median():
+    # The fast path (one C median over a reshape) must give the SAME grid as
+    # the slow loop: a block median is a block median, and the reshape is
+    # only legitimate when the frame divides exactly by the block.
+    rng = np.random.default_rng(5)
+    data = rng.normal(100.0, 3.0, (128, 160))
+    data[40:50, 60:70] += 500.0
+    grid, ys, xs = reg._block_grid(data, 32)
+    assert grid.shape == (4, 5)
+    for j in range(grid.shape[0]):
+        for i in range(grid.shape[1]):
+            expected = np.median(data[ys[j]:ys[j + 1], xs[i]:xs[i + 1]])
+            assert grid[j, i] == pytest.approx(float(expected))
+
+
+def test_the_background_of_a_frame_that_does_not_divide_keeps_the_loop():
+    # A 130x150 frame with block 32: the last block is narrower, the reshape
+    # would be a lie, and the loop has to answer. The grid must still be the
+    # block median of the REAL blocks.
+    rng = np.random.default_rng(7)
+    data = rng.normal(100.0, 3.0, (130, 150))
+    grid, ys, xs = reg._block_grid(data, 32)
+    for j in range(grid.shape[0]):
+        for i in range(grid.shape[1]):
+            expected = np.median(data[ys[j]:ys[j + 1], xs[i]:xs[i + 1]])
+            assert grid[j, i] == pytest.approx(float(expected))
+
+
+def test_the_cached_reference_source_image_is_the_same_answer():
+    # The sequence builds ONE source image of the reference and passes it to
+    # every frame (rebuilding it per frame was pure waste). The cached answer
+    # must be identical to the one computed from scratch.
+    ref = _field(seed=8)
+    src = reg.apply_transform(ref, math.radians(3.0), 9.0, -4.0)
+    ref_src = reg.source_image(ref)
+    ref_stars = reg.detect_stars(ref_src)
+    cached = reg.estimate_transform(ref, src, ref_stars=ref_stars,
+                                    ref_src=ref_src)
+    fresh = reg.estimate_transform(ref, src, ref_stars=ref_stars)
+    assert cached["dx"] == pytest.approx(fresh["dx"], abs=1e-9)
+    assert cached["dy"] == pytest.approx(fresh["dy"], abs=1e-9)
+    assert cached["angle"] == pytest.approx(fresh["angle"], abs=1e-12)

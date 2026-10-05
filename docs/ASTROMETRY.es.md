@@ -1,5 +1,10 @@
 # Astrometría de cuerpos menores: guía de uso
 
+> Las técnicas que suben la señal frente al ruido (apilar las dos tandas,
+> pesar por 1/σ², el filtro adaptado, la estela, el diagnóstico y el
+> pseudo-flat) están explicadas a tres niveles, observador, astrónomo y
+> desarrollador, en `docs/SNR.es.md`.
+
 *Cómo medir un asteroide débil con NightScribe y enviarlo al MPC.*
 
 ---

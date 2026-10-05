@@ -47,11 +47,11 @@ vez de suponerla.
 | --- | --- | --- |
 | **B0** | Arreglo: el fotograma que no contiene la observación | **Hecho** (`bug-fotograma-fuera-de-campo.md`) |
 | **P0** | Los fotogramas que se quedan en el suelo | **Hecho** (`p0-fotogramas-perdidos.md`) |
-| **P4** | Inyección y recuperación (el instrumento) | Pendiente |
+| **P4** | Inyección y recuperación (el instrumento) | **Hecho** (`p4-inyeccion-recuperacion.md`) |
 | **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |
-| **P5** | Pseudo-flat | Pendiente |
+| **P5** | Pseudo-flat | **Hecho** (`p5-pseudo-flat.md`) |
 | **P6** | Decisión sobre nxt (denoiser de IA) | **Hecho**: ADR-063 (no entra en la medida) |
 
 **B0** no es una fase del plan: es el arreglo de un fallo real que apareció

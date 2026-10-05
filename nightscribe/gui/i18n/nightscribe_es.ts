@@ -8925,100 +8925,110 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeCalibrationTab</name>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="127"/>
+        <location filename="../ufe_calibration_tab.py" line="131"/>
         <location filename="../ui/ufe_calibration_tab.ui" line="28"/>
         <source>Open the editor from a visit to see its recipe.</source>
         <translation>Abre el editor desde una visita para ver su receta.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="137"/>
+        <location filename="../ufe_calibration_tab.py" line="141"/>
         <source>The first frame could not be read:</source>
         <translation>No se pudo leer el primer frame:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="154"/>
+        <location filename="../ufe_calibration_tab.py" line="158"/>
         <source>Camera %1 · gain %2 · %3 °C · exposure %4 s · filter %5</source>
         <translation>Cámara %1 · ganancia %2 · %3 °C · exposición %4 s · filtro %5</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="161"/>
+        <location filename="../ufe_calibration_tab.py" line="165"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="162"/>
+        <location filename="../ufe_calibration_tab.py" line="166"/>
         <source>Bias</source>
         <translation>Bias</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="166"/>
+        <location filename="../ufe_calibration_tab.py" line="170"/>
         <source>Offset: missing (no dark or bias in the library)</source>
         <translation>Offset: falta (no hay dark ni bias en la biblioteca)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="168"/>
+        <location filename="../ufe_calibration_tab.py" line="172"/>
         <source>Flat:</source>
         <translation>Flat:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="170"/>
+        <location filename="../ufe_calibration_tab.py" line="174"/>
         <source>(offset removed: %1)</source>
         <translation>(offset restado: %1)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="174"/>
+        <location filename="../ufe_calibration_tab.py" line="178"/>
         <source>(no dark-flat: the flat keeps its own pedestal)</source>
         <translation>(sin dark-flat: el flat conserva su propio pedestal)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="177"/>
+        <location filename="../ufe_calibration_tab.py" line="181"/>
         <source>Flat: missing for this filter</source>
         <translation>Flat: falta para este filtro</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="189"/>
+        <location filename="../ufe_calibration_tab.py" line="193"/>
         <source>No dark at this exposure: the bias was subtracted, so the thermal current stays in the frame</source>
         <translation>No hay dark a esta exposición: se restó el bias, así que la corriente térmica queda en el frame</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="193"/>
+        <location filename="../ufe_calibration_tab.py" line="197"/>
         <source>No dark or bias in the library: the pedestal and the thermal current stay in the frame</source>
         <translation>No hay dark ni bias en la biblioteca: el pedestal y la corriente térmica quedan en el frame</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="197"/>
+        <location filename="../ufe_calibration_tab.py" line="201"/>
         <source>No flat for this filter: the flat residual is not corrected (it matters for the magnitude, little for the centroid)</source>
         <translation>No hay flat para este filtro: el residuo del flat no se corrige (importa para la magnitud, poco para el centroide)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="212"/>
+        <location filename="../ufe_calibration_tab.py" line="216"/>
         <source>Cancelling: the calibration stops after the frame it is applying; the copies already exported are kept.</source>
         <translation>Cancelando: la calibración se detiene después del frame que está aplicando; las copias ya exportadas se conservan.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="218"/>
+        <location filename="../ufe_calibration_tab.py" line="222"/>
         <source>No visit with frames: open the editor from a visit.</source>
         <translation>No hay visita con frames: abre el editor desde una visita.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="236"/>
+        <location filename="../ufe_calibration_tab.py" line="240"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="261"/>
+        <location filename="../ufe_calibration_tab.py" line="267"/>
         <source>The calibration failed:</source>
         <translation>La calibración falló:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="271"/>
+        <location filename="../ufe_calibration_tab.py" line="277"/>
         <source>Cancelled after %1 frames.</source>
         <translation>Cancelada después de %1 frames.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="294"/>
+        <location filename="../ufe_calibration_tab.py" line="300"/>
         <source>Calibrated %1 frames (%2 exported).</source>
         <translation>Calibrados %1 frames (%2 exportados).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_calibration_tab.py" line="308"/>
+        <source>Pseudo-flat built from %1 frames (median %2 ADU).</source>
+        <translation>Pseudo-flat construido con %1 tomas (mediana %2 ADU).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_calibration_tab.py" line="312"/>
+        <source>Warning:</source>
+        <translation>Aviso:</translation>
     </message>
     <message>
         <location filename="../ui/ufe_calibration_tab.ui" line="20"/>
@@ -9032,31 +9042,41 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_calibration_tab.ui" line="34"/>
+        <source>Build a flat from the frames when the library has none</source>
+        <translation>Construir un flat de las tomas cuando la biblioteca no tenga ninguno</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_calibration_tab.ui" line="36"/>
+        <source>A pseudo-flat: the train&apos;s dust and the sensor&apos;s vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It needs the sequence to be dithered: without dithering the stars survive the percentile and the app says so</source>
+        <translation>Un pseudo-flat: las motas del tren óptico y el viñeteado del sensor están fijos en el fotograma y sobreviven a un percentil bajo entre tomas, mientras que las estrellas se mueven y no. Se suaviza y se normaliza, y se usa SOLO para los filtros que no tengan flat en la biblioteca (un flat de verdad siempre gana). Necesita que la secuencia esté dithered: sin dithering las estrellas sobreviven al percentil y la app lo dice</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_calibration_tab.ui" line="42"/>
         <source>Export the calibrated frames (FITS copies)</source>
         <translation>Exportar los frames calibrados (copias FITS)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_calibration_tab.ui" line="36"/>
+        <location filename="../ui/ufe_calibration_tab.ui" line="44"/>
         <source>Calibration works in memory; writing hundreds of calibrated FITS is optional and explicit. The copies land in the project&apos;s folder (a &quot;calibrados&quot; subfolder) and are registered to the visit</source>
         <translation>La calibración trabaja en memoria; escribir cientos de FITS calibrados es opcional y explícito. Las copias van a la carpeta del proyecto (una subcarpeta «calibrados») y se registran en la visita</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_calibration_tab.ui" line="45"/>
+        <location filename="../ui/ufe_calibration_tab.ui" line="53"/>
         <source>Calibrate the visit</source>
         <translation>Calibrar la visita</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_calibration_tab.ui" line="47"/>
+        <location filename="../ui/ufe_calibration_tab.ui" line="55"/>
         <source>Apply the recipe to every frame of the visit (offset first, flat second). While it runs, this button is the Cancel</source>
         <translation>Aplica la receta a cada frame de la visita (primero el offset, después el flat). Mientras corre, este botón es el Cancelar</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_calibration_tab.ui" line="67"/>
+        <location filename="../ui/ufe_calibration_tab.ui" line="75"/>
         <source>Warnings</source>
         <translation>Avisos</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_calibration_tab.ui" line="74"/>
+        <location filename="../ui/ufe_calibration_tab.ui" line="82"/>
         <source>What the recipe could not do and what stays in the frames: no dark, no bias, no flat for the filter, or a master out of tolerance</source>
         <translation>Lo que la receta no pudo hacer y lo que queda en los frames: sin dark, sin bias, sin flat para el filtro, o un master fuera de tolerancia</translation>
     </message>

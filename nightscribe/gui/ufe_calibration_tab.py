@@ -56,12 +56,16 @@ class UfeCalibrationTab(QWidget):
         self.lbl_recipe = self._ui.lbl_recipe
         self.lbl_warnings = self._ui.lbl_warnings
         self.lbl_status = self._ui.lbl_status
+        self.chk_pseudo_flat = self._ui.chk_pseudo_flat
         self.chk_export = self._ui.chk_export
         self.btn_calibrate = self._ui.btn_calibrate
         self.prg_calib = self._ui.prg_calib
         # D6: exporting calibrated copies is explicit; the checkbox's
         # default is the setting's, so the choice survives sessions
         self.chk_export.setChecked(bool(config.get("calib_export", False)))
+        # P5: the pseudo-flat is opt-in, and the choice survives sessions
+        self.chk_pseudo_flat.setChecked(
+            bool(config.get("calib_pseudo_flat", False)))
         self.btn_calibrate.clicked.connect(self._on_calibrate)
         self._btn_label = self.btn_calibrate.text()
 
@@ -234,7 +238,9 @@ class UfeCalibrationTab(QWidget):
         self.prg_calib.setRange(0, len(paths))
         self.prg_calib.setValue(0)
         self.btn_calibrate.setText(self.tr("Cancel"))
-        self._worker = CalibrationWorker(paths, db, export_dir, config)
+        self._worker = CalibrationWorker(
+            paths, db, export_dir, config,
+            pseudo_flat=self.chk_pseudo_flat.isChecked())
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -293,3 +299,15 @@ class UfeCalibrationTab(QWidget):
                         "calibrated export register failed: %s", err)
         self._say(self.tr("Calibrated %1 frames (%2 exported).").replace(
             "%1", str(len(reports))).replace("%2", str(len(written))))
+        # P5: what the pseudo-flat was, and whether it could be trusted: a
+        # flat built from frames that were not dithered still carries the
+        # stars, and saying so beats leaving a wrong flat on the frames
+        info = payload.get("pseudo_flat") or {}
+        if info.get("median_adu"):
+            note = self.tr(
+                "Pseudo-flat built from %1 frames (median %2 ADU).").replace(
+                    "%1", str(info.get("n_frames"))).replace(
+                    "%2", f"{float(info['median_adu']):.0f}")
+            if info.get("note"):
+                note += " " + self.tr("Warning:") + " " + info["note"]
+            self._say(note)

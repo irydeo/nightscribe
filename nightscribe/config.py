@@ -110,6 +110,10 @@ DEFAULTS = {
     "calib_root": "",           # empty -> the data dir's calib/ folder
     "calib_temp_tol_c": 3.0,
     "calib_export": False,
+    # P5: build a flat from the frames themselves for the filters the master
+    # library has no flat for. Off by default: a real flat always wins, and
+    # a pseudo-flat needs the sequence to be dithered.
+    "calib_pseudo_flat": False,
     # Track & stack (ADR-062): the detection gate and the submission bar
     # are DIFFERENT thresholds on purpose. The MPC recommends SNR >= 20 to
     # submit and forbids marginal detections, but that is a recommendation:

@@ -974,10 +974,15 @@ class CalibrationWorker(QThread):
     finished = Signal(object)        # {"status", "reports", "written"}
     failed = Signal(str)             # an unexpected error, in English
 
-    def __init__(self, paths, db, export_dir=None, cfg=None):
+    def __init__(self, paths, db, export_dir=None, cfg=None,
+                 pseudo_flat=False):
         super().__init__()
         self._paths = list(paths)
         self._db = db
+        # P5: build a flat from the frames themselves for the filters the
+        # library has no flat for. It is built ONCE for the whole visit
+        # (it needs every frame) and then applied to each one.
+        self._pseudo_flat = bool(pseudo_flat)
         self._export = str(export_dir) if export_dir else None
         self._cfg = cfg
         self._cancel = False
@@ -990,10 +995,20 @@ class CalibrationWorker(QThread):
     def run(self):
         from ..core import calibration
         reports, written = [], []
+        flat = None
+        flat_info = None
         try:
             total = len(self._paths)
             if self._export:
                 Path(self._export).mkdir(parents=True, exist_ok=True)
+            if self._pseudo_flat and self._paths:
+                # P5: the flat is a property of the VISIT (the train did not
+                # change in five minutes), so it is built once here and then
+                # applied to every frame. It needs all the frames at the same
+                # time, which is why it cannot live inside the per-frame loop.
+                flat, flat_info = calibration.pseudo_flat(
+                    self._paths, cancel=lambda: self._cancel,
+                    progress=lambda d, t: self.progress.emit(0, total))
             for index, path in enumerate(self._paths, 1):
                 if self._cancel:
                     break
@@ -1001,7 +1016,7 @@ class CalibrationWorker(QThread):
                 # batch entry point resolves, per frame, from its header
                 out = calibration.calibrate_paths(
                     [path], self._db, self._cfg,
-                    cancel=lambda: self._cancel)
+                    cancel=lambda: self._cancel, pseudo_flat=flat)
                 if not out:
                     break
                 src, data, header, report = out[0]
@@ -1017,7 +1032,8 @@ class CalibrationWorker(QThread):
             self.failed.emit(str(err))
             return
         self.finished.emit({"status": "cancelled" if self._cancel else "ok",
-                            "reports": reports, "written": written})
+                            "reports": reports, "written": written,
+                            "pseudo_flat": flat_info})
 
 
 class TrackStackWorker(QThread):

@@ -1110,11 +1110,14 @@ class UfeMeasureTab(QWidget):
             self._centre.raise_()
         self._remeasure()
 
-    def _apertures(self, entries):
+    def _apertures(self, entries, image=None):
         # H3: when the seeing checkbox is on, measure the comps' FWHM on
         # the plate and scale the radii; the spins follow so the numbers
         # stay visible and tweakable. A hand edit wins until the next
         # plate (the observer's radii are never stomped).
+        # @args: entries - the comparison sequence, image - where the seeing
+        #        is measured (None: the plate itself; a track & stack passes
+        #        its star stack, where the comps are points)
         if not self.chk_seeing.isChecked() or self._radii_manual:
             return (self.spn_rap.value(), self.spn_rin.value(),
                     self.spn_rout.value()), None
@@ -1127,8 +1130,9 @@ class UfeMeasureTab(QWidget):
             except Exception:
                 continue
         sat = photometry.saturation_ceiling(self._state.header)
-        fwhm = photometry.estimate_fwhm(self._state.data, positions,
-                                        sat_adu=sat)
+        fwhm = photometry.estimate_fwhm(
+            image if image is not None else self._state.data, positions,
+            sat_adu=sat)
         r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm)
         if fwhm is not None:
             for spn, v in ((self.spn_rap, r_ap), (self.spn_rin, r_in),
@@ -1173,15 +1177,49 @@ class UfeMeasureTab(QWidget):
         lbl.setText(self.tr("auto: {0}").format(" · ".join(parts)) if parts
                     else self.tr("auto: no ceiling known (plateau only)"))
 
+    def _pair_image(self):
+        # @return: the star stack that goes with this plate, or None
+        # A track & stack saves TWO files per observation: the object's stack
+        # (its light, and the stars as TRAILS) and the star stack (the comps
+        # as points, and the object as a trail). NS_PAIR carries the name of
+        # the other one, so whichever is opened the tab knows its partner.
+        # The comps read on the star stack and the target on the object's:
+        # that is the only way a zero point means anything on this kind of
+        # plate.
+        header = getattr(self._state, "header", None) or {}
+        name = header.get("NS_PAIR")
+        if not name or not self._state.path:
+            return None
+        partner = Path(self._state.path).parent / str(name)
+        if not partner.exists():
+            return None
+        try:
+            from ..core import fits_io
+            _header, data = fits_io.read_fits(str(partner))
+            return np.ascontiguousarray(data, dtype=np.float32)
+        except Exception as err:
+            logger.warning("the pair %s could not be read: %s", partner, err)
+            return None
+
     def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
         # shared with the series engine), and paint the outcome.
         from ..config import config
-        radii, fwhm = self._apertures(entries)
+        # the star stack, when this plate is half of a track & stack pair:
+        # the seeing is measured on IT too (there the comps are points, and
+        # a FWHM taken from their trails would size the aperture with a
+        # smear)
+        pair = self._pair_image()
+        radii, fwhm = self._apertures(entries, image=pair)
         if self._diff is not None:
             image, comp_image = self._diff, self._pair_obs
             comp_scale = self._diff_scale
+        elif pair is not None:
+            image, comp_image, comp_scale = self._state.data, pair, 1.0
+            self._say(self.tr(
+                "The comparison stars are read on the star stack of these "
+                "same frames: on this plate they are trails."))
         else:
             image, comp_image, comp_scale = self._state.data, None, 1.0
         cfg = photometry.PlateConfig(

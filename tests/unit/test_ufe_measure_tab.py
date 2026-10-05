@@ -2431,3 +2431,25 @@ def test_a_track_stack_with_its_pair_is_not_blocked(dlg):
     dlg.state.header["NS_PAIR"] = "2025UR_obs1_20251018T214012_stars.fits"
     _click(dlg, *dlg._test_target)
     assert "track & stack" not in dlg.tab_measure.lbl_status.text()
+
+
+def test_a_track_stack_reads_the_comps_on_its_pair(dlg, tmp_path):
+    # A track & stack saves TWO files per observation: the object's stack
+    # (its light, and the stars as trails) and the star stack (the comps as
+    # points, and the object as a trail). NS_PAIR carries the name of the
+    # other one, and the measurement reads the comps THERE: on the object's
+    # plate a circular aperture on a streak is not a flux.
+    import shutil
+    from pathlib import Path
+    plate = Path(dlg.state.path)
+    partner = plate.parent / "pair_stars.fits"
+    shutil.copyfile(plate, partner)
+    dlg.state.header["NS_STACK"] = "object"
+    dlg.state.header["NS_PAIR"] = partner.name
+    _sequence(dlg, dlg._test_comps)      # the comps have to be there
+    # the pair is found and read
+    assert dlg.tab_measure._pair_image() is not None
+    # and the guard steps aside: the click really measures
+    _click(dlg, *dlg._test_target)
+    assert dlg.tab_measure._last is not None
+    assert dlg.tab_measure._last.get("mag") is not None

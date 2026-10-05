@@ -857,6 +857,15 @@ class UfeTrackStackTab(QWidget):
             # streaks, and with it the tab can say why it will not.
             hdu.header["NS_STACK"] = (
                 "object", "track & stack: the stars are trails")
+            # The two stacks of an observation are a PAIR: the object's has
+            # the light and the star's has the comps, and the Photometry tab
+            # needs both to measure the brightness by hand. The link travels
+            # in the header (a file name, same folder), so it survives
+            # moving the project and there is no database to migrate.
+            stars = result.get("star_stacks") or []
+            if index < len(stars) and stars[index] is not None \
+                    and stars[index][0] is not None:
+                hdu.header["NS_PAIR"] = self._stack_name(index, stars=True)
             name = (self._context() or {}).get("object_name")
             if name:
                 hdu.header["OBJECT"] = str(name)
@@ -981,6 +990,9 @@ class UfeTrackStackTab(QWidget):
             hdu.header["NS_STACK"] = (
                 "stars", "track & stack: the stars are points, the object "
                 "trails")
+            # the other half of the pair: the object's stack, in the same
+            # folder, so whichever one is opened the tab knows the other
+            hdu.header["NS_PAIR"] = self._stack_name(index)
             name = (self._context() or {}).get("object_name")
             if name:
                 hdu.header["OBJECT"] = str(name)

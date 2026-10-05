@@ -150,9 +150,10 @@ class UfeTrackStackTab(QWidget):
         self.btn_more = self._ui.btn_more
         self.lbl_snr_line = self._ui.lbl_snr_line
         self._sections = {
-            "snr": self._wrap_section(
-                "sec_snr_content", self.tr("Expected SNR per observation"),
-                "trackstack_snr_open"),
+            # The SNR table is NOT a fold: it is the plan's own detail (the
+            # frames and the T_mid of each observation) and it is read
+            # BEFORE the run, to decide how many observations to ask for.
+            # It was the only fold hiding something used before running.
             "advanced": self._wrap_section(
                 "sec_advanced_content", self.tr("Stacking settings"),
                 # a FRESH key on purpose: the block is open by default now
@@ -193,15 +194,22 @@ class UfeTrackStackTab(QWidget):
             widget = item.widget()
             if widget is not None:
                 box.addWidget(widget)      # reparents it into the inner
-            else:
-                # A nested layout OR a SPACER: both move as they are. The
-                # trailing spacer is the one that collects the extra space
-                # at the bottom of the column; dropping it (a QSpacerItem
-                # is neither a widget nor a layout) handed that space to
-                # whatever could grow, and the observations row came out
-                # 141 px tall in a tall window, pushing the Stack button
-                # out of sight behind a black void.
-                box.addItem(item)
+                continue
+            nested = item.layout()
+            if nested is not None:
+                # A ROW: addLayout (NOT addItem) is what reparents its
+                # widgets into the inner widget. addItem moves the layout
+                # alone and leaves the widgets as children of the tab,
+                # where the scroll area's viewport paints OVER them: the
+                # row went missing and the column looked empty exactly
+                # where it should have been.
+                box.addLayout(nested)
+                continue
+            # A SPACER: the trailing one collects the extra space at the
+            # bottom. Dropping it handed that space to whatever could
+            # grow, and the observations row came out 141 px tall in a
+            # tall window, pushing the Stack button out of sight.
+            box.addItem(item)
         area = QScrollArea(self)
         area.setWidgetResizable(True)
         area.setFrameShape(QFrame.NoFrame)
@@ -241,20 +249,19 @@ class UfeTrackStackTab(QWidget):
 
     def _show_result_area(self, flag):
         # @args: flag - True when there is a result to show
-        # @return: None. The empty containers say nothing, and neither do
-        #          the ones that talk about something that has not happened
-        #          yet (a check with no run, a report with nothing in it):
-        #          before a run this column is the PLAN, and the result
-        #          arrives whole or not at all.
+        # @return: None. What belongs to the RESULT appears with a run and
+        #          goes away with it: the strip, the table, the row that
+        #          chooses which stack to look at, the check (a verdict that
+        #          does not exist yet is a paragraph about nothing) and the
+        #          report's text. The REPORT block itself stays: its buttons
+        #          are disabled and it says what the flow will produce,
+        #          which is part of planning.
         self.lbl_points_title.setVisible(flag)
         self.tbl_points.setVisible(flag)
         self._thumbs.setVisible(flag)
-        # the row that chooses WHICH stack to look at is part of the result
-        # too (there is nothing to choose before the run)
         self._ui.lbl_view.setVisible(flag)
         self.cmb_group.setVisible(flag)
         self._check_section.setVisible(flag)
-        self._ui.grp_report.setVisible(flag)
         self._sections["report"].setVisible(flag)
 
     def _wrap_section(self, name, title, key, open_by_default=False):

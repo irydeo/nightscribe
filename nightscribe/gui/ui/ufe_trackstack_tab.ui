@@ -83,6 +83,12 @@
       <property name="bottomMargin"><number>0</number></property>
       <item>
        <widget class="QTableWidget" name="tbl_snr">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
         <property name="toolTip">
          <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</string>
@@ -288,6 +294,12 @@
    <item>
     <widget class="QTableWidget" name="tbl_points">
      <property name="visible"><bool>false</bool></property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
      <column><property name="text"><string>Obs.</string></property></column>
      <column><property name="text"><string>T_mid</string></property></column>
@@ -393,6 +405,12 @@
       <property name="bottomMargin"><number>0</number></property>
       <item>
        <widget class="QPlainTextEdit" name="txt_report">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="maximumSize"><size><width>16777215</width><height>110</height></size></property>
         <property name="readOnly"><bool>true</bool></property>
         <property name="font"><font><family>Monospace</family></font></property>

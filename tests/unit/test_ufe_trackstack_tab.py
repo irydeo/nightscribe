@@ -450,22 +450,24 @@ def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
 
 def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
     # ADR-038: three levels. The nightly flow stays in the column (the
-    # plan with its one-line SNR and the run, and the result with the
-    # report) and the knobs most observers never touch go into blocks that
-    # say what they hold. The STACKING SETTINGS open by default (the
-    # method, the field, the margin, the brightness and the recipe are the
-    # planning decisions); the three that are READ, not chosen, start
-    # folded.
+    # plan with its one-line SNR, the table behind it, the run, and the
+    # report block) and the knobs most observers never touch go into
+    # blocks that say what they hold. The STACKING SETTINGS open by
+    # default (the method, the field, the margin, the brightness and the
+    # recipe are the planning decisions); the two that are READ, not
+    # chosen, start folded.
     tab, _host = _tab(qapp, tmp_path)
     assert tab.btn_stack.isVisibleTo(tab)          # the primary action
     assert tab.lbl_snr_line.isVisibleTo(tab)       # the plan, in one line
-    assert len(tab._sections) == 4
+    # the SNR table is part of the plan, not a fold: it is read BEFORE the
+    # run to decide how many observations to ask for
+    assert tab.tbl_snr.isVisibleTo(tab)
+    assert len(tab._sections) == 3
     assert tab._sections["advanced"]._expanded
-    for key in ("snr", "check", "report"):
+    for key in ("check", "report"):
         assert not tab._sections[key]._expanded
     # the open block shows its knobs; the folded ones hide theirs
     assert tab.cmb_method.isVisibleTo(tab)
-    assert not tab.tbl_snr.isVisibleTo(tab)
     assert not tab.chk_force.isVisibleTo(tab)
     assert not tab.txt_report.isVisibleTo(tab)
     # folding one takes its content away with it
@@ -474,17 +476,20 @@ def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
 
 
 def test_the_result_area_starts_hidden(qapp, tmp_path):
-    # An empty grid and a blank strip say nothing, and neither does a check
-    # or a report about something that has not happened yet: before a run
-    # this column is the PLAN, and the result arrives whole or not at all.
+    # What belongs to the result appears with a run and goes away with it:
+    # an empty grid and a blank strip say nothing, and a check about a
+    # verdict that does not exist yet is a paragraph about nothing. The
+    # REPORT block stays visible (disabled) because it says what the flow
+    # will produce, which is part of planning.
     tab, _host = _tab(qapp, tmp_path)
     assert not tab.tbl_points.isVisibleTo(tab)
     assert not tab.lbl_points_title.isVisibleTo(tab)
     assert not tab._thumbs.isVisibleTo(tab)
     assert not tab.cmb_group.isVisibleTo(tab)      # which stack to look at
     assert not tab._check_section.isVisibleTo(tab)
-    assert not tab._ui.grp_report.isVisibleTo(tab)
     assert not tab._sections["report"].isVisibleTo(tab)
+    assert tab._ui.grp_report.isVisibleTo(tab)
+    assert not tab.btn_report.isEnabled()          # and honest about it
 
 
 def test_nothing_absorbs_the_extra_height_of_a_tall_window(qapp, tmp_path):
@@ -542,3 +547,23 @@ def test_the_door_holds_the_occasional_actions(qapp, tmp_path):
     # the buttons left the column: no floating widget where they were
     assert not tab.btn_blink.isVisibleTo(tab)
     assert not tab.btn_undo.isVisibleTo(tab)
+
+
+def test_the_whole_column_is_inside_the_scroll_area(qapp, tmp_path):
+    # Moving the column into the scroll area has to reparent EVERY widget.
+    # A nested row layout moved with addItem keeps its widgets as children
+    # of the tab, and the scroll area's viewport then paints OVER them: the
+    # observations row and the ⋯ button went missing that way, and the
+    # column showed a black void exactly where they should have been.
+    # addLayout is the call that carries the widgets with it.
+    tab, _host = _tab(qapp, tmp_path)
+    area = tab.layout().itemAt(0).widget()
+    inner = area.widget()
+    assert inner is not None
+    for name in ("lbl_object", "btn_more", "lbl_nobs", "spn_nobs",
+                 "lbl_snr_line", "btn_stack", "tbl_snr", "cmb_method",
+                 "cmb_final_size", "spn_margin", "chk_brightness",
+                 "lbl_recipe", "btn_recipe", "tbl_points", "grp_report"):
+        widget = getattr(tab._ui, name, None)
+        assert widget is not None, name
+        assert inner.isAncestorOf(widget), f"{name} no vive en la columna"

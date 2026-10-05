@@ -11003,67 +11003,67 @@ not touched.</translation>
 <context>
     <name>UfeTrackStackTab</name>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="213"/>
+        <location filename="../ufe_trackstack_tab.py" line="221"/>
         <source>Sum</source>
         <translation>Sum</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="214"/>
+        <location filename="../ufe_trackstack_tab.py" line="222"/>
         <source>Mean</source>
         <translation>Mean</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="215"/>
+        <location filename="../ufe_trackstack_tab.py" line="223"/>
         <source>Median</source>
         <translation>Median</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="216"/>
+        <location filename="../ufe_trackstack_tab.py" line="224"/>
         <source>Sigma-clipped</source>
         <translation>Sigma-clipped</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="222"/>
+        <location filename="../ufe_trackstack_tab.py" line="230"/>
         <source>Whole frame</source>
         <translation>Whole frame</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="223"/>
+        <location filename="../ufe_trackstack_tab.py" line="231"/>
         <source>1024 px</source>
         <translation>1024 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="224"/>
+        <location filename="../ufe_trackstack_tab.py" line="232"/>
         <source>512 px</source>
         <translation>512 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="225"/>
+        <location filename="../ufe_trackstack_tab.py" line="233"/>
         <source>256 px</source>
         <translation>256 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="230"/>
+        <location filename="../ufe_trackstack_tab.py" line="238"/>
         <source>ADES PSV</source>
         <translation>ADES PSV</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="231"/>
+        <location filename="../ufe_trackstack_tab.py" line="239"/>
         <source>MPC 80 columns</source>
         <translation>MPC 80 columns</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="360"/>
+        <location filename="../ufe_trackstack_tab.py" line="367"/>
         <source>The brightness is not measured: this run reports positions only.</source>
         <translation>The brightness is not measured: this run reports positions only.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="365"/>
+        <location filename="../ufe_trackstack_tab.py" line="372"/>
         <source>Photometry recipe: the editor&apos;s defaults (open the Photometry tab to see or change them).</source>
         <translation>Photometry recipe: the editor&apos;s defaults (open the Photometry tab to see or change them).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="368"/>
+        <location filename="../ufe_trackstack_tab.py" line="375"/>
         <source>the comps&apos; own band</source>
         <translation>the comps&apos; own band</translation>
     </message>
@@ -11072,27 +11072,27 @@ not touched.</translation>
         <translation type="vanished">Photometry recipe: %1 · apertures %2 px · sky %3</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="157"/>
+        <location filename="../ufe_trackstack_tab.py" line="158"/>
         <source>Stacking settings</source>
         <translation>Stacking settings</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="168"/>
+        <location filename="../ufe_trackstack_tab.py" line="169"/>
         <source>Report text</source>
         <translation>Report text</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="370"/>
+        <location filename="../ufe_trackstack_tab.py" line="377"/>
         <source>Photometry recipe: %1 · apertures %2 · sky %3</source>
         <translation>Photometry recipe: %1 · apertures %2 · sky %3</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="381"/>
+        <location filename="../ufe_trackstack_tab.py" line="388"/>
         <source>from the seeing</source>
         <translation>from the seeing</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="384"/>
+        <location filename="../ufe_trackstack_tab.py" line="391"/>
         <source>the defaults</source>
         <translation>the defaults</translation>
     </message>
@@ -11141,168 +11141,168 @@ not touched.</translation>
         <translation>Warnings and flags of the point</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="412"/>
+        <location filename="../ufe_trackstack_tab.py" line="419"/>
         <location filename="../ui/ufe_trackstack_tab.ui" line="23"/>
         <source>Object and frames: open the editor from a visit to arm the sequence.</source>
         <translation>Object and frames: open the editor from a visit to arm the sequence.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="437"/>
+        <location filename="../ufe_trackstack_tab.py" line="444"/>
         <source>(unnamed)</source>
         <translation>(unnamed)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="438"/>
+        <location filename="../ufe_trackstack_tab.py" line="445"/>
         <source>Object: %1 · %2 frames</source>
         <translation>Object: %1 · %2 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="445"/>
+        <location filename="../ufe_trackstack_tab.py" line="452"/>
         <source> · window %1–%2 UT</source>
         <translation> · window %1–%2 UT</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="475"/>
+        <location filename="../ufe_trackstack_tab.py" line="482"/>
         <source>Below the MPC submission floor of %1: this observation would be left out of the report</source>
         <translation>Below the MPC submission floor of %1: this observation would be left out of the report</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="484"/>
+        <location filename="../ufe_trackstack_tab.py" line="491"/>
         <source>Expected SNR: %1</source>
         <translation>Expected SNR: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="516"/>
+        <location filename="../ufe_trackstack_tab.py" line="523"/>
         <source>Cancelling: the pipeline stops at the stage boundary it is at; nothing is kept from a cancelled run.</source>
         <translation>Cancelling: the pipeline stops at the stage boundary it is at; nothing is kept from a cancelled run.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="524"/>
+        <location filename="../ufe_trackstack_tab.py" line="531"/>
         <source>No visit with frames: open the editor from a visit to stack its sequence.</source>
         <translation>No visit with frames: open the editor from a visit to stack its sequence.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="529"/>
+        <location filename="../ufe_trackstack_tab.py" line="536"/>
         <source>The project has no object name: the ephemeris cannot be fetched, and without it there is no track.</source>
         <translation>The project has no object name: the ephemeris cannot be fetched, and without it there is no track.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="535"/>
+        <location filename="../ufe_trackstack_tab.py" line="542"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="571"/>
+        <location filename="../ufe_trackstack_tab.py" line="578"/>
         <source>Solving the reference frame…</source>
         <translation>Solving the reference frame…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="572"/>
+        <location filename="../ufe_trackstack_tab.py" line="579"/>
         <source>Registering the frames…</source>
         <translation>Registering the frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="573"/>
+        <location filename="../ufe_trackstack_tab.py" line="580"/>
         <source>Stacking the whole sequence…</source>
         <translation>Stacking the whole sequence…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="574"/>
+        <location filename="../ufe_trackstack_tab.py" line="581"/>
         <source>Looking for the object…</source>
         <translation>Looking for the object…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="575"/>
+        <location filename="../ufe_trackstack_tab.py" line="582"/>
         <source>Sweeping the velocity…</source>
         <translation>Sweeping the velocity…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="576"/>
+        <location filename="../ufe_trackstack_tab.py" line="583"/>
         <source>Stacking each observation…</source>
         <translation>Stacking each observation…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="577"/>
+        <location filename="../ufe_trackstack_tab.py" line="584"/>
         <source>Measuring the positions…</source>
         <translation>Measuring the positions…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="578"/>
+        <location filename="../ufe_trackstack_tab.py" line="585"/>
         <source>Measuring the brightness…</source>
         <translation>Measuring the brightness…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="579"/>
+        <location filename="../ufe_trackstack_tab.py" line="586"/>
         <source>Checking against other observers…</source>
         <translation>Checking against other observers…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="594"/>
+        <location filename="../ufe_trackstack_tab.py" line="601"/>
         <source>The run failed:</source>
         <translation>The run failed:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="603"/>
+        <location filename="../ufe_trackstack_tab.py" line="610"/>
         <source>Cancelled: nothing was kept from this run.</source>
         <translation>Cancelled: nothing was kept from this run.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="606"/>
+        <location filename="../ufe_trackstack_tab.py" line="613"/>
         <source>The run could not finish:</source>
         <translation>The run could not finish:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="647"/>
+        <location filename="../ufe_trackstack_tab.py" line="654"/>
         <source>Run undone: %1 observations removed.</source>
         <translation>Run undone: %1 observations removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="659"/>
+        <location filename="../ufe_trackstack_tab.py" line="666"/>
         <source>The object was not detected above the %1σ gate: the velocity sweep is not run, because measuring noise is how a false positive is manufactured.</source>
         <translation>The object was not detected above the %1σ gate: the velocity sweep is not run, because measuring noise is how a false positive is manufactured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="664"/>
+        <location filename="../ufe_trackstack_tab.py" line="671"/>
         <source>The stack&apos;s limit magnitude is %1: the night reached that deep.</source>
         <translation>The stack&apos;s limit magnitude is %1: the night reached that deep.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="682"/>
+        <location filename="../ufe_trackstack_tab.py" line="689"/>
         <source>The sequence is not dithered: pattern noise may stack up</source>
         <translation>The sequence is not dithered: pattern noise may stack up</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="686"/>
+        <location filename="../ufe_trackstack_tab.py" line="693"/>
         <source>The composed WCS is off by up to %1″ against a direct solve: the field&apos;s distortion is biting</source>
         <translation>The composed WCS is off by up to %1″ against a direct solve: the field&apos;s distortion is biting</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="692"/>
+        <location filename="../ufe_trackstack_tab.py" line="699"/>
         <source>Velocity sweep: %1″/min at PA %2° (%3 velocities scored; the score is SNR × roundness, which penalises a smeared object)</source>
         <translation>Velocity sweep: %1″/min at PA %2° (%3 velocities scored; the score is SNR × roundness, which penalises a smeared object)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="701"/>
+        <location filename="../ufe_trackstack_tab.py" line="708"/>
         <source>Detected on the base stack with SNR %1 (the gate is %2σ: below it nothing is measured)</source>
         <translation>Detected on the base stack with SNR %1 (the gate is %2σ: below it nothing is measured)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="711"/>
+        <location filename="../ufe_trackstack_tab.py" line="718"/>
         <source>the project&apos;s sequence</source>
         <translation>the project&apos;s sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="713"/>
+        <location filename="../ufe_trackstack_tab.py" line="720"/>
         <source>an automatic proposal</source>
         <translation>an automatic proposal</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="715"/>
+        <location filename="../ufe_trackstack_tab.py" line="722"/>
         <source>Brightness %1 ± %2 %3 per observation (%4 observations, %5 frames each) from %6 comparison stars · %7</source>
         <translation>Brightness %1 ± %2 %3 per observation (%4 observations, %5 frames each) from %6 comparison stars · %7</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="726"/>
+        <location filename="../ufe_trackstack_tab.py" line="733"/>
         <source>The brightness was not measured (the box is off): this run reports positions only</source>
         <translation>The brightness was not measured (the box is off): this run reports positions only</translation>
     </message>
@@ -11311,158 +11311,158 @@ not touched.</translation>
         <translation type="vanished">Brightness %1 ± %2 %3 from %4 comparison stars on %5 frames (%6)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="735"/>
+        <location filename="../ufe_trackstack_tab.py" line="742"/>
         <source>Observation %1 (%2 frames)</source>
         <translation>Observation %1 (%2 frames)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="744"/>
-        <location filename="../ufe_trackstack_tab.py" line="924"/>
+        <location filename="../ufe_trackstack_tab.py" line="751"/>
+        <location filename="../ufe_trackstack_tab.py" line="931"/>
         <source>Obs. %1</source>
         <translation>Obs. %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="764"/>
+        <location filename="../ufe_trackstack_tab.py" line="771"/>
         <source>Sequence stacked: %1 observations measured.</source>
         <translation>Sequence stacked: %1 observations measured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="768"/>
+        <location filename="../ufe_trackstack_tab.py" line="775"/>
         <source>%1 frames could not be aligned and were left out.</source>
         <translation>%1 frames could not be aligned and were left out.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="818"/>
+        <location filename="../ufe_trackstack_tab.py" line="825"/>
         <source>The group&apos;s stack could not be written:</source>
         <translation>The group&apos;s stack could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="827"/>
+        <location filename="../ufe_trackstack_tab.py" line="834"/>
         <source>The group&apos;s stack could not be shown:</source>
         <translation>The group&apos;s stack could not be shown:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="896"/>
+        <location filename="../ufe_trackstack_tab.py" line="903"/>
         <source>Blink (animated GIF)</source>
         <translation>Blink (animated GIF)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="897"/>
+        <location filename="../ufe_trackstack_tab.py" line="904"/>
         <source>Montage (still PNG)</source>
         <translation>Montage (still PNG)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="946"/>
+        <location filename="../ufe_trackstack_tab.py" line="953"/>
         <source>The blink figure could not be written:</source>
         <translation>The blink figure could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="954"/>
+        <location filename="../ufe_trackstack_tab.py" line="961"/>
         <source>Blink figure written:</source>
         <translation>Blink figure written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="993"/>
+        <location filename="../ufe_trackstack_tab.py" line="1000"/>
         <source>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</source>
         <translation>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="997"/>
+        <location filename="../ufe_trackstack_tab.py" line="1004"/>
         <source>The two measurements disagree: the point is flagged, nothing is chosen in silence</source>
         <translation>The two measurements disagree: the point is flagged, nothing is chosen in silence</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1006"/>
+        <location filename="../ufe_trackstack_tab.py" line="1013"/>
         <source>The two measurements disagree</source>
         <translation>The two measurements disagree</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1008"/>
+        <location filename="../ufe_trackstack_tab.py" line="1015"/>
         <source>No per-frame centroid</source>
         <translation>No per-frame centroid</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1022"/>
+        <location filename="../ufe_trackstack_tab.py" line="1029"/>
         <source>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</source>
         <translation>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1027"/>
+        <location filename="../ufe_trackstack_tab.py" line="1034"/>
         <source>The check is not available:</source>
         <translation>The check is not available:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1031"/>
+        <location filename="../ufe_trackstack_tab.py" line="1038"/>
         <source>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</source>
         <translation>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1036"/>
+        <location filename="../ufe_trackstack_tab.py" line="1043"/>
         <source>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</source>
         <translation>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1041"/>
+        <location filename="../ufe_trackstack_tab.py" line="1048"/>
         <source>The check passes: our residual fits inside the published observations&apos; dispersion.</source>
         <translation>The check passes: our residual fits inside the published observations&apos; dispersion.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1045"/>
+        <location filename="../ufe_trackstack_tab.py" line="1052"/>
         <source>Our residual: %1″ / %2″ · %3 distinct observatories</source>
         <translation>Our residual: %1″ / %2″ · %3 distinct observatories</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1053"/>
+        <location filename="../ufe_trackstack_tab.py" line="1060"/>
         <source>not available</source>
         <translation>not available</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1055"/>
+        <location filename="../ufe_trackstack_tab.py" line="1062"/>
         <source>nothing to compare</source>
         <translation>nothing to compare</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1057"/>
+        <location filename="../ufe_trackstack_tab.py" line="1064"/>
         <source>blocked</source>
         <translation>blocked</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1059"/>
+        <location filename="../ufe_trackstack_tab.py" line="1066"/>
         <source>passes</source>
         <translation>passes</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1100"/>
+        <location filename="../ufe_trackstack_tab.py" line="1107"/>
         <source>Measure the sequence first.</source>
         <translation>Measure the sequence first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1114"/>
+        <location filename="../ufe_trackstack_tab.py" line="1121"/>
         <source>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</source>
         <translation>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1119"/>
+        <location filename="../ufe_trackstack_tab.py" line="1126"/>
         <source>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</source>
         <translation>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1132"/>
+        <location filename="../ufe_trackstack_tab.py" line="1139"/>
         <source>Report generated: %1 observations kept.</source>
         <translation>Report generated: %1 observations kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1142"/>
+        <location filename="../ufe_trackstack_tab.py" line="1149"/>
         <source>Generate the report first.</source>
         <translation>Generate the report first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1148"/>
+        <location filename="../ufe_trackstack_tab.py" line="1155"/>
         <source>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</source>
         <translation>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1152"/>
+        <location filename="../ufe_trackstack_tab.py" line="1159"/>
         <source>The visit window is not open: open the visit to send the report to its MPC block.</source>
         <translation>The visit window is not open: open the visit to send the report to its MPC block.</translation>
     </message>
@@ -11489,9 +11489,8 @@ not touched.</translation>
         <translation type="vanished">How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal: the table below shows it before you accept</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="154"/>
         <source>Expected SNR per observation</source>
-        <translation>Expected SNR per observation</translation>
+        <translation type="vanished">Expected SNR per observation</translation>
     </message>
     <message>
         <source>Estimated from the frames each group gets (the SNR grows with the square root of n). A group below the MPC submission floor (SNR 20 by default) will be left out of the report, with its reason</source>
@@ -11502,33 +11501,33 @@ not touched.</translation>
         <translation type="vanished">One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="90"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="292"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="96"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="304"/>
         <source>Obs.</source>
         <translation>Obs.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="91"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="97"/>
         <source>Frames</source>
         <translation>Frames</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="92"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="98"/>
         <source>T_mid (UT)</source>
         <translation>T_mid (UT)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="93"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="99"/>
         <source>Expected SNR</source>
         <translation>Expected SNR</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="110"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="116"/>
         <source>Method:</source>
         <translation>Method:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="116"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="122"/>
         <source>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean&apos;s SNR while rejecting the trails (the default)</source>
         <translation>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean&apos;s SNR while rejecting the trails (the default)</translation>
     </message>
@@ -11545,12 +11544,12 @@ not touched.</translation>
         <translation type="vanished">Trail margin (px)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="144"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="150"/>
         <source>Extra pixels around the object&apos;s own trail in the cutout the detection and the velocity sweep use. Bigger is safer and slower; the final stack does not use it.</source>
         <translation>Extra pixels around the object&apos;s own trail in the cutout the detection and the velocity sweep use. Bigger is safer and slower; the final stack does not use it.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="210"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="216"/>
         <source>Stack the sequence</source>
         <translation>Stack the sequence</translation>
     </message>
@@ -11575,7 +11574,7 @@ not touched.</translation>
         <translation>The SNR each observation is expected to reach, from the frames it gets: the SNR grows with the square root of the frames, so asking for more observations splits the signal. The full table is below, in its own fold</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="212"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="218"/>
         <source>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</source>
         <translation>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</translation>
     </message>
@@ -11584,7 +11583,7 @@ not touched.</translation>
         <translation type="vanished">How much sky the FINAL stack of each observation covers. The whole frame is what the eye wants (the field, with the comparison stars around); a smaller window is faster and lighter. The velocity sweep always works on the object&apos;s own trail cutout, whatever this says.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="161"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="167"/>
         <source>Measure the brightness</source>
         <translation>Measure the brightness</translation>
     </message>
@@ -11601,7 +11600,7 @@ not touched.</translation>
         <translation type="vanished">The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term are edited there and nowhere else, so the app has one editor and the numbers cannot drift apart</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="188"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="194"/>
         <source>Edit in Photometry…</source>
         <translation>Edit in Photometry…</translation>
     </message>
@@ -11618,7 +11617,7 @@ not touched.</translation>
         <translation type="vanished">Stack of the observation:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="88"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="94"/>
         <source>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</source>
         <translation>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</translation>
     </message>
@@ -11627,7 +11626,7 @@ not touched.</translation>
         <translation type="vanished">Final field:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="130"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="136"/>
         <source>How much sky the FINAL stack of each observation covers. The whole frame is the field with the comparison stars around it; a smaller window is faster and lighter. The velocity sweep always works on the object&apos;s own trail cutout, whatever this says.</source>
         <translation>How much sky the FINAL stack of each observation covers. The whole frame is the field with the comparison stars around it; a smaller window is faster and lighter. The velocity sweep always works on the object&apos;s own trail cutout, whatever this says.</translation>
     </message>
@@ -11636,97 +11635,97 @@ not touched.</translation>
         <translation type="vanished">Trail margin:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="125"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="131"/>
         <source>Field:</source>
         <translation>Field:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="135"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="141"/>
         <source>Margin:</source>
         <translation>Margin:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="142"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="148"/>
         <source> px</source>
         <translation> px</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="163"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="169"/>
         <source>Measures each observation&apos;s magnitude: the object on its own stack and the comparison stars on small stacks of the same frames aligned on the stars, because on the object&apos;s stack they are streaks. Without it the run reports positions only and says so</source>
         <translation>Measures each observation&apos;s magnitude: the object on its own stack and the comparison stars on small stacks of the same frames aligned on the stars, because on the object&apos;s stack they are streaks. Without it the run reports positions only and says so</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="182"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="188"/>
         <source>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</source>
         <translation>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="190"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="196"/>
         <source>Takes you to the Photometry tab, where the apertures, the sky and the centroid are edited</source>
         <translation>Takes you to the Photometry tab, where the apertures, the sky and the centroid are edited</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="235"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="241"/>
         <source>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness</source>
         <translation>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="244"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="250"/>
         <source>Observation:</source>
         <translation>Observation:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="251"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="257"/>
         <source>Which observation&apos;s stack is shown below, with the measured position marked</source>
         <translation>Which observation&apos;s stack is shown below, with the measured position marked</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="258"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="264"/>
         <source>Blink / montage…</source>
         <translation>Blink / montage…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="260"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="266"/>
         <source>Writes one figure with every observation&apos;s stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</source>
         <translation>Writes one figure with every observation&apos;s stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="270"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="276"/>
         <source>Every observation&apos;s stack, centred on the object. Click one to bring it to the main view</source>
         <translation>Every observation&apos;s stack, centred on the object. Click one to bring it to the main view</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="282"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="288"/>
         <source>Measurement per observation</source>
         <translation>Measurement per observation</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="284"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="290"/>
         <source>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</source>
         <translation>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="293"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="305"/>
         <source>T_mid</source>
         <translation>T_mid</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="294"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="306"/>
         <source>RA</source>
         <translation>RA</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="295"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="307"/>
         <source>Dec</source>
         <translation>Dec</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="296"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="308"/>
         <source>Δ″</source>
         <translation>Δ″</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="299"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="311"/>
         <source>!</source>
         <translation>!</translation>
     </message>
@@ -11743,27 +11742,27 @@ not touched.</translation>
         <translation type="vanished">Δ (″)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="311"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="323"/>
         <source>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</source>
         <translation>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="324"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="336"/>
         <source>Force the report</source>
         <translation>Force the report</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="326"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="338"/>
         <source>An outlier blocks the report by default; forcing it leaves the decision on record (the check&apos;s verdict and the report&apos;s own note say it was forced)</source>
         <translation>An outlier blocks the report by default; forcing it leaves the decision on record (the check&apos;s verdict and the report&apos;s own note say it was forced)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="358"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="370"/>
         <source>Generate</source>
         <translation>Generate</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="367"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="379"/>
         <source>Send to the MPC block</source>
         <translation>Send to the MPC block</translation>
     </message>
@@ -11772,12 +11771,12 @@ not touched.</translation>
         <translation type="vanished">Δ ways (″)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="297"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="309"/>
         <source>SNR</source>
         <translation>SNR</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="298"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="310"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
@@ -11786,7 +11785,7 @@ not touched.</translation>
         <translation type="vanished">Warnings</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="165"/>
+        <location filename="../ufe_trackstack_tab.py" line="166"/>
         <source>Check against other observers</source>
         <translation>Check against other observers</translation>
     </message>
@@ -11795,7 +11794,7 @@ not touched.</translation>
         <translation type="vanished">Find_Orb fits the published observations without ours and predicts where ours should land; our residual against their dispersion decides.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="317"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="329"/>
         <source>The check filters, it does not prove: fitting a short arc is not proof of a detection.</source>
         <translation>The check filters, it does not prove: fitting a short arc is not proof of a detection.</translation>
     </message>
@@ -11808,17 +11807,17 @@ not touched.</translation>
         <translation type="vanished">An outlier blocks the report by default; forcing it leaves the decision on record</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="335"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="347"/>
         <source>Report</source>
         <translation>Report</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="341"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="353"/>
         <source>Format:</source>
         <translation>Format:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="347"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="359"/>
         <source>ADES PSV is the modern machine-readable format the MPC prefers; the 80-column format is the classic one, readable by every program</source>
         <translation>ADES PSV is the modern machine-readable format the MPC prefers; the 80-column format is the classic one, readable by every program</translation>
     </message>
@@ -11827,7 +11826,7 @@ not touched.</translation>
         <translation type="vanished">Generate report</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="360"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="372"/>
         <source>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</source>
         <translation>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</translation>
     </message>
@@ -11836,17 +11835,17 @@ not touched.</translation>
         <translation type="vanished">Send to the visit&apos;s MPC block</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="369"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="381"/>
         <source>Fill the visit&apos;s MPC paste box with the report; the validator there has the last word before saving</source>
         <translation>Fill the visit&apos;s MPC paste box with the report; the validator there has the last word before saving</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="376"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="388"/>
         <source>Undo this run</source>
         <translation>Undo this run</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="378"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="390"/>
         <source>Remove this execution&apos;s observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</source>
         <translation>Remove this execution&apos;s observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</translation>
     </message>

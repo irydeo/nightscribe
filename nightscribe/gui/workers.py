@@ -1058,6 +1058,7 @@ class TrackStackWorker(QThread):
                 progress=lambda d, t, _l: self.progress.emit("register", d, t),
                 cancel=lambda: self._cancel)
             out["dither"] = track_stack.dither_check(frames)
+            out["n_failed"] = sum(1 for f in frames if f.failed_register)
             if self._cancel:
                 out["status"] = "cancelled"
                 self.finished.emit(out)
@@ -1162,6 +1163,11 @@ class TrackStackWorker(QThread):
             self.progress.emit("measure", 0, len(stacks))
             points = []
             for index, (stack, _srep) in enumerate(stacks):
+                if stack is None:
+                    # every frame of this observation failed to register:
+                    # nothing to measure (and saying so beats a bogus point)
+                    self.progress.emit("measure", index + 1, len(stacks))
+                    continue
                 box = boxes[index]
                 q_box = (q_by_group[index][0] - box[0],
                          q_by_group[index][1] - box[1])
@@ -1219,8 +1225,13 @@ def _rate_pa(motion, t_mid_jd):
     # is the one sweep/_rescore uses: 0 deg towards +dec (north), 90 deg
     # towards +RA (east, which is -x on the usual CD1_1<0 grid).
     import math
-    p0 = motion(t_mid_jd - 1.0 / 2880.0)
-    p1 = motion(t_mid_jd + 1.0 / 2880.0)
+    # +/- ONE minute (1/1440 of a day), so the baseline is two minutes and
+    # the /2 below is the arcsec PER MINUTE. The first version used
+    # 1/2880 (+/- 30 s) and still divided by 2, which returned exactly HALF
+    # the real rate (measured on 2025 UR: 15.25 instead of 30.6"/min, with
+    # the PA right because the direction does not change).
+    p0 = motion(t_mid_jd - 1.0 / 1440.0)
+    p1 = motion(t_mid_jd + 1.0 / 1440.0)
     if not p0 or not p1:
         return None, None
     cosd = math.cos(math.radians(p0[1]))

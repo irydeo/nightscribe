@@ -111,12 +111,15 @@ DEFAULTS = {
     "calib_temp_tol_c": 3.0,
     "calib_export": False,
     # Track & stack (ADR-062): the detection gate and the submission bar
-    # are DIFFERENT thresholds on purpose (the MPC recommends SNR >= 20 to
-    # submit and forbids marginal detections), the sweep walks a 5x5 grid
+    # are DIFFERENT thresholds on purpose. The MPC recommends SNR >= 20 to
+    # submit and forbids marginal detections, but that is a recommendation:
+    # the author's Tycho submissions of 2025 UR ran at ~16 and were
+    # accepted, so the default is 10 (editable) and the interface says how
+    # far each observation is from the bar. The sweep walks a 5x5 grid
     # around the theoretical velocity, and the cutout carries a margin
     # over the object's own trail.
     "astrometry_snr_sigma": 3.5,
-    "astrometry_submit_snr": 20.0,
+    "astrometry_submit_snr": 10.0,
     "astrometry_sweep_pct": 5.0,
     "astrometry_sweep_steps": 25,
     "astrometry_method": "sigma",

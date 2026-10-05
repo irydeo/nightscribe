@@ -210,3 +210,28 @@ def test_detect_reports_a_magnitude_limit_with_a_zero_point():
     det = ts.detect(stack, (20.0, 20.0), snr_sigma=3.5, zp=25.0)
     assert not det.detected
     assert det.mag_limit is not None and det.mag_limit > 0
+
+
+def test_failed_frames_are_left_out_of_the_stack(tmp_path):
+    # A frame whose registration was not trusted inherits the previous
+    # transform so the pipeline keeps going, but stacking it misaligned
+    # only adds noise: it is left out and counted (measured on a real
+    # night: 63 of 140 frames failed and dragged the base SNR from 15.8
+    # to 11.4 until they were excluded).
+    frames = _sequence(tmp_path, n=4, rate_px=1.0)
+    frames[1].failed_register = True
+    assert ts.usable(frames[0]) and not ts.usable(frames[1])
+    q = (24.0 + 1.0 * 1.5, 34.0)
+    box = ts.cutout_box(frames, (0, 4), q, margin_px=10, shape=(64, 64))
+    stack, report = ts.stack_group(frames, (0, 4), q, "mean", box, (64, 64))
+    assert report.n_frames == 3        # the failed one is not stacked
+
+
+def test_a_group_with_no_usable_frame_returns_no_stack(tmp_path):
+    frames = _sequence(tmp_path, n=3, rate_px=1.0)
+    for f in frames:
+        f.failed_register = True
+    q = (24.0, 34.0)
+    box = ts.cutout_box(frames, (0, 3), q, margin_px=10, shape=(64, 64))
+    stack, report = ts.stack_group(frames, (0, 3), q, "mean", box, (64, 64))
+    assert stack is None and report.n_frames == 0

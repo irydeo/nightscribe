@@ -255,7 +255,9 @@ def measure_frames(frames, group, wcs_of, mjd=None, fwhm=None,
     points = []
     for i in range(*group):
         frame = frames[i]
-        if frame.object_xy is None:
+        if frame.object_xy is None or getattr(frame, "failed_register", False):
+            # a frame that could not be registered has a composed WCS that
+            # is wrong: measuring on it would add a bogus position
             continue
         wcs = wcs_of(frame) if callable(wcs_of) else wcs_of
         if wcs is None:

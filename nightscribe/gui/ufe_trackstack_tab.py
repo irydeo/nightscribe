@@ -433,8 +433,17 @@ class UfeTrackStackTab(QWidget):
             self._base_snr = float(det.snr)
             self._refresh_preview()
         n = len(self._result.get("points") or [])
-        self._say(self.tr("Sequence stacked: %1 observations measured."
-                          ).replace("%1", str(n)))
+        # the report buttons FOLLOW the run (they were only refreshed at
+        # init and on reset, so a successful run left them disabled)
+        self._sync_report_buttons()
+        failed = int(self._result.get("n_failed") or 0)
+        note = self.tr("Sequence stacked: %1 observations measured."
+                       ).replace("%1", str(n))
+        if failed:
+            note += " " + self.tr(
+                "%1 frames could not be aligned and were left out."
+                ).replace("%1", str(failed))
+        self._say(note)
 
     def _show_group(self, index):
         # The group's stack in this tab's OWN viewer. UfeImageState loads

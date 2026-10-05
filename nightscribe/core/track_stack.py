@@ -84,6 +84,18 @@ class DitherReport:
     note: str = ""
 
 
+def usable(frame):
+    # @args: frame - a Frame
+    # @return: True when the frame can be stacked
+    # A frame whose registration was not trusted inherits the previous
+    # transform so the pipeline can keep going, but it must NOT be stacked:
+    # stacking it misaligned is what dragged the base SNR from 15.8 down to
+    # 11.4 on a night with two runs whose pointing jumped a whole field
+    # (63 of 140 frames failed and went in crooked). It is left out and
+    # counted instead.
+    return frame.transform is not None and not frame.failed_register
+
+
 @dataclass
 class WcsQCReport:
     checked: int = 0
@@ -421,22 +433,31 @@ def group_q(frames, group, w0, motion):
 
 
 def track_offsets(frames, group, q, shape):
-    # @args: frames - list[Frame], group - (start, end), q - the group's
-    #        reference point, shape - (naxis1, naxis2)
-    # @return: list of (dx, dy) per frame: how much the object has to be
-    #          moved so it lands on q
+    # @args: frames - list[Frame], group - (start, end) or a list of
+    #        indices, q - the group's reference point, shape - (naxis1, naxis2)
+    # @return: list of (dx, dy), one per USABLE frame, in order
     # delta_i = p_i - T_i(q): the object's native position minus where the
     # transform would put q. With the frames registered on the reference
     # grid, this is what freezes the object while the stars trail.
     out = []
-    for i in range(*group):
+    for i in _indices(frames, group):
         frame = frames[i]
-        if frame.object_xy is None or frame.transform is None:
-            out.append((0.0, 0.0))
-            continue
-        tx, ty = register.ref_to_src_point(frame.transform, q, (shape[1], shape[0]))
+        tx, ty = register.ref_to_src_point(frame.transform, q,
+                                           (shape[1], shape[0]))
         out.append((frame.object_xy[0] - tx, frame.object_xy[1] - ty))
     return out
+
+
+def _indices(frames, group):
+    # @args: frames - list[Frame], group - (start, end) or a list of indices
+    # @return: the indices of the group that can actually be stacked
+    if isinstance(group, (list, tuple)) and len(group) == 2 \
+            and all(isinstance(v, int) for v in group):
+        candidates = range(group[0], group[1])
+    else:
+        candidates = group
+    return [i for i in candidates if usable(frames[i])
+            and frames[i].object_xy is not None]
 
 
 def cutout_box(frames, group, q, margin_px=64, shape=None):
@@ -448,12 +469,11 @@ def cutout_box(frames, group, q, margin_px=64, shape=None):
     # motion, never from a magic number.
     # The object sits at q, but the STARS trail: in the reference grid the
     # object's trail spans where each frame's object lands once warped, so
-    # the box must hold src_to_ref(p_i) for every frame, plus the margin.
+    # the box must hold src_to_ref(p_i) for every USABLE frame, plus the
+    # margin.
     xs, ys = [q[0]], [q[1]]
-    for i in range(*group):
+    for i in _indices(frames, group):
         frame = frames[i]
-        if frame.object_xy is None or frame.transform is None:
-            continue
         tx, ty = register.src_to_ref_point(frame.transform, frame.object_xy,
                                            (shape[1], shape[0]))
         xs.append(tx)
@@ -579,17 +599,22 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     # does); otherwise the output is walked in strips and only the region
     # each strip needs is read. The two paths are tested to agree, because
     # a streaming that does not match the RAM is a silent source of error.
-    offsets = track_offsets(frames, group, q, shape)
+    # Frames that could not be registered are LEFT OUT (usable): stacking
+    # them misaligned only adds noise.
+    indices = _indices(frames, group)
+    report = StackReport(method=method, n_frames=len(indices), box=box,
+                         sigma=sigma, iterations=iterations)
+    if not indices:
+        return None, report
+    offsets = track_offsets(frames, indices, q, shape)
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
-    n = group[1] - group[0]
+    n = len(indices)
     need = n * out_h * out_w * 4
-    report = StackReport(method=method, n_frames=n, box=box, sigma=sigma,
-                         iterations=iterations)
     if need <= budget_bytes:
         stack = np.empty((n, out_h, out_w), dtype=np.float32)
         masks = np.empty((n, out_h, out_w), dtype=bool)
-        for k, i in enumerate(range(*group)):
+        for k, i in enumerate(indices):
             warped, valid = _warp_to_box(frames[i].path, frames[i].transform,
                                          offsets[k], box, shape, loader=loader)
             stack[k] = warped
@@ -613,7 +638,7 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         sub_box = (box[0], box[1] + py0, box[2], box[1] + py1)
         strip = np.empty((n, py1 - py0, out_w), dtype=np.float32)
         masks = np.empty((n, py1 - py0, out_w), dtype=bool)
-        for k, i in enumerate(range(*group)):
+        for k, i in enumerate(indices):
             warped, valid = _warp_to_box(frames[i].path, frames[i].transform,
                                          offsets[k], sub_box, shape,
                                          loader=loader)
@@ -637,9 +662,12 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
             break
         stack, report = stack_group(frames, group, q_by_group[index], method,
                                     boxes[index], shape, cfg=cfg, loader=loader)
-        out.append((stack, report))
         if progress is not None:
             progress(index + 1, total, f"observation {index + 1}")
+        # one entry PER GROUP even when it is empty, so the caller's index
+        # alignment survives (a group whose frames all failed to register
+        # has nothing to measure and is reported as such, not as a cancel)
+        out.append((stack, report))
     return out
 
 
@@ -767,11 +795,9 @@ def _rescore(frames, q, base_rate, base_pa, rate, pa, box, shape, method,
     # base velocity over the elapsed time, in pixels.
     t0 = group_mid_jd(frames, (0, len(frames))) or 0.0
     scale = _arcsec_per_pixel_guess(frames)
+    usable_frames = [f for f in frames if usable(f) and f.object_xy is not None]
     offsets = []
-    for frame in frames:
-        if frame.transform is None or frame.object_xy is None:
-            offsets.append((0.0, 0.0))
-            continue
+    for frame in usable_frames:
         tx, ty = register.ref_to_src_point(frame.transform, q,
                                             (shape[1], shape[0]))
         base_delta = (frame.object_xy[0] - tx, frame.object_xy[1] - ty)
@@ -781,15 +807,18 @@ def _rescore(frames, q, base_rate, base_pa, rate, pa, box, shape, method,
         dra = d_rate * math.sin(d_pa) / max(scale, 1e-6)
         ddec = d_rate * math.cos(d_pa) / max(scale, 1e-6)
         offsets.append((base_delta[0] - dra, base_delta[1] + ddec))
-    # stack with the candidate offsets
-    n = len(frames)
+    if not usable_frames:
+        grid.append({"rate": rate, "pa": pa, "score": 0.0, "snr": 0.0,
+                     "roundness": 0.0})
+        return
+    # stack with the candidate offsets (only the frames that registered)
+    n = len(usable_frames)
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
     stack = np.empty((n, out_h, out_w), dtype=np.float32)
     masks = np.empty((n, out_h, out_w), dtype=bool)
-    for k, frame in enumerate(frames):
-        warped, valid = _warp_to_box(frame.path, frame.transform or
-                                     {"angle": 0.0, "dx": 0.0, "dy": 0.0},
+    for k, frame in enumerate(usable_frames):
+        warped, valid = _warp_to_box(frame.path, frame.transform,
                                      offsets[k], box, shape, loader=loader)
         stack[k] = warped
         masks[k] = valid

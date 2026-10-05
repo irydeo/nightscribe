@@ -167,12 +167,14 @@ def test_expected_snr_splits_with_sqrt_n(qapp, tmp_path):
 def test_low_snr_group_is_marked_before_stacking(qapp, tmp_path):
     # D26: a group below the submission floor is SEEN before the run,
     # with the reason in the cell's tooltip (a figure is never shown
-    # without its explanation, ADR-058).
+    # without its explanation, ADR-058). The floor's default is 10 (the
+    # MPC recommends 20 but the author's accepted submissions ran at ~16),
+    # so a group projected at 6 is below it.
     tab, _host = _tab(qapp, tmp_path)
-    tab._base_snr = 20.0
-    tab.spn_nobs.setValue(4)      # 20*sqrt(1/4) = 10.0, floor is 20
+    tab._base_snr = 12.0
+    tab.spn_nobs.setValue(4)      # 12*sqrt(1/4) = 6.0, below the floor of 10
     text = tab.tbl_snr.item(0, 3).text()
-    assert text.startswith("10.0")
+    assert text.startswith("6.0")
     assert "⚠" in text
     assert tab.tbl_snr.item(0, 3).toolTip()
 

@@ -10605,8 +10605,18 @@ class MainWindow(QMainWindow):
         if not paths:
             return None
         p = project.get(db, pid) or {}
+        ctx = p.get("context") or {}
+        # The NEO's photometry reuses the SERIES engine, which calibrates
+        # frame by frame against comparison stars. The project's saved
+        # sequence is the observer's own choice of them (the Compare tab);
+        # when there is none the worker proposes one from the catalog.
+        seq = ctx.get("sequence") or {}
+        comps = [e for e in (seq.get("entries") or [])
+                 if (e.get("kind") or "comp") == "comp"]
         return {"pid": pid, "session_id": session_id, "paths": paths,
-                "object_name": p.get("object_name") or ""}
+                "object_name": p.get("object_name") or "",
+                "comps": comps,
+                "target_mag": seq.get("target_mag") or ctx.get("mag")}
 
     def _ufe_astrometry_persist(self, pid, session_id, payload):
         # ADR-062, phase 8: one execution, its observations and the frame

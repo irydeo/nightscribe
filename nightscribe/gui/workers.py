@@ -988,7 +988,8 @@ class TrackStackWorker(QThread):
     failed = Signal(str)              # an unexpected error, in English
 
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
-                 obs_code="", site="", final_size=0, margin=64):
+                 obs_code="", site="", final_size=0, margin=64,
+                 comps=None, band=None, target_mag=None):
         super().__init__()
         self._paths = list(paths)
         self._name = name
@@ -1001,6 +1002,13 @@ class TrackStackWorker(QThread):
         # detection/sweep cutout's margin, both from the tab's controls
         self._final_size = int(final_size or 0)
         self._margin = int(margin or 64)
+        # the NEO's photometry reuses the SERIES engine (ADR-048) with a
+        # moving target: the project's comp sequence when it has one, the
+        # band of the filter and the target's rough magnitude for the
+        # automatic proposal
+        self._comps = list(comps or [])
+        self._band = band
+        self._target_mag = target_mag
         self._cancel = False
         self._solve_cancel = None   # SolveCancel while the solver runs
 
@@ -1018,6 +1026,117 @@ class TrackStackWorker(QThread):
         if self._cfg is None:
             return default
         return self._cfg.get(key, default)
+
+    def _photometry(self, frames, w0, motion, target_xy):
+        # @args: frames - the sequence (with WCS), w0 - the reference WCS,
+        #        motion - callable(jd) -> (ra, dec), target_xy - the object
+        #        in the reference grid
+        # @return: {"mag","err","band","n_comps","n_frames","source"} or None
+        # The NEO's magnitude is measured FRAME BY FRAME against the field's
+        # comparison stars: on a track & stack the stars are TRAILS, so
+        # measuring them on the stack would be wrong. The series engine
+        # (ADR-048) already does per-frame zero points with an ensemble of
+        # comps, the MAD veto and honest errors, and it takes a moving
+        # target through cfg.target_motion. This is orchestration, not a
+        # second photometric recipe.
+        import math
+        from ..core import compstars, series_measure
+        from ..core import wcs as wcs_mod
+        entries = list(self._comps)
+        source = "project" if entries else "auto"
+        band = self._band or "G"
+        # the series engine speaks core.wcs.Wcs, not the astropy WCS the
+        # astrometry flow uses: convert once, here
+        engine_wcs = wcs_mod.Wcs.from_astropy(w0)
+        if not entries:
+            try:
+                ra, dec = w0.all_pix2world([[target_xy[0], target_xy[1]]], 0)[0]
+            except Exception:
+                return None
+            naxis1 = int(frames[0].header.get("NAXIS1", 0)) or None
+            naxis2 = int(frames[0].header.get("NAXIS2", 0)) or None
+            field = compstars.load_field(
+                "gaia", float(ra), float(dec),
+                float(self._cfg_get("astrometry_phot_fov_arcmin", 20.0)),
+                naxis=(naxis1, naxis2), margin_arcsec=60.0)
+            if not field:
+                return None
+            proposal = compstars.propose_comps(
+                field["stars"], float(self._target_mag or 18.0), n=8,
+                margin_arcsec=60.0)
+            entries = list((proposal or {}).get("comps") or [])
+        if not entries:
+            return None
+        cfg = series_measure.SeriesConfig(
+            wcs=engine_wcs, target_xy=tuple(target_xy),
+            comp_set=tuple(entries),
+            band=band, align="auto", target_motion=motion,
+            seeing_aperture=True,
+            site_gain=self._cfg_get("ccd_gain", None),
+            site_ron=self._cfg_get("ccd_read_noise", None),
+            site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=self._cfg_get("ccd_saturate", None),
+            site_lon=self._cfg_get("lon", None),
+            site_lat=self._cfg_get("lat", None),
+            site_aperture_m=float(self._cfg_get("aperture_inches", 10.0) or 10.0)
+            * 0.0254,
+            site_height_m=float(self._cfg_get("height", 0) or 0.0),
+            site_linear=self._cfg_get("cam_linearity_adu", None),
+            site_dark=self._cfg_get("cam_dark_current_e_s", None))
+        label = self._name or "target"
+        try:
+            res = series_measure.measure_pass(
+                self._paths, cfg,
+                targets=[(label, float(target_xy[0]), float(target_xy[1]))],
+                progress=lambda d, t: self.progress.emit("photometry", d, t),
+                cancel=lambda: self._cancel)
+        except Exception as err:
+            logger.warning("NEO photometry failed: %s", err)
+            return None
+        targets = getattr(res, "targets", None) or []
+        if not targets:
+            return None
+        result = (targets[0] or {}).get("result") if isinstance(
+            targets[0], dict) else None
+        if result is None:
+            return None
+        import numpy as np
+        good = []
+        # Which flags really invalidate a magnitude: the flux is not
+        # proportional (saturated / nonlinear), the aperture caught a
+        # cosmic ray, the frame was not aligned, or the plate was refused.
+        # The QUALITY flags (cloud, seeing, guide_jump) are KEPT: they
+        # widen the scatter, and the median already absorbs that. Dropping
+        # guide_jump cost the whole curve, because on a faint NEO it fires
+        # on 27 of 30 frames (measured on 2025 UR): the object's own
+        # centroid wanders far more than a stationary guide's would.
+        bad = {"unusable", "saturated", "nonlinear", "cosmic",
+               "align_failed", "align_edge"}
+        for p in (result.points or []):
+            if p.mag is None or not math.isfinite(p.mag):
+                continue
+            if set(p.flags or []) & bad:
+                continue
+            good.append(float(p.mag))
+        if not good:
+            return None
+        # The object is faint on a single frame, so its curve carries
+        # bright outliers (measured on 2025 UR: the per-frame magnitudes
+        # span 16.8 to 18.4 while the truth is 18.0). The inverse-variance
+        # MEAN is dragged by them (it returned 17.29, 0.7 mag off); the
+        # MEDIAN returns 18.10, and its error comes from the MAD, not from
+        # a Gaussian nobody promised.
+        arr = np.asarray(good, dtype=float)
+        mag = float(np.median(arr))
+        mad = float(np.median(np.abs(arr - mag))) * 1.4826
+        err = mad / math.sqrt(len(arr)) if len(arr) > 1 else 0.0
+        if not math.isfinite(err) or err <= 0.0:
+            errs = [float(p.err) for p in (result.points or []) if p.err]
+            err = (float(np.median(errs)) / math.sqrt(len(arr))
+                   if errs else 0.0)
+        return {"mag": mag, "err": err, "band": band,
+                "n_comps": len(entries), "n_frames": len(arr),
+                "source": source}
 
     def run(self):
         import math
@@ -1197,6 +1316,23 @@ class TrackStackWorker(QThread):
             out.update(points=points, groups=groups, stacks=stacks,
                        boxes=boxes, qs=q_by_group, mids=mids, w0=w0,
                        frames=frames)
+
+            # --- the NEO's photometry: a SERIES with a moving target ------
+            # The stack is for the POSITION; the magnitude comes from the
+            # frames, because on a track & stack the comparison stars are
+            # TRAILS (measuring them there would be wrong). The series
+            # engine (ADR-048) already does per-frame zero points with an
+            # ensemble of comps, the MAD veto and honest errors, and it
+            # takes a moving target through cfg.target_motion: this is
+            # orchestration, not a second photometric recipe.
+            self.progress.emit("photometry", 0, 1)
+            phot = self._photometry(frames, w0, motion, q_all)
+            if phot is not None:
+                out["photometry"] = phot
+                for sp, _fp, _fl in points:
+                    sp.mag = phot.get("mag")
+                    sp.band = phot.get("band")
+            self.progress.emit("photometry", 1, 1)
 
             # --- the check, delegated to Find_Orb (D25) -------------------
             self.progress.emit("check", 0, 1)

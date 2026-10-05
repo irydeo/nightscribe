@@ -324,7 +324,8 @@ class UfeTrackStackTab(QWidget):
             obs_code=str(config.get("mpc_code", "")),
             site=str(config.get("mpc_code", "")),
             final_size=int(self.cmb_final_size.currentData() or 0),
-            margin=int(self.spn_margin.value()))
+            margin=int(self.spn_margin.value()),
+            comps=ctx.get("comps"), target_mag=ctx.get("target_mag"))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -352,6 +353,7 @@ class UfeTrackStackTab(QWidget):
             "sweep": self.tr("Sweeping the velocity…"),
             "groups": self.tr("Stacking each observation…"),
             "measure": self.tr("Measuring the positions…"),
+            "photometry": self.tr("Measuring the brightness…"),
             "check": self.tr("Checking against other observers…"),
         }.get(key, "")
 
@@ -474,6 +476,24 @@ class UfeTrackStackTab(QWidget):
                 "Detected on the base stack with SNR %1 (the gate is %2σ: "
                 "below it nothing is measured)").replace(
                     "%1", f"{det.snr:.1f}").replace("%2", f"{gate:.1f}"))
+        phot = self._result.get("photometry")
+        if phot is not None and phot.get("mag") is not None:
+            # The magnitude is measured on the FRAMES against the comps
+            # (on a track & stack the stars are trails), so it is a series
+            # run and its error is honest (ADR-048). Saying where the comps
+            # came from matters: an automatic proposal is a first guess.
+            origin = (self.tr("the project's sequence")
+                      if phot.get("source") == "project"
+                      else self.tr("an automatic proposal"))
+            notes.append(self.tr(
+                "Brightness %1 ± %2 %3 from %4 comparison stars on %5 "
+                "frames (%6)").replace(
+                    "%1", f"{phot['mag']:.3f}").replace(
+                    "%2", f"{phot.get('err') or 0:.3f}").replace(
+                    "%3", str(phot.get("band") or "")).replace(
+                    "%4", str(phot.get("n_comps") or 0)).replace(
+                    "%5", str(phot.get("n_frames") or 0)).replace(
+                    "%6", origin))
         self.lbl_notes.setVisible(bool(notes))
         self.lbl_notes.setText("\n".join("• " + n for n in notes))
         # the viewer: one entry per observation, the first one on stage

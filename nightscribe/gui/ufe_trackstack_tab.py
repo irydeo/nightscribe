@@ -82,7 +82,7 @@ class UfeTrackStackTab(QWidget):
         self.btn_stack = self._ui.btn_stack
         self.prg_stack = self._ui.prg_stack
         self.lbl_status = self._ui.lbl_status
-        self.lbl_notes = self._ui.lbl_notes
+        self.txt_notes = self._ui.txt_notes
         self.cmb_group = self._ui.cmb_group
         self.tbl_points = self._ui.tbl_points
         # The headers are short because the column is 380 px wide: the long
@@ -99,7 +99,7 @@ class UfeTrackStackTab(QWidget):
             header = self.tbl_points.horizontalHeaderItem(col)
             if header is not None:
                 header.setToolTip(tip)
-        self.lbl_check = self._ui.lbl_check
+        self.txt_check = self._ui.txt_check
         self.chk_force = self._ui.chk_force
         self.cmb_format = self._ui.cmb_format
         self.btn_report = self._ui.btn_report
@@ -428,8 +428,7 @@ class UfeTrackStackTab(QWidget):
         #          lines, so the wrapped labels are refitted here, where
         #          the width is known.
         super().resizeEvent(event)
-        for name in ("lbl_object", "lbl_notes", "lbl_status", "lbl_recipe",
-                     "lbl_check"):
+        for name in ("lbl_object", "lbl_status", "lbl_recipe"):
             label = getattr(self._ui, name, None)
             if label is not None and label.isVisible():
                 self._fit_label(label)
@@ -468,7 +467,7 @@ class UfeTrackStackTab(QWidget):
             self.cmb_group.clear()
             self.cmb_group.setEnabled(False)
             self.txt_report.clear()
-            self.lbl_notes.setVisible(False)
+            self.txt_notes.setVisible(False)
             self._show_result_area(False)
             self._sync_report_buttons()
         n = len(self._frames)
@@ -716,8 +715,8 @@ class UfeTrackStackTab(QWidget):
             text += " " + self.tr(
                 "The stack's limit magnitude is %1: the night reached "
                 "that deep.").replace("%1", f"{det.mag_limit:.2f}")
-        self.lbl_notes.setVisible(True)
-        self._set_wrapped(self.lbl_notes, text)
+        self.txt_notes.setVisible(True)
+        self.txt_notes.setPlainText(text)
         self.cmb_group.setEnabled(False)
         self._sync_report_buttons()
         self._say("")
@@ -778,9 +777,8 @@ class UfeTrackStackTab(QWidget):
             notes.append(self.tr(
                 "The brightness was not measured (the box is off): this "
                 "run reports positions only"))
-        self.lbl_notes.setVisible(bool(notes))
-        self.lbl_notes.setText("\n".join("• " + n for n in notes))
-        self._fit_label(self.lbl_notes)
+        self.txt_notes.setVisible(bool(notes))
+        self.txt_notes.setPlainText("\n".join("• " + n for n in notes))
         # the viewer: one entry per observation, the first one on stage
         self.cmb_group.blockSignals(True)
         self.cmb_group.clear()
@@ -1100,8 +1098,7 @@ class UfeTrackStackTab(QWidget):
             ).replace("%1", f"{check.our_residual[0]:.2f}").replace(
                 "%2", f"{check.our_residual[1]:.2f}").replace(
                 "%3", str(check.n_stations))
-        self.lbl_check.setText(text)
-        self._fit_label(self.lbl_check)
+        self.txt_check.setPlainText(text)
         # the verdict rides the block's header, so it is read WITHOUT
         # opening it (the block is folded by default)
         if not check.available:

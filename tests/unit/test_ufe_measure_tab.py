@@ -147,7 +147,7 @@ def _click(dlg, x, y):
 def test_tab_present_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
     assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Track && Stack"]
+                      "Calibration", "Astrometry"]
     assert dlg.tab_measure.isEnabled()
 
 

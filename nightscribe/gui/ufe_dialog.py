@@ -628,7 +628,7 @@ class UfeDialog(QWidget):
         from .ufe_trackstack_tab import UfeTrackStackTab
         self.tab_trackstack = UfeTrackStackTab(self.state, self._lang,
                                                view=self.view)
-        self.tabs.addTab(self.tab_trackstack, self.tr("Track && Stack"))
+        self.tabs.addTab(self.tab_trackstack, self.tr("Astrometry"))
         # only the current tab owns the view's clicks and overlays
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
         self._on_feature_tab_changed(self.tabs.currentIndex())

@@ -53,7 +53,7 @@ def test_layout_three_placeholder_tabs(dlg):
     # Calibration and Track & Stack (astrometry plan, phase 7)
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
     assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Track && Stack"]
+                      "Calibration", "Astrometry"]
     assert dlg.histogram is not None      # the phase-B histogram strip
     # the image dominates: at 1280 px the view is wider than the tab column
     assert dlg.view.width() > dlg.tabs.width()

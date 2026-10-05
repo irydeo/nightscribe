@@ -191,9 +191,9 @@
         </item>
         <item>
          <widget class="QPushButton" name="btn_recipe">
-          <property name="text"><string>Edit in Photometry…</string></property>
+          <property name="text"><string>Photometry settings…</string></property>
           <property name="toolTip">
-           <string>Takes you to the Photometry tab, where the apertures, the sky and the centroid are edited</string>
+           <string>The apertures, the sky method and the centroid the run will use are edited in the Photometry tab, and nowhere else. The brightness itself is measured here, on the stacks</string>
           </property>
          </widget>
         </item>
@@ -229,18 +229,20 @@
    <item>
     <widget class="QLabel" name="lbl_status">
      <property name="visible"><bool>false</bool></property>
+     <property name="minimumSize"><size><width>0</width><height>34</height></size></property>
      <property name="text"><string/></property>
      <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="lbl_notes">
+    <widget class="QPlainTextEdit" name="txt_notes">
      <property name="visible"><bool>false</bool></property>
-     <property name="text"><string/></property>
+     <property name="minimumSize"><size><width>0</width><height>90</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>170</height></size></property>
+     <property name="readOnly"><bool>true</bool></property>
      <property name="toolTip">
-      <string>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness</string>
+      <string>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness. The box keeps its own height and scrolls, so a long night never pushes the rest out of the panel and nothing is cut</string>
      </property>
-     <property name="wordWrap"><bool>true</bool></property>
     </widget>
    </item>
    <item>
@@ -319,9 +321,11 @@
       <property name="rightMargin"><number>0</number></property>
       <property name="bottomMargin"><number>0</number></property>
       <item>
-       <widget class="QLabel" name="lbl_check">
-        <property name="text"><string>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</string></property>
-        <property name="wordWrap"><bool>true</bool></property>
+       <widget class="QPlainTextEdit" name="txt_check">
+        <property name="minimumSize"><size><width>0</width><height>70</height></size></property>
+        <property name="maximumSize"><size><width>16777215</width><height>130</height></size></property>
+        <property name="readOnly"><bool>true</bool></property>
+        <property name="plainText"><string>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</string></property>
        </widget>
       </item>
       <item>
@@ -411,7 +415,8 @@
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
-        <property name="maximumSize"><size><width>16777215</width><height>110</height></size></property>
+        <property name="minimumSize"><size><width>0</width><height>80</height></size></property>
+        <property name="maximumSize"><size><width>16777215</width><height>140</height></size></property>
         <property name="readOnly"><bool>true</bool></property>
         <property name="font"><font><family>Monospace</family></font></property>
        </widget>

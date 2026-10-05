@@ -130,7 +130,7 @@ class _HoldingFieldWorker(_FakeFieldWorker):
 def test_tab_is_real_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
     assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Track && Stack"]
+                      "Calibration", "Astrometry"]
     assert dlg.tab_compare.isEnabled()
     assert dlg.tab_compare.edt_target.text() == "sn2026zji_new_image"
 

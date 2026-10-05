@@ -778,12 +778,14 @@ class UfeMeasureTab(QWidget):
                 "here (a streak read with a circular aperture is not a "
                 "flux). The brightness is measured in the Astrometry tab, "
                 "which reads the comps on a second stack aligned on the "
-                "stars.")
+                "stars. Here you can still adjust the RECIPE that tab "
+                "uses: the apertures, the sky and the centroid.")
         return self.tr(
             "This plate is the STAR stack of a track & stack: the comps are "
             "points here, but the OBJECT is a trail, so it cannot be "
             "measured on this plate. Open the object's stack and measure "
-            "there.")
+            "there. Here you can still adjust the RECIPE the Astrometry "
+            "tab uses.")
 
     def _explain_no_wcs_measure(self):
         # The automatic solve did not land: the click cannot be measured.

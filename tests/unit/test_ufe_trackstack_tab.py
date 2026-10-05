@@ -356,8 +356,8 @@ def test_the_run_paints_the_strip_the_magnitude_and_the_brightness(qapp,
     }
     tab._paint_run()
     assert tab.tbl_points.item(0, 6).text() == "18.050"
-    assert "18.050" in tab.lbl_notes.text()
-    assert "an automatic proposal" in tab.lbl_notes.text()
+    assert "18.050" in tab.txt_notes.toPlainText()
+    assert "an automatic proposal" in tab.txt_notes.toPlainText()
     assert tab.btn_blink.isEnabled()
     panels = [tab._thumbs._row.itemAt(i).widget()
               for i in range(tab._thumbs._row.count())
@@ -584,26 +584,22 @@ def test_a_single_operation_stage_shows_a_busy_bar(qapp, tmp_path):
     assert "(3/25)" in tab.lbl_status.text()
 
 
-def test_a_long_wrapped_note_is_not_clipped(qapp, tmp_path):
-    # A wrapped QLabel does not always ask for the height its text needs
-    # (the sizeHint is computed for a width that changes later) and every
-    # line comes out clipped. The app already hit this twice (the measure
-    # tab and the manual window) and fixed it the same way: ask the label
-    # itself, at the width it has.
+def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
+    # A long text in a LABEL has no middle ground: either it grows without
+    # limit (and pushes the rest of the column out) or it clips its lines.
+    # The run's notes and the check's verdict are read-only text boxes with
+    # a floor and a ceiling and their own scrollbar, so they are always
+    # readable and never eat the panel. The report's box gets a floor too.
+    from PySide6.QtWidgets import QPlainTextEdit
     tab, _host = _tab(qapp, tmp_path)
-    tab.resize(380, 700)
-    tab.show()
+    for name in ("txt_notes", "txt_check", "txt_report"):
+        box = getattr(tab, name, None) or getattr(tab._ui, name, None)
+        assert isinstance(box, QPlainTextEdit), name
+        assert box.isReadOnly(), name
+        assert box.minimumHeight() >= 70, name      # a floor to read from
+        assert box.maximumHeight() <= 200, name     # a ceiling to live with
+    # the notes keep their own height whatever the text says
+    tab.txt_notes.setVisible(True)
+    tab.txt_notes.setPlainText("\n".join("• note %d" % i for i in range(40)))
     qapp.processEvents()
-    lab = tab.lbl_notes
-    lab.setVisible(True)
-    tab._set_wrapped(lab, "Sequence stacked: 1 observations measured. 85 "
-                          "frames could not be aligned and were left out.\n"
-                          "• The sequence is not dithered: pattern noise may "
-                          "stack up\n"
-                          "• The composed WCS is off by up to 0.59″ against a "
-                          "direct solve: the field's distortion is biting\n"
-                          "• Detected on the base stack with SNR 17.2 (the "
-                          "gate is 3.5σ: below it nothing is measured)")
-    qapp.processEvents()
-    assert lab.height() >= lab.heightForWidth(lab.width())
-    tab.hide()
+    assert tab.txt_notes.height() <= tab.txt_notes.maximumHeight()

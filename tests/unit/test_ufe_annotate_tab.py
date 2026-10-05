@@ -55,7 +55,7 @@ def dlg(qapp):
 def test_tab_replaces_the_placeholder(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
     assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Track && Stack"]
+                      "Calibration", "Astrometry"]
     tab = dlg.tab_annotate
     assert dlg.tabs.indexOf(tab) == 2
 

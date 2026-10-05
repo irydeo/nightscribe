@@ -5491,6 +5491,11 @@ class MainWindow(QMainWindow):
             # editor's series block for this visit (D8/D36)
             measure_series=lambda sid:
                 self._visit_measure_series(pid, sid),
+            # ADR-062, phase 7: the visit's "Astrometry" opens the editor's
+            # Track & Stack tab for this visit (D15); it is the entry point
+            # the observer looks for, next to the series one.
+            astrometry=lambda sid:
+                self._visit_astrometry(pid, sid),
             # quality plan (C): the period search works on the project's
             # curve, from the visit window where the observer already is
             phase=lambda pid_: self._open_phase_dialog(pid_),
@@ -5992,6 +5997,35 @@ class MainWindow(QMainWindow):
         # ADR-048 follow-up: the series/EXOTIC flow starts from the
         # sequence already built (plate state first, project second)
         self._load_editor_sequence(dlg, pid, paths[0])
+
+    def _visit_astrometry(self, pid, session_id):
+        # ADR-062, phase 7 (D15): the visit's frames become a track & stack
+        # run. The editor opens on the visit's first plate with the visit
+        # armed (the astrometry hook), and the Track & Stack tab on stage.
+        # @args: pid - project id, session_id - the visit
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to work from the editor"), 8000)
+            return
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("This visit has no FITS frames to stack."), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
+                             session_id=session_id)
+        dlg.open_plate(paths[0])
+        dlg.set_object(obj)
+        show = getattr(dlg, "show_tab", None)
+        if callable(show):
+            show("trackstack")
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -10180,9 +10214,17 @@ class MainWindow(QMainWindow):
             if callable(badge):
                 badge(None)              # ad-hoc: no project behind it
         self._ufe_page()
-        dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
-                      "annotate": dlg.tab_annotate,
-                      "measure": dlg.tab_measure}[tab])
+        # Defensive, like every other hook here: a host double in a test
+        # need not have the new tabs.
+        tabs = {"blink": getattr(dlg, "tab_blink", None),
+                "compare": getattr(dlg, "tab_compare", None),
+                "annotate": getattr(dlg, "tab_annotate", None),
+                "measure": getattr(dlg, "tab_measure", None),
+                "calibration": getattr(dlg, "tab_calibration", None),
+                "trackstack": getattr(dlg, "tab_trackstack", None)}
+        target = tabs.get(tab)
+        if target is not None:
+            dlg.show_tab(target)
         self.navigate(VIEW_UFE, pid=hook_pid)
         return dlg
 

@@ -112,8 +112,8 @@ class VisitsPanel(QWidget):
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
-                 measure_series=None, phase=None, on_visit_selected=None,
-                 parent=None):
+                 measure_series=None, astrometry=None, phase=None,
+                 on_visit_selected=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -121,6 +121,7 @@ class VisitsPanel(QWidget):
         self._on_change = on_change
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
+        self._astrometry = astrometry
         self._phase = phase
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
@@ -291,6 +292,7 @@ class VisitsPanel(QWidget):
                                 open_in_editor=self._open_in_editor,
                                 on_measure_click=self._on_measure_click,
                                 measure_series=self._measure_series,
+                                astrometry=self._astrometry,
                                 phase=self._phase,
                                 data_changed=self._from_window_changed,
                                 parent=self)
@@ -345,8 +347,8 @@ class VisitWindow(QDialog):
 
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
-                 on_measure_click=None, measure_series=None, phase=None,
-                 parent=None):
+                 on_measure_click=None, measure_series=None, astrometry=None,
+                 phase=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -360,6 +362,7 @@ class VisitWindow(QDialog):
         self._data_changed = data_changed
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
+        self._astrometry = astrometry
         self._phase = phase
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
@@ -396,6 +399,7 @@ class VisitWindow(QDialog):
         # ---- resources
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
         self._ui.vp_btn_series.clicked.connect(self._on_measure_series)
+        self._ui.vp_btn_astrometry.clicked.connect(self._on_astrometry)
         self._ui.vp_btn_phase.clicked.connect(self._on_phase)
         self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
         self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
@@ -553,6 +557,14 @@ class VisitWindow(QDialog):
         # series block armed for this visit.
         if callable(self._measure_series):
             self._measure_series(self._sid)
+
+    def _on_astrometry(self):
+        # ADR-062, phase 7 (D15): the track & stack starts from the visit
+        # too (its frames and the project's object), never a folder dialog.
+        # The host opens the editor's Track & Stack tab armed for this
+        # visit; this is the entry point the observer looks for.
+        if callable(self._astrometry):
+            self._astrometry(self._sid)
 
     def _on_phase(self):
         # The period search works on the PROJECT's curve (every visit,

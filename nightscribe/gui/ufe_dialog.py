@@ -726,6 +726,13 @@ class UfeDialog(QWidget):
                 or tab in ("compare", "measure"):
             self.tabs.setCurrentWidget(self.tab_photometry)
             return
+        # the astrometry tabs by name too, so the host can deep-link into
+        # them (ADR-062): "calibration" | "trackstack"
+        by_name = {"calibration": getattr(self, "tab_calibration", None),
+                   "trackstack": getattr(self, "tab_trackstack", None)}
+        if tab in by_name and by_name[tab] is not None:
+            self.tabs.setCurrentWidget(by_name[tab])
+            return
         self.tabs.setCurrentWidget(tab)
 
     def set_save_hook(self, fn):

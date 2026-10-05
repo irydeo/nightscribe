@@ -10136,6 +10136,16 @@ class MainWindow(QMainWindow):
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(self._ufe_mpc_send)
+            # ADR-062, phase 8: the run is persisted by the HOST (the tab
+            # never touches the database), with its undo per execution
+            persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
+            if callable(persist_hook):
+                persist_hook(
+                    lambda payload: self._ufe_astrometry_persist(
+                        hook_pid, session_id, payload))
+            undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
+            if callable(undo_hook):
+                undo_hook(self._ufe_astrometry_undo)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10196,6 +10206,12 @@ class MainWindow(QMainWindow):
             astro_hook = getattr(dlg, "set_astrometry_hook", None)
             if callable(astro_hook):
                 astro_hook(None)
+            persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
+            if callable(persist_hook):
+                persist_hook(None)
+            undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
+            if callable(undo_hook):
+                undo_hook(None)
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
@@ -10591,6 +10607,87 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid) or {}
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "object_name": p.get("object_name") or ""}
+
+    def _ufe_astrometry_persist(self, pid, session_id, payload):
+        # ADR-062, phase 8: one execution, its observations and the frame
+        # manifest land in the database (the tab never touches it). The run
+        # id comes back so the tab can offer "undo this run".
+        # @args: pid - project id, session_id - the visit, payload - the
+        #        worker's result dict
+        # @return: the run id, or None (no visit, or nothing measured)
+        from ..core import astrometry_store as store
+        payload = payload or {}
+        # the worker's verdict is ok|not_detected|error|cancelled; the store
+        # speaks complete|not_detected|incomplete|undone
+        status = {"ok": "complete"}.get(payload.get("status"),
+                                        payload.get("status"))
+        if session_id is None or status not in ("complete", "not_detected"):
+            return None
+        points = payload.get("points") or []
+        if status == "complete" and not points:
+            return None
+        p = project.get(db, pid) or {}
+        det = payload.get("detection")
+        sweep = payload.get("sweep")
+        dither = payload.get("dither")
+        frames = payload.get("frames") or []
+        gate = float(config.get("astrometry_snr_sigma", 3.5))
+        floor = float(config.get("astrometry_submit_snr", 10.0))
+        best = (sweep.best if sweep is not None else None) or {}
+        run_id = store.create_run(
+            db, pid, session_id,
+            cfg={"n_obs": payload.get("n_obs"),
+                 "method": payload.get("method"),
+                 "n_failed": payload.get("n_failed"),
+                 "snr_gate": gate, "submit_snr": floor},
+            status=status, object_name=p.get("object_name") or "",
+            method=payload.get("method") or "", n_frames=len(frames),
+            n_obs=len(points), rate_arcsec_min=best.get("rate"),
+            pa_deg=best.get("pa"),
+            sweep=(sweep.grid if sweep is not None else None),
+            dither=(dither.dithered if dither is not None else None),
+            snr_gate=gate, submit_snr=floor,
+            detected=(det.detected if det is not None else None))
+        rows = []
+        for sp, fp, _flags in points:
+            for source, pt in (("stack", sp), ("frames", fp)):
+                if pt is None:
+                    continue
+                rows.append({
+                    "run_id": run_id, "project_id": pid,
+                    "session_id": session_id, "group_index": pt.group_index,
+                    "mjd": pt.mjd, "ra": pt.ra, "dec": pt.dec,
+                    "rms_ra": pt.rms_ra, "rms_dec": pt.rms_dec,
+                    "mag": pt.mag, "band": pt.band, "x": pt.x, "y": pt.y,
+                    "n_frames": pt.n_frames, "snr": pt.snr, "source": source,
+                    "method": payload.get("method"),
+                    "flags": list(pt.flags or [])})
+        store.add_points(db, rows)
+        frame_rows = []
+        for f in frames:
+            try:
+                size = Path(f.path).stat().st_size
+            except OSError:
+                size = None
+            frame_rows.append({"path": f.path, "size": size,
+                               "filter": f.filter, "exptime_s": f.exptime_s,
+                               "date_obs": f.date_obs})
+        store.add_frames(db, run_id, frame_rows)
+        logger.info("astrometry run %s persisted (%d points, %d frames)",
+                    run_id, len(rows), len(frame_rows))
+        return run_id
+
+    def _ufe_astrometry_undo(self, run_id):
+        # ADR-062, phase 8 (D14): undo THIS execution, its points and its
+        # frame manifest. The run row stays, marked "undone", for the audit
+        # trail (the same shape the series' undo has).
+        # @args: run_id - the execution
+        # @return: how many points were removed, or None
+        from ..core import astrometry_store as store
+        if run_id is None:
+            return None
+        removed = store.delete_run(db, run_id)
+        return removed.get("points") if isinstance(removed, dict) else removed
 
     def _ufe_mpc_send(self, text):
         # The Track & Stack tab's report lands in the visit's MPC paste

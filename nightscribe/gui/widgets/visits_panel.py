@@ -523,6 +523,7 @@ class VisitWindow(QDialog):
             "report": self.tr("report"),
             "sequence": self.tr("sequence"),
             "ephemeris": self.tr("ephemeris"),
+            "stack": self.tr("stack"),
             "motion_gif": self.tr("motion (GIF)"),
             "motion_mp4": self.tr("motion (MP4)"),
             "evo_gif": self.tr("evolution (GIF)"),

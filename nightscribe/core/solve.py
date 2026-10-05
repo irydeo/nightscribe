@@ -57,6 +57,25 @@ class SolveCancel:
             _terminate(proc)
 
 
+def is_cancelled(cancel):
+    # @args: cancel - a SolveCancel (attach()/is_set()), a plain callable,
+    #        or None
+    # @return: True when the run was asked to stop
+    # The engines have always accepted a plain callable (the GUI workers
+    # hand them `lambda: self._cancel`) while the solve dialog and the
+    # astrometry.net wait use a SolveCancel. Polling one shape only is what
+    # broke twice: "'function' object has no attribute 'attach'" on the
+    # first track & stack solve, and "'SolveCancel' object is not callable"
+    # as soon as the worker started passing the object. This is the one
+    # place that knows both.
+    if cancel is None:
+        return False
+    is_set = getattr(cancel, "is_set", None)
+    if callable(is_set):
+        return bool(is_set())
+    return bool(cancel()) if callable(cancel) else False
+
+
 def cached(path):
     # A WCS this app already solved for the exact file (content hash),
     # WITHOUT invoking a solver: the cache keeps a plate solved across

@@ -42,14 +42,17 @@ logger = logging.getLogger("nightscribe.gui.ufe_trackstack_tab")
 
 
 class UfeTrackStackTab(QWidget):
-    # @args: state - the shared UfeImageState (its plate is NOT touched:
-    #        the group stacks are shown in this tab's own state), lang -
-    #        "es" | "en", parent - widget
+    # @args: state - the shared UfeImageState (the group's stack is loaded
+    #        into it, so the histogram, stretch and marks work on it),
+    #        lang - "es" | "en", view - the shared UfeImageView (the
+    #        measured position is marked on it; None builds a private
+    #        fallback, which is what the tests use), parent - widget
 
-    def __init__(self, state, lang="es", parent=None):
+    def __init__(self, state, lang="es", view=None, parent=None):
         super().__init__(parent)
         self._state = state
         self._lang = lang
+        self._view = view
         self._worker = None        # TrackStackWorker while it runs
         self._frames = None        # list[Frame] of the open visit
                                    # (headers only: no pixels live here)
@@ -58,6 +61,7 @@ class UfeTrackStackTab(QWidget):
                                    # first run turns the expected-SNR
                                    # column into a real projection, D22)
         self._result = None        # the last run's payload
+        self._run_id = None        # its row in astrometry_runs (the Undo)
         self._build_ui()
         self._sync_context()
 
@@ -83,13 +87,22 @@ class UfeTrackStackTab(QWidget):
         self.cmb_format = self._ui.cmb_format
         self.btn_report = self._ui.btn_report
         self.btn_send_mpc = self._ui.btn_send_mpc
+        self.btn_undo = self._ui.btn_undo
         self.txt_report = self._ui.txt_report
-        # the group viewer is this tab's OWN state + view: the dialog's
-        # plate (and its overlays) belong to the workbench, and a group's
-        # stack is another image (placeholder + replaceWidget, ADR-005)
-        self._stack_state = UfeImageState(self)
-        self._stack_view = UfeImageView(self._stack_state)
-        drop_in(self.layout(), self._ui.ph_stack_view, self._stack_view)
+        # The group's stack is shown in the MAIN stage (the shared state),
+        # so the histogram, the stretch and the marks work on it and the
+        # other tabs can operate on top. The private viewer is only a
+        # fallback for a host that gave no view (the tests).
+        if self._view is None:
+            self._stack_state = UfeImageState(self)
+            self._stack_view = UfeImageView(self._stack_state)
+            drop_in(self.layout(), self._ui.ph_stack_view, self._stack_view)
+        else:
+            self._stack_state = None
+            self._stack_view = None
+            placeholder = getattr(self._ui, "ph_stack_view", None)
+            if placeholder is not None:
+                placeholder.hide()
         # the four combination methods of core/track_stack (D11), with the
         # setting's default on top
         self.cmb_method.addItem(self.tr("Sum"), "sum")
@@ -107,6 +120,7 @@ class UfeTrackStackTab(QWidget):
         self.cmb_group.currentIndexChanged.connect(self._show_group)
         self.chk_force.toggled.connect(lambda _on: self._sync_report_buttons())
         self.btn_report.clicked.connect(self._on_report)
+        self.btn_undo.clicked.connect(self._on_undo)
         self.btn_send_mpc.clicked.connect(self._on_send_mpc)
         self._sync_report_buttons()
 
@@ -115,9 +129,13 @@ class UfeTrackStackTab(QWidget):
     def set_active(self, flag):
         # @args: flag - True when the dialog hands this tab the stage
         # @return: None. The context is re-read on entering: the visit may
-        #          have been armed (or changed) while the tab was hidden.
+        #          have been armed (or changed) while the tab was hidden;
+        #          on leaving, the measured-position mark is taken off the
+        #          shared stage (it belongs to this tab).
         if flag:
             self._sync_context()
+        elif self._view is not None:
+            self._view.clear_overlays()
 
     def refresh_context(self):
         # Called by the dialog when the host sets (or clears) the
@@ -354,8 +372,42 @@ class UfeTrackStackTab(QWidget):
             return
         if status == "not_detected":
             self._paint_not_detected()
+            self._persist_run(self._result)
             return
         self._paint_run()
+        self._persist_run(self._result)
+
+    def _persist_run(self, payload):
+        # ADR-062, phase 8: the HOST writes the run (the tab never touches
+        # the database) and hands back its id, which the "undo this run"
+        # button needs. Without a host (an ad-hoc open) there is nothing to
+        # persist and the button stays off.
+        # @args: payload - the worker's result dict
+        # @return: None
+        host = host_of(self)
+        persist = getattr(host, "persist_astrometry", None)
+        self._run_id = persist(payload) if callable(persist) else None
+        self._sync_report_buttons()
+
+    def _on_undo(self):
+        # The run's own undo (D14): its points and its frame manifest go,
+        # the run row stays marked "undone", and nothing else is touched.
+        # @return: None
+        if self._run_id is None:
+            return
+        host = host_of(self)
+        undo = getattr(host, "undo_astrometry", None)
+        removed = undo(self._run_id) if callable(undo) else None
+        self._run_id = None
+        self._result = None
+        self.cmb_group.clear()
+        self.cmb_group.setEnabled(False)
+        self.tbl_points.setRowCount(0)
+        self.txt_report.clear()
+        self._sync_report_buttons()
+        self._say(self.tr("Run undone: %1 observations removed."
+                          ).replace("%1", str(removed if removed is not None
+                                             else 0)))
 
     def _paint_not_detected(self):
         # D10: below the gate there is no sweep and no measurement (the
@@ -446,42 +498,78 @@ class UfeTrackStackTab(QWidget):
         self._say(note)
 
     def _show_group(self, index):
-        # The group's stack in this tab's OWN viewer. UfeImageState loads
-        # from a path, so the stack is written to a temporary FITS: the
-        # dialog's plate state is never touched and the workbench keeps
-        # showing the frame the observer had open.
+        # The group's stack goes to the MAIN stage (the shared state), so
+        # the histogram, the stretch and the marks work on it and the other
+        # tabs can operate on top. It is SAVED in the project (kind
+        # "stack") instead of a temp file that vanishes, and the measured
+        # position is marked on the shared view while this tab is on stage.
         # @args: index - the group's index in the last run
         # @return: None
         result = self._result or {}
         stacks = result.get("stacks") or []
         if index is None or index < 0 or index >= len(stacks):
             return
-        import tempfile
         import numpy as np
         stack, _rep = stacks[index]
-        path = Path(tempfile.gettempdir()) / \
-            f"nightscribe_trackstack_group{index}.fits"
+        if stack is None:
+            return
+        path = self._stack_path(index)
         try:
             from astropy.io import fits
             fits.PrimaryHDU(np.asarray(stack, dtype=np.float32)).writeto(
                 str(path), overwrite=True)
-            self._stack_state.load(str(path))
-        except Exception as err:     # a viewer that cannot show says so
+        except Exception as err:     # a stack that cannot be written says so
+            logger.warning("group stack write failed: %s", err)
+            self._say(self.tr("The group's stack could not be written:")
+                      + f" {err}")
+            return
+        state = self._state if self._view is not None else self._stack_state
+        view = self._view if self._view is not None else self._stack_view
+        try:
+            state.load(str(path))
+        except Exception as err:
             logger.warning("group stack view failed: %s", err)
             self._say(self.tr("The group's stack could not be shown:")
                       + f" {err}")
             return
         # the measured position, marked: scene coordinates are the state's
         # business (it is the only one that flips y), never the tab's
-        self._stack_view.clear_overlays()
+        view.clear_overlays()
         points = result.get("points") or []
         if index < len(points):
             sp = points[index][0]
-            w, h = self._stack_state.plate_shape
-            sx, sy = self._stack_state.data_to_scene(sp.x, sp.y)
+            w, h = state.plate_shape
+            sx, sy = state.data_to_scene(sp.x, sp.y)
             for item in cross_marker_items(sx, sy, float(w), float(h),
                                            "#ff5555", 10.0):
-                self._stack_view.add_overlay(item)
+                view.add_overlay(item)
+        # the stack belongs to the project: register it there (kind
+        # "stack") so it shows in the visit and can be reopened
+        if self._view is not None:
+            notify = getattr(host_of(self), "notify_saved", None)
+            if callable(notify):
+                notify([str(path)], "stack")
+
+    def _stack_path(self, index):
+        # @args: index - the group's index
+        # @return: where the group's stack is written: the project's own
+        #          folder when the host points at one (it lands next to the
+        #          rest of the project and survives a restart), the system
+        #          temp otherwise
+        import tempfile
+        folder = None
+        ask = getattr(host_of(self), "export_folder", None)
+        if callable(ask):
+            try:
+                folder = ask()
+            except Exception:
+                folder = None
+        base = Path(folder) if folder else Path(tempfile.gettempdir())
+        try:
+            base.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            base = Path(tempfile.gettempdir())
+        return base / f"stack_obs{index + 1}.fits"
 
     # ------------------------------------------------------ measurement
 
@@ -596,6 +684,9 @@ class UfeTrackStackTab(QWidget):
         self.btn_send_mpc.setEnabled(
             ok and not blocked
             and bool(self.txt_report.toPlainText().strip()))
+        # the run's own undo (phase 8): enabled while there is a persisted
+        # execution to take back
+        self.btn_undo.setEnabled(self._run_id is not None)
 
     def _on_report(self):
         # The generator applies the submission floor itself (D26) and the

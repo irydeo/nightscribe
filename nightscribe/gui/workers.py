@@ -1186,7 +1186,8 @@ class TrackStackWorker(QThread):
                 points.append((sp, fp, flags))
                 self.progress.emit("measure", index + 1, len(stacks))
             out.update(points=points, groups=groups, stacks=stacks,
-                       boxes=boxes, qs=q_by_group, mids=mids, w0=w0)
+                       boxes=boxes, qs=q_by_group, mids=mids, w0=w0,
+                       frames=frames)
 
             # --- the check, delegated to Find_Orb (D25) -------------------
             self.progress.emit("check", 0, 1)

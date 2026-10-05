@@ -126,6 +126,10 @@ class UfeDialog(QWidget):
         # there is no sequence) and the way a generated report reaches the
         # visit's MPC block
         self._astrometry_hook = None
+        self._astrometry_persist_hook = None   # the run's rows, written by
+                                               # the host (the tab never
+                                               # touches the database)
+        self._astrometry_undo_hook = None      # "undo this run"
         self._mpc_send_hook = None
         # the passes of the visit (one night, one curve, 2026-09-30): the
         # list and which of them the chart shows
@@ -622,7 +626,8 @@ class UfeDialog(QWidget):
         self.tab_calibration = UfeCalibrationTab(self.state, self._lang)
         self.tabs.addTab(self.tab_calibration, self.tr("Calibration"))
         from .ufe_trackstack_tab import UfeTrackStackTab
-        self.tab_trackstack = UfeTrackStackTab(self.state, self._lang)
+        self.tab_trackstack = UfeTrackStackTab(self.state, self._lang,
+                                               view=self.view)
         self.tabs.addTab(self.tab_trackstack, self.tr("Track && Stack"))
         # only the current tab owns the view's clicks and overlays
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
@@ -1020,6 +1025,41 @@ class UfeDialog(QWidget):
         except Exception as err:
             logger.warning("mpc send hook failed: %s", err)
             return False
+
+    def set_astrometry_persist_hook(self, fn):
+        # @args: fn - callable(payload: dict) -> run_id, or None
+        # @return: None. The host writes the run (astrometry_runs, its
+        #          points and the frame manifest), so the tab never touches
+        #          the database (the same split the series uses).
+        self._astrometry_persist_hook = fn if callable(fn) else None
+
+    def persist_astrometry(self, payload):
+        # @args: payload - the worker's result dict
+        # @return: the run id, or None (no host, or nothing to keep)
+        if self._astrometry_persist_hook is None:
+            return None
+        try:
+            return self._astrometry_persist_hook(payload)
+        except Exception as err:
+            logger.warning("astrometry persist hook failed: %s", err)
+            return None
+
+    def set_astrometry_undo_hook(self, fn):
+        # @args: fn - callable(run_id) -> how many points were removed, or
+        #        None
+        # @return: None
+        self._astrometry_undo_hook = fn if callable(fn) else None
+
+    def undo_astrometry(self, run_id):
+        # @args: run_id - the execution to undo
+        # @return: the number of points removed, or None
+        if self._astrometry_undo_hook is None:
+            return None
+        try:
+            return self._astrometry_undo_hook(run_id)
+        except Exception as err:
+            logger.warning("astrometry undo hook failed: %s", err)
+            return None
 
     # ----------------------------------------------------- visit frames
 

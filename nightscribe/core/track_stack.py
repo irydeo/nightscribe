@@ -157,7 +157,7 @@ def solve_reference(frames, cfg=None, cancel=None, progress=None):
         return None, None
     for frame in frames:
         cards = solve.solved_cards(frame.path)
-        if not cards and cancel is not None and cancel():
+        if not cards and solve.is_cancelled(cancel):
             return None, None
         if not cards:
             if progress is not None:
@@ -190,7 +190,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     previous = None
     total = len(frames)
     for index, frame in enumerate(frames):
-        if cancel is not None and cancel():
+        if solve.is_cancelled(cancel):
             break
         if frame is ref:
             frame.transform = {"angle": 0.0, "dx": 0.0, "dy": 0.0,
@@ -311,7 +311,7 @@ def verify_composed_wcs(frames, sample=2, tol_arcsec=WCS_QC_TOL_ARCSEC,
     step = max(1, len(candidates) // (sample + 1))
     report = WcsQCReport()
     for frame in candidates[::step][:sample]:
-        if cancel is not None and cancel():
+        if solve.is_cancelled(cancel):
             break
         cards = solve.solve(frame.path, cancel=cancel)
         if not cards:
@@ -658,7 +658,7 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
     out = []
     total = len(groups)
     for index, group in enumerate(groups):
-        if cancel is not None and cancel():
+        if solve.is_cancelled(cancel):
             break
         stack, report = stack_group(frames, group, q_by_group[index], method,
                                     boxes[index], shape, cfg=cfg, loader=loader)
@@ -769,7 +769,7 @@ def sweep(frames, q, base_rate, base_pa, box, shape, pct=5.0, steps=5,
     done = 0
     for factor in factors:
         for dpa in pas:
-            if cancel is not None and cancel():
+            if solve.is_cancelled(cancel):
                 break
             rate = base_rate * factor
             pa = base_pa + dpa

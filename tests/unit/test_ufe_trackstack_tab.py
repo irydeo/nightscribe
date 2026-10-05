@@ -224,3 +224,56 @@ def test_workers_carry_their_cancel(qapp):
     from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
     tab = UfeTrackStackTab(UfeImageState(), "en")
     tab.shutdown()
+
+
+def test_the_group_stack_goes_to_the_main_stage(qapp, tmp_path):
+    # The stack must be shown in the SHARED stage (so the histogram, the
+    # stretch and the marks work on it) and saved in the project, not left
+    # in a private little viewer and a temp file (the observer's ask).
+    import numpy as np
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.core import astrometry
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    saved = []
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2026 QX"}
+    host.export_folder = lambda: str(tmp_path)
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    state = UfeImageState(host)
+    view = UfeImageView(state)
+    tab = UfeTrackStackTab(state, "en", view=view, parent=host)
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+                   "points": [(point, None, [])], "n_failed": 0}
+    tab._show_group(0)
+    # the SHARED state now holds the stack, not a private one
+    assert state.path.endswith("stack_obs1.fits")
+    # and the stack was registered in the project (kind "stack")
+    assert saved and saved[0][1] == "stack"
+    assert saved[0][0][0].endswith("stack_obs1.fits")
+
+
+def test_the_run_is_persisted_and_can_be_undone(qapp, tmp_path):
+    # Phase 8: the HOST persists the run (the tab never touches the
+    # database) and hands back its id; "undo this run" takes back only that
+    # execution. The tab is a facade over the two hooks.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    calls = {}
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    host.persist_astrometry = lambda payload: calls.setdefault("run", 7)
+    host.undo_astrometry = lambda run_id: (calls.__setitem__("undone", run_id)
+                                           or 3)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._on_finished({"status": "ok", "points": [], "method": "sigma"})
+    assert calls.get("run") == 7 and tab._run_id == 7
+    assert tab.btn_undo.isEnabled()
+    tab._on_undo()
+    assert calls.get("undone") == 7
+    assert tab._run_id is None and not tab.btn_undo.isEnabled()

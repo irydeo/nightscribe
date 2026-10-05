@@ -229,6 +229,15 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QPushButton" name="btn_undo">
+          <property name="enabled"><bool>false</bool></property>
+          <property name="text"><string>Undo this run</string></property>
+          <property name="toolTip">
+           <string>Remove this execution's observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
       <item>

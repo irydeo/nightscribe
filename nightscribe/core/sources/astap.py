@@ -489,18 +489,14 @@ def _notable(line):
 def _cancelled(cancel):
     # @args: cancel - a core.solve.SolveCancel, a plain callable, or None
     # @return: True when the run was asked to stop
-    # The solver accepts BOTH shapes on purpose: the GUI worker has always
-    # handed the engines a callable (lambda: self._cancel), while the
-    # astrometry.net wait and the solve dialog use a SolveCancel with
-    # attach()/is_set(). Asking for .is_set() unconditionally is what made
-    # a plain callable blow up with "'function' object has no attribute
-    # 'attach'" the first time the track & stack solve ran.
-    if cancel is None:
-        return False
-    is_set = getattr(cancel, "is_set", None)
-    if callable(is_set):
-        return bool(is_set())
-    return bool(cancel()) if callable(cancel) else False
+    # Both shapes are accepted on purpose: the GUI worker has always handed
+    # the engines a callable (lambda: self._cancel), while the solve dialog
+    # uses a SolveCancel with attach()/is_set(). Asking for .is_set()
+    # unconditionally is what made a plain callable blow up with
+    # "'function' object has no attribute 'attach'" the first time the
+    # track & stack solve ran. The knowledge lives in core.solve.
+    from .. import solve
+    return solve.is_cancelled(cancel)
 
 
 def _run_astap(cmd, progress, cancel, budget):

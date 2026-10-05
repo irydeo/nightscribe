@@ -28,10 +28,10 @@ logger = logging.getLogger(__name__)
 _COMP_MARGIN_ARCSEC = 60.0
 
 # The target's magnitude is only used to pick comps of a similar
-# brightness, and the project usually knows it (its own card). When it does
-# not, this is the starting point, and the run SAYS the sequence was
-# proposed automatically: it is a guess, and it is labelled as one.
-_TARGET_MAG_GUESS = 18.0
+# brightness, and the project usually knows it (its own card, or the
+# astrometry that measured the object). When nobody does, the shared
+# fallback in core/compstars.py is the starting point and the run SAYS the
+# sequence was proposed automatically: it is a guess, labelled as one.
 
 # A comp's window: it has to hold the aperture and its annulus, with room
 # for the radial profile to find its half-maximum and for a seeing-sized
@@ -1101,7 +1101,7 @@ class TrackStackWorker(QThread):
                 field["stars"],
                 float(self._target_mag
                       or self._cfg_get("astrometry_phot_target_mag",
-                                       _TARGET_MAG_GUESS)),
+                                       compstars.TARGET_MAG_FALLBACK)),
                 margin_arcsec=margin)
             entries = list((proposal or {}).get("comps") or [])
             # the check star travels WITH the sequence: it never enters the

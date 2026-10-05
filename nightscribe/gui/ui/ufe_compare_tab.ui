@@ -61,7 +61,7 @@
      <item>
       <widget class="QDoubleSpinBox" name="spn_mag">
        <property name="toolTip">
-        <string>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</string>
+        <string>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it. With no data the proposal starts from a declared guess and says so, instead of using a number nobody chose</string>
        </property>
        <property name="decimals">
         <number>2</number>
@@ -72,8 +72,14 @@
        <property name="maximum">
         <double>25.000000000000000</double>
        </property>
+       <property name="singleStep">
+        <double>0.100000000000000</double>
+       </property>
        <property name="value">
-        <double>12.000000000000000</double>
+        <double>0.000000000000000</double>
+       </property>
+       <property name="specialValueText">
+        <string>No data</string>
        </property>
       </widget>
      </item>

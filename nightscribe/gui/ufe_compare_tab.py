@@ -431,7 +431,7 @@ class UfeCompareTab(QWidget):
             or self.cmb_catalog.currentText(),
             "center": list(field.get("center") or ()),
             "fov_arcmin": float(field.get("fov_arcmin") or 0.0),
-            "target_mag": float(self.spn_mag.value()),
+            "target_mag": float(self.spn_mag.value()) or None,
             "entries": [
                 {
                     "name": e["name"],
@@ -1153,7 +1153,7 @@ class UfeCompareTab(QWidget):
         # @return: None
         try:
             seq = compstars.propose_comps(
-                self._stars, self.spn_mag.value(), validator=validator,
+                self._stars, self._proposal_mag(), validator=validator,
                 margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         except Exception as err:
             logger.exception("sequence proposal failed: %s", err)
@@ -1171,7 +1171,7 @@ class UfeCompareTab(QWidget):
         # @return: None
         from .workers import UfeProposeWorker
         self._propose_worker = UfeProposeWorker(
-            self._stars, self.spn_mag.value(), validator,
+            self._stars, self._proposal_mag(), validator,
             margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         self._propose_worker.progress.connect(self._on_propose_stage)
         self._propose_worker.finished.connect(self._on_proposed)
@@ -1255,8 +1255,46 @@ class UfeCompareTab(QWidget):
         self._build_backup = []
         if self._last_proposal_was_same():
             text += " " + self.tr("The sequence is the same as before.")
+        if float(self.spn_mag.value()) <= 0.0:
+            # The sequence is a first guess, and the observer must know WHY:
+            # nobody knows the magnitude, so a declared constant anchored it.
+            text += " " + self.tr(
+                "The target's magnitude is not known, so the proposal "
+                "started from %1: set it, or let the astrometry measure "
+                "it.").replace("%1", f"{compstars.TARGET_MAG_FALLBACK:.1f}")
         self._say(text)
         self._commit()
+
+    def _proposal_mag(self):
+        # @return: the magnitude the proposal anchors on, in mag
+        # The field shows "No data" until somebody knows it (the project,
+        # or the astrometry that measured the object). The proposal still
+        # has to start somewhere, so it starts from a DECLARED constant and
+        # _apply_proposal says so: a silent default is how a 12.00 nobody
+        # chose ended up stored as if it were data.
+        mag = float(self.spn_mag.value())
+        return mag if mag > 0.0 else float(compstars.TARGET_MAG_FALLBACK)
+
+    def set_target_magnitude(self, mag):
+        # @args: mag - the object's magnitude, or None when nobody knows it
+        # @return: True when the field took it
+        # The host lands it when the editor opens from a project: the
+        # magnitude the project knows (or the one the astrometry measured)
+        # is what the proposal should anchor on, not the widget's default.
+        if mag is None:
+            return False
+        try:
+            value = float(mag)
+        except (TypeError, ValueError):
+            return False
+        if value <= 0.0:
+            return False
+        if float(self.spn_mag.value()) > 0.0:
+            # the plate's own saved state already landed one: it wins, the
+            # same way its saved sequence does
+            return False
+        self.spn_mag.setValue(value)
+        return True
 
     def _last_proposal_was_same(self):
         # @return: True when the proposal did not change the sequence
@@ -1426,7 +1464,7 @@ class UfeCompareTab(QWidget):
         if st is None:
             st = {"catalog": "manual", "catalog_name": "Manual",
                   "fov_arcmin": 0.0,
-                  "target_mag": float(self.spn_mag.value())}
+                  "target_mag": float(self.spn_mag.value()) or None}
         if not st.get("entries"):
             st = dict(st)
             st["entries"] = [

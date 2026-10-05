@@ -872,6 +872,15 @@ class UfeDialog(QWidget):
                 self.state.toggle_flip(axis)
         self.tab_photometry.apply_state(st)
 
+    def set_target_magnitude(self, mag):
+        # @args: mag - the object's magnitude, or None when nobody knows it
+        # @return: True when the field took it
+        # The project knows the object's magnitude (from the planner, or
+        # from the astrometry that measured it), and the sequence proposal
+        # anchors on it. Landing it here is what keeps the Compare tab's
+        # field from showing a default nobody chose.
+        return bool(self.tab_compare.set_target_magnitude(mag))
+
     def load_saved_sequence(self, seq):
         # ADR-047/048: when the open plate carries no sequence of its own,
         # the project's saved sequence fills the Compare tab, so measuring

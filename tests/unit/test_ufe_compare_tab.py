@@ -1256,3 +1256,46 @@ def test_the_manual_window_fits_its_content(dlg):
     assert bottom > 0                          # and the content is inside
     # the width floor stays (the wide-font guard of the test above)
     assert w.minimumWidth() >= 760
+
+
+# ------------------------------------------------- the target's magnitude
+
+def test_the_target_magnitude_says_no_data_until_somebody_knows_it(dlg):
+    # The field carried 12.00 from the Designer file, and a number nobody
+    # chose ended up stored in the project (four projects in the real
+    # database carry it). Now it says "No data" until the project, or the
+    # astrometry that measured the object, knows the magnitude.
+    from nightscribe.core import compstars
+    cmp = dlg.tab_compare
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.spn_mag.text() == cmp.spn_mag.specialValueText()
+    # the proposal still has to start somewhere, and it is a DECLARED
+    # constant, not a silent default
+    assert cmp._proposal_mag() == pytest.approx(
+        compstars.TARGET_MAG_FALLBACK)
+    # and the sentinel never becomes the project's magnitude
+    assert cmp._sequence_payload()["target_mag"] is None
+
+
+def test_the_project_magnitude_fills_the_field_only_when_it_is_empty(dlg):
+    cmp = dlg.tab_compare
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.set_target_magnitude(17.92) is True
+    assert cmp.spn_mag.value() == pytest.approx(17.92)
+    assert cmp._proposal_mag() == pytest.approx(17.92)
+    # a plate that already landed one wins, exactly as its saved sequence
+    # does: a second landing must not stomp it
+    assert cmp.set_target_magnitude(11.0) is False
+    assert cmp.spn_mag.value() == pytest.approx(17.92)
+    # nothing known: nothing landed, and no crash
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.set_target_magnitude(None) is False
+    assert cmp.set_target_magnitude(0.0) is False
+
+
+def test_the_editor_lands_the_magnitude_on_the_compare_tab(dlg):
+    # The host calls this when the editor opens from a project, so the
+    # proposal anchors on the object's real magnitude.
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    assert dlg.set_target_magnitude(17.92) is True
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(17.92)

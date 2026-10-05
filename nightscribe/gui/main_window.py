@@ -5902,7 +5902,16 @@ class MainWindow(QMainWindow):
         if meta.get("ufe"):
             dlg.apply_plate_state(meta["ufe"])
         p = project.get(db, pid) or {}
-        dlg.load_saved_sequence((p.get("context") or {}).get("sequence"))
+        ctx = p.get("context") or {}
+        dlg.load_saved_sequence(ctx.get("sequence"))
+        # the object's magnitude, from the project (the planner put it
+        # there, or the astrometry measured it): the Compare tab's proposal
+        # anchors on it, and without this it showed a default nobody chose.
+        # A host double from before the magnitude existed simply has no
+        # setter, and that is not an error.
+        setter = getattr(dlg, "set_target_magnitude", None)
+        if callable(setter):
+            setter(ctx.get("mag"))
 
     def _ufe_sequence_hook(self, pid, state):
         # The editor's sequence changed by the observer: keep it in the
@@ -5916,7 +5925,10 @@ class MainWindow(QMainWindow):
             "fov_arcmin": state.get("fov_arcmin"),
             "target_mag": state.get("target_mag"),
             "entries": entries}}
-        if state.get("target_mag") is not None:
+        if state.get("target_mag"):
+            # only a magnitude somebody chose becomes the project's: the
+            # sentinel ("no data") is falsy on purpose, so a widget default
+            # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
         project.update_context(db, pid, ctx_update)
 
@@ -6784,7 +6796,10 @@ class MainWindow(QMainWindow):
             "fov_arcmin": state.get("fov_arcmin"),
             "target_mag": state.get("target_mag"),
             "entries": state.get("entries") or []}}
-        if state.get("target_mag") is not None:
+        if state.get("target_mag"):
+            # only a magnitude somebody chose becomes the project's: the
+            # sentinel ("no data") is falsy on purpose, so a widget default
+            # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
         project.update_context(db, pid, ctx_update)
 
@@ -10658,6 +10673,13 @@ class MainWindow(QMainWindow):
             dither=(dither.dithered if dither is not None else None),
             snr_gate=gate, submit_snr=floor,
             detected=(det.detected if det is not None else None))
+        # The project learns the object's magnitude from the measurement:
+        # the next comparison proposal anchors on a datum instead of a
+        # guess, and the Photometry tab's field stops being empty. The
+        # magnitude is the run's own summary, so nothing is invented.
+        phot = payload.get("photometry") or {}
+        if phot.get("mag"):
+            project.update_context(db, pid, {"mag": float(phot["mag"])})
         rows = []
         for sp, fp, _flags in points:
             for source, pt in (("stack", sp), ("frames", fp)):

@@ -47,6 +47,7 @@ from ..viz import palette
 from .ufe_manual_dialog import UfeManualDialog
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
+from .ufe_host import host_of
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -672,7 +673,7 @@ class UfeCompareTab(QWidget):
             self._say(self.tr(
                 "The plate has no WCS: solving it to build the comparison "
                 "field…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_generate(),
@@ -1410,7 +1411,7 @@ class UfeCompareTab(QWidget):
     def _notify_saved(self, paths, payload=None):
         # Files written while a host watches (a project) get registered
         # there; with no host this is a no-op.
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify(paths, "sequence", payload or {})
@@ -1441,7 +1442,7 @@ class UfeCompareTab(QWidget):
         # the host, so the project keeps it and reopening does not mean
         # rebuilding the comparison stars every time.
         # @args: force - persist even when empty (an explicit clear)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_sequence", None)
         if callable(notify):
             notify(self._sequence_payload(), force)

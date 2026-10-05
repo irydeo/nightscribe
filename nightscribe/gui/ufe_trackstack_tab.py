@@ -34,6 +34,7 @@ from PySide6.QtWidgets import QTableWidgetItem, QWidget
 
 from ..config import config
 from .ufe_state import UfeImageState
+from .ufe_host import host_of
 from .ui_loader import adopt_ui, drop_in
 from .widgets.ufe_image_view import UfeImageView, cross_marker_items
 
@@ -139,7 +140,7 @@ class UfeTrackStackTab(QWidget):
         # @return: the visit context {"pid", "session_id", "paths",
         #          "object_name"} the host hooked, or None (ad-hoc open:
         #          without a visit there is no sequence, D15)
-        dlg = self.window()
+        dlg = host_of(self)
         getter = getattr(dlg, "astrometry_context", None)
         if not callable(getter):
             return None
@@ -643,7 +644,7 @@ class UfeTrackStackTab(QWidget):
         if not text:
             self._say(self.tr("Generate the report first."))
             return
-        dlg = self.window()
+        dlg = host_of(self)
         send = getattr(dlg, "send_to_mpc_block", None)
         if callable(send) and send(text):
             self._say(self.tr(

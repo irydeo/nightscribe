@@ -106,6 +106,31 @@ def test_visit_arms_the_tab(qapp, tmp_path):
     assert "2026 QX" in tab.lbl_object.text()
 
 
+def test_the_tab_finds_an_embedded_host(qapp, tmp_path):
+    # ADR-053: the editor is a PAGE of the shell, so window() from a tab is
+    # the MAIN window and the hooks live in an ancestor. The helper above
+    # mounts the host parentless, which is what production does NOT do, so
+    # it never caught this; here the host is embedded and the trap is
+    # reproduced. Before the fix the buttons stayed disabled with a visit
+    # open (the visit reached the hook, the tab never found it).
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    outer = QWidget()                     # the shell's page
+    host = QWidget(outer)                 # the embedded UfeDialog
+    paths = _write_frames(tmp_path, 3)
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": paths,
+                                       "object_name": "2026 QX"}
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    assert tab.window() is outer          # the trap, reproduced
+    assert tab._context() is not None     # host_of walks up to the host
+    tab.set_active(True)
+    assert tab.btn_stack.isEnabled() is True
+    assert tab.spn_nobs.isEnabled() is True
+
+
 # ------------------------------------------------- the expected SNR (D22)
 
 def test_preview_table_follows_n_obs(qapp, tmp_path):

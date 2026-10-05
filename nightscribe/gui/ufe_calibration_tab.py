@@ -28,6 +28,7 @@ from PySide6.QtWidgets import QWidget
 
 from ..config import config
 from .ui_loader import adopt_ui
+from .ufe_host import host_of
 
 logger = logging.getLogger("nightscribe.gui.ufe_calibration_tab")
 
@@ -92,7 +93,7 @@ class UfeCalibrationTab(QWidget):
     def _context(self):
         # @return: the visit context {"pid", "session_id", "paths",
         #          "object_name"} the host hooked, or None (ad-hoc open)
-        dlg = self.window()
+        dlg = host_of(self)
         getter = getattr(dlg, "astrometry_context", None)
         if not callable(getter):
             return None
@@ -220,7 +221,7 @@ class UfeCalibrationTab(QWidget):
         if self.chk_export.isChecked():
             from .. import paths as paths_mod
             folder = None
-            getter = getattr(self.window(), "export_folder", None)
+            getter = getattr(host_of(self), "export_folder", None)
             if callable(getter):
                 try:
                     folder = getter()
@@ -283,7 +284,7 @@ class UfeCalibrationTab(QWidget):
         if written:
             # the copies register to the visit like any other product
             # (the dialog's save hook owns the database)
-            notify = getattr(self.window(), "notify_saved", None)
+            notify = getattr(host_of(self), "notify_saved", None)
             if callable(notify):
                 try:
                     notify(written, "fits")

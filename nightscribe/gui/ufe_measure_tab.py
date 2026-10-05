@@ -45,6 +45,7 @@ from ..core import chart_annotate, coords, fits_meta, photometry, \
     series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ufe_host import host_of
 from .ufe_centre_dialog import UfeCentreDialog
 from .ufe_series_dialog import UfeSeriesDialog
 from .ufe_passes_dialog import UfePassesDialog
@@ -639,7 +640,7 @@ class UfeMeasureTab(QWidget):
         # ADR-047: the working state back to the editor's defaults: the
         # recipe, the stretch, the sequence. No confirmation: nothing on
         # disk is lost, the saved state is just overwritable.
-        dlg = self.window()
+        dlg = host_of(self)
         f = getattr(dlg, "reset_state_local", None)
         if not callable(f) or not f():
             self._say(self.tr(
@@ -657,7 +658,7 @@ class UfeMeasureTab(QWidget):
         # ADR-047: destructive for the light curve: every measured point
         # saved on THIS plate is dropped. The plan requires a
         # confirmation here, and the hook fires only after a yes.
-        dlg = self.window()
+        dlg = host_of(self)
         if not dlg.state.has_image:
             self._say(self.tr(
                 "Load a plate first: there are no plate points to reset."))
@@ -705,7 +706,7 @@ class UfeMeasureTab(QWidget):
             # it to its project_files row and saves the plate's state.
             "path": self._state.path,
         }
-        dlg = self.window()
+        dlg = host_of(self)
         if not dlg or not dlg.notify_point(payload):
             self._say(
                 self.tr("Could not save the point in the project."))
@@ -774,7 +775,7 @@ class UfeMeasureTab(QWidget):
             self._say(self.tr(
                 "The plate has no WCS: solving it to locate the "
                 "comparison stars…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_scene_clicked(scene_pt),
@@ -1261,7 +1262,7 @@ class UfeMeasureTab(QWidget):
         # @return: the frames context {"paths", "session_id", ...} the host
         #          hooked, or None (ad-hoc open, or no frames for that
         #          scope)
-        dlg = self.window()
+        dlg = host_of(self)
         getter = getattr(dlg, "series_context", None)
         if not callable(getter):
             return None
@@ -1363,7 +1364,7 @@ class UfeMeasureTab(QWidget):
             return None
         if self._last is not None and self._last.get("col") is not None:
             return (self._last["col"], self._last["row"])
-        obj = getattr(self.window(), "object", lambda: None)()
+        obj = getattr(host_of(self), "object", lambda: None)()
         if obj and obj.get("ra") is not None and obj.get("dec") is not None:
             try:
                 return self._state.wcs.sky_to_pixel(float(obj["ra"]),
@@ -1484,7 +1485,7 @@ class UfeMeasureTab(QWidget):
             # ADR-051: solve the reference plate and start the series
             self._say(self.tr(
                 "The plate has no WCS: solving it to place the series…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(self._on_measure_series,
@@ -1544,7 +1545,7 @@ class UfeMeasureTab(QWidget):
                 "Measure the series first: the figure is the curve."))
             return
         name = ""
-        window = self.window()
+        window = host_of(self)
         obj = getattr(window, "object", None)
         if callable(obj):
             name = (obj() or {}).get("name") or ""
@@ -1566,7 +1567,7 @@ class UfeMeasureTab(QWidget):
         self._say(self.tr(
             "Chart written as you see it: {0}").format(out))
         # ADR-045: the scene export registers like the other tabs' files
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify([out], "chart")
@@ -1639,7 +1640,7 @@ class UfeMeasureTab(QWidget):
         # @return: the folder (a Path), created if it did not exist
         from .. import paths as paths_mod
         folder = None
-        ask = getattr(self.window(), "export_folder", None)
+        ask = getattr(host_of(self), "export_folder", None)
         if callable(ask):
             try:
                 folder = ask()
@@ -1700,7 +1701,7 @@ class UfeMeasureTab(QWidget):
         # (reported: "el botón Night Conditions (PNG) no hace nada").
         folder = self._export_folder()
         name = "series"
-        window = self.window()
+        window = host_of(self)
         obj = getattr(window, "object", None)
         if callable(obj):
             name = (obj() or {}).get("name") or name
@@ -1745,7 +1746,7 @@ class UfeMeasureTab(QWidget):
         # observer does not have to hunt for the other door.
         ctx = self._series_context() or {}
         pid = ctx.get("pid")
-        dlg = self.window()
+        dlg = host_of(self)
         hook = getattr(dlg, "_open_phase_dialog", None)
         if pid and callable(hook):
             hook(pid)
@@ -1927,7 +1928,7 @@ class UfeMeasureTab(QWidget):
         # project): the tab never touches the database. A host without the
         # hook (a test double, an ad-hoc open) simply has none.
         # @return: {"runs": [...], "curve_run_id": int|None} or {}
-        ask = getattr(self.window(), "visit_passes", None)
+        ask = getattr(host_of(self), "visit_passes", None)
         if not callable(ask):
             return {}
         try:
@@ -1963,7 +1964,7 @@ class UfeMeasureTab(QWidget):
         # of the other passes stay in the project.
         # @args: run_id - the pass to draw
         # @return: None
-        choose = getattr(self.window(), "choose_visit_curve", None)
+        choose = getattr(host_of(self), "choose_visit_curve", None)
         if not callable(choose):
             return
         try:
@@ -1981,7 +1982,7 @@ class UfeMeasureTab(QWidget):
         # marked undone and the chart falls back to the pass before it.
         # @args: run_id - the pass to undo
         # @return: None
-        undo = getattr(self.window(), "undo_run", None)
+        undo = getattr(host_of(self), "undo_run", None)
         count = 0
         if callable(undo):
             count = int(undo(run_id) or 0)
@@ -2219,7 +2220,7 @@ class UfeMeasureTab(QWidget):
         else:
             self._say("")
         rows = self._series_rows(result.points)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_points", None)
         self._series_run_id = None
         if callable(notify) and rows:
@@ -2504,7 +2505,7 @@ class UfeMeasureTab(QWidget):
         # know the window's layout (a dialog is not always the parent, so
         # the guard is honest about it).
         # @return: True when the curve is in front
-        show = getattr(self.window(), "show_curve", None)
+        show = getattr(host_of(self), "show_curve", None)
         if callable(show):
             show()
             return True
@@ -2531,7 +2532,7 @@ class UfeMeasureTab(QWidget):
                      for m in check["messages"]]
             self._say("⚠ " + " · ".join(lines))
         planet = ""
-        obj = getattr(self.window(), "object", lambda: None)()
+        obj = getattr(host_of(self), "object", lambda: None)()
         if obj and obj.get("name"):
             planet = obj["name"]
         else:
@@ -2577,10 +2578,10 @@ class UfeMeasureTab(QWidget):
             return
         self._say(
             self.tr("ExoClock files written. Upload them at exoclock.space"))
-        notify = getattr(self.window(), "notify_saved", None)
+        notify = getattr(host_of(self), "notify_saved", None)
         if callable(notify):
             notify([out], "report")
-        hook = getattr(self.window(), "notify_exoclock", None)
+        hook = getattr(host_of(self), "notify_exoclock", None)
         if callable(hook):
             hook({"planet": planet, "points": len(pts)})
         QDesktopServices.openUrl(QUrl("https://exoclock.space/upload/"))
@@ -2594,7 +2595,7 @@ class UfeMeasureTab(QWidget):
         run_ids += list(self._live_run_ids)
         if not run_ids:
             return
-        dlg = self.window()
+        dlg = host_of(self)
         undo = getattr(dlg, "undo_run", None)
         count = 0
         if callable(undo):
@@ -2675,7 +2676,7 @@ class UfeMeasureTab(QWidget):
         # @args: result - the batch's SeriesResult
         # @return: None; the curve and the counter follow.
         rows = self._series_rows(result.points)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_points", None)
         if callable(notify) and rows:
             echo = dict(self._series_cfg_dict or {})
@@ -2748,7 +2749,7 @@ class UfeMeasureTab(QWidget):
         root = paths_mod.docs_dir()
         name = "SEQUENCES.es.md" if self._lang != "en" else "SEQUENCES.md"
         start = root / name if (root / name).exists() else None
-        open_browser(root, self.window(), start=start)
+        open_browser(root, host_of(self), start=start)
 
     def _restore_advanced_defaults(self):
         # D25: every knob back to the .ui's shipped default.
@@ -3034,7 +3035,7 @@ class UfeMeasureTab(QWidget):
             self._say(self.tr(
                 "The plate has no WCS: solving it for the aligned "
                 "reference…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_subtract_toggled(True),
@@ -3212,7 +3213,7 @@ class UfeMeasureTab(QWidget):
         self._say(self.tr("Written to {0}").format(out))
         # ADR-045: the one-row report registers in the watching project
         # (the visit it was measured from), like every other UFE file
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify([out], "report")

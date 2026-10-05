@@ -10685,6 +10685,19 @@ class MainWindow(QMainWindow):
         phot = payload.get("photometry") or {}
         if phot.get("mag"):
             project.update_context(db, pid, {"mag": float(phot["mag"])})
+        # The comparison stars the run used are SAVED when the project had
+        # none: opening the Photometry tab then finds the same sequence
+        # instead of proposing a different one, and the next run starts from
+        # the observer's own field. A project that already had a sequence
+        # keeps it: the run used it, so there is nothing to write.
+        comps = phot.get("comps") if isinstance(phot, dict) else None
+        ctx = p.get("context") or {}
+        if comps and not ((ctx.get("sequence") or {}).get("entries")):
+            project.update_context(db, pid, {"sequence": {
+                "catalog": phot.get("catalog") or "gaia",
+                "catalog_name": "Gaia (proposed by the run)",
+                "target_mag": phot.get("mag"),
+                "entries": comps}})
         rows = []
         for sp, fp, _flags in points:
             for source, pt in (("stack", sp), ("frames", fp)):

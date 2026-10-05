@@ -856,7 +856,7 @@ class UfeTrackStackTab(QWidget):
             # Photometry tab would happily build a zero point out of
             # streaks, and with it the tab can say why it will not.
             hdu.header["NS_STACK"] = (
-                "object", "track & stack: the stars are trails")
+                "object", "the stars are trails")
             # The two stacks of an observation are a PAIR: the object's has
             # the light and the star's has the comps, and the Photometry tab
             # needs both to measure the brightness by hand. The link travels
@@ -908,6 +908,11 @@ class UfeTrackStackTab(QWidget):
             notify = getattr(host_of(self), "notify_saved", None)
             if callable(notify):
                 notify([str(path)], "stack")
+        # The object's own position, annotated ON the stack: the editor
+        # paints the marker (the same AIJ card the Annotate tab writes), so
+        # in the Photometry tab you SEE where the object is and click it
+        # instead of hunting a point among the stars' trails.
+        self._annotate_object(path, index, result)
         # The star stack of the same observation, when the run kept one: it
         # is the plate the Photometry tab needs to measure the pair by hand
         # (on the object's stack the comps are trails). It is written when
@@ -966,6 +971,32 @@ class UfeTrackStackTab(QWidget):
                 stamp = ""
         return f"{slug}_obs{index + 1}{stamp}{'_stars' if stars else ''}.fits"
 
+    def _annotate_object(self, path, index, result):
+        # @args: path - the stack just written, index - the observation,
+        #        result - the run's payload
+        # @return: None. The measured position, written as the annotation the
+        #          editor already knows how to paint. A failure here must
+        #          never cost the stack: the marker is a help, the file is
+        #          the work.
+        points = result.get("points") or []
+        if index >= len(points):
+            return
+        sp = points[index][0]
+        if sp is None or sp.x is None or sp.y is None:
+            return
+        try:
+            from ..core import astrometry, fits_annotate
+            w0 = result.get("w0")
+            scale = astrometry.pixel_scale_arcsec(w0) if w0 is not None \
+                else None
+            fits_annotate.write_annotated_fits(
+                path, path, sn_xy=(float(sp.x), float(sp.y)), scale=scale,
+                obj_name=(self._context() or {}).get("object_name") or "",
+                ra_deg=(float(sp.ra) if sp.ra is not None else None),
+                dec_deg=(float(sp.dec) if sp.dec is not None else None))
+        except Exception as err:
+            logger.warning("the stack could not be annotated: %s", err)
+
     def _write_star_stack(self, index, result):
         # @args: index - the observation, result - the run's payload
         # @return: the path written, or None when the run kept no star stack
@@ -988,8 +1019,7 @@ class UfeTrackStackTab(QWidget):
             if index < len(wcss) and wcss[index] is not None:
                 hdu.header.update(wcss[index].to_header())
             hdu.header["NS_STACK"] = (
-                "stars", "track & stack: the stars are points, the object "
-                "trails")
+                "stars", "the stars are points")
             # the other half of the pair: the object's stack, in the same
             # folder, so whichever one is opened the tab knows the other
             hdu.header["NS_PAIR"] = self._stack_name(index)

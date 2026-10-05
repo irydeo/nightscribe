@@ -633,14 +633,27 @@ def test_the_star_stack_is_saved_next_to_the_object_stack(qapp, tmp_path):
     w.pixel_shape = (16, 16)
     obj = np.zeros((16, 16), dtype=np.float32)
     stars = np.ones((16, 16), dtype=np.float32)
-    tab._result = {"stacks": [(obj, None)], "points": [], "n_failed": 0,
-                   "groups": [(0, 5)], "mids": [2460965.5],
+    from nightscribe.core import astrometry
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"stacks": [(obj, None)], "points": [(point, None, [])],
+                   "n_failed": 0, "groups": [(0, 5)], "mids": [2460965.5],
                    "wcs_by_group": [w], "star_stacks": [(stars, None)]}
     tab._show_group(0)
     # the name carries the observation's UT: the run's mids are JULIAN
     # dates and the MJD offset is what turns 2460965.5 into 2025-10-17
     star_path = tmp_path / "2025UR_obs1_20251017T000000_stars.fits"
     assert star_path.exists()
+    # the two stacks name each other (the pair the Photometry tab reads)
+    from astropy.io import fits as _fits
+    from nightscribe.core import fits_annotate
+    obj_path = tmp_path / "2025UR_obs1_20251017T000000.fits"
+    assert _fits.getheader(str(obj_path))["NS_PAIR"] == star_path.name
+    assert _fits.getheader(str(star_path))["NS_PAIR"] == obj_path.name
+    # and the object's measured position travels as the annotation the
+    # editor paints, so the Photometry tab shows where to click
+    marks = fits_annotate.read_annotations(str(obj_path))
+    assert marks and marks[0]["x"] == pytest.approx(8.0)
+    assert marks[0]["y"] == pytest.approx(8.0)
     header = fits.getheader(str(star_path))
     assert header["NS_STACK"] == "stars"
     assert header["CRVAL1"] == pytest.approx(30.0)

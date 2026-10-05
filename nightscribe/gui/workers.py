@@ -1214,7 +1214,11 @@ class TrackStackWorker(QThread):
                 "band": band,
                 "n_comps": max(p["n_comps"] for p in good),
                 "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
-                "n_obs": len(good), "source": source, "per_obs": per_obs}
+                "n_obs": len(good), "source": source, "per_obs": per_obs,
+                # the comparison stars themselves, so the project can KEEP
+                # them: the Photometry tab then opens with the same sequence
+                # the run used instead of proposing a different one
+                "comps": entries, "catalog": "gaia"}
 
     def _object_centre(self, sp, q, box):
         # @args: sp - the astrometric point of the observation (or None),

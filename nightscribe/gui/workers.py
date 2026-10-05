@@ -33,6 +33,13 @@ _COMP_MARGIN_ARCSEC = 60.0
 # proposed automatically: it is a guess, and it is labelled as one.
 _TARGET_MAG_GUESS = 18.0
 
+# A comp's window: it has to hold the aperture and its annulus, with room
+# for the radial profile to find its half-maximum and for a seeing-sized
+# aperture (r_out can reach ~33 px when the measured FWHM is large). Even
+# at 40 px of half side it is ~1 % of a 2048 frame, and that is where the
+# saving comes from: the whole star stack cost 74 s for the same number.
+_WINDOW_MIN_HALF = 40
+
 
 class _Cancelled(Exception):
     # Raised at a phase boundary when the worker was cancelled (never
@@ -1064,7 +1071,7 @@ class TrackStackWorker(QThread):
         # orchestration, not a second photometry.
         import numpy as np
         from ..core import astrometry as astrometry_mod
-        from ..core import compstars, photometry, track_stack
+        from ..core import compstars, photometry
         from ..core import wcs as wcs_mod
         recipe = dict(self._recipe or {})
         entries = list(self._comps)
@@ -1110,22 +1117,18 @@ class TrackStackWorker(QThread):
         # Gaia G. A Clear filter is white light, and white light against
         # Gaia G is the honest description of what was measured.
         band, _bands = photometry.pick_band(entries, recipe.get("band"), "G")
-        # --- the STAR stacks: same frames, same method, aligned on the sky
+        # --- the comps' WINDOWS: small stacks aligned on the stars -------
+        # A comp needs averaging as much as the object does (on ONE frame
+        # a mag-17.4 star peaks ~800 ADU over a sky whose noise is 261 ADU,
+        # measured on 2025 UR: SNR 2), but stacking the WHOLE frame a
+        # second time is 74 s for eight windows that are ~80 px wide. So
+        # each comp gets its own small star-aligned stack, and the zero
+        # point is the same number for a fraction of the time.
         total = max(1, 2 * len(groups))
-        star_stacks = track_stack.stack_groups(
-            frames, groups, qs, self._method, boxes, shape, cfg=self._cfg,
-            track=False,
-            progress=lambda d, t, _l: self.progress.emit("photometry", d,
-                                                         total),
-            cancel=lambda: self._cancel)
-        if self._cancel or len(star_stacks) < len(groups):
-            return None
         per_obs = []
         for index, (stack, _rep) in enumerate(stacks):
             self.progress.emit("photometry", len(groups) + index + 1, total)
-            star_stack = (star_stacks[index][0]
-                          if index < len(star_stacks) else None)
-            if stack is None or star_stack is None:
+            if stack is None or index >= len(groups):
                 per_obs.append(None)
                 continue
             box = boxes[index]
@@ -1135,18 +1138,25 @@ class TrackStackWorker(QThread):
                 per_obs.append(None)
                 continue
             wcs_box = wcs_mod.Wcs.from_astropy(_shift_wcs(w0, box))
-            fwhm = self._seeing(star_stack, entries, wcs_box)
+            windows = self._comp_windows(frames, groups[index], entries,
+                                         wcs_box, shape)
+            if not windows:
+                per_obs.append(None)
+                continue
+            fwhm = self._seeing(windows)
             cfg = photometry.PlateConfig(
-                target_xy=centre, entries=entries, header=ref.header,
-                wcs=wcs_box, band=band, fallback_band=band,
-                radii=self._radii(recipe, fwhm), fwhm=fwhm,
+                target_xy=centre,
+                entries=[w[0] for w in windows],
+                comp_images=[w[1:] for w in windows],
+                header=ref.header, wcs=wcs_box, band=band,
+                fallback_band=band, radii=self._radii(recipe, fwhm),
+                fwhm=fwhm,
                 centroid_mode=("none" if recipe.get("manual_centre")
                                else "gaussian"),
                 sigmaclip=bool(recipe.get("sigmaclip", True)),
                 sky_mode=recipe.get("sky") or "median",
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),
-                comp_image=star_stack, comp_scale=1.0,
                 linear_adu=self._cfg_get("cam_linearity_adu", None),
                 site_gain=self._cfg_get("ccd_gain", None),
                 site_ron=self._cfg_get("ccd_read_noise", None),
@@ -1201,34 +1211,80 @@ class TrackStackWorker(QThread):
             return None
         return (float(q[0]) - box[0], float(q[1]) - box[1])
 
-    def _seeing(self, star_stack, entries, wcs_box):
-        # @args: star_stack - the stack aligned on the stars, entries - the
-        #        comps, wcs_box - the reference WCS shifted to that stack
-        #        (a core.wcs.Wcs: the plate recipe's currency)
-        # @return: the FWHM in px, or None
-        # The seeing is measured on the STAR stack and nowhere else: the
-        # comps are points there, and an aperture that follows the seeing
-        # must be sized by the same PSF the comps have (the object shares
-        # it: both stacks are the same frames on the same grid).
-        from ..core import photometry
-        spots = []
+    def _comp_windows(self, frames, group, entries, wcs_box, shape):
+        # @args: frames - the sequence, group - the observation's frames,
+        #        entries - the comps and the check star, wcs_box - the
+        #        reference WCS shifted to the stack, shape - the frame size
+        # @return: [(entry, image, x, y), ...] for the ones that landed on
+        #          the plate
+        # A comp needs averaging as much as the object does (on ONE frame
+        # a mag-17.4 star peaks ~800 ADU over a sky whose noise is 261 ADU,
+        # measured on 2025 UR: SNR 2), but only in the pixels it occupies.
+        # A window around each comp is ~1 % of the frame, and the whole
+        # star stack measured 74 s for the very same zero point.
+        from ..core import track_stack
+        half = self._window_half()
+        out = []
         for e in entries:
             star = e.get("star") or {}
             if star.get("ra") is None:
                 continue
             try:
-                spots.append(wcs_box.sky_to_pixel(star["ra"], star["dec"]))
+                cx, cy = wcs_box.sky_to_pixel(star["ra"], star["dec"])
             except Exception:
                 continue
-        if not spots:
-            return None
+            box = _window_box(cx, cy, half, shape)
+            if box is None:
+                continue
+            small, _rep = track_stack.stack_group(
+                frames, group, (cx, cy), self._method, box, shape,
+                cfg=self._cfg, track=False)
+            if small is None:
+                continue
+            out.append((e, small, cx - box[0], cy - box[1]))
+        return out
+
+    def _window_half(self):
+        # @return: the half side of a comp's window, in px
+        # The window has to hold the aperture AND its annulus, with room
+        # for the radial profile to find its half-maximum and for the
+        # seeing-sized aperture, which can reach r_out ~33 px when the
+        # measured FWHM is large. The floor is generous on purpose: even
+        # at 40 it is ~1 % of a 2048 frame, which is where the saving
+        # comes from.
+        from ..core import photometry
+        try:
+            rout = int(float((self._recipe or {}).get("rout") or 0))
+        except (TypeError, ValueError):
+            rout = 0
+        return max(int(photometry.R_ANN_OUT), rout, _WINDOW_MIN_HALF)
+
+    def _seeing(self, windows):
+        # @args: windows - [(entry, image, x, y), ...] as built by
+        #        _comp_windows
+        # @return: the FWHM in px (the median over the comps), or None
+        # The seeing is measured on the comps' own windows and nowhere
+        # else: they are points there, and an aperture that follows the
+        # seeing must be sized by the same PSF the comps have (the object
+        # shares it: same frames, same grid).
+        #
         # "radial" and not "moments": on a noisy plate the median-subtracted
         # window keeps a noise pedestal, and the second moments integrate it
         # into a FWHM three or four times too large (measured on 2025 UR,
         # whose sky noise is 261 ADU: moments said 13 px, radial says 2.7).
         # The radial profile finds the half-maximum crossing instead, which
         # is what the aperture rule actually needs.
-        return photometry.estimate_fwhm(star_stack, spots, method="radial")
+        import numpy as np
+        from ..core import photometry
+        fwhms = []
+        for _entry, image, x, y in windows:
+            value = photometry.estimate_fwhm(image, [(x, y)],
+                                             method="radial")
+            if value:
+                fwhms.append(float(value))
+        if not fwhms:
+            return None
+        return float(np.median(fwhms))
 
     def _radii(self, recipe, fwhm):
         # @args: recipe - the project's photometry recipe, fwhm - the
@@ -1530,3 +1586,18 @@ def _shift_wcs(w0, box):
     w = copy.deepcopy(w0)
     w.wcs.crpix = [w0.wcs.crpix[0] - box[0], w0.wcs.crpix[1] - box[1]]
     return w
+
+
+def _window_box(cx, cy, half, shape):
+    # @args: cx, cy - the comp's pixel, half - the window's half side,
+    #        shape - (naxis1, naxis2)
+    # @return: (x0, y0, x1, y1) inside the frame, or None when the frame
+    #          cannot hold the window at all
+    # The window is SHIFTED in, never shrunk: the comp's own pixel stays
+    # inside, which is what the measurement needs.
+    side = 2 * int(half)
+    if side < 8 or shape[0] < side or shape[1] < side:
+        return None
+    x0 = max(0, min(int(round(cx)) - int(half), shape[0] - side))
+    y0 = max(0, min(int(round(cy)) - int(half), shape[1] - side))
+    return (x0, y0, x0 + side, y0 + side)

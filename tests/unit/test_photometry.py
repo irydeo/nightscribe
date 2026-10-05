@@ -1249,3 +1249,33 @@ def test_a_paired_image_keeps_the_camera_ceiling_on_the_target():
     assert not paired.ok and not solo.ok
     assert "saturat" in str(paired.reason).lower()
     assert "saturat" in str(solo.reason).lower()
+
+
+def test_a_comp_on_its_own_window_gives_the_same_magnitude():
+    # The track & stack builds a small star-aligned stack per comp instead
+    # of stacking the whole frame a second time (measured on 2025 UR: 74 s
+    # for the full star stack against a second for the eight windows). The
+    # zero point must not notice: the same comp, the same aperture, the
+    # same pixels, wherever those pixels live.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    full = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, **base))
+    assert full.ok
+    half = 40
+    entries, windows = [], []
+    for e in base["entries"]:
+        star = e["star"]
+        cx, cy = int(round(star["ra"])), int(round(star["dec"]))
+        x0 = max(0, min(cx - half, data.shape[1] - 2 * half))
+        y0 = max(0, min(cy - half, data.shape[0] - 2 * half))
+        entries.append(e)
+        windows.append((data[y0:y0 + 2 * half, x0:x0 + 2 * half],
+                        float(cx - x0), float(cy - y0)))
+    win = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, entries=entries, comp_images=windows,
+        **{k: v for k, v in base.items() if k != "entries"}))
+    assert win.ok
+    assert win.mag == pytest.approx(full.mag, abs=1e-9)
+    assert win.zp["zp"] == pytest.approx(full.zp["zp"], abs=1e-9)
+    assert win.err_total == pytest.approx(full.err_total, abs=1e-12)

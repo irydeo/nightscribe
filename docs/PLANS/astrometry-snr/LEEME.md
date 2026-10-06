@@ -48,6 +48,7 @@ vez de suponerla.
 | **B0** | Arreglo: el fotograma que no contiene la observación | **Hecho** (`bug-fotograma-fuera-de-campo.md`) |
 | **P0** | Los fotogramas que se quedan en el suelo | **Hecho** (`p0-fotogramas-perdidos.md`) |
 | **P4** | Inyección y recuperación (el instrumento) | **Hecho** (`p4-inyeccion-recuperacion.md`) |
+| **P4b** | El barrido del movimiento, medido | **Hecho** (`p4b-barrido-del-movimiento.md`) |
 | **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |

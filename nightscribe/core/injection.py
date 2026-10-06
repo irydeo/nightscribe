@@ -59,12 +59,13 @@ INJ_X = "NS_INJX"         # its position in THIS frame, in pixels
 INJ_Y = "NS_INJY"
 
 
-def inject_sequence(paths, flux_adu, rate_px=1.5, pa_deg=90.0, psf_fwhm=4.0,
+def inject_sequence(paths, flux_adu, rate_px_min=1.5, pa_deg=90.0,
+                    psf_fwhm=4.0,
                     out_dir=None, start=None, seed=0, ref_wcs=None,
                     progress=None, cancel=None):
     # @args: paths - the real frames (read only), flux_adu - the source's
-    #        total flux above the sky, in ADU, rate_px - how far it moves
-    #        between consecutive frames, pa_deg - the direction of that
+    #        total flux above the sky, in ADU, rate_px_min - how far it
+    #        moves PER MINUTE (see below), pa_deg - the direction of that
     #        motion (0 = +x, 90 = +y), psf_fwhm - the injected point spread,
     #        out_dir - where the copies go (a folder of its own is created
     #        when None), start - where the source starts, in pixels (the
@@ -115,7 +116,21 @@ def inject_sequence(paths, flux_adu, rate_px=1.5, pa_deg=90.0, psf_fwhm=4.0,
         start = (shape[1] / 2.0 + 0.37, shape[0] / 2.0 + 0.21)
     sigma = float(psf_fwhm) / 2.3548200450309493
     ang = math.radians(float(pa_deg))
-    step = (float(rate_px) * math.cos(ang), float(rate_px) * math.sin(ang))
+    step = (float(rate_px_min) * math.cos(ang),
+            float(rate_px_min) * math.sin(ang))
+    # The position is a function of TIME and not of the frame index, and
+    # that is measured, not pedantry: the real cadence is irregular (on the
+    # 2025 UR visit it runs from 4 to 6 seconds between frames), so a fixed
+    # step per frame is NOT a straight line in the sky, and the velocity
+    # sweep, which fits a line, would then be judged against a motion nobody
+    # made. Measured before the fix: the sweep found 35.5"/min at PA 5.9 deg
+    # where the injected endpoint derivative said 34.0 at 0.2, and the
+    # difference was the cadence and nothing else.
+    jd0 = None
+    for frame in frames:
+        if frame.t_mid_jd is not None:
+            jd0 = float(frame.t_mid_jd)
+            break
     truth = []
     out_paths = []
     total = len(frames)
@@ -123,8 +138,11 @@ def inject_sequence(paths, flux_adu, rate_px=1.5, pa_deg=90.0, psf_fwhm=4.0,
         if cancel is not None and cancel():
             break
         data, header = calibration.read_image(frame.path)
-        x = float(start[0]) + step[0] * index
-        y = float(start[1]) + step[1] * index
+        dt_min = 0.0
+        if jd0 is not None and frame.t_mid_jd is not None:
+            dt_min = (float(frame.t_mid_jd) - jd0) * 1440.0
+        x = float(start[0]) + step[0] * dt_min
+        y = float(start[1]) + step[1] * dt_min
         # the sub-pixel phase: two sources of the same flux must not land on
         # the same fraction of a pixel every time, or the recovery would be
         # measuring that fraction and not the pipeline
@@ -235,6 +253,123 @@ def _motion_from_truth(truth, frames, shape):
     return motion
 
 
+def sky_motion(motion, t_mid_jd):
+    # @args: motion - callable(jd) -> (ra_deg, dec_deg), t_mid_jd - the
+    #        instant to measure the motion at
+    # @return: (rate arcsec/min, PA degrees north through east), or
+    #          (None, None) when the motion cannot be sampled
+    # The SAME convention the sweep's seed uses (0 deg towards +dec, 90 deg
+    # towards +RA), measured over a two-minute baseline so the divisor is
+    # the arcsec PER MINUTE. It is written here instead of imported because
+    # the sweep's version lives in the GUI's worker and this module is core:
+    # the instrument cannot depend on the interface. If the two ever
+    # disagree, the injected truth and the found velocity stop being
+    # comparable, which is what this function exists to check.
+    if motion is None or t_mid_jd is None:
+        return None, None
+    p0 = motion(float(t_mid_jd) - 1.0 / 1440.0)
+    p1 = motion(float(t_mid_jd) + 1.0 / 1440.0)
+    if not p0 or not p1:
+        return None, None
+    cosd = math.cos(math.radians(p0[1]))
+    dra = (p1[0] - p0[0]) * cosd * 3600.0
+    ddec = (p1[1] - p0[1]) * 3600.0
+    rate = math.hypot(dra, ddec) / 2.0
+    pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+    return float(rate), float(pa)
+
+
+def pa_difference(a, b):
+    # @args: a, b - two position angles in degrees
+    # @return: the smallest absolute difference, in degrees (0..180)
+    # A position angle is a direction and not a number: 359 and 1 are two
+    # degrees apart, and subtracting them would report 358.
+    if a is None or b is None:
+        return None
+    return float(abs((float(a) - float(b) + 180.0) % 360.0 - 180.0))
+
+
+def _scaled_motion(motion, jd0, jd1, factor):
+    # @args: motion - the true motion, jd0/jd1 - the sequence's ends,
+    #        factor - how wrong the seed is (1.0 = exact)
+    # @return: a linear motion through the first point whose velocity is
+    #          `factor` times the true one
+    # The ephemeris is never perfect, so the interesting question is not
+    # "does the sweep keep the velocity it was given" (that is
+    # self-consistency) but "does it find the truth when the seed is off".
+    # The grid is +/- pct %, so beyond it the sweep CANNOT find it, and that
+    # boundary is worth measuring.
+    p0 = motion(jd0) if motion is not None else None
+    p1 = motion(jd1) if motion is not None else None
+    if not p0 or not p1 or jd1 <= jd0:
+        return motion
+    span = float(jd1) - float(jd0)
+
+    def out(jd):
+        t = (float(jd) - float(jd0)) / span
+        return (float(p0[0]) + (float(p1[0]) - float(p0[0])) * factor * t,
+                float(p0[1]) + (float(p1[1]) - float(p0[1])) * factor * t)
+    return out
+
+
+def motion_recovery(paths, flux_adu, rate_px_min, pa_deg, ref_wcs, cfg=None,
+                    out_dir=None, seed=0, n_obs=1, method="sigma",
+                    steps=5, pct=5.0, seed_factor=1.0, cancel=None,
+                    progress=None):
+    # @args: paths - the real frames, flux_adu - the injected source's flux,
+    #        rate_px_min/pa_deg - the injected motion (px per minute),
+    #        ref_wcs - the reference
+    #        WCS, cfg - Config, out_dir - where the copies go, seed - the
+    #        sub-pixel phase, n_obs/method - the chain's knobs, steps/pct -
+    #        the sweep's grid, seed_factor - how wrong the ephemeris the
+    #        chain is given is (1.0 = exact; 1.1 = ten per cent too fast),
+    #        cancel/progress - as usual
+    # @return: {"injected": {"rate", "pa"}, "found": {"rate", "pa"},
+    #          "err_rate", "err_pa", "detected", "snr", "snr_ap", "note"}
+    #
+    # THE QUESTION THIS ANSWERS: is the velocity sweep centred where it
+    # should be? The pipeline looks for the object on a grid around the
+    # ephemeris' own velocity, and the grid is what decides whether a real
+    # object is found at all. Injecting a source moving at a KNOWN rate and
+    # heading and reading back what the sweep chose turns "the sweep looks
+    # fine" into two numbers: the error in rate (arcsec/min) and the error
+    # in position angle (degrees).
+    from . import track_stack
+    got = inject_sequence(paths, flux_adu, rate_px_min=rate_px_min,
+                          pa_deg=pa_deg,
+                          out_dir=out_dir, seed=seed, ref_wcs=ref_wcs,
+                          cancel=cancel, progress=progress)
+    if not got["paths"]:
+        return {"injected": None, "found": None, "err_rate": None,
+                "err_pa": None, "detected": False, "snr": None,
+                "snr_ap": None, "note": "the source left the frame"}
+    seed_motion = got["motion"]
+    if seed_factor != 1.0 and got["motion"] is not None and got["truth"]:
+        frames_jd = [f.t_mid_jd for f in track_stack.load_sequence(
+            got["paths"]) if f.t_mid_jd is not None]
+        if len(frames_jd) >= 2:
+            seed_motion = _scaled_motion(got["motion"], frames_jd[0],
+                                         frames_jd[-1], float(seed_factor))
+    res = recover(got["paths"], seed_motion, ref_wcs, cfg=cfg, n_obs=n_obs,
+                  method=method, cancel=cancel, sweep=True, steps=steps,
+                  pct=pct)
+    injected = None
+    if got.get("truth_at") is not None and res.get("t_mid_jd") is not None:
+        rate, pa = sky_motion(got["motion"], res["t_mid_jd"])
+        if rate is not None:
+            injected = {"rate": rate, "pa": pa}
+    found = res.get("sweep")
+    return {"injected": injected, "found": found,
+            "seed_factor": float(seed_factor),
+            "err_rate": (None if not injected or not found
+                         else float(found["rate"] - injected["rate"])),
+            "err_pa": (None if not injected or not found
+                       else pa_difference(found["pa"], injected["pa"])),
+            "detected": bool(res.get("detected")), "snr": res.get("snr"),
+            "snr_ap": None, "note": res.get("note"),
+            "truth_at": got.get("truth_at")}
+
+
 def truth_of(paths):
     # @args: paths - the injected copies (or any frames)
     # @return: [(path, x, y)] for the ones that carry the truth, in the
@@ -255,7 +390,8 @@ def truth_of(paths):
 
 
 def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
-            cancel=None, progress=None, loader=None):
+            cancel=None, progress=None, loader=None, sweep=False, steps=5,
+            pct=5.0):
     # @args: paths - the frames to measure (the injected copies), motion -
     #        callable(jd) -> (ra, dec) (the truth's own motion), ref_wcs -
     #        the reference frame's astropy WCS (the solve is NOT part of what
@@ -264,7 +400,9 @@ def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
     #        combination, cancel/progress - as usual, loader - a
     #        calibrating loader (calibration.FrameCalibrator) when the run
     #        being measured is calibrated: the SAME chain then sees the same
-    #        pixels the observer's run would
+    #        pixels the observer's run would, sweep - also run the VELOCITY
+    #        SWEEP and return what it chose (see motion_recovery), steps/pct
+    #        - the sweep's grid
     # @return: {"detected", "snr", "x", "y", "n_frames", "note"}
     # The real chain, minus the plate solve: register, place the object with
     # the ephemeris, stack along the motion, and ask the detection gate.
@@ -308,6 +446,24 @@ def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
         return {"detected": False, "snr": None, "x": None, "y": None,
                 "n_frames": sum(1 for f in frames if track_stack.usable(f)),
                 "note": "no stack could be built"}
+    found = None
+    if sweep:
+        # The velocity sweep, over the WHOLE sequence and on the cutout that
+        # holds the trail, exactly as the observer's run does it: what comes
+        # back is the velocity the pipeline chose, which is what the
+        # instrument compares with the injected one.
+        base_rate, base_pa = sky_motion(motion, t_all)
+        if base_rate is not None:
+            box_all = track_stack.cutout_box(frames, (0, len(frames)), q_all,
+                                             margin_px=64, shape=shape)
+            res_sweep = track_stack.sweep(
+                frames, q_all, base_rate, base_pa, box_all, shape, pct=pct,
+                steps=steps, method="median", cfg=cfg, loader=loader,
+                cancel=cancel)
+            best = getattr(res_sweep, "best", None)
+            if best:
+                found = {"rate": float(best.get("rate")),
+                         "pa": float(best.get("pa"))}
     # the detection speaks in the STACK's own pixels (a box), and the truth
     # lives in the reference frame's: the box's origin is what joins them.
     # Comparing the two without it is comparing two different rulers, which
@@ -334,7 +490,7 @@ def recover(paths, motion, ref_wcs, cfg=None, n_obs=1, method="sigma",
     return {"detected": bool(det.detected), "snr": float(det.snr or 0.0),
             "x": float(det.x) + float(box[0]),
             "y": float(det.y) + float(box[1]), "flux": flux,
-            "t_mid_jd": used_jd,
+            "t_mid_jd": used_jd, "sweep": found,
             "n_frames": sum(1 for f in frames if track_stack.usable(f)),
             "note": (det.notes or None) if not det.detected else None}
 

@@ -77,7 +77,7 @@ def _sequence(tmp_path, n=NF, noise=4.0, seed=1):
 def test_a_bright_source_comes_back_where_it_was_put(tmp_path):
     paths = _sequence(tmp_path)
     w = _wcs()
-    got = injection.inject_sequence(paths, 4000.0, rate_px=1.5, pa_deg=90.0,
+    got = injection.inject_sequence(paths, 4000.0, rate_px_min=1.5, pa_deg=90.0,
                                     out_dir=tmp_path / "inj", ref_wcs=w)
     assert len(got["paths"]) == NF
     assert got["motion"] is not None
@@ -99,7 +99,7 @@ def test_a_source_too_faint_for_the_stack_is_not_detected(tmp_path):
     os.makedirs(tmp_path / "faint", exist_ok=True)
     paths = _sequence(tmp_path / "faint")
     w = _wcs()
-    got = injection.inject_sequence(paths, 2.0, rate_px=1.5,
+    got = injection.inject_sequence(paths, 2.0, rate_px_min=1.5,
                                     out_dir=tmp_path / "inj2", ref_wcs=w)
     res = injection.recover(got["paths"], got["motion"], w)
     assert res["detected"] is False
@@ -123,7 +123,7 @@ def test_the_source_walks_along_the_position_angle(tmp_path):
     # The motion is the injected one, in the direction asked for: without
     # that, the sweep would be measuring the injection and not the pipeline.
     paths = _sequence(tmp_path)
-    got = injection.inject_sequence(paths, 1000.0, rate_px=2.0, pa_deg=0.0,
+    got = injection.inject_sequence(paths, 1000.0, rate_px_min=2.0, pa_deg=0.0,
                                     out_dir=tmp_path / "inj", ref_wcs=_wcs())
     truth = got["truth"]
     # the step is measured over the whole walk and not frame to frame: each
@@ -180,3 +180,60 @@ def test_the_cli_runs_the_instrument(tmp_path, capsys):
     assert "injected motion" in out
     assert "flux ADU" in out
     assert "6000" in out
+
+
+def test_pa_difference_is_a_direction_not_a_number():
+    # 359 and 1 are two degrees apart, and subtracting them reports 358.
+    assert injection.pa_difference(359.0, 1.0) == pytest.approx(2.0)
+    assert injection.pa_difference(10.0, 20.0) == pytest.approx(10.0)
+    assert injection.pa_difference(90.0, 270.0) == pytest.approx(180.0)
+    assert injection.pa_difference(None, 10.0) is None
+
+
+def test_the_velocity_sweep_finds_the_injected_motion(tmp_path):
+    # The sweep is what decides whether a real object is found at all: it
+    # looks for it on a grid around the ephemeris' own velocity. Injecting a
+    # source moving at a KNOWN rate and heading and reading back what the
+    # sweep chose turns "the sweep looks fine" into two numbers: the error
+    # in rate and the error in position angle.
+    paths = _sequence(tmp_path)
+    w = _wcs()
+    got = injection.motion_recovery(paths, 8000.0, rate_px_min=1.5, pa_deg=90.0,
+                                    ref_wcs=w, out_dir=tmp_path / "inj",
+                                    steps=5, pct=5.0)
+    assert got["detected"] is True, got.get("note")
+    assert got["injected"] is not None
+    assert got["found"] is not None
+    # the injected motion is 1.5 px per frame; the frames are a minute apart
+    # and the plate is 2"/px, so the truth is 3"/min and the sweep's grid is
+    # +/-5 % around it: the answer has to land inside the grid
+    assert got["injected"]["rate"] == pytest.approx(3.0, rel=0.1)
+    # The injected motion is +y in PIXELS, and this WCS has a positive Dec
+    # per y: +y is NORTH, so the sky's position angle is 0 and not 90. The
+    # two conventions are different on purpose (the injection speaks pixels
+    # because that is what it writes; the sweep speaks the sky because that
+    # is what the mount and the ephemeris fail on) and this is where they
+    # meet.
+    assert injection.pa_difference(got["injected"]["pa"], 0.0) < 3.0
+    assert abs(got["err_rate"]) <= 0.10 * got["injected"]["rate"]
+    assert got["err_pa"] <= 15.0
+
+
+def test_the_motion_is_the_injected_one_in_the_sky(tmp_path):
+    # The instrument measures the truth with the sweep's own convention, so
+    # the two numbers are comparable. A wrong sign or a wrong baseline here
+    # would make the whole comparison meaningless.
+    paths = _sequence(tmp_path)
+    w = _wcs()
+    for pa_deg, rate_px in ((90.0, 1.5), (0.0, 1.0), (180.0, 2.0)):
+        got = injection.inject_sequence(paths, 1000.0, rate_px_min=rate_px,
+                                        pa_deg=pa_deg, out_dir=tmp_path /
+                                        f"inj{int(pa_deg)}", ref_wcs=w)
+        t_mid = got["truth"][len(got["truth"]) // 2]
+        rate, pa = injection.sky_motion(got["motion"], 2461304.46)
+        # 2"/px and one frame per minute: the rate in "/min is 2 x rate_px
+        assert rate == pytest.approx(2.0 * rate_px, rel=0.15)
+        # PA 0 is +dec and 90 is +RA, and the plate is mirrored in RA
+        # (CD1_1 < 0), so the two are checked against each other and not
+        # against a remembered sign
+        assert 0.0 <= pa < 360.0

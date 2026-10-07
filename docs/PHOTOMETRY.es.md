@@ -516,8 +516,28 @@ saturada, así que la app **excluye esas comps/check** con el motivo explícito
 en el CSV. En sensores muy sensibles (GSENSE400) es lo que impide usar las
 estrellas más brillantes del campo.
 
+**Esto es una regla de la casa, no un detalle (ADR-066)**: nunca se usa una
+estrella saturada ni una por encima de la linealidad de tu cámara, en **ningún**
+camino que calibre con una estrella (la placa suelta, la serie, el run de
+astrometría, la propuesta de comparsas y el ajuste de apertura). Los dos techos
+salen de un solo sitio (`photometry.star_ceilings`), así que ningún camino puede
+olvidarlos, y cuando la **linealidad no está puesta** la app sigue midiendo con
+el mejor techo que tenga (la tarjeta SATURATE o el recorte de la propia placa) y
+lo **dice**, en el panel y en las notas del run, con el sitio donde se ajusta:
+medir con un techo que no es el que manda, en silencio, es como un cero punto
+malo parece bueno.
+
 Referencia rápida: `full well / ganancia` da la saturación en ADU, y la
 linealidad suele quedar por debajo. **Si cambias de ganancia, remide.**
+
+Los techos son del **sensor**, en ADU de **un** fotograma. Un apilado que
+**suma** sus tomas (el método `sum` del run de astrometría) tiene N veces el
+nivel, así que los techos se multiplican por el número de tomas antes de
+compararlos con la placa (ADR-062 rev). Sin eso, el propio cielo de un stack
+`sum` queda por encima de la linealidad de la cámara y se rechazan **todas**
+las comparadas: medido en la visita 2025 FG18 del autor (cielo 1552 ADU, 207
+tomas, linealidad 53 000) el cielo del `sum` solo ya son 321 000 ADU y el run
+no daba ninguna magnitud.
 
 ---
 

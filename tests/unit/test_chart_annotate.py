@@ -208,7 +208,7 @@ def test_the_band_says_identity_then_context():
     assert _roles(first) == [
         ("V0526 Per", ca.ROLE_NAME),
         ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
-        ("12.34 ± 0.04 (V)", ca.ROLE_MAG)]
+        ("12.34 ± 0.04 (V) (measured)", ca.ROLE_MAG)]
     assert _roles(second) == [
         ("2023-12-19 18:42 UT", ca.ROLE_CONTEXT),
         ("40.0 s", ca.ROLE_CONTEXT),
@@ -221,6 +221,37 @@ def test_the_band_says_identity_then_context():
     assert [s["field"] for s in second] == [
         "date", "exp", "filter", "equip", "stn", "psc", "fov"]
     assert [s["field"] for s in first] == ["name", "pos", "mag"]
+
+
+def test_the_band_shows_the_predicted_magnitude_when_nothing_was_measured():
+    # Asked for: when the run did not measure the brightness (a faint object,
+    # the box off) the plate must still say how bright the object should be,
+    # and it must say WHO says so: the ephemeris' prediction, not a
+    # measurement of this plate.
+    band = ca.build_band(
+        name="2026 PY9", meta=_META, wcs_info=_WCS,
+        predicted_mag={"mag": 22.21, "band": "V"}, catalog_mag=21.5)
+    first = band["lines"][0]
+    assert _roles(first) == [
+        ("2026 PY9", ca.ROLE_NAME),
+        ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
+        ("22.21 V (eph)", ca.ROLE_MAG_EPH)]
+    # a measurement of this plate always wins over the prediction
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         measured=_GOOD_MAG,
+                         predicted_mag={"mag": 22.21, "band": "V"})
+    assert _roles(band["lines"][0])[2] == ("12.34 ± 0.04 (V) (measured)",
+                                           ca.ROLE_MAG)
+    # without a prediction the catalogue's value is still there, labelled
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         catalog_mag=21.5)
+    assert _roles(band["lines"][0])[2] == ("21.50 cat", ca.ROLE_MAG_CAT)
+    # an "n.a." prediction (Horizons cannot compute it) is not a figure: the
+    # band falls through to the catalogue instead of printing "n.a."
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         predicted_mag={"mag": None, "band": "V"},
+                         catalog_mag=21.5)
+    assert _roles(band["lines"][0])[2] == ("21.50 cat", ca.ROLE_MAG_CAT)
 
 
 def test_a_plate_without_a_solution_says_what_it_cannot_say():
@@ -258,6 +289,13 @@ def test_the_magnitude_wears_the_colour_its_numbers_deserve():
     assert ca.magnitude_role({**_GOOD_MAG, "check_ok": False}) == \
         ca.ROLE_MAG_DOUBT
     assert ca.magnitude_role({**_GOOD_MAG, "clipped": True}) == \
+        ca.ROLE_MAG_DOUBT
+    # ADR-062 rev: below the detection gate the brightness is measured
+    # anyway, and it is RED whatever else it says: the object was never
+    # detected, so the number comes from the ephemeris' position
+    assert ca.magnitude_role({**_GOOD_MAG, "below_gate": True}) == \
+        ca.ROLE_MAG_DOUBT
+    assert ca.magnitude_role({**_GOOD_MAG, "flags": ["below_gate"]}) == \
         ca.ROLE_MAG_DOUBT
 
     # the light ones, which cost one step and not the measurement
@@ -331,11 +369,15 @@ def test_the_band_shows_the_measured_motion_and_position():
     assert _roles(first) == [
         ("2025 UR", ca.ROLE_NAME),
         ("RA 03 19 57.7 · Dec +49 52 07.5", ca.ROLE_POS),
-        ("12.34 ± 0.04 (V)", ca.ROLE_MAG),
+        ("12.34 ± 0.04 (V) (measured)", ca.ROLE_MAG),
         ("1.23″/min", ca.ROLE_MOTION),
-        ("PA 245°", ca.ROLE_MOTION)]
+        ("PA 245° (measured)", ca.ROLE_MOTION)]
     # the measured position is this plate's, so it never wears the (cat)
     assert "(cat)" not in first[1]["text"]
+    # and what was measured says so, the same way a prediction says (eph):
+    # an unlabelled figure would be the only one to be guessed (asked for)
+    assert "(measured)" in first[2]["text"]
+    assert "(measured)" in first[4]["text"]
     # the rate and the PA are two segments: the renderer puts its separator
     # between them, the same dot as between the other data
     assert [s["field"] for s in first] == \

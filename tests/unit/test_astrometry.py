@@ -132,6 +132,40 @@ def test_measure_stack_maps_to_sky():
     assert pt.source == "stack" and pt.snr > 20
 
 
+def test_measure_groups_gives_the_loader_only_to_the_per_frame_path():
+    # The worker passes loader=<the calibrating loader> (P5b). It belongs to
+    # the PER-FRAME path, which reads pixels; measure_stack measures the
+    # already-combined image and never reads. Forwarding it blindly to both
+    # raised "measure_stack() got an unexpected keyword argument 'loader'"
+    # and killed every calibrated run at the measurement step.
+    from nightscribe.core import track_stack
+    stack = _gaussian(x=20.3, y=18.7, size=41)
+    wcs = _wcs()
+    calls = []
+
+    def loader(path, box):
+        calls.append((path, box))
+        w, h = box[2] - box[0], box[3] - box[1]
+        yy, xx = np.mgrid[0:h, 0:w]
+        img = np.full((h, w), 1000.0, dtype=np.float32)
+        img += 2000.0 * np.exp(-((xx - 12.0) ** 2 + (yy - 12.0) ** 2)
+                               / (2 * (3.0 / 2.355) ** 2))
+        return img
+
+    frame = track_stack.Frame(path="frame0.fits")
+    frame.wcs = wcs
+    frame.object_xy = (20.0, 19.0)
+    out = ast.measure_groups(
+        [stack], [(20.0, 19.0)], wcs, frames=[frame], groups=[(0, 1)],
+        mjd_by_group=[61268.9], loader=loader, fwhm=3.0)
+    assert len(out) == 1
+    sp, fp, _flags = out[0]
+    assert sp.source == "stack" and sp.snr > 20
+    assert fp is not None and fp.source == "frames"
+    assert calls and calls[0][0] == "frame0.fits"     # the loader was used
+    assert "disagree" not in sp.flags                 # the two paths agree
+
+
 def test_compare_flags_a_disagreement():
     good = ast.AstrometryPoint(ra=30.0, dec=10.0, rms_ra=0.1, rms_dec=0.1)
     same = ast.AstrometryPoint(ra=30.0, dec=10.0, rms_ra=0.1, rms_dec=0.1)

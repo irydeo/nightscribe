@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Astrometry tab: the manual mode for a faint object, in its own small
+  non-modal window (ADR-065). The tab keeps only the checkbox and shows
+  this dialog while it is checked; the tab owns the behaviour (it writes
+  the base stack, arms the mark and wires the arrows). Loaded by
+  gui/ufe_manual_stack_dialog.py through gui/ui_loader.py; the class tag
+  matches the Python class so the i18n context carries over. The readouts
+  are data: code sets them.
+-->
+<ui version="4.0">
+ <class>UfeManualStackDialog</class>
+ <widget class="QWidget" name="UfeManualStackDialog">
+  <layout class="QVBoxLayout" name="vbox_manual">
+   <property name="leftMargin"><number>11</number></property>
+   <property name="topMargin"><number>11</number></property>
+   <property name="rightMargin"><number>11</number></property>
+   <property name="bottomMargin"><number>11</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_manual_hint">
+     <property name="text">
+      <string>Show the whole-sequence stack, click the object on it and measure from your mark: the position is yours (refined to the centroid and nudged by hand), the velocity is the ephemeris', and the sweep is not run. Useful for an object below the detection gate and to place a detected one's centroid by eye.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_manual_show">
+     <property name="text"><string>Show the stack and mark…</string></property>
+     <property name="toolTip">
+      <string>Brings the whole-sequence stack to the main view and arms the mark: click the object on it. The click is refined to the local centroid. The stack is saved with the run, so this works on a run reopened later too</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_manual">
+     <item>
+      <layout class="QGridLayout" name="grid_nudge">
+       <item row="0" column="1"><widget class="QPushButton" name="btn_up"><property name="text"><string>↑</string></property><property name="toolTip"><string>Move the mark up 0.1 px</string></property></widget></item>
+       <item row="1" column="0"><widget class="QPushButton" name="btn_left"><property name="text"><string>←</string></property><property name="toolTip"><string>Move the mark left 0.1 px</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLabel" name="lbl_nudge"><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="minimumSize"><size><width>80</width><height>0</height></size></property></widget></item>
+       <item row="1" column="2"><widget class="QPushButton" name="btn_right"><property name="text"><string>→</string></property><property name="toolTip"><string>Move the mark right 0.1 px</string></property></widget></item>
+       <item row="2" column="1"><widget class="QPushButton" name="btn_down"><property name="text"><string>↓</string></property><property name="toolTip"><string>Move the mark down 0.1 px</string></property></widget></item>
+      </layout>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_nudge_reset">
+       <property name="text"><string>0</string></property>
+       <property name="toolTip"><string>Back to the marked centroid</string></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_manual">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_manual_mark">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chk_show_cross">
+     <property name="checked"><bool>true</bool></property>
+     <property name="text"><string>Show the cross at the mark</string></property>
+     <property name="toolTip">
+      <string>A short crosshair on the marked point, so you can see exactly where the centroid sits while you nudge it. Turn it off for an unobstructed look</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_manual_measure">
+     <property name="enabled"><bool>false</bool></property>
+     <property name="text"><string>Measure at the mark</string></property>
+     <property name="toolTip">
+      <string>Runs the pipeline again with the object centred on your mark: the detection gate is bypassed (your mark is the detection) and the velocity sweep is not run</string>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

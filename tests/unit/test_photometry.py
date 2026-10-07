@@ -1300,3 +1300,118 @@ def test_auto_picks_the_estimator_the_data_can_afford():
     bad = phot.estimate_fwhm(noisy, [(40.0, 40.0)], method="moments")
     assert bad > 2.0 * got                  # the pedestal, in action
     assert got == pytest.approx(true, rel=0.35)
+
+
+def test_a_summed_stack_is_compared_against_the_sensors_own_limits():
+    # The ceilings (saturation, linearity) are the SENSOR's, in the units of
+    # ONE frame; a stack that ADDS its frames has N times the level. Without
+    # knowing the scale, a sum stack's own sky sits above the camera's
+    # linearity and EVERY comparison star is thrown out: measured on the
+    # author's own 2025 FG18 visit (sky 1552 ADU, linearity 53000, 207
+    # frames) the sum's sky alone is 321 000 ADU and the run reported no
+    # magnitude at all.
+    n, size = 12, 96
+    yy, xx = np.mgrid[0:size, 0:size]
+
+    def star(x, y, amp):
+        return amp * np.exp(-(((xx - x) ** 2 + (yy - y) ** 2)
+                              / (2 * 1.8 ** 2)))
+    rng = np.random.default_rng(4)
+    cube = rng.normal(500.0, 12.0, (n, size, size)).astype(np.float32)
+    comps = ((24, 24, 9000.0), (72, 24, 8500.0),
+             (24, 72, 8800.0), (72, 72, 9200.0))
+    for (sx, sy, amp) in comps:
+        cube += star(sx, sy, amp).astype(np.float32)
+    cube += star(48.0, 48.0, 900.0).astype(np.float32)   # the object
+    # The flat WCS maps pixel to sky one to one, which is all this needs.
+    # The comps' catalogues come from their own amplitudes (a constant offset
+    # is irrelevant: the zero point absorbs it and what is compared here is
+    # the SAME recipe on the same plate).
+    entries = []
+    for i, (sx, sy, amp) in enumerate(comps):
+        mag = -2.5 * math.log10(amp) + 12.0
+        entries.append({"name": f"C{i + 1}", "kind": "comp",
+                        "star": {"ra": float(sx), "dec": float(sy),
+                                 "mag": mag, "band": "V",
+                                 "bands": [{"label": "V", "value": mag,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    base = dict(target_xy=(48.0, 48.0), entries=entries, header={},
+                wcs=_FlatWcs(), band="V", fallback_band="V",
+                radii=(6.0, 10.0, 15.0), fwhm=None,
+                linear_adu=53000.0, site_saturate=53000.0)
+    # 1) a mean-like stack: the sensor's limits apply as they are
+    plain = phot.measure_plate(cube.mean(axis=0),
+                               phot.PlateConfig(**base))
+    assert plain.ok and plain.mag is not None, plain.reason
+    # 2) the SAME stack summed, told that it adds n frames: same answer
+    scaled = phot.measure_plate(
+        cube.sum(axis=0), phot.PlateConfig(stack_scale=float(n), **base))
+    assert scaled.ok and scaled.mag is not None, scaled.reason
+    assert scaled.mag == pytest.approx(plain.mag, abs=0.05)
+    # 3) and without the scale the comps are rejected: what was happening
+    naive = phot.measure_plate(cube.sum(axis=0), phot.PlateConfig(**base))
+    assert naive.mag is None
+
+
+def test_star_ceilings_are_the_one_home_of_the_rule():
+    # ADR-066, the rule of the house: a star whose peak reaches the
+    # detector's saturation OR the camera's linearity is NEVER used. Each
+    # caller used to pass the two ceilings by hand and one path (the series'
+    # aperture tuning) forgot; star_ceilings is the one home they all ask.
+    from nightscribe.core import photometry as phot
+    hdr = {"SATURATE": 60000.0}
+    cfg = {"ccd_saturate": 55000.0, "cam_linearity_adu": 45000.0}
+    # the header's own card wins over the setting, as it always did
+    assert phot.star_ceilings(hdr, cfg) == (60000.0, 45000.0)
+    # a per-run recipe wins over the camera profile (the PlateConfig's own)
+    assert phot.star_ceilings({}, cfg, linear_adu=30000.0,
+                              saturate=50000.0) == (50000.0, 30000.0)
+    # nothing known: both None, and measure_point infers from the plate
+    assert phot.star_ceilings({}, None) == (None, None)
+    # and the effective ceiling (the minimum) keeps working as before
+    assert phot.effective_ceiling(hdr, cfg) == 45000.0
+
+
+def test_a_star_over_the_camera_linearity_is_never_used():
+    # The rule, on the measurement itself: the star is refused with its own
+    # reason (distinct from a hard saturation, so the panel can say which
+    # limit was hit) and it cannot reach a zero point.
+    from nightscribe.core import photometry as phot
+    size = 64
+    yy, xx = np.mgrid[0:size, 0:size]
+
+    def star(x, y, amp, sky=100.0):
+        return sky + amp * np.exp(-(((xx - x) ** 2 + (yy - y) ** 2)
+                                    / (2 * 2.0 ** 2)))
+    data = star(32.0, 32.0, 50000.0)          # a bright, unclipped core
+    r = phot.measure_point(data, 32.0, 32.0, r_ap=6.0, r_ann_in=10.0,
+                           r_ann_out=15.0, sat_adu=65000.0,
+                           linear_adu=40000.0)
+    assert r["ok"] is False
+    assert r.get("nonlinear") is True and r.get("saturated") is False
+    assert "linealidad" in r["reason"]["es"]
+    # the same star under the limit is used
+    ok = phot.measure_point(data, 32.0, 32.0, r_ap=6.0, r_ann_in=10.0,
+                            r_ann_out=15.0, sat_adu=65000.0,
+                            linear_adu=60000.0)
+    assert ok["ok"] is True and ok["flux"] > 0
+    # and at the saturation it is refused as saturated
+    sat = phot.measure_point(data, 32.0, 32.0, r_ap=6.0, r_ann_in=10.0,
+                             r_ann_out=15.0, sat_adu=45000.0,
+                             linear_adu=60000.0)
+    assert sat["ok"] is False and sat.get("saturated") is True
+
+
+def test_an_unknown_linearity_is_said_out_loud():
+    # Asked for 2026-10-06: with the linearity unset the app used to fall back
+    # to the SATURATE card or the plate's clip in SILENCE, and a star over
+    # the (unknown) linearity slips through. It is said instead, and with the
+    # place where the number is set.
+    from nightscribe.core import photometry as phot
+    warn = phot.ceiling_warning({}, {})
+    assert warn is not None
+    assert "linearity" in warn["en"] and "linealidad" in warn["es"]
+    assert "Settings" in warn["en"] and "Ajustes" in warn["es"]
+    # with the linearity known there is nothing to say
+    assert phot.ceiling_warning({}, {"cam_linearity_adu": 45000.0}) is None

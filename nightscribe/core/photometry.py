@@ -1287,6 +1287,56 @@ def linearity_ceiling(cfg):
     return None
 
 
+def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
+    # THE TWO CEILINGS EVERY STAR MUST CLEAR, from ONE place (ADR-066).
+    #
+    # The rule, asked for as a rule of the house: a star whose peak reaches
+    # the detector's saturation OR the camera's linearity limit is NEVER used
+    # to build a zero point. A clipped core is not proportional at all, and a
+    # star above the linearity limit calibrates nothing even when it is not
+    # clipped yet (its flux stopped following the light): the zero point it
+    # would set is a number that looks fine and is wrong.
+    #
+    # Each caller used to pass these two numbers by hand, and one path (the
+    # series' aperture tuning) forgot: one home means no path can forget.
+    #
+    # @args: header - the plate's header dict, cfg - a config-like object
+    #        with .get (or None), linear_adu - an explicit linearity limit
+    #        (a per-run recipe wins over the camera profile), saturate - an
+    #        explicit saturation ceiling (same)
+    # @return: (saturation, linearity) in ADU, either of them None when
+    #          nobody knows. The header's own SATURATE card still wins over
+    #          the setting, exactly as before.
+    cfg_like = {"ccd_saturate": saturate} if saturate is not None else cfg
+    sat = saturation_ceiling(header, cfg_like)
+    lin = linear_adu if linear_adu is not None else linearity_ceiling(cfg)
+    return sat, lin
+
+
+def ceiling_warning(header, cfg=None, linear_adu=None, saturate=None):
+    # @args: as star_ceilings
+    # @return: a bilingual warning when the camera's LINEARITY limit is not
+    #          known (so the app is measuring with the best ceiling it has,
+    #          which is not the same thing), or None when it is.
+    # Asked for 2026-10-06: with the linearity unset the app used to fall back
+    # to the SATURATE card or to the plate's own clip in SILENCE, and a star
+    # that is over the (unknown) linearity but under the clip slips through.
+    # The observer has to know which limit is being enforced.
+    _sat, lin = star_ceilings(header, cfg, linear_adu=linear_adu,
+                              saturate=saturate)
+    if lin is not None:
+        return None
+    return {"es": "No sé el límite de linealidad de tu cámara: estoy "
+                  "midiendo con el mejor techo que tengo (la tarjeta "
+                  "SATURATE o el recorte de la propia placa). Ponlo en "
+                  "Ajustes → Perfil de cámara para que la regla se cumpla "
+                  "de verdad.",
+            "en": "I do not know your camera's linearity limit: I am "
+                  "measuring with the best ceiling I have (the SATURATE card "
+                  "or the plate's own clip). Set it in Settings → Camera "
+                  "profile so the rule really holds."}
+
+
 def effective_ceiling(header, cfg=None, linear_adu=None):
     # The single, honest ceiling the photometry obeys: the MINIMUM of the
     # known limits. The camera profile's linearity is usually the strictest
@@ -2054,6 +2104,19 @@ class PlateConfig:
                                     # even without a catalog value
     linear_adu: float = None        # the camera profile's linearity limit
                                     # (per gain), or None when unset
+    stack_scale: float = 1.0        # how many frames the plate ADDS: N for a
+                                    # "sum" stack, 1 for a mean/median/sigma.
+                                    # The ceilings are the SENSOR's, in the
+                                    # units of ONE frame, so on a sum stack
+                                    # they are multiplied by this before the
+                                    # plate's own level is compared against
+                                    # them. Measured on the author's own 2025
+                                    # FG18 visit (sky 1552 ADU, camera
+                                    # linearity 53000, 207 frames): the sum's
+                                    # sky alone is 321 000 ADU, six times the
+                                    # linearity, so every comparison star was
+                                    # rejected and the run reported no
+                                    # magnitude at all.
     # site (Ajustes, ADR-028): the same values the panel has always used
     site_gain: float = None
     site_ron: float = None
@@ -2167,11 +2230,26 @@ def measure_plate(image, cfg):
     scale = float(cfg.comp_scale) if cfg.comp_image is not None else 1.0
     radii = tuple(cfg.radii) if cfg.radii else (R_AP, R_ANN_IN, R_ANN_OUT)
     fwhm = cfg.fwhm
-    sat = saturation_ceiling(cfg.header,
-                             {"ccd_saturate": cfg.site_saturate})
+    # The ceilings are the SENSOR's, in the units of ONE frame; a stack that
+    # ADDS its frames ("sum") has N times the level. A pixel saturates when
+    # the FRAME it came from did, and on a sum stack the per-frame equivalent
+    # of a plate value V is V/N, so the ceilings are multiplied by the scale
+    # and the same test (plate value against ceiling) answers the same
+    # question. Without this, a sum stack's own sky (measured on the author's
+    # own 2025 FG18 visit: 1552 ADU per frame, 207 frames, so 321 000 ADU in
+    # the sum) sat six times above the camera's linearity of 53 000 and EVERY
+    # comparison star was thrown out: the run reported no magnitude at all.
+    stack_scale = max(1.0, float(getattr(cfg, "stack_scale", 1.0) or 1.0))
+    # THE TWO CEILINGS, from their one home (ADR-066). The per-run recipe's
+    # linearity and the site's saturation setting travel in the PlateConfig;
+    # the header's SATURATE card still wins, as it always did.
+    sat, lin = star_ceilings(cfg.header, None, linear_adu=cfg.linear_adu,
+                             saturate=cfg.site_saturate)
+    sat = (sat * stack_scale) if sat is not None else None
     # the camera profile's linearity limit is in plate ADU; it does not
     # apply to a resampled/downsampled work frame (host subtraction)
-    lin = cfg.linear_adu if scale == 1.0 else None
+    lin = lin if scale == 1.0 else None
+    lin = (lin * stack_scale) if lin is not None else None
     res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
                       sigma_clip=cfg.sigmaclip)
     # ---- the targets ------------------------------------------------

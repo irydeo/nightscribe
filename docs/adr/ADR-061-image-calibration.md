@@ -60,6 +60,31 @@ calibración pasa a ser la primera fase del pipeline de astrometría y una mejor
 para la fotometría. Tests con masters sintéticos: la aritmética exacta, el
 matching por tolerancia y la ausencia sin excepción.
 
+**Revisión (2026-10-06): la calibración es un servicio, no una pestaña de un
+motor**. Se pidió usarla más allá de la astrometría, y el estado anterior lo
+impedía por confuso: la política del pseudo-flat estaba **duplicada** (una
+casilla en la pestaña Calibración que leía `calib_pseudo_flat` y **nunca** lo
+escribía, y otra en Ajustes que sí lo escribía y era la que leía el stack), así
+que el interruptor que el observador tocaba no era el que funcionaba, y la
+casilla «Aplicar la calibración al stack» **no se guardaba** (se reseteaba en
+cada reconstrucción). Lo que cambia:
+
+- **Un solo sitio para la receta, la biblioteca y la política del pseudo-flat**:
+  la pestaña Calibración. Su casilla de pseudo-flat ahora **escribe** la clave y
+  es la única; se retira la de Ajustes (Ajustes conserva la biblioteca de
+  masters). Su botón se distingue de «aplicar»: es una pasada puntual sobre la
+  visita que exporta copias si se pide.
+- **Cada motor se apunta con su propia casilla**, junto a donde se lanza: en
+  Astrometría, «Aplicar la calibración al apilado» (`calib_astrometry`),
+  persistida. Una **pista de una línea** dice antes de lanzar qué va a pasar con
+  los píxeles (dark/bias, flat real o pseudo-flat, o que el viñeteado se queda),
+  tomada de la **misma** receta resuelta (una sola fuente, vía el host), y un
+  botón **«Calibración…»** es el enlace profundo a la pestaña, como el de la
+  receta de fotometría.
+- **La extensión es una casilla**: cuando la serie fotométrica quiera calibrar,
+  añade su `chk_calibrate`, su pista y su enlace, y lee la misma receta y el
+  mismo `FrameCalibrator`. Nada que desmontar.
+
 ## English
 
 **Context**: NightScribe does not calibrate images. It only uses dark current
@@ -103,3 +128,122 @@ plain-language warnings instead of exceptions when a piece is missing; and
 calibration becomes the first phase of the astrometry pipeline and an improvement
 for photometry. Tests with synthetic masters: exact arithmetic, tolerance
 matching and absence without exception.
+
+**Revision (2026-10-06): calibration is a service, not one engine's tab**. It
+was asked to be usable beyond astrometry, and the previous state got in the way
+by being confusing: the pseudo-flat policy was **duplicated** (a checkbox in the
+Calibration tab that read `calib_pseudo_flat` and **never** wrote it, and one in
+Settings that did write it and was the one the stack read), so the switch the
+observer touched was not the one that worked; and the "Apply the calibration to
+the stack" checkbox was **not saved** (it reset on every rebuild). What changes:
+
+- **One home for the recipe, the library and the pseudo-flat policy**: the
+  Calibration tab. Its pseudo-flat checkbox now **writes** the key and is the
+  only one; the Settings one is retired (Settings keeps the master library). Its
+  button is told apart from "apply": it is a one-off pass over the visit that
+  exports copies if asked.
+- **Every engine opts in with its own checkbox**, next to where it is launched:
+  in Astrometry, "Apply the calibration to the stack" (`calib_astrometry`),
+  persisted. A **one-line hint** says before the run what will happen to the
+  pixels (dark/bias, a real or pseudo flat, or that the vignetting stays), taken
+  from the **same** resolved recipe (one source, through the host), and a
+  **"Calibration…"** button is the deep link to the tab, like the photometry
+  recipe's.
+- **Extending it is one checkbox**: when the photometric series wants to
+  calibrate, it adds its own `chk_calibrate`, hint and link, and reads the same
+  recipe and the same `FrameCalibrator`. Nothing to dismantle.
+
+**Revisión (2026-10-06): el defecto de la calibración sigue a la biblioteca.**
+Con los ajustes escondidos (ADR-038 rev), el valor por defecto es el que manda,
+y «apagada» no era el bueno: la calibración quita el viñeteado y el polvo del
+tren óptico, y medido en una visita real el viñeteado suave solo ya vale 0.087
+mag de error sistemático. La clave `calib_astrometry` pasa a **tres estados**:
+
+- **ausente** = nadie ha elegido todavía, y decide la biblioteca: la casilla se
+  enciende si la receta resuelta tiene un **offset o un flat real** para esa
+  cámara y ese filtro (`UfeCalibrationTab.has_masters()`, reenviado por el
+  diálogo). Un «no lo sé» (sin visita, primer frame ilegible) la deja apagada:
+  encenderla sin saberlo prometería una calibración que nadie ha verificado.
+- **0 / 1** = la palabra del observador, y no se pisa nunca.
+
+Dos detalles que la implementación respeta: la elección automática **no se
+escribe** (se marca la casilla con `blockSignals`, así el `toggled` no la
+guarda como si fuera del observador y la congelaría para siempre), y el
+subtítulo del botón dice qué masters se aplican, para que el defecto no sea
+invisible.
+
+**Revision (2026-10-06): the calibration's default follows the library.** With
+the knobs hidden (ADR-038 rev) the default is what decides, and "off" was not
+the right one: the calibration removes the optical train's vignetting and dust,
+and measured on a real visit the smooth vignetting alone is worth 0.087 mag of
+systematic error. The `calib_astrometry` key becomes **three-state**:
+
+- **absent** = nobody has chosen yet, and the library decides: the checkbox
+  comes on when the resolved recipe has an **offset or a real flat** for this
+  camera and filter (`UfeCalibrationTab.has_masters()`, forwarded by the
+  dialog). An "I do not know" (no visit, unreadable first frame) leaves it off:
+  turning it on without knowing would promise a calibration nobody verified.
+- **0 / 1** = the observer's word, and it is never overridden.
+
+Two details the implementation respects: the automatic choice is **not
+written** (the box is set with `blockSignals`, so the `toggled` does not save it
+as if it were the observer's and freeze it forever), and the button's subtitle
+says which masters are applied, so the default is never invisible.
+
+**Revisión (2026-10-06): un flat no comparte la ganancia, y el pseudo-flat que
+lleva las estrellas se sustituye por un modelo suave.** Tres correcciones
+medidas sobre las visitas reales del autor (2025 FG18 y 2025 HL5):
+
+1. **La ganancia sale del emparejamiento del flat.** Un flat se **normaliza**
+   antes de aplicarse, así que la ganancia solo escala su nivel entero, nunca su
+   forma: exigirla era rechazar flats reales. Medido: los flats de esa noche se
+   tomaron a ganancia 3 y las tomas a ganancia 5, así que la biblioteca
+   respondía «no hay flat» y la visita caía al pseudo-flat. El **dark sí la
+   conserva** (ahí el nivel ES la señal) y el dark de los flats también.
+2. **La biblioteca se rellena desde donde se lee la receta.** El botón «Añadir
+   masters…» vive ahora en la pestaña Calibración del editor (con su combo de
+   tipo), no solo en Ajustes: un observador con 150 flats de una noche no tenía
+   forma de meterlos desde donde se lee la receta. El diálogo abre el selector y
+   el host indexa (la pestaña nunca toca la base de datos), y la línea de la
+   receta se vuelve a resolver para que se vea qué cambió.
+3. **Un flat que lleva las estrellas es peor que ningún flat.** Con montura
+   sidereal las estrellas no se mueven entre tomas y el percentil las conserva:
+   cada estrella se divide por sí misma. Medido en esa visita (16 tomas):
+   `residual_pct = 2.8091`, rango del flat 0.683–2.724, y una comparada sobre
+   una estrella brillante salía 1.08 mag desviada. Lo que sí queda de esas tomas
+   es el **viñeteado**, que es suave y fijo: se enmascaran las fuentes (lo que
+   está a más de 5σ sobre el percentil suavizado, dilatable 12 px) y se ajusta
+   una superficie de grado 4. Medido contra el flat real de la misma noche: la
+   relación tiene mediana 0.9963 y p5–p95 0.954–1.045 (concuerda al ~3 %); la
+   estructura fina que no corrige (el polvo) vale 0.611 % = 0.007 mag. El
+   resultado se dice por lo que es (`kind = "vignette_model"`), nunca como un
+   flat completo.
+
+**Revision (2026-10-06): a flat does not share the gain, and a pseudo-flat that
+carries the stars becomes a smooth model.** Three fixes measured on the author's
+real visits (2025 FG18 and 2025 HL5):
+
+1. **The gain leaves the flat's match.** A flat is **normalised** before it is
+   applied, so the gain only scales its whole level, never its shape: requiring
+   it rejected real flats. Measured: that night's flats were taken at gain 3 and
+   the lights at gain 5, so the library answered "no flat" and the visit fell
+   back to a pseudo-flat. The **dark keeps it** (there the level IS the signal),
+   and so does the dark of the flats.
+2. **The library is filled from where the recipe is read.** The "Add masters…"
+   button now lives in the editor's Calibration tab (with its kind combo), not
+   only in Settings: an observer with 150 flats of one night had no way to put
+   them in from where the recipe is read. The dialog opens the picker and the
+   host indexes (the tab never touches the database), and the recipe line is
+   resolved again so what changed is visible.
+3. **A flat that carries the stars is worse than no flat.** With a sidereal
+   mount the stars do not move between frames and the percentile keeps them:
+   every star is divided by itself. Measured on that visit (16 frames):
+   `residual_pct = 2.8091`, flat range 0.683–2.724, and a comparison star
+   sitting on a bright star came out 1.08 mag off. What IS usable from those
+   frames is the **vignetting**, which is smooth and fixed: the sources are
+   masked (what is more than 5σ above the smoothed percentile, dilated by
+   12 px) and a degree-4 surface is fitted. Measured against the real flat of
+   the same night: the ratio has a median of 0.9963 and p5–p95 of 0.954–1.045
+   (agreement within ~3 %); the fine structure it does not correct (the dust) is
+   worth 0.611 % = 0.007 mag. The result is said for what it is
+   (`kind = "vignette_model"`), never as a full flat.

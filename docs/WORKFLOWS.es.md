@@ -1060,7 +1060,11 @@ mando** (Mark done/Skip junto a Go →; las secciones conservan solo un pie
 discreto); la **prominencia a tres niveles** (primario visible / menú ⋯ /
 bloque colapsable con título en lenguaje llano — Calibration y «Lo que
 guardaste de la sesión» arrancan cerrados; las herramientas de fotometría
-tras un ⋯); el **ciclo de vida consolidado** en el ⋯ de la cabecera del
+tras un ⋯), **afinada el 2026-10-06**: en Fotometría y Astrometría el
+primario es **un botón grande pintado en el color del tipo de objeto**, con
+una línea que dice lo que hará, y todos los ajustes en bloques **cerrados**
+(ADR-038 rev), y **todo, incluidos los resultados, en tarjetas con
+borde** (un grupo sin borde no deja ver dónde acaba); el **ciclo de vida consolidado** en el ⋯ de la cabecera del
 proyecto; el **control CCDciel completando su mudanza a Observatory**
 (grupo «Live capture» — Send plan lee el plan guardado del objetivo);
 **Campaigns como sala de guerra** («Está pasando ahora» — renombrado desde

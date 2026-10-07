@@ -880,7 +880,11 @@ card as the step machine's command center** (Mark done/Skip beside Go →;
 sections keep only a discreet footer); **three-level action prominence**
 (primary visible / ⋯ menu / collapsed block with a plain-language title —
 Calibration and "What you kept from the session" start closed; photometry
-tools behind one ⋯); the **project lifecycle consolidated** into the
+tools behind one ⋯), **sharpened on 2026-10-06**: in Photometry and
+Astrometry the primary is **a big button painted in the object kind's
+colour**, with a line saying what it will do, and every knob in **closed**
+blocks (ADR-038 rev), and **everything, the results included, in bordered
+cards** (a group without a border does not show where it ends); the **project lifecycle consolidated** into the
 header ⋯ menu; the **CCDciel live control completing its move to
 Observatory** ("Live capture" group — Send plan reads the selected
 target's saved plan); **Campaigns as the war room** ("Happening now" —

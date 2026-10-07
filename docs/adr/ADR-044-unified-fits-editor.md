@@ -598,3 +598,374 @@ feature to the editor does not modify `ufe_dialog.py` beyond an
 `add_feature_tab`. The legacy dialogs stay frozen while the UFE matures;
 phase B is the only one touching legacy code, and only to re-export
 (`viz/blink_view.py` keeps compatibility).
+
+**Revisión (2026-10-06): la calibración se enlaza desde el motor que la usa.**
+El editor mantiene la pestaña **Calibración** como casa única de la receta, la
+biblioteca de masters y la política del pseudo-flat, y **cada motor se apunta**
+desde su propia pestaña: en Astrometría, «Aplicar la calibración al apilado»
+(persistida), una **pista de una línea** con lo que va a pasar con los píxeles y
+un botón **«Calibración…»** que es el enlace profundo a la pestaña, con el mismo
+patrón que el enlace a la receta de fotometría. El diálogo expone
+`calibration_summary()` (que reenvía al resumen de una línea de la pestaña
+Calibración) para que la pista no duplique la resolución de la receta. Ajustes
+deja de duplicar la política del pseudo-flat: conserva solo la biblioteca.
+
+**Revision (2026-10-06): calibration is linked from the engine that uses it.**
+The editor keeps the **Calibration** tab as the single home of the recipe, the
+master library and the pseudo-flat policy, and **every engine opts in** from its
+own tab: in Astrometry, "Apply the calibration to the stack" (persisted), a
+**one-line hint** with what will happen to the pixels, and a **"Calibration…"**
+button that is the deep link to the tab, the same pattern as the photometry
+recipe's. The dialog exposes `calibration_summary()` (which forwards the
+Calibration tab's one-liner) so the hint does not resolve the recipe twice.
+Settings stops duplicating the pseudo-flat policy: it keeps only the library.
+
+**Revisión (2026-10-06): las pestañas que eran recados son ventanas.** La
+columna derecha tenía cinco pestañas: Blink, Fotometría, Anotar, Calibración
+y Astrometría. Tres de ellas (Blink, Calibración, Anotar) y la serie
+fotométrica **no son lo que un observador hace todo el rato**: son recados, y
+cada una pagaba una columna permanente de 380 px y un título. Se pidió lo
+contrario: un botón en la barra y el panel en una ventana que se abre encima
+de la placa. Así queda:
+
+- **La columna conserva los dos paneles donde se vive**: Fotometría
+  (Comparaciones + Medir) y Astrometría. La pestaña sigue siendo el mismo
+  `QTabWidget` y `add_feature_tab` sigue siendo toda la API de extensión.
+- **Los cuatro recados son ventanas no modales** (`gui/ufe_tool_dialog.py`),
+  alojando el panel que ya existía: la clase y su `.ui` no cambian (ADR-005
+  intacto) y la ventana no tiene estructura propia que diseñar (un área de
+  contenido), así que no lleva `.ui`. El tamaño se mide en el primer
+  `showEvent`, sobre las filas ya colocadas, como documenta `UfeManualDialog`
+  (las pistas de tamaño mienten sobre el alto de un formulario).
+- **Una a la vez y el escenario**: la ventana abierta manda sobre la placa
+  (`set_active(True)`: el frame del blink, la marca y los clics de anotar);
+  al cerrarse el escenario vuelve al panel seleccionado, y abrir otra cierra
+  la anterior (nunca hay duda de quién manda). **Solo lo toman las que lo
+  necesitan**: Blink (su frame) y Anotar (los clics); Calibrar es un panel de
+  receta y la serie un panel de ejecución, y quitarle el escenario a
+  Fotometría mientras corre una serie apagaría los anillos de la secuencia
+  justo cuando se quieren ver. Un panel sin escenario conserva sus
+  superposiciones si le corresponden.
+- **El escenario se resuelve en un solo sitio** (`_apply_stage`), y el
+  cursor de pick lo sigue (los paneles y las herramientas declaran
+  `pick_clicks`). Cambiar de panel en la columna **no** le roba la placa a
+  una ventana abierta.
+- **Los deep links siguen funcionando**: `show_tab("blink" | "calibration" |
+  "annotate" | "series")` (o el propio widget) abre la ventana; el host no
+  cambió una línea. `show_tab` rearma el escenario aunque el panel pedido ya
+  estuviera seleccionado (un deep link que no emite señal dejaría el panel
+  sin armar).
+- **Al salir del banco, las ventanas se esconden** (`leave_view()`, que llama
+  el shell al cambiar de vista): son hijas de la página y colgarían sobre el
+  proyecto. Escondidas, nunca destruidas: al volver están donde estaban.
+- **Los cuatro botones van en una puerta (Herramientas ▾) y no en la barra**,
+  por una razón medida: cuatro etiquetas cuestan 331 px, la barra pasa de 508
+  a 1039 y el **distintivo del proyecto** (lo único que dice en qué proyecto
+  trabajas) se comprime desde 1100 px hacia abajo. Dentro de la puerta cada
+  botón conserva su icono y su etiqueta, que es lo que se pidió.
+- **Image | Light curve** deja su fila propia (encima de la placa) y pasa al
+  extremo derecho de la barra: es una vista del **centro**, así que pertenece
+  a la barra. Los botones son los mismos widgets y el cableado no cambió.
+
+**Revision (2026-10-06): the tabs that were errands are windows.** The right
+column had five tabs: Blink, Photometry, Annotate, Calibration and Astrometry.
+Three of them (Blink, Calibration, Annotate) and the photometric series **are
+not what an observer does all the time**: they are errands, and each paid for a
+permanent 380 px column and a title. What was asked for is the opposite: a
+button in the bar and the panel in a window over the plate. This is how it
+lands:
+
+- **The column keeps the two panels where the work happens**: Photometry
+  (Comparisons + Measure) and Astrometry. The tab widget is the same one and
+  `add_feature_tab` is still the whole extension API.
+- **The four errands are non-modal windows** (`gui/ufe_tool_dialog.py`)
+  hosting the panel that already existed: the class and its `.ui` do not
+  change (ADR-005 intact) and the window has no structure of its own to design
+  (one content area), so it carries no `.ui`. The size is measured on the
+  first `showEvent`, on the laid-out rows, as `UfeManualDialog` documents (the
+  size hints lie about a form's height).
+- **One at a time, and the stage**: the open window owns the plate
+  (`set_active(True)`: the blink frame, the annotate marker and clicks);
+  closing it hands the stage back to the selected panel, and opening another
+  closes the previous one (there is never a question of who owns it). **Only
+  the ones that need it take it**: Blink (its own frame) and Annotate (the
+  clicks); Calibration is a recipe panel and the series is a run panel, and
+  taking the stage from Photometry while a series runs would drop the
+  sequence's rings exactly when they are wanted. A panel without the stage
+  keeps its overlays when they belong to it.
+- **The stage is resolved in one place** (`_apply_stage`), and the pick cursor
+  follows it (panels and tools declare `pick_clicks`). Switching the panel in
+  the column does **not** steal the plate from an open window.
+- **The deep links keep working**: `show_tab("blink" | "calibration" |
+  "annotate" | "series")` (or the widget itself) opens the window; the host
+  did not change a line. `show_tab` re-arms the stage even when the requested
+  panel was already selected (a deep link that emits no signal would leave the
+  panel unarmed).
+- **Leaving the workbench hides the windows** (`leave_view()`, which the shell
+  calls on every view change): they are children of the page and would hang
+  over the project. Hidden, never destroyed: coming back finds them where they
+  were.
+- **The four buttons live in a door (Tools ▾) and not in the bar**, for a
+  measured reason: four labels cost 331 px, the bar goes from 508 to 1039 and
+  the **project badge** (the one thing that says which project you are working
+  on) is squeezed from 1100 px down. Inside the door each button keeps its icon
+  and its label, which is what was asked for.
+- **Image | Light curve** leaves its own row (above the plate) and moves to the
+  right end of the bar: it is a view of the **centre**, so it belongs to the
+  bar. The buttons are the same widgets and the wiring did not change.
+
+**Revisión (2026-10-06, segunda del día): los recados, en su fila, y los
+fotogramas de la visita a la vista.**
+
+1. **Los cuatro recados vuelven a la barra como botones independientes**
+   (pedido: la puerta no valía). Están en **su propia fila** bajo la barra, no
+   dentro de ella, y el motivo está medido: con el tema aplicado, cuatro
+   botones de icono cuestan 232 px y dentro de la barra dejaban al distintivo
+   del proyecto sin sitio desde 1200 px hacia abajo (a 900 no cabía ni el
+   nombre). En su fila, la barra mide 1060 px y el distintivo conserva el
+   nombre desde ~1100. Los cuatro siguen el ajuste `ufe_bar_icons`: icono con
+   su tooltip por defecto, icono y etiqueta si el observador los enciende.
+   (La puerta de la revisión anterior queda retirada.)
+2. **El botón héroe cabe siempre** (`gui/widgets/hero_fit.py`): un QPushButton
+   ni parte la línea ni elide, así que la etiqueta se recorta a la anchura real
+   en cada `resize` y el ancho del botón deja de depender de su texto. Medido:
+   «Construir la secuencia (comparsas)…» pide 329 px y la columna puede bajar a
+   280 (262 útiles): antes se salía, ahora se lee entera o elidida con puntos.
+3. **El panel de Astrometría recupera lo que el refactor a grupos dejó
+   escondido**: la tabla de «Measurement per observation», su título y la tira
+   de previews por observación se quedaron invisibles para siempre (el
+   `_show_result_area` antiguo los mostraba y el bucle sobre las secciones los
+   perdió). Es la regresión que dejaba ese grupo vacío.
+4. **Los fotogramas de la visita, en previews** (`gui/widgets/frame_previews.py`
+   en el panel izquierdo): una lista vertical con una miniatura de 140 px por
+   toma, su nombre, sus números en el tooltip (tamaño en disco, cielo medido,
+   filtro, exposición, fecha) y las **marcas de problema** que hacen útil una
+   lista de doscientas tomas: ilegible, sin registrar por el último run. Con un
+   filtro «solo problemas», el clic abre la toma en el editor y el menú
+   contextual la quita de la visita (desenlaza, el fichero no se toca) o la
+   mueve a `descartados/` (nada se borra). La lectura es **muestreada**
+   (`fits_io.read_sample`: una fila de cada N, ~1 MB por toma de 2048² en vez
+   de 16 MB) y va en un worker.
+
+**Revision (2026-10-06, second of the day): the errands in their own row, and
+the visit's frames in sight.**
+
+1. **The four errands are back in the bar as independent buttons** (asked for:
+   the door did not do). They live in **their own row** under the bar, not
+   inside it, and the reason is measured: with the theme applied, four icon
+   buttons cost 232 px and inside the bar they left the project badge without
+   room from 1200 px down (at 900 not even the name fitted). In their row the
+   bar measures 1060 px and the badge keeps its name from ~1100. The four follow
+   the `ufe_bar_icons` setting: icon with its tooltip by default, icon and label
+   when the observer turns the labels on. (The door of the previous revision is
+   withdrawn.)
+2. **The hero button always fits** (`gui/widgets/hero_fit.py`): a QPushButton
+   neither wraps nor elides, so its label is trimmed to the real width on every
+   `resize` and the button's width stops depending on its text. Measured:
+   "Build the sequence (comparisons)…" asks for 329 px and the column can go
+   down to 280 (262 usable): it used to run over its own edges, now it reads
+   whole or elided with dots.
+3. **The Astrometry panel gets back what the refactor to groups left hidden**:
+   the "Measurement per observation" table, its title and the per-observation
+   strip of previews stayed invisible for good (the old `_show_result_area`
+   showed them and the loop over the sections lost them). That is the regression
+   that left that group empty.
+4. **The visit's frames, as previews** (`gui/widgets/frame_previews.py` in the
+   left panel): a vertical list with a 140 px thumbnail per frame, its name, its
+   numbers in the tooltip (size on disk, measured sky, filter, exposure, date)
+   and the **problem marks** that make a list of two hundred frames useful:
+   unreadable, not registered by the last run. With an "only problems" filter,
+   a click opens the frame in the editor and the context menu takes it out of
+   the visit (unlink, the file is not touched) or moves it to `discarded/`
+   (nothing is deleted). The read is **sampled** (`fits_io.read_sample`: one row
+   out of every N, ~1 MB per 2048² frame instead of 16 MB) and runs in a worker.
+
+**Revisión (2026-10-06, tercera del día): la miniatura ocupa la columna y la
+leyenda va encima.** La lista de previews nació con miniaturas de 140 px y la
+leyenda al lado (dos líneas de texto por fila). Se pidió lo contrario: la
+imagen lo más grande posible y el texto encima.
+
+- **La lista llena el alto**: el espaciador final del panel de la visita era
+  `Expanding` y se llevaba 264 px de 640 (medido); pasa a `Fixed` y la lista
+  pasa de 264 a 518 px.
+- **La miniatura se ajusta al ancho de la lista** en cada `resize` (140 px
+  antes, **252** en una columna de 300, y sigue al divisor). La proporción de
+  la toma se respeta: una no cuadrada ajusta al ancho y se centra.
+- **La leyenda se pinta SOBRE la imagen** con un delegado propio
+  (`QStyledItemDelegate`): tipo de 11 px, **en rojo** (`theme.C_EVENT`) con un
+  contorno oscuro y una banda semitransparente debajo, para que se lea sobre
+  un cielo negro o sobre una nebulosa brillante. La fila es la imagen y nada
+  más: los 24 px que gastaba la leyenda lateral son los que pagan la imagen
+  más grande. El nombre completo sigue en el tooltip y en el texto del ítem.
+- **El aviso de problema cambia de canal**: como la leyenda es roja para
+  todas, una toma ilegible o sin registrar lleva **borde rojo** alrededor de
+  la miniatura (y la palabra en la leyenda). El contador y el filtro «Solo
+  problemas» no cambian.
+- **La muestra se lee a 320 px** (`read_sample(max_px=320)`, ~2 MB por toma de
+  2048² en vez de 1): una muestra más pequeña que la miniatura se vería
+  blanda. El coste de una visita de 200 sigue siendo un segundo.
+- **Lo que cuesta**: con miniaturas de ~250 px se ven dos tomas por pantalla,
+  así que recorrer una visita larga es cosa del filtro y del navegador.
+
+**Revision (2026-10-06, third of the day): the preview takes the column and the
+caption rides on it.** The preview list was born with 140 px thumbnails and the
+caption beside them (two lines of text per row). What was asked for is the
+opposite: the image as big as possible and the text over it.
+
+- **The list fills the height**: the visit panel's trailing spacer was
+  `Expanding` and took 264 px of 640 (measured); it is `Fixed` now and the list
+  goes from 264 to 518 px.
+- **The preview fits the list's width** on every `resize` (140 px before, **252**
+  in a 300 px column, and it follows the splitter). The frame's own proportions
+  are kept: a non-square one fits the width and is centred.
+- **The caption is painted ON the image** by a delegate of its own
+  (`QStyledItemDelegate`): 11 px type, **in red** (`theme.C_EVENT`) with a dark
+  outline and a semi-transparent band under it, so it reads over black sky and
+  over a bright nebula alike. The row is the image and nothing else: the 24 px
+  the side caption took are what pays for the bigger picture. The whole name
+  stays in the tooltip and in the item's text.
+- **The problem mark changes channel**: since the caption is red for every
+  frame, one that cannot be read or was not registered wears a **red border**
+  around the preview (and the word in the caption). The count and the "only
+  problems" filter do not change.
+- **The sample is read at 320 px** (`read_sample(max_px=320)`, ~2 MB per 2048²
+  frame instead of 1): a sample smaller than the preview would be shown soft.
+  A 200-frame visit is still a second.
+- **What it costs**: with ~250 px previews, two frames fit on screen, so walking
+  a long visit is the filter's and the navigator's job.
+
+**Revisión (2026-10-06, cuarta del día): la leyenda en el color del objeto y
+EXOTIC con la serie.**
+
+1. **La leyenda de las previews deja el rojo y viste el color del tipo de
+   objeto** (pedido: el rojo se lee como error). El color sale del mismo
+   payload que ya usan el chip, el botón héroe y las espinas de los bloques
+   (`project_accent()`), con el acento de la app como respaldo cuando el
+   editor se abre sin proyecto; el diálogo lo reparte donde ya reparte los
+   demás (`set_project_badge`). El **rojo queda para lo que es un problema**:
+   el borde de la miniatura y la palabra de aviso, que el delegado pinta en
+   rojo después del nombre (la leyenda se parte por el símbolo ⚠ y cada mitad
+   va de su color). El contorno oscuro y la banda siguen ahí, así que
+   cualquiera de los colores del tipo se lee sobre cielo o sobre nebulosa.
+2. **El bloque EXOTIC se muda a la ventana de la serie fotométrica** (pedido:
+   es su sitio). Un ajuste de tránsito ES la serie de una visita de tránsito,
+   así que el bloque vive en la ventana de «Serie», debajo del bloque de
+   serie, y el panel de la visita se queda con el navegador y las previews.
+   El bloque tiene su propio `.ui` (`gui/ui/ufe_exotic_block.ui`, con la misma
+   clase `UfeDialog` para que las traducciones no se muevan de contexto), la
+   ventana de serie aloja un cuerpo con los dos bloques, y el comportamiento
+   no cambia: sigue apareciendo solo en tránsitos con secuencia armada, con
+   los mismos hooks y los mismos botones (que ahora cuelgan de `exotic.*`).
+
+**Revision (2026-10-06, fourth of the day): the caption in the object's colour
+and EXOTIC with the series.**
+
+1. **The previews' caption leaves red and wears the object kind's colour**
+   (asked for: red reads as an error). The colour comes from the same payload
+   the chip, the hero button and the block spines already use
+   (`project_accent()`), with the app's accent as the fallback when the editor
+   is opened with no project; the dialog hands it out where it hands out the
+   rest (`set_project_badge`). **Red stays for what is a problem**: the
+   preview's border and the warning word, which the delegate paints in red
+   after the name (the caption is split on the ⚠ and each half goes in its own
+   colour). The dark outline and the band stay, so any of the kind colours
+   reads over sky and over a nebula.
+2. **The EXOTIC block moves to the photometric series window** (asked for: it
+   belongs there). A transit fit IS the series of a transit visit, so the
+   block lives in the "Series" window, under the series block, and the visit
+   panel keeps the navigator and the previews. The block has its own `.ui`
+   (`gui/ui/ufe_exotic_block.ui`, with the same `UfeDialog` class so the
+   translations do not change context), the series window hosts a body with
+   both blocks, and the behaviour does not change: it still appears only in
+   transits with an armed sequence, with the same hooks and the same buttons
+   (which now hang from `exotic.*`).
+
+**Revisión (2026-10-06, quinta del día): la banda de los paneles cabe su
+contenido.**
+
+Se reportó que «los mensajes de la derecha se cortan». Medido: la columna de
+los paneles medía **380 px (362 útiles)** y el contenido del panel de
+Astrometría necesitaba **396**, así que aparecía una **barra horizontal** y las
+etiquetas que sobresalían se cortaban (`lbl_recipe` pedía 276 y recibía 213).
+Las dos filas que forzaban ese mínimo estaban en «Stacking settings»:
+
+- la casilla de la calibración y su botón compartían línea (334 px): la casilla
+  pasa a **«Aplicar la calibración»** (la explicación larga ya vivía en su
+  tooltip) y la fila baja a 272;
+- «Campo» y «Margen» compartían línea (368 px): el margen **baja a su propia
+  fila** y los dos combos aceptan encogerse
+  (`AdjustToMinimumContentsLengthWithIcon` + `minimumContentsLength`), con lo
+  que un combo deja de imponer el ancho de su ítem más largo.
+
+Con eso el mínimo del panel queda en **331** y cabe sin barra horizontal. Y la
+columna **abre más ancha**: `_TABS_W` de 380 a **420** y `_TABS_MAX_W` de 520 a
+**560** (el divisor sigue arrastrándose), para que los mensajes y el botón
+héroe tengan aire; la placa se queda con el resto.
+
+La línea de estado deja además de elidirse y **envuelve hasta tres líneas**
+(con tope de altura): lo que había que evitar era el crecimiento sin freno (el
+párrafo que medía 204 px), no que el mensaje se lea. El texto completo sigue en
+el tooltip y en la línea única de la ventana.
+
+Un test lo vigila: con un run en Astrometría y todo desplegado, a la anchura
+por defecto no hay barra horizontal, ninguna etiqueta visible se corta (las que
+envuelven tienen la altura que su texto pide) y el mínimo del panel cabe.
+
+**Revision (2026-10-06, fifth of the day): the panel column fits its content.**
+
+Reported: "the messages on the right get cut". Measured: the panels' column was
+**380 px (362 usable)** and the Astrometry panel's content needed **396**, so a
+**horizontal scrollbar** appeared and the labels that stuck out were cut
+(`lbl_recipe` asked for 276 and was given 213). The two rows that forced that
+minimum were in "Stacking settings":
+
+- the calibration checkbox and its button shared a line (334 px): the checkbox
+  becomes **"Apply the calibration"** (the long explanation already lived in
+  its tooltip) and the row drops to 272;
+- "Field" and "Margin" shared a line (368 px): the margin **moves to its own
+  row** and both combos accept shrinking
+  (`AdjustToMinimumContentsLengthWithIcon` + `minimumContentsLength`), so a
+  combo stops imposing the width of its longest entry.
+
+With that the panel's minimum is **331** and it fits with no horizontal
+scrollbar. And the column **opens wider**: `_TABS_W` from 380 to **420** and
+`_TABS_MAX_W` from 520 to **560** (the splitter still drags), so the messages
+and the hero button have air; the plate keeps the rest.
+
+The Astrometry status line also stops eliding and **wraps up to three lines**
+(capped height): what had to be avoided was unbounded growth (the paragraph
+that measured 204 px), not the message being readable. The whole text stays in
+the tooltip and in the window's single line.
+
+A test watches it: with a run in Astrometry and everything expanded, at the
+default width there is no horizontal scrollbar, no visible label is cut (the
+wrapping ones have the height their text asks for) and the panel's minimum fits.
+
+**Revisión (2026-10-06, sexta del día): fuera la entrada ad-hoc de Blink.**
+El menú Herramientas llevaba «Blink (ad-hoc)…», que con el editor unificado en
+marcha (el defecto) abría la ventana de Blink del banco de imágenes, la misma
+que ya tiene su botón en la fila de herramientas, y con el editor apagado
+abría el diálogo clásico. Se pidió quitarla: era una segunda puerta a lo mismo.
+
+- Fuera la entrada del menú, su acción (`action_blink`) y su manejador
+  (`_tools_blink`): nada los usaba ya.
+- **El diálogo clásico se queda en el código, sin puerta** (decisión del
+  observador): `_open_blink_dialog` y `blink_tab.ui` siguen ahí, documentados
+  como el camino clásico al que hoy no llega nada de la interfaz, y con su test
+  funcional. Es el camino de vuelta si algún día se quiere una entrada otra vez.
+- La puerta del observador es el botón **Blink** del banco de imágenes, que no
+  se toca.
+
+**Revision (2026-10-06, sixth of the day): the ad-hoc Blink entry is gone.**
+The Tools menu carried "Blink (ad-hoc)…", which with the unified editor on (the
+default) opened the editor's own Blink window, the one that already has its
+button in the tools row, and with the editor off opened the classic dialog. It
+was asked out: it was a second door to the same thing.
+
+- The menu entry, its action (`action_blink`) and its handler (`_tools_blink`)
+  are gone: nothing used them any more.
+- **The classic dialog stays in the code, without a door** (the observer's
+  choice): `_open_blink_dialog` and `blink_tab.ui` are still there, documented
+  as the classic path nothing in the interface reaches today, with their
+  functional test. It is the way back if a door is ever wanted again.
+- The observer's door is the workbench's **Blink** button, which is untouched.

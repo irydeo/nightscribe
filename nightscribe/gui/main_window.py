@@ -580,8 +580,45 @@ class MainWindow(QMainWindow):
         # its plate and stretch survive); its workers are only shut down
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
         self._shell_stack().setCurrentIndex(index)
+        self._sync_sky_bar(index)
+        if index != VIEW_UFE:
+            # the workbench's tool windows (Blink, Calibrate, Annotate, the
+            # series) are floating windows of its page: they must not hang
+            # over the view the observer just opened. The workbench itself
+            # stays alive (ADR-047).
+            ufe = getattr(self, "_ufe", None)
+            leave = getattr(ufe, "leave_view", None)
+            if callable(leave):
+                leave()
         if index == VIEW_PROJECTS:
             self._sync_projects_pane()
+
+    def _sync_sky_bar(self, index):
+        # The night (Moon, darkness, planets and the event chips) lives in
+        # the navigation row and is useful while planning. Inside the image
+        # workbench it is only noise: the observer is looking at a plate, not
+        # at tonight, and the row is the one piece of chrome the workbench
+        # cannot hide. Asked for: out of the UFE, in everywhere else.
+        # @args: index - the view just opened
+        # @return: None. The bar is HIDDEN, never destroyed, so its state
+        #          (texts, chips) is where it was when the observer returns;
+        #          the refresh is skipped while it is out of sight and run
+        #          again on the way back, so nothing is rebuilt for nobody.
+        bar = getattr(self, "_sky_bar", None)
+        if bar is None:
+            return
+        if index == VIEW_UFE:
+            self._sky_bar_out = True
+            bar.setVisible(False)
+            return
+        if getattr(self, "_sky_bar_out", False):
+            self._sky_bar_out = False
+            bar.setVisible(True)
+            # the bar was frozen while the workbench was open: tonight has
+            # moved (or the site has), so it is filled again on the way back
+            self.refresh_sky_bar()
+        else:
+            bar.setVisible(True)
 
     # ---------------- navigation history (Interfaz 1.1, ADR-056) ---------
 
@@ -1226,12 +1263,21 @@ class MainWindow(QMainWindow):
         drop_in(host.parentWidget().layout(), host, self._sky_bar)
         # the sky-event chips land in the bar from now on
         self._sky_chips_row = self._sky_bar.chips
+        # the workbench hides the whole bar (see _sync_sky_bar): the flag is
+        # the source of truth, not isVisible(), which is also False before
+        # the window is first shown
+        self._sky_bar_out = False
         self.refresh_sky_bar()
 
     def refresh_sky_bar(self):
         # Recomputes the bar from the site. All local ephemeris, so it can
         # afford to run whenever the site or the clock may have moved.
-        # @return: None
+        # @return: None. While the workbench has the bar hidden (it is out of
+        #          sight) the work is skipped: the chips are rebuilt on the
+        #          way back (see _sync_sky_bar), and nothing is computed for
+        #          a row nobody can see.
+        if getattr(self, "_sky_bar_out", False):
+            return
         from ..core import night_brief as nb
         try:
             lat = float(config.get("lat") or 0.0)
@@ -1442,7 +1488,6 @@ class MainWindow(QMainWindow):
         self._menus.action_welcome.triggered.connect(
             lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
-        self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
             self._tools_campaigns)
 
@@ -2009,6 +2054,31 @@ class MainWindow(QMainWindow):
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
+        # The astrometry's own settings (ADR-062). They lived ONLY in the
+        # config file until 2026-10-06: the report said "Settings →
+        # Astrometry" and there was no such place, so the submission floor
+        # (the one that decides whether a report has lines at all) could not
+        # be changed from the app.
+        dlg.spn_astro_gate.setValue(float(config.get("astrometry_snr_sigma",
+                                                     3.5)))
+        dlg.spn_astro_floor.setValue(float(config.get(
+            "astrometry_submit_snr", 10.0)))
+        dlg.spn_astro_sweep_pct.setValue(float(config.get(
+            "astrometry_sweep_pct", 5.0)))
+        dlg.spn_astro_steps.setValue(int(config.get(
+            "astrometry_sweep_steps", 25)))
+        dlg.spn_astro_margin.setValue(int(config.get(
+            "astrometry_cutout_margin_px", 64)))
+        dlg.chk_astro_check.setChecked(bool(config.get(
+            "astrometry_check_enabled", True)))
+        dlg.spn_astro_check_sigma.setValue(float(config.get(
+            "astrometry_check_sigma", 3.0)))
+        dlg.spn_astro_check_floor.setValue(float(config.get(
+            "astrometry_check_floor_arcsec", 1.0)))
+        dlg.spn_astro_check_window.setValue(int(config.get(
+            "astrometry_check_window_days", 30)))
+        dlg.spn_astro_threads.setValue(int(config.get(
+            "astrometry_threads", 0)))
         # plate solver (ADR-051): auto | astap | astrometry
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
@@ -2162,17 +2232,15 @@ class MainWindow(QMainWindow):
             lambda: dlg.edt_projects_root.setText(""))
         # the master library (ADR-061): the editor's Calibration tab
         # resolves a recipe against it and names the master it uses, so
-        # the place that fills the library belongs in Settings
-        # the pseudo-flat's default lives WITH the library it belongs to:
-        # a setting without a widget is a setting nobody can find
-        dlg.chk_calib_pseudo_flat.setChecked(
-            bool(config.get("calib_pseudo_flat", False)))
+        # the place that fills the library belongs in Settings. The
+        # pseudo-flat policy lives WITH the recipe, in that tab: it used to
+        # be duplicated here, and the copy that the stack read was not the
+        # one the observer saw.
         self._settings_masters_init(dlg)
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
             return
-        config.set("calib_pseudo_flat", dlg.chk_calib_pseudo_flat.isChecked())
         config.set("mpc_code", dlg.edt_mpc_code.text().strip().upper())
         config.set("observatory_name", dlg.edt_obs_name.text().strip())
         config.set("lat", dlg.spn_lat.value())
@@ -2185,6 +2253,20 @@ class MainWindow(QMainWindow):
         config.set("min_alt", dlg.spn_min_alt.value())
         config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
+        config.set("astrometry_snr_sigma", dlg.spn_astro_gate.value())
+        config.set("astrometry_submit_snr", dlg.spn_astro_floor.value())
+        config.set("astrometry_sweep_pct", dlg.spn_astro_sweep_pct.value())
+        config.set("astrometry_sweep_steps", dlg.spn_astro_steps.value())
+        config.set("astrometry_cutout_margin_px", dlg.spn_astro_margin.value())
+        config.set("astrometry_check_enabled",
+                   dlg.chk_astro_check.isChecked())
+        config.set("astrometry_check_sigma",
+                   dlg.spn_astro_check_sigma.value())
+        config.set("astrometry_check_floor_arcsec",
+                   dlg.spn_astro_check_floor.value())
+        config.set("astrometry_check_window_days",
+                   dlg.spn_astro_check_window.value())
+        config.set("astrometry_threads", dlg.spn_astro_threads.value())
         config.set("solver", dlg.cmb_solver.currentData() or "auto")
         config.set("astap_path", dlg.edt_astap_path.text().strip())
         config.set("findorb_path", dlg.edt_findorb_path.text().strip())
@@ -2360,21 +2442,15 @@ class MainWindow(QMainWindow):
         item = dlg.tbl_masters.item(rows[0].row(), 0)
         return item.data(Qt.UserRole) if item is not None else None
 
-    def _settings_master_add(self, dlg):
-        # @args: dlg - the settings dialog
-        # @return: None. The files are INDEXED, never copied or moved: a
-        #          master can be big and the library only needs to know
-        #          where it is and what makes it valid (camera, gain,
-        #          temperature, exposure, filter). Any of those the file's
-        #          own header carries is read from it.
+    def _masters_index_files(self, kind, files):
+        # @args: kind - one of core.calibration.KINDS, files - the FITS paths
+        # @return: (added, repeated, failed) with failed = [(name, why)].
+        # One home for the indexing, shared by the Settings dialog and the
+        # editor's Calibration tab (ADR-061 rev): a master is INDEXED, never
+        # copied or moved, and what makes it valid is read from its own
+        # header.
         from pathlib import Path
         from ..core import calibration
-        files, _sel = QFileDialog.getOpenFileNames(
-            dlg, self.tr("Add masters"), "",
-            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
-        if not files:
-            return
-        kind = dlg.cmb_master_kind.currentData() or "dark"
         known = {m.path for m in calibration.list_masters(db, kind=kind)}
         added, repeated, failed = 0, 0, []
         for path in files:
@@ -2387,7 +2463,12 @@ class MainWindow(QMainWindow):
             except Exception as err:
                 # one unreadable file must not lose the rest of the batch
                 failed.append((Path(path).name, str(err)))
-        self._settings_masters_refresh(dlg)
+        return added, repeated, failed
+
+    def _masters_add_words(self, kind, added, repeated, failed):
+        # @args: kind - the kind indexed, added/repeated - counts, failed -
+        #        [(name, why)]
+        # @return: the result in words, for the label that asked for it
         bits = [self.tr("Indexed %1 masters (%2).").replace(
             "%1", str(added)).replace("%2", self._master_kind_label(kind))
             if added else self.tr("Nothing new to index.")]
@@ -2396,7 +2477,40 @@ class MainWindow(QMainWindow):
                 "%1", str(repeated)))
         for name, why in failed[:3]:
             bits.append(f"✕ {name}: {why}")
-        dlg.lbl_master_status.setText("  ".join(bits))
+        return "  ".join(bits)
+
+    def _ufe_add_masters(self, kind):
+        # ADR-061 rev: the editor's Calibration tab fills the library from
+        # where the recipe is read. The tab never touches the database: this
+        # opens the dialog and answers with words.
+        # @args: kind - one of core.calibration.KINDS
+        # @return: what happened, in words ("" when nothing was chosen)
+        files, _sel = QFileDialog.getOpenFileNames(
+            self, self.tr("Add masters"), "",
+            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
+        if not files:
+            return ""
+        added, repeated, failed = self._masters_index_files(kind, files)
+        return self._masters_add_words(kind, added, repeated, failed)
+
+    def _settings_master_add(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The files are INDEXED, never copied or moved: a
+        #          master can be big and the library only needs to know
+        #          where it is and what makes it valid (camera, gain,
+        #          temperature, exposure, filter). Any of those the file's
+        #          own header carries is read from it.
+        from ..core import calibration
+        files, _sel = QFileDialog.getOpenFileNames(
+            dlg, self.tr("Add masters"), "",
+            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
+        if not files:
+            return
+        kind = dlg.cmb_master_kind.currentData() or "dark"
+        added, repeated, failed = self._masters_index_files(kind, files)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self._masters_add_words(kind, added, repeated, failed))
 
     def _settings_master_remove(self, dlg):
         # @args: dlg - the settings dialog
@@ -4081,6 +4195,7 @@ class MainWindow(QMainWindow):
         from ..core import kinds as _kinds
         detail_text = _kinds.context_line(kind, p.get("context") or {})
         return {
+            "kind": kind,
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
             "campaign_name": camp_names.get(p.get("campaign_id")),
@@ -9570,14 +9685,6 @@ class MainWindow(QMainWindow):
         if ok and name.strip():
             self._open_explore_dialog(name.strip())
 
-    def _tools_blink(self):
-        # ADR-044: with the UFE as default the ad-hoc blink opens in the
-        # editor; the classic dialog stays one setting away
-        if self._use_ufe():
-            self._ufe_open("blink")
-            return
-        self._open_blink_dialog()
-
     def _tools_campaigns(self):
         # Campaigns live in their own top-level tab (UX-a; supersedes
         # the modal manager of ADR-035 V-j). Also the hub button.
@@ -9859,6 +9966,14 @@ class MainWindow(QMainWindow):
 
     def _open_blink_dialog(self, sn_name=None, ra=None, dec=None,
                             fits_path=None):
+        # THE CLASSIC BLINK, WITHOUT A DOOR (2026-10-06). The Tools menu used
+        # to carry "Blink (ad-hoc)…", which with the unified editor on (the
+        # default) opened the editor's own Blink window and, with it off,
+        # this dialog. The entry was redundant with the workbench's Blink
+        # button, so it was removed; this path is kept because the observer
+        # asked for it (it is the way back if a door is ever wanted again)
+        # and because a functional test drives it. Nothing in the interface
+        # reaches it today.
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Blink"))
         dlg.resize(1100, 640)
@@ -10682,9 +10797,32 @@ class MainWindow(QMainWindow):
                 astro_hook(
                     lambda: self._ufe_astrometry_context(hook_pid,
                                                          session_id))
+            # ADR-065: the run the visit already holds, so reopening it
+            # SHOWS the result instead of an empty column. Goes with the
+            # context hook (the tab asks for it as soon as it is armed).
+            result_hook = getattr(dlg, "set_astrometry_result_hook", None)
+            if callable(result_hook):
+                result_hook(
+                    lambda: self._ufe_astrometry_result(hook_pid, session_id))
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(self._ufe_mpc_send)
+            # ADR-061 rev: the Calibration tab fills the master library from
+            # where the recipe is read (it used to be only in Settings, so an
+            # observer with real flats had no way to put them in)
+            masters_hook = getattr(dlg, "set_add_masters_hook", None)
+            if callable(masters_hook):
+                masters_hook(self._ufe_add_masters)
+            # the visit's frames, from the editor's preview list (2026-10-06):
+            # the panel never touches the registry, it asks the host, and the
+            # frames can be taken out of the visit or moved aside
+            frames_hook = getattr(dlg, "set_visit_frames_hooks", None)
+            if callable(frames_hook):
+                frames_hook(
+                    lambda paths: self._ufe_frames_remove(hook_pid,
+                                                          session_id, paths),
+                    lambda paths: self._ufe_frames_discard(hook_pid,
+                                                           session_id, paths))
             # ADR-062, phase 8: the run is persisted by the HOST (the tab
             # never touches the database), with its undo per execution
             persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
@@ -10761,6 +10899,9 @@ class MainWindow(QMainWindow):
             astro_hook = getattr(dlg, "set_astrometry_hook", None)
             if callable(astro_hook):
                 astro_hook(None)
+            result_hook = getattr(dlg, "set_astrometry_result_hook", None)
+            if callable(result_hook):
+                result_hook(None)
             persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
             if callable(persist_hook):
                 persist_hook(None)
@@ -10773,6 +10914,12 @@ class MainWindow(QMainWindow):
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
+            masters_hook = getattr(dlg, "set_add_masters_hook", None)
+            if callable(masters_hook):
+                masters_hook(None)
+            frames_hook = getattr(dlg, "set_visit_frames_hooks", None)
+            if callable(frames_hook):
+                frames_hook(None, None)
             dlg.set_exotic_hooks(None, None)
             dlg.set_sequence_hook(None)
             passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
@@ -11104,6 +11251,83 @@ class MainWindow(QMainWindow):
 
     # ---------------- UFE plate resets (ADR-047) ----------------
 
+    def _ufe_frames_remove(self, pid, session_id, paths):
+        # @args: pid - project id, session_id - the visit, paths - the frames
+        #        to take out of it
+        # @return: what happened, in words
+        # The editor's preview list asks for this: the frames stop being part
+        # of the visit (the registry row goes) and NOTHING on disk is touched
+        # (project.delete_file unlinks, it never deletes). The frames can be
+        # attached again from the visit's window.
+        taken = 0
+        wanted = {str(p) for p in (paths or [])}
+        for f in project.files_for_session(db, session_id):
+            if str(f.get("path")) not in wanted:
+                continue
+            if project.delete_file(db, f["id"]):
+                taken += 1
+        if taken:
+            # the tab's own context (frames, plan, result) is re-read: what
+            # is on screen is what the visit holds now
+            self._refresh_visit_after_frames(pid, session_id)
+        return (self.tr("%1 frames are no longer part of the visit "
+                        "(the files stay where they are).").replace(
+                            "%1", str(taken)) if taken
+                else self.tr("Nothing was taken out: those frames are not "
+                             "part of this visit any more."))
+
+    def _ufe_frames_discard(self, pid, session_id, paths):
+        # @args: pid - project id, session_id - the visit, paths - the frames
+        #        to move aside
+        # @return: what happened, in words
+        # A REAL move, into `descartados/` inside the project (free_space
+        # does the work and the registry follows it). Nothing is deleted and
+        # the frames can be brought back from that folder.
+        from ..core import free_space
+        p = project.get(db, pid) or {}
+        storage = project.storage_dir(p) if p else None
+        if not storage:
+            return self.tr("This project has no folder to move them into.")
+        report = free_space.discard_files(db, paths, storage)
+        if report.moved:
+            self._refresh_visit_after_frames(pid, session_id)
+        bits = [self.tr("%1 frames moved to discarded/.").replace(
+            "%1", str(report.moved))]
+        if report.skipped:
+            bits.append(self.tr("%1 were not there any more.").replace(
+                "%1", str(len(report.skipped))))
+        for err in report.errors[:2]:
+            bits.append(f"✕ {err}")
+        return " ".join(bits)
+
+    def _refresh_visit_after_frames(self, pid, session_id):
+        # @args: pid - project id, session_id - the visit
+        # @return: None. The editor's own context (its frame list, the
+        #          astrometry tab's sequence, the visit's window) is told
+        #          that the visit changed: the frames are the visit's, and
+        #          half of the app reads them.
+        dlg = getattr(self, "_ufe", None)
+        if dlg is not None:
+            hook = getattr(dlg, "refresh_visit_context", None)
+            if callable(hook):
+                try:
+                    hook()
+                except Exception as err:      # a refresh never breaks a move
+                    logger.warning("visit context refresh failed: %s", err)
+        self._visit_sync(pid, session_id)
+
+    def _visit_sync(self, pid, session_id):
+        # @args: pid - project id, session_id - the visit
+        # @return: None. The visit's window, when it is open, is told too
+        #          (the panel's own refresh repopulates its resources).
+        win = self._visit_window()
+        refresh = getattr(win, "refresh", None)
+        if callable(refresh):
+            try:
+                refresh()
+            except Exception as err:
+                logger.warning("the visit's window could not refresh: %s", err)
+
     def _ufe_series_context(self, pid, session_id, scope="visit"):
         # ADR-048 (D8): the series works from a visit's frames, never a
         # folder dialog. No visit (or no FITS in it): no series block.
@@ -11181,6 +11405,77 @@ class MainWindow(QMainWindow):
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}
 
+    def _astrometry_summary(self, payload):
+        # @args: payload - the worker's result dict
+        # @return: a JSON-safe summary of the run, stored in the run's own
+        #          cfg_json so the visit can RESTORE it (ADR-065): the
+        #          detection, the sweep, the brightness, the registration and
+        #          the check. The heavy pieces already have a home (the
+        #          stacks are files, the points are rows); this is what
+        #          neither of them carries, and it needs no schema change.
+        import json
+        def _scalar(v):
+            # numpy scalars are not JSON's: .item() unwraps them (a
+            # np.bool_ serialised by default=str would come back as the
+            # STRING "True", which is truthy for the wrong reason)
+            if v is None or isinstance(v, (bool, int, float, str)):
+                return v
+            item = getattr(v, "item", None)
+            if callable(item):
+                try:
+                    return _scalar(item())
+                except Exception:
+                    return str(v)
+            if isinstance(v, (list, tuple)):
+                return [_scalar(x) for x in v]
+            if isinstance(v, dict):
+                return {str(k): _scalar(x) for k, x in v.items()}
+            return str(v)
+        def _obj(o, keys):
+            if o is None:
+                return None
+            return {k: _scalar(getattr(o, k, None)) for k in keys}
+        summary = {
+            "method": payload.get("method"),
+            "ephem_source": payload.get("ephem_source"),
+            "n_failed": payload.get("n_failed"),
+            "n_off_frame": payload.get("n_off_frame"),
+            "phot_skipped": bool(payload.get("phot_skipped")),
+            # What the manual mode needs to place a mark on a run that was
+            # REOPENED: the base stack's cutout origin in the reference grid
+            # (the mark is in the stack's pixels and the pipeline wants the
+            # grid). The stack itself is a file in the project.
+            "box_all": _scalar(payload.get("box_all")),
+            "base_rate": _scalar(payload.get("base_rate")),
+            "base_pa": _scalar(payload.get("base_pa")),
+            # The ephemeris' own answer about the light: the band shows it,
+            # labelled, when the run did not measure the brightness.
+            "ephem_mag": _scalar(payload.get("ephem_mag")),
+            "ephem_band": _scalar(payload.get("ephem_band")),
+            "ephem_mag_source": _scalar(payload.get("ephem_mag_source")),
+            "detection": _obj(payload.get("detection"),
+                              ("detected", "snr", "x", "y", "fwhm",
+                               "roundness", "mag_limit", "notes")),
+            "dither": _obj(payload.get("dither"),
+                           ("dithered", "spread_px", "note")),
+            "wcs_qc": _obj(payload.get("wcs_qc"),
+                           ("checked", "max_offset_arcsec", "ok", "note")),
+            "sweep": _obj(payload.get("sweep"), ("best", "grid", "method")),
+            "check": _obj(payload.get("check"),
+                          ("available", "blocked", "outlier", "no_reference",
+                           "our_residual", "scatter", "z", "n_others",
+                           "n_stations", "note")),
+            "photometry": _scalar(payload.get("photometry")),
+            "register_report": _scalar(payload.get("register_report")),
+            "calibration": _scalar(payload.get("calibration")),
+        }
+        try:
+            return json.loads(json.dumps(summary, ensure_ascii=False))
+        except (TypeError, ValueError) as err:  # never lose a run over this
+            logger.warning("the astrometry summary is not serialisable: %s",
+                           err)
+            return {}
+
     def _ufe_astrometry_persist(self, pid, session_id, payload):
         # ADR-062, phase 8: one execution, its observations and the frame
         # manifest land in the database (the tab never touches it). The run
@@ -11212,7 +11507,10 @@ class MainWindow(QMainWindow):
             cfg={"n_obs": payload.get("n_obs"),
                  "method": payload.get("method"),
                  "n_failed": payload.get("n_failed"),
-                 "snr_gate": gate, "submit_snr": floor},
+                 "snr_gate": gate, "submit_snr": floor,
+                 # the run's own words, JSON-safe: this is what the visit
+                 # paints again when it is reopened (ADR-065)
+                 "result": self._astrometry_summary(payload)},
             status=status, object_name=p.get("object_name") or "",
             method=payload.get("method") or "", n_frames=len(frames),
             n_obs=len(points), rate_arcsec_min=best.get("rate"),
@@ -11273,6 +11571,38 @@ class MainWindow(QMainWindow):
         if self._project_widgets.get("astrometry_runs_tbl") is not None:
             self._analysis_astrometry_refresh(pid)
         return run_id
+
+    def _ufe_astrometry_result(self, pid, session_id):
+        # ADR-065: what the visit already holds, so reopening it SHOWS the
+        # run instead of an empty column. The last complete (or
+        # not-detected) execution of THIS visit, its points and the stack
+        # files the visit registered. Nothing is recomputed here: the tab
+        # paints it.
+        # @args: pid - project id, session_id - the visit
+        # @return: {"run", "points", "stacks"} or None
+        from ..core import astrometry_store as store
+        if pid is None or session_id is None:
+            return None
+        try:
+            runs = [r for r in store.list_runs(db, pid)
+                    if r.get("session_id") == session_id
+                    and r.get("status") in ("complete", "not_detected")]
+        except Exception as err:
+            logger.warning("the astrometry runs could not be listed: %s", err)
+            return None
+        if not runs:
+            return None
+        run = runs[-1]                    # oldest first: the newest one wins
+        try:
+            points = store.points_for_run(db, run["id"])
+            files = project.files_for_session(db, session_id)
+        except Exception as err:
+            logger.warning("the astrometry result could not be read: %s", err)
+            return None
+        stacks = [f.get("path") for f in files
+                  if (f.get("kind") == "stack") and f.get("path")
+                  and Path(str(f["path"])).exists()]
+        return {"run": run, "points": points, "stacks": stacks}
 
     def _ufe_manual_magnitude(self, run_id, group_index, mag, band=None):
         # @args: run_id - the execution, group_index - the observation,

@@ -386,6 +386,9 @@ def test_generating_the_report_shows_why_an_observation_was_left_out(
     tab.txt_notes.setPlainText("the run's own notes")
     tab._on_report()                       # used to raise AttributeError
     assert tab.txt_report.toPlainText().strip()      # the block is there
+    # the group is closed by default (2026-10-06): the box is inside it, so
+    # the test opens it (the observer is TOLD by the notice)
+    tab._sections["notes"].setCollapsed(False)
     assert tab.txt_notes.isVisibleTo(tab)
     text = tab.txt_notes.toPlainText()
     assert "left out" in text and "6.0" in text
@@ -476,39 +479,190 @@ def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
 
 # ---------------------------------------------- prominence (ADR-038)
 
-def test_the_nightly_flow_is_visible_and_the_knobs_are_folded(qapp, tmp_path):
-    # ADR-038: three levels. The nightly flow stays in the column (the
-    # plan with its one-line SNR, the table behind it, the run, and the
-    # report block) and the knobs most observers never touch go into
-    # blocks that say what they hold. The STACKING SETTINGS open by
-    # default (the method, the field, the margin, the brightness and the
-    # recipe are the planning decisions); the two that are READ, not
-    # chosen, start folded.
+def test_the_panel_opens_with_one_action_and_every_knob_folded(qapp, tmp_path):
+    # ADR-038 (rev 2026-10-06): what the observer SEES on entering is the
+    # object, the ONE action of the panel (a hero button) and a line saying
+    # what that action will do with the current defaults. Every knob lives in
+    # a collapsible group, ALL OF THEM CLOSED, and the result's groups do not
+    # exist yet: they appear with the run (nothing lives outside a group).
     tab, _host = _tab(qapp, tmp_path)
-    assert tab.btn_stack.isVisibleTo(tab)          # the primary action
-    assert tab.lbl_snr_line.isVisibleTo(tab)       # the plan, in one line
-    # the SNR table is part of the plan, not a fold: it is read BEFORE the
-    # run to decide how many observations to ask for
-    assert tab.tbl_snr.isVisibleTo(tab)
-    assert len(tab._sections) == 3
-    assert tab._sections["advanced"]._expanded
-    for key in ("check", "report"):
-        assert not tab._sections[key]._expanded
-    # the open block shows its knobs; the folded ones hide theirs
-    assert tab.cmb_method.isVisibleTo(tab)
-    assert not tab.chk_force.isVisibleTo(tab)
-    assert not tab.txt_report.isVisibleTo(tab)
-    # folding one takes its content away with it
-    tab._sections["advanced"]._toggle()
+    assert tab.btn_stack.isVisibleTo(tab)          # the one action
+    assert tab.lbl_plan_line.isVisibleTo(tab)      # what it will do
+    assert tab.lbl_plan_line.text()                # and it says something
+    assert tab.lbl_object.isVisibleTo(tab)         # the context it works on
+    # the decisions: present and closed
+    for key in ("plan", "advanced"):
+        assert tab._sections[key].isVisibleTo(tab), key
+        assert not tab._sections[key]._expanded, key
+    # the result: not on screen until there is one
+    for key in ("notes", "view", "points", "manual", "check", "report"):
+        assert not tab._sections[key].isVisibleTo(tab), key
+    # the plan and the knobs are inside the closed groups
+    assert not tab.spn_nobs.isVisibleTo(tab)
+    assert not tab.tbl_snr.isVisibleTo(tab)
     assert not tab.cmb_method.isVisibleTo(tab)
+    assert not tab.txt_report.isVisibleTo(tab)
+    # opening one brings its content back
+    tab._sections["advanced"]._toggle()
+    assert tab.cmb_method.isVisibleTo(tab)
+    tab._sections["plan"]._toggle()
+    assert tab.spn_nobs.isVisibleTo(tab)
+
+
+def test_every_group_is_a_bordered_card(qapp, tmp_path):
+    # Asked for: the group must be BORDERED, so an expanded group has a
+    # visible beginning and end. The skin is the object card's own section
+    # skin (theme.block_card_style): a hairline, a 10 px radius and a 3 px
+    # spine, with the title inside in the card's accent.
+    from nightscribe.gui import theme
+    tab, _host = _tab(qapp, tmp_path)
+    section = tab._sections["advanced"]
+    assert section.objectName() == "sectionCard"
+    assert "border: 1px solid" in section.styleSheet()
+    assert "border-left: 3px solid" in section.styleSheet()
+    assert "border-radius: 10px" in section.styleSheet()
+    # the title wears the accent, and the content is indented inside the card
+    assert theme.C_ACCENT in section._btn.styleSheet()
+    margins = section._content_layout.contentsMargins()
+    assert (margins.left(), margins.right()) == (12, 12)
+
+
+def test_the_result_arrives_in_groups(qapp, tmp_path):
+    # Asked for: the RESULT is grouped too. With a run the groups appear (and
+    # the ones that carry news start open); without one, none of them exists.
+    from nightscribe.core import astrometry, track_stack
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0, snr=12.0)
+    tab._result = {
+        "status": "ok", "groups": [(0, 2)], "n_failed": 0,
+        "stacks": [(np.zeros((8, 8), dtype=np.float32), None)],
+        "boxes": [(0, 0, 8, 8)], "qs": [(8.0, 8.0)], "mids": [2461000.5],
+        "points": [(sp, None, [])], "phot_skipped": True,
+        "detection": track_stack.DetectionReport(detected=True, snr=12.0),
+    }
+    tab._paint_run()
+    for key in ("view", "points", "manual", "check", "notes"):
+        assert tab._sections[key].isVisibleTo(tab), key
+        # EVERY group is closed by default (asked for 2026-10-06): the
+        # observer opens what they want to read
+        assert not tab._sections[key]._expanded, key
+    assert not tab.txt_notes.isVisibleTo(tab)      # inside the closed group
+    assert not tab._sections["report"]._expanded   # nothing to read in it yet
+    # ... and the news ANNOUNCES itself on the header of the closed group
+    assert tab._sections["notes"].notice() is not None
+    assert tab._sections["points"].notice() == ("1", "info")
+    assert tab._sections["view"].notice() == ("1", "info")
+    # opening one consumes its notice
+    tab._sections["notes"]._toggle()
+    assert tab._sections["notes"].notice() is None
+    assert tab.txt_notes.isVisibleTo(tab)
+
+
+def test_the_action_wears_the_objects_hue(qapp, tmp_path):
+    # The hero button is painted in the kind's hue (the same grammar the
+    # masthead's active tab already uses) and carries the kind's glyph,
+    # drawn in the button's own text colour: on a surface of the kind's hue
+    # the glyph's hue would vanish.
+    from nightscribe.gui import theme
+    tab, host = _tab(qapp, tmp_path)
+    host.project_accent = lambda: {"hue": "#4484ef", "kind": "neo",
+                                   "label": "NEO"}
+    tab.refresh_accent()
+    assert "#4484ef" in tab.btn_stack.styleSheet()
+    assert not tab.btn_stack.icon().isNull()
+    # the CARD carries the quiet spine of the hue (the list grammar: the hue
+    # carries the meaning, it does not shout) and its title wears the accent;
+    # the progress bar fills with the hue itself
+    spine = theme.composite("#4484ef", "70", over=theme.C_BASE)
+    assert spine in tab._sections["advanced"].styleSheet()
+    assert "#4484ef" in tab._sections["advanced"]._btn.styleSheet()
+    assert "#4484ef" in tab.prg_stack.styleSheet()
+    # without a project (an ad-hoc open) the app's own accent is used and
+    # there is no kind glyph to draw
+    host.project_accent = None
+    tab.refresh_accent()
+    assert theme.C_ACCENT in tab.btn_stack.styleSheet()
+    assert tab.btn_stack.icon().isNull()
+
+
+def test_the_plan_line_says_what_the_run_will_do(qapp, tmp_path):
+    # The subtitle of the hero button, built from the same sources the blocks
+    # show: the frames, how many observations, what the brightness is
+    # measured with, whether the frames are calibrated and whether the check
+    # runs. It is the answer to "what happens if I press this?".
+    tab, host = _tab(qapp, tmp_path)
+    host.photometry_recipe = lambda: {"band": "G", "rap": 5.0, "rin": 9.0,
+                                      "rout": 14.0, "sky": "median"}
+    host.calibration_summary = lambda: "dark · flat: flatG.fits"
+    tab._sync_recipe_row()
+    text = tab.lbl_plan_line.text()
+    assert "4 frames" in text
+    assert "1 observation" in text
+    assert "G" in text and "5.0/9.0/14.0" in text
+    assert "no calibration" in text          # off by default here
+    assert "check" in text
+    # and it follows the knobs: more observations, calibration on
+    tab.spn_nobs.setValue(2)
+    assert "2 observations" in text or "2 observations" in \
+        tab.lbl_plan_line.text()
+    tab.chk_calibrate.setChecked(True)
+    assert "flatG.fits" in tab.lbl_plan_line.text()
+
+
+def test_the_calibration_default_follows_the_library(qapp, tmp_path):
+    # ADR-061 (rev): with a dark or a flat that matches this visit, applying
+    # the calibration is what the measurement needs (0.087 mag of smooth
+    # vignetting, measured), so it comes ON by itself. The stored key is
+    # three-state: while nobody has chosen, the library decides.
+    from nightscribe.config import config
+    original = config.get("calib_astrometry", None)
+    config._data.pop("calib_astrometry", None)
+    try:
+        tab, host = _tab(qapp, tmp_path)
+        assert config.get("calib_astrometry", None) is None
+        host.calibration_masters = lambda: True
+        tab._auto_calibrate()
+        assert tab.chk_calibrate.isChecked()
+        # and the automatic choice is NOT written: it is not the observer's
+        assert config.get("calib_astrometry", None) is None
+        # once the observer touches it, their word is the law
+        tab.chk_calibrate.setChecked(False)
+        assert config.get("calib_astrometry", None) == 0
+        host.calibration_masters = lambda: True
+        tab._auto_calibrate()
+        assert not tab.chk_calibrate.isChecked()
+    finally:
+        # the config is the observer's file, not the test's: put it back
+        config._data["calib_astrometry"] = original
+        config.save()
+
+
+def test_the_calibration_stays_off_when_no_master_matches(qapp, tmp_path):
+    # A library with nothing for this camera and filter leaves the
+    # calibration off, and an UNKNOWN answer too: turning it on without
+    # knowing would promise a calibration nobody verified.
+    from nightscribe.config import config
+    original = config.get("calib_astrometry", None)
+    config._data.pop("calib_astrometry", None)
+    try:
+        tab, host = _tab(qapp, tmp_path)
+        host.calibration_masters = lambda: False
+        tab._auto_calibrate()
+        assert not tab.chk_calibrate.isChecked()
+        host.calibration_masters = lambda: None
+        tab._auto_calibrate()
+        assert not tab.chk_calibrate.isChecked()
+    finally:
+        config._data["calib_astrometry"] = original
+        config.save()
 
 
 def test_the_result_area_starts_hidden(qapp, tmp_path):
     # What belongs to the result appears with a run and goes away with it:
     # an empty grid and a blank strip say nothing, and a check about a
-    # verdict that does not exist yet is a paragraph about nothing. The
-    # REPORT block stays visible (disabled) because it says what the flow
-    # will produce, which is part of planning.
+    # verdict that does not exist yet is a paragraph about nothing, and the
+    # report's block (its format, its buttons and its text) is the RESULT of
+    # a run too: it appears with it.
     tab, _host = _tab(qapp, tmp_path)
     assert not tab.tbl_points.isVisibleTo(tab)
     assert not tab.lbl_points_title.isVisibleTo(tab)
@@ -516,7 +670,7 @@ def test_the_result_area_starts_hidden(qapp, tmp_path):
     assert not tab.cmb_group.isVisibleTo(tab)      # which stack to look at
     assert not tab._check_section.isVisibleTo(tab)
     assert not tab._sections["report"].isVisibleTo(tab)
-    assert tab._ui.grp_report.isVisibleTo(tab)
+    assert not tab._ui.grp_report.isVisibleTo(tab)
     assert not tab.btn_report.isEnabled()          # and honest about it
 
 
@@ -605,11 +759,15 @@ def test_a_single_operation_stage_shows_a_busy_bar(qapp, tmp_path):
     tab, _host = _tab(qapp, tmp_path)
     tab._on_progress("base", 0, 1)
     assert tab.prg_stack.minimum() == 0 and tab.prg_stack.maximum() == 0
-    assert "Stacking the whole sequence" in tab.lbl_status.text()
+    # the FULL line is the record (and the tooltip); what is painted is that
+    # same line elided to the width it has (2026-10-06: it used to wrap and
+    # grow to 204 px of the column)
+    assert "Stacking the whole sequence" in tab._status_text
+    assert tab.lbl_status.toolTip() == tab._status_text
     # a stage with an inside to count stays determinate
     tab._on_progress("sweep", 3, 25)
     assert tab.prg_stack.maximum() == 25 and tab.prg_stack.value() == 3
-    assert "(3/25)" in tab.lbl_status.text()
+    assert "(3/25)" in tab._status_text
 
 
 def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
@@ -737,6 +895,7 @@ def test_the_band_reads_the_motion_and_brightness_of_a_stack(qapp, tmp_path):
     assert header["NS_NFRAM"] == 4
     assert header["EXPTIME"] == pytest.approx(30.0)
     assert header["DATE-OBS"].startswith("2025-10-17")
+    assert header["NS_MAGSR"] == "measured"
     # the tab hands the band the same facts, from the header alone
     facts = tab.band_facts(dict(header))
     assert facts["motion"] == {"rate_arcsec_min": 1.234, "pa_deg": 245.4,
@@ -790,6 +949,96 @@ def test_the_band_marks_a_predicted_motion_and_the_star_stack_has_no_mag(
     facts = tab.band_facts(dict(star_header))
     assert facts["motion"]["measured"] is False
     assert "measured" not in facts and "measured_pos" not in facts
+
+
+def test_the_base_stack_is_saved_with_its_own_band_cards(qapp, tmp_path):
+    # Asked for: the whole-sequence stack (the image the manual mark is
+    # placed on) is a PRODUCT of the run, saved with its measurements: what
+    # the band needs (motion and brightness with their source) and the
+    # detection that was made on it (SNR, gate, limit magnitude). Without
+    # those cards the band over it said nothing about the object.
+    from astropy.io import fits
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.core import track_stack
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    saved = []
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2026 PY9"}
+    host.export_folder = lambda: str(tmp_path)
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", view=UfeImageView(state), parent=host)
+    tab._run_id = 7
+    frame = track_stack.Frame(path="f.fits",
+                              header={"EXPTIME": 60.0, "FILTER": "Clear"},
+                              exptime_s=60.0, date_obs="2026-10-06T22:00:00",
+                              t_mid_jd=2461319.5)
+    tab._result = {
+        "base_stack": np.zeros((32, 32), dtype=np.float32),
+        "box_all": (10, 20, 42, 52), "q_all": (26.0, 36.0),
+        "frames": [frame], "n_failed": 0,
+        "base_rate": 0.42, "base_pa": 271.0,
+        "detection": track_stack.DetectionReport(detected=False, snr=1.4,
+                                                 mag_limit=19.4),
+        "ephem_mag": 22.21, "ephem_band": "V",
+        "ephem_mag_source": "horizons",
+    }
+    tab._save_base_stack(tab._result)
+    path = tmp_path / "2026PY9_base.fits"
+    assert path.exists()
+    # and it is registered on the visit, like the observations' stacks
+    assert saved and saved[0][1] == "stack"
+    assert saved[0][0][0].endswith("2026PY9_base.fits")
+    header = fits.getheader(str(path))
+    assert header["NS_STACK"] == "base"
+    assert header["NS_RUN"] == 7
+    assert header["NS_WHOLE"] == 1
+    assert header["NS_NFRAM"] == 1
+    assert header["NS_MOT"] == "eph"           # no sweep: a prediction
+    assert header["NS_RATE"] == pytest.approx(0.42)
+    # the brightness was NOT measured: the ephemeris' figure rides along,
+    # labelled, instead of the plate saying nothing about the object's light
+    assert header["NS_MAG"] == pytest.approx(22.21)
+    assert header["NS_MAGSR"] == "ephemeris"
+    assert header["NS_MAGB"] == "V"
+    # and the detection made ON this image
+    assert header["NS_FOUND"] == 0
+    assert header["NS_SNR"] == pytest.approx(1.4)
+    assert header["NS_GATE"] == pytest.approx(3.5)
+    assert header["NS_LIMIT"] == pytest.approx(19.4)
+    # the tab hands the band all of it, from the header alone
+    facts = tab.band_facts(dict(header))
+    assert facts["motion"]["measured"] is False
+    assert facts["predicted"] == {"mag": 22.21, "band": "V"}
+    assert "measured" not in facts
+    assert facts["detection"]["snr"] == pytest.approx(1.4)
+    assert facts["detection"]["limit"] == pytest.approx(19.4)
+
+
+def test_the_band_says_when_the_brightness_is_a_prediction(qapp, tmp_path):
+    # The magnitude's origin travels in the file (NS_MAGSR) and band_facts
+    # respects it: a prediction is handed over as `predicted`, never as a
+    # measurement, so it cannot wear the quality colours of one. And a stack
+    # written BEFORE the card existed is still read as a measurement, which
+    # is what all of them were.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    base = {"NS_STACK": "object", "NS_RUN": 7, "NS_MAG": 18.05,
+            "NS_MAGB": "G", "NS_MAGER": 0.12, "NS_MAGNC": 8}
+    facts = tab.band_facts(dict(base))
+    assert facts["measured"]["mag"] == pytest.approx(18.05)
+    assert "predicted" not in facts
+    facts = tab.band_facts({**base, "NS_MAGSR": "ephemeris"})
+    assert facts["predicted"] == {"mag": 18.05, "band": "G"}
+    assert "measured" not in facts
 
 
 def test_the_registration_note_says_what_happened(qapp, tmp_path):
@@ -875,6 +1124,137 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     assert "dithered" in tab.chk_calibrate.toolTip()
 
 
+def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(
+        qapp, tmp_path, monkeypatch):
+    # The choice is SAVED now (it used to reset on every rebuild), and the
+    # hint says the vignetting's fate BEFORE the run. The hint's recipe comes
+    # from the Calibration tab, the single source, so the two cannot disagree.
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "calib_astrometry", 0)
+    tab, host = _tab(qapp, tmp_path)
+    assert tab.chk_calibrate.isChecked() is False
+    assert "vignetting" in tab.lbl_calibration_hint.text()
+    tab.chk_calibrate.setChecked(True)
+    assert int(config.get("calib_astrometry")) == 1
+    host.calibration_summary = lambda: "bias · pseudo-flat from the frames"
+    tab._sync_calibration_hint()
+    assert "pseudo-flat from the frames" in tab.lbl_calibration_hint.text()
+
+
+def test_the_calibration_link_opens_the_calibration_tab(qapp, tmp_path):
+    # The recipe, the library and the pseudo-flat policy live in the
+    # Calibration tab: this button is the deep link to it, the same pattern
+    # as the photometry recipe's.
+    tab, host = _tab(qapp, tmp_path)
+    seen = []
+    host.show_tab = lambda name: seen.append(name)
+    tab.btn_calibration.click()
+    assert seen == ["calibration"]
+
+
+# ------------------------------------------------------- manual mode (ADR-065)
+
+def _manual_result():
+    import numpy as np
+    return {"status": "not_detected", "detection": None,
+            "base_stack": np.zeros((64, 64), dtype=np.float32),
+            "box_all": (10, 20, 74, 84), "q_all": (42.0, 52.0),
+            "w0": None, "shape": (64, 64)}
+
+
+def test_the_manual_door_is_always_available_once_there_is_a_run(qapp,
+                                                                tmp_path):
+    # Asked for: the manual mark is not a door that only opens when a run
+    # finds nothing. It is useful on ANY run (to place a faint object's
+    # centroid by eye), so it is enabled whenever there is a visit to stack
+    # and it is THERE as soon as a run exists. Before any run there is no
+    # whole-sequence stack to mark on, so it waits with the rest of the
+    # result (a door onto nothing is furniture).
+    tab, _host = _tab(qapp, tmp_path)
+    assert not tab.chk_manual.isVisibleTo(tab)    # no run yet: no stack
+    tab._result = _manual_result()
+    tab._paint_not_detected()                     # below the gate
+    # the door is there, inside its group; every group is closed by default
+    # (2026-10-06), so the observer opens it first
+    assert tab._sections["manual"].isVisibleTo(tab)
+    tab._sections["manual"].setCollapsed(False)
+    assert tab.chk_manual.isVisibleTo(tab)
+    assert tab.chk_manual.isEnabled()
+    tab._hide_manual()                            # a new visit or an undo
+    assert tab.chk_manual.isEnabled()             # the door stays open
+    assert not tab.chk_manual.isChecked()
+    # with no visit there is no sequence to stack: the door is closed (and,
+    # with no run either, it is not even on screen)
+    no_visit, _h = _tab(qapp, tmp_path, visit=False)
+    assert not no_visit.chk_manual.isEnabled()
+    assert not no_visit.chk_manual.isVisibleTo(no_visit)
+
+
+def test_the_manual_mark_is_nudged_and_measured_from_the_reference_grid(
+        qapp, tmp_path, monkeypatch):
+    from PySide6.QtCore import QPointF
+    tab, _host = _tab(qapp, tmp_path)
+    # a plate must be on the stage for the click to land
+    tab._stack_state.load(tab._context()["paths"][0])
+    tab._result = _manual_result()
+    tab._paint_not_detected()
+    tab.chk_manual.setChecked(True)
+    tab._manual_armed = True
+    tab._on_manual_click(QPointF(32.0, 32.0))
+    assert tab._manual_base is not None
+    assert tab.btn_manual_measure.isEnabled()
+    tab._nudge_step(0.1, -0.2)
+    assert tab.lbl_nudge.text() == "(+0.1, -0.2)"
+    # "Measure at the mark" hands the mark in REFERENCE-GRID pixels: the
+    # base stack's data coordinates plus the cutout's origin
+    seen = {}
+    monkeypatch.setattr(
+        tab, "_start_run",
+        lambda manual_ref=None: seen.setdefault("ref", manual_ref))
+    tab._on_manual_measure()
+    mx, my = tab._manual_base
+    assert seen["ref"] == pytest.approx((10 + mx + 0.1, 20 + my - 0.2))
+    assert tab._manual_armed is False
+
+
+def test_a_manual_run_says_the_detection_was_the_observers(qapp, tmp_path):
+    # The position of a manual run is still MEASURED on the plate, but the
+    # decision that there was something to measure was the observer's. A note
+    # that says it is not a nicety: without it the run reads as an automatic
+    # detection that bypassed the gate (ADR-065, point 5).
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=2.1, flags=["manual"])
+    tab._result = {"status": "ok", "manual": True, "points": [(sp, None,
+                                                               ["manual"])],
+                   "groups": [(0, 2)], "stacks": [(np.zeros((8, 8),
+                                                             dtype=np.float32),
+                                                   None)],
+                   "qs": [(8.0, 8.0)], "boxes": [(0, 0, 8, 8)],
+                   "mids": [2461000.5], "phot_skipped": True}
+    tab._paint_run()
+    text = tab.txt_notes.toPlainText()
+    assert "HUMAN MARK" in text and "manual mode" in text
+    # and the point's flag reaches the table as words, never as a code
+    assert "mark" in tab.tbl_points.item(0, 7).text()
+
+
+def test_the_manual_flag_travels_with_the_point():
+    # The worker's own half: every point of a manual run is flagged, once, and
+    # the flag list is the one the measurement already returned (the table and
+    # the persisted row read that same list).
+    from nightscribe.core import astrometry
+    from nightscribe.gui import workers
+    a = astrometry.AstrometryPoint(ra=1.0, dec=2.0, flags=["disagree"])
+    b = astrometry.AstrometryPoint(ra=3.0, dec=4.0)
+    points = [(a, None, a.flags), (b, None, b.flags)]
+    workers._mark_as_manual(points)
+    workers._mark_as_manual(points)          # idempotent: never twice
+    assert a.flags == ["disagree", "manual"]
+    assert b.flags == ["manual"]
+
+
 def test_the_calibration_note_says_what_the_magnitude_was_measured_with(
         qapp, tmp_path):
     # ADR-061: a brightness never goes out without saying whether the frames
@@ -894,3 +1274,464 @@ def test_the_calibration_note_says_what_the_magnitude_was_measured_with(
     assert "no master matched" in tab._calibration_note(
         {"n": 3, "offsets": [], "flats": []})
     assert tab._calibration_note(None) == ""
+
+
+def test_the_manual_mark_cross_is_drawn_and_can_be_hidden(qapp, tmp_path,
+                                                          monkeypatch):
+    # Asked for: a subtle cross on the marked centroid so it is clear WHERE
+    # the point is, and a switch to take it off (a cross over a 19th
+    # magnitude object is a cross over the object).
+    from PySide6.QtCore import QPointF
+    from PySide6.QtWidgets import QGraphicsLineItem
+    tab, _host = _tab(qapp, tmp_path)
+    tab._stack_state.load(tab._context()["paths"][0])
+    tab._result = _manual_result()
+    tab._paint_not_detected()
+    tab.chk_manual.setChecked(True)
+    tab._manual_armed = True
+    view = tab._stack_view
+
+    def lines():
+        return [it for it in view._items_registered
+                if isinstance(it, QGraphicsLineItem)]
+
+    tab._draw_marks()                    # nothing is marked yet
+    assert lines() == []
+    tab._on_manual_click(QPointF(32.0, 32.0))
+    # the mark's own cross: two arms, two passes each (a shadow and the
+    # colour), and nothing else (this result has no measured point)
+    assert tab._manual_base is not None
+    assert len(lines()) == 4
+    tab._manual.chk_show_cross.setChecked(False)
+    assert lines() == []
+    tab._manual.chk_show_cross.setChecked(True)
+    assert len(lines()) == 4
+    # nudging moves the cross with the mark (it is redrawn, not duplicated)
+    tab._nudge_step(0.1, 0.1)
+    assert len(lines()) == 4
+    # and measuring takes the mark's cross away
+    monkeypatch.setattr(tab, "_start_run", lambda manual_ref=None: None)
+    tab._on_manual_measure()
+    assert lines() == []
+
+
+def test_the_measured_cross_survives_a_new_plate_and_a_tab_switch(qapp,
+                                                                 tmp_path):
+    # Reported: the red measured-position cross was lost when another image
+    # of the series was loaded and when the Photometry tab took the stage.
+    # It is anchored to the SKY (the point's RA/Dec) and placed with the
+    # open plate's own WCS, so it comes back on every plate of the visit.
+    import numpy as np
+    from astropy.wcs import WCS
+    from PySide6.QtWidgets import QGraphicsLineItem, QWidget
+    from nightscribe.core import astrometry
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    host.export_folder = lambda: str(tmp_path)
+    state = UfeImageState(host)
+    view = UfeImageView(state)
+    tab = UfeTrackStackTab(state, "en", view=view, parent=host)
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cd = [[-1e-4, 0.0], [0.0, 1e-4]]
+    w.pixel_shape = (16, 16)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+                   "points": [(sp, None, [])], "wcs_by_group": [w],
+                   "boxes": [(0, 0, 16, 16)], "qs": [(8.0, 8.0)],
+                   "groups": [(0, 1)], "mids": [2461000.5]}
+    tab._show_group(0)
+
+    def cross_lines():
+        return [it for it in view._items_registered
+                if isinstance(it, QGraphicsLineItem)]
+
+    assert len(cross_lines()) == 4       # the measured cross's four arms
+    # leaving the tab does not take the mark away (it belongs to the result)
+    tab.set_active(False)
+    assert len(cross_lines()) == 4
+    # and coming back finds it again, placed on the open plate's own sky
+    tab.set_active(True)
+    assert len(cross_lines()) == 4
+    # without a WCS the mark can only be placed on the observation's OWN
+    # stack (its own pixels): on any other plate of the visit it goes
+    # rather than sitting somewhere it does not belong
+    state.wcs = None
+    tab._draw_marks()
+    assert len(cross_lines()) == 4
+    tab._shown_stack_path = str(tmp_path / "another_plate.fits")
+    tab._draw_marks()
+    assert cross_lines() == []
+
+
+# --------------------------------------------------------- the restore
+
+def _saved_run(tmp_path, mag=18.2):
+    # @return: (run, points, stack paths) as the host hands them over
+    import numpy as np
+    from astropy.io import fits
+    path = tmp_path / "2026QX_obs1.fits"
+    fits.PrimaryHDU(np.zeros((16, 16), dtype=np.float32)).writeto(
+        path, overwrite=True)
+    run = {"id": 7, "session_id": 2, "status": "complete", "method": "sigma",
+           "cfg": {"result": {
+               "method": "sigma",
+               "detection": {"detected": True, "snr": 12.0},
+               "photometry": {"mag": mag, "err": 0.1, "band": "G",
+                              "n_comps": 5, "n_obs": 1, "n_frames": 4,
+                              "source": "project"},
+               "check": {"available": True, "blocked": False},
+               "box_all": [10, 20, 42, 52], "base_rate": 0.42,
+               "base_pa": 271.0, "ephem_mag": 22.21, "ephem_band": "V",
+               "ephem_mag_source": "horizons"}}}
+    points = [{"group_index": 0, "source": "stack", "ra": 30.0, "dec": 10.0,
+               "x": 8.0, "y": 8.0, "snr": 12.0, "mag": mag, "band": "G",
+               "mjd": 61000.5, "n_frames": 4, "flags": []}]
+    return run, points, [str(path)]
+
+
+def test_a_saved_run_is_shown_again_when_the_visit_is_reopened(qapp, tmp_path):
+    # Asked for: if the visit already holds a run, reopening it shows
+    # everything (the notes, the table, the group viewer and the strip),
+    # rebuilt from what was saved, WITHOUT stacking again. The stacks are
+    # the files the run wrote; the points and the notes come from the
+    # database.
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab._result is not None and tab._result.get("restored")
+    assert tab._run_id == 7                      # the undo door follows it
+    assert tab.btn_undo.isEnabled()
+    assert tab.cmb_group.count() == 1
+    assert tab.tbl_points.rowCount() == 1
+    assert tab.tbl_points.item(0, 6).text() == "18.200"
+    assert "18.200" in tab.txt_notes.toPlainText()
+    # the strip holds the saved stack (the array was read back from disk)
+    assert tab._result["stacks"][0][0] is not None
+    assert tab._result["stacks"][0][0].shape == (16, 16)
+    assert tab.btn_blink.isEnabled()
+    # and the status line says WHERE this came from, never pretending it
+    # was computed now (the whole line; what is painted is elided to fit)
+    assert "saved" in tab._status_text
+    # the door to a fresh run stays open: a restore is not a lock
+    assert tab.btn_stack.isEnabled()
+
+
+def test_a_restored_run_does_not_write_its_stacks_again(qapp, tmp_path):
+    # A restored run SHOWS its stacks; rewriting them would duplicate files
+    # (and cost the observer's disk). The registered files stay untouched
+    # and nothing new is announced.
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    saved = []
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    before = Path(stacks[0]).stat().st_mtime_ns
+    tab.refresh_context()
+    tab._show_group(0)
+    assert not saved
+    assert Path(stacks[0]).stat().st_mtime_ns == before
+
+
+def test_coming_back_with_a_cleared_plate_shows_the_observation_again(
+        qapp, tmp_path):
+    # A session change drops the plate but not the run held in memory:
+    # coming back to the tab shows the observation on stage again, so the
+    # marks are not left floating over nothing.
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab._result is not None
+    tab._stack_state.clear()
+    tab.set_active(False)
+    tab.set_active(True)
+    assert tab._stack_state.has_image
+    assert tab._stack_state.path.endswith("2026QX_obs1.fits")
+
+
+def test_the_report_comes_back_with_the_restored_run(qapp, tmp_path):
+    # Asked for: reopening the visit shows the run WITH its report. The
+    # generator is local and deterministic (the same points give the same
+    # text), so it is rebuilt instead of stored; and it is rebuilt QUIETLY:
+    # the notes box keeps the run's own story (the report's "left out and
+    # why" notes would otherwise overwrite it).
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab.txt_report.toPlainText().strip()
+    assert "18.200" in tab.txt_notes.toPlainText()
+    # the report is ready to send, and it was not sent anywhere by itself
+    assert tab.btn_send_mpc.isEnabled()
+
+
+def test_a_restored_run_can_be_marked_by_hand(qapp, tmp_path, monkeypatch):
+    # The manual mark is carried to the reference grid with the base stack's
+    # cutout origin (box_all), which travels in the run's summary: without it
+    # a reopened run could not be marked at all, and the door would be a lie.
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab._result["box_all"] == (10, 20, 42, 52)
+    assert tab._result["ephem_mag"] == pytest.approx(22.21)
+    tab._stack_state.load(stacks[0])
+    tab._manual_armed = True
+    tab._manual_base = (5.0, 6.0)
+    seen = {}
+    monkeypatch.setattr(
+        tab, "_start_run",
+        lambda manual_ref=None: seen.setdefault("ref", manual_ref))
+    tab._on_manual_measure()
+    assert seen["ref"] == pytest.approx((15.0, 26.0))
+    # The saved point carries the EFFECTIVE magnitude (a measurement made by
+    # hand in the Photometry tab takes over the one the report would use) and
+    # mag_source says who wrote it: the table must not present it as the
+    # run's own figure.
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path, mag=18.9)
+    points[0]["mag_source"] = "manual"
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab.tbl_points.item(0, 6).text() == "18.900"
+    assert "hand" in tab.tbl_points.item(0, 7).text()
+
+
+def test_the_restore_pairs_a_stack_with_its_observation_number(qapp, tmp_path):
+    # The stack files carry "obs<N>" in their names: the restore pairs them
+    # by that number and NOT by their position in the visit's list, so an
+    # observation that measured nothing cannot shift the others onto the
+    # wrong file (the strip and the blink would show another night's sky).
+    import numpy as np
+    from astropy.io import fits
+    tab, host = _tab(qapp, tmp_path)
+    a = tmp_path / "2026QX_obs1.fits"
+    b = tmp_path / "2026QX_obs3.fits"
+    fits.PrimaryHDU(np.full((16, 16), 1.0, dtype=np.float32)).writeto(a)
+    fits.PrimaryHDU(np.full((16, 16), 9.0, dtype=np.float32)).writeto(b)
+
+    def row(gi, x):
+        return {"group_index": gi, "source": "stack", "ra": 30.0,
+                "dec": 10.0, "x": x, "y": 8.0, "snr": 5.0, "mjd": 61000.5,
+                "n_frames": 2, "flags": []}
+
+    # observation 2 measured nothing: only 1 and 3 are saved
+    host.astrometry_result = lambda: {
+        "run": {"id": 3, "session_id": 2, "status": "complete",
+                "method": "sigma", "cfg": {"result": {}}},
+        "points": [row(0, 8.0), row(2, 4.0)],
+        "stacks": [str(b), str(a)]}
+    tab.refresh_context()
+    stacks = tab._result["stacks"]
+    assert len(stacks) == 2
+    assert stacks[0][0][0, 0] == pytest.approx(1.0)      # observation 1
+    assert stacks[1][0][0, 0] == pytest.approx(9.0)      # observation 3
+    # and the positions kept their own observation's numbers
+    assert [p[0].group_index for p in tab._result["points"]] == [0, 2]
+
+
+def test_an_undone_run_is_not_restored(qapp, tmp_path):
+    # Undo takes the run back and marks its row "undone": reopening the
+    # visit must not resurrect it (the host filters it out, and the tab
+    # paints an empty column).
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_result = lambda: None
+    tab.refresh_context()
+    assert tab._result is None
+    assert tab.cmb_group.count() == 0
+    assert not tab.btn_undo.isEnabled()
+
+
+def test_the_manual_door_is_open_on_a_restored_not_detected_run(qapp,
+                                                               tmp_path):
+    # The base stack is saved with the run, so a restored run that found
+    # nothing can still be marked by hand: the door is open and the notes
+    # say how deep the night reached. (An old run with no stack on disk gets
+    # the dialog's own "stack the sequence first".)
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    run["status"] = "not_detected"
+    run["cfg"]["result"]["detection"] = {"detected": False, "snr": 1.0,
+                                        "mag_limit": 18.9}
+    host.astrometry_result = lambda: {"run": run, "points": [],
+                                      "stacks": []}
+    tab.refresh_context()
+    assert tab._result is not None and tab._result["restored"]
+    assert tab.chk_manual.isEnabled()
+    assert "18.90" in tab.txt_notes.toPlainText()
+
+
+def test_a_run_below_the_gate_measures_anyway_and_paints_it_red(qapp,
+                                                               tmp_path):
+    # ADR-062 rev (D10 revisited): the gate still forbids the SWEEP, but it no
+    # longer throws the run away. The observer asked for the brightness to be
+    # measured ALWAYS and marked when it is not to be trusted: the magnitude
+    # cell comes out RED (the same role the plate's band uses) and the notes
+    # say where the number comes from (the ephemeris' position) and that the
+    # stack's limit magnitude is what the night really reached.
+    from nightscribe.core import astrometry, track_stack
+    from nightscribe.viz import palette
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=1.8, mag=20.4, band="G")
+    tab._result = {
+        "status": "ok", "below_gate": True, "groups": [(0, 5)], "n_failed": 0,
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+        "boxes": [(0, 0, 16, 16)], "qs": [(8.0, 8.0)],
+        "mids": [2461000.5],
+        "points": [(sp, None, ["below_gate"])],
+        "detection": track_stack.DetectionReport(detected=False, snr=1.8,
+                                                 mag_limit=20.9),
+        "photometry": {"mag": 20.4, "err": 0.4, "band": "G", "n_comps": 6,
+                       "n_frames": 5, "source": "auto",
+                       "per_obs": [{"mag": 20.4, "err": 0.4, "n_comps": 6,
+                                    "check_ok": None}]},
+    }
+    tab._paint_run()
+    # the measurement is THERE (this is the point of the change)
+    assert tab.tbl_points.item(0, 6).text() == "20.400"
+    # and it wears the doubtful role: red, not green
+    colour = tab.tbl_points.item(0, 6).foreground().color().name()
+    assert colour.lower() == palette.DANGER.lower()
+    notes = tab.txt_notes.toPlainText()
+    assert "did NOT clear" in notes
+    assert "20.90" in notes                     # the limit magnitude is said
+    assert "not to be published" in notes
+
+
+def test_a_clean_run_paints_its_magnitude_green(qapp, tmp_path):
+    # The other half of the same rule: a run that DID detect the object and
+    # whose comps hold the zero point wears the clean role, so red really
+    # means something.
+    from nightscribe.core import astrometry, track_stack
+    from nightscribe.viz import palette
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=15.0, mag=18.05, band="G")
+    tab._result = {
+        "status": "ok", "groups": [(0, 5)], "n_failed": 0,
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+        "boxes": [(0, 0, 16, 16)], "qs": [(8.0, 8.0)],
+        "mids": [2461000.5],
+        "points": [(sp, None, [])],
+        "detection": track_stack.DetectionReport(detected=True, snr=15.0),
+        "photometry": {"mag": 18.05, "err": 0.05, "band": "G", "n_comps": 8,
+                       "n_frames": 5, "source": "auto",
+                       "per_obs": [{"mag": 18.05, "err": 0.05, "n_comps": 8,
+                                    "check_ok": True}]},
+    }
+    tab._paint_run()
+    colour = tab.tbl_points.item(0, 6).foreground().color().name()
+    assert colour.lower() == palette.GOOD.lower()
+
+
+def test_the_result_brings_its_own_widgets_not_just_the_groups(qapp,
+                                                               tmp_path):
+    # Regression (reported 2026-10-06: "Measurement per observation está
+    # vacío; creo que las preview de cada observación las hemos perdido").
+    # The refactor to collapsible groups left three widgets hidden for good:
+    # the measurement table, its title and the strip of observation stacks.
+    # The groups appeared with their title and NOTHING inside.
+    from nightscribe.core import astrometry, track_stack
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=12.0, mag=18.2, band="G")
+    tab._result = {
+        "status": "ok", "groups": [(0, 2), (2, 4)], "n_failed": 0,
+        "stacks": [(np.zeros((32, 32), dtype=np.float32), None),
+                   (np.ones((32, 32), dtype=np.float32), None)],
+        "boxes": [(0, 0, 32, 32), (0, 0, 32, 32)],
+        "qs": [(16.0, 16.0), (16.0, 16.0)], "mids": [2461000.5, 2461000.6],
+        "points": [(sp, None, []), (sp, None, [])], "phot_skipped": True,
+        "detection": track_stack.DetectionReport(detected=True, snr=12.0),
+    }
+    tab._paint_run()
+    qapp.processEvents()
+    # open the two groups the widgets live in
+    tab._sections["points"].setCollapsed(False)
+    tab._sections["view"].setCollapsed(False)
+    qapp.processEvents()
+    assert tab.lbl_points_title.isVisibleTo(tab)
+    assert tab.tbl_points.isVisibleTo(tab)
+    assert tab.tbl_points.rowCount() == 2          # one per observation
+    assert tab._thumbs.isVisibleTo(tab)            # the previews are back
+    assert tab._thumbs._row.count() == 3           # two panels + the stretch
+    # and they all leave again with the result
+    tab._show_result_area(False)
+    assert not tab.tbl_points.isVisibleTo(tab)
+    assert not tab._thumbs.isVisibleTo(tab)
+
+
+def test_the_calibration_button_opens_the_window_not_a_tab(qapp, tmp_path):
+    # Regression (reported 2026-10-06): the button deep-linked with the name
+    # "calibration", the tool is keyed "calibrate", and the name that matched
+    # nothing fell through to tabs.setCurrentWidget("calibration") and raised
+    # a TypeError on every press. The real dialog is what the test drives: the
+    # one that used a host double could not see it.
+    tab, _host = _tab(qapp, tmp_path)
+    dlg = tab.window() if hasattr(tab, "window") else None
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1280, 860)
+    d.show()
+    d.tabs.setCurrentWidget(d.tab_trackstack)
+    qapp.processEvents()
+    d.tab_trackstack.btn_calibration.click()
+    qapp.processEvents()
+    assert d._tools["calibrate"].isVisible()
+    assert d._active_tool == "calibrate"
+    # and a name that no panel claims is logged, never raised
+    d.show_tab("no-existe")
+    assert d._tools["calibrate"].isVisible()
+    d.shutdown()
+    d.deleteLater()
+
+
+def test_the_report_says_what_came_out_and_never_sends_nothing(qapp,
+                                                               tmp_path):
+    # Reported 2026-10-06: a 2025 FG18 sequence with two observations
+    # "generated nothing". Measured: both were below the MPC submission floor
+    # (SNR 20 by default), so the generator returned the format's header and
+    # no data lines, and the reason lived in a group that is closed by
+    # default. Now the report's own group says it, the send button refuses an
+    # empty report and the notes group is marked.
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+
+    def run(snr):
+        pts = [astrometry.AstrometryPoint(
+            ra=322.5, dec=-12.3, rms_ra=0.2, rms_dec=0.2, mag=19.6,
+            band="G", snr=snr, n_frames=100, group_index=i,
+            mjd=60763.86 + i * 0.001) for i in range(2)]
+        tab._result = {"status": "ok", "points": [(p, None, []) for p in pts],
+                       "check": None}
+        tab._sync_report_buttons()
+        tab._on_report()
+        qapp.processEvents()
+
+    from nightscribe.config import config
+    floor = int(float(config.get("astrometry_submit_snr", 20.0)))
+    assert floor > 6                          # this test needs it below
+    run(6.0)                                  # below the floor: no report
+    assert "None of the 2 observations" in tab.lbl_report_note.text()
+    assert f"SNR {floor}" in tab.lbl_report_note.text()
+    assert tab.btn_send_mpc.isEnabled() is False
+    assert tab._sections["notes"].notice() is not None
+    assert "SNR 6.0" in tab.txt_notes.toPlainText()
+    run(25.0)                                 # above it: a report to send
+    assert tab.lbl_report_note.text() == "2 of 2 observations are in the report."
+    assert tab.btn_send_mpc.isEnabled() is True
+    assert tab.txt_report.toPlainText().count("\n") >= 2   # header + rows

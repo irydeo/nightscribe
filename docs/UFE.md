@@ -27,33 +27,77 @@ the survey field (DSS2/PS1) as a FITS with WCS and works on it directly.
 
 ```
 | [Open][Export][Solve] | [Fit][100 %][Zoom ▾] 100 % | [View ▾] | Image|Curve |
+| [Blink][Calibrate][Annotate][Series]                                      |
 |───────────────────┬────────────────────────────────────────┬──────────────|
-|  visit / series   |                                        |  tab         |
-|  (foldable)       |   IMAGE  (or the curve)                |  ────────    |
-|                   |   · the object, over the plate          |  primary     |
-|                   |                                        |  [Settings▸] |
+|  visit             |                                        |  panel       |
+|  · frame navigator |   IMAGE  (or the curve)                |  ────────    |
+|  · FRAME PREVIEWS  |   · the object, over the plate          |  primary     |
+|  · EXOTIC          |                                        |  [Settings▸] |
 |───────────────────┴────────────────────────────────────────┴──────────────|
 | Histogram ▸  (folded: 24 px; open: ~110 px, two rows of controls)         |
 |──────────────────────────────────────────────────────────────────────────|
 | ⓘ status: one line, fixed height, never grows                            |
 ```
 
+**The four errands** (2026-10-06) are their own buttons in a row under the bar:
+**Blink**, **Calibrate**, **Annotate** and the **photometric series**. Each one
+opens a **non-modal window** over the plate, sized to what it holds, and while
+it is open it owns the plate (the blink frame, the annotation's clicks);
+closing it hands the plate back to the panel. One at a time. They are in their
+own row and not inside the bar for a measured reason: with the theme on, four
+icon buttons cost 232 px and inside the bar they left the project badge (the one
+thing that says WHICH project you are working on) without room from 1200 px
+down. They follow the bar's icon mode: a glyph with its tooltip by default, and
+icon plus label if you turn the labels on in Settings.
+
+**Image | Light curve** is at the right end of the bar: it is a view of the
+centre, so it belongs to the bar and not to a row of its own above the plate
+(it used to cost a row of the plate's height).
+
+The **visit** panel at the left holds the frame navigator and the **frame
+previews**. The photometric series and the **EXOTIC transit reduction** moved
+out of it into the series window (**Series** in the tools row): a transit fit
+is the series of a transit visit, so the reduction lives under the series
+block, and it still appears only in a transit visit with an armed comparison
+sequence.
+
+**Frame previews** (2026-10-06): a vertical list that takes the whole column
+and the whole height of the panel, with one preview per frame of the visit,
+filled as they are read (a sampled read, ~2 MB per 2048² frame, in a worker).
+The preview is as wide as the column (140 px became ~250, and it follows the
+splitter) and the caption rides **on the image**: "Frame 12 · the_file.fits",
+small and in the **object kind's colour** (the same hue the chip, the hero
+button and the block spines wear), with a dark outline so it reads over black
+sky or over a bright nebula. A frame with something wrong wears a **red
+border** and says what it is, **in red**: **unreadable** (a cut capture leaves
+a 0-byte file) or **not registered** by the last astrometry run. Red means a
+problem and nothing else. The tooltip carries the frame's own
+numbers: size on disk, measured sky, filter, exposure and date. The header
+counts them ("207 frames · 3 with problems") and **Only problems** shows just
+those, which is the fast way through a night of hundreds of frames. A click
+opens the frame in the editor (the navigator follows both ways) and the context
+menu takes a frame out of the visit (the file is NOT touched) or moves it to
+the project's `discarded/` folder (nothing is deleted, it can be brought back).
+
 The chrome takes what it NEEDS and the work area gets everything else: the
-plate is what the window is for. The top bar is stable (it measured 25 px
+plate is what the window is for. The panel column opens at 420 px and can be
+dragged to 560: its content needs 331 as a minimum (measured 2026-10-06, when
+a narrower column cut the messages and pushed a horizontal scrollbar into the
+panels), so the labels are read whole and the plate keeps the rest. The top bar is stable (it measured 25 px
 in a short window and 69 px in a tall one before: the layout's stretch was
 never applied by the loader), and the histogram strip is compact and folds
 with its state remembered. The object's name, position and magnitude are
 painted OVER the plate (and into the exported PNG), not in a row of their
 own.
 
-The series block in the left panel keeps what an observer touches while
-measuring (the frame navigator, the grouping of frames, **Measure the
-sequence**, live mode and the progress) and puts the rest behind two
-doors: **Chart and quality…** opens the chart's own non-modal window
-(scale, error bars, binning, mean curve, outliers and exclusions) and
-**Series ▾** holds the occasional actions (undo, ExoClock, the night's
-figures, save the chart, period and phase, the guide). Before this the
-same panel showed some thirty controls stacked in a column.
+The photometric series has its own window (Tools ▾ → Series) and keeps what
+an observer touches while measuring (the grouping of frames, **Measure the
+sequence**, live mode and the progress) with the rest behind two doors:
+**Chart and quality…** opens the chart's own non-modal window (scale, error
+bars, binning, mean curve, outliers and exclusions) and **Series ▾** holds
+the occasional actions (undo, ExoClock, the night's figures, save the chart,
+period and phase, the guide). Before this the same panel showed some thirty
+controls stacked in a column.
 
 * **Image**: takes up most of the window. The wheel zooms anchored at
   the cursor; dragging pans; double-click returns to the fit. Hovering
@@ -64,9 +108,9 @@ same panel showed some thirty controls stacked in a column.
   centred. The detection is local and robust (it sees faint sources even
   on a galaxy's glow) and the snap's reach is capped at 9 plate px: the
   reticle never jumps to a bright star far away.
-* **Tabs**: one per feature. **Blink**, **Photometry** and
-  **Annotate** are available (below). Only the visible tab answers
-  clicks on the image.
+* **Panels**: two, **Photometry** and **Astrometry**, plus the four tool
+  windows (Blink, Calibrate, Annotate, Series) behind **Tools ▾**. Only the
+  panel (or the tool window) that is on stage answers clicks on the image.
 
 ## Blink
 
@@ -97,7 +141,7 @@ in sight with its rings and labels, so you can switch between building
 and measuring without losing track of what is on the plate (ADR-044,
 layout revision, 2026-09-24).
 
-### Sequence (top half)
+### Sequence (the comparisons block)
 
 Builds the photometric sequence on your plate (a WCS is needed; if it
 is missing, the configured solver gets you one, ASTAP or nova):
@@ -137,7 +181,13 @@ One frame that fails does not stop the batch: it is counted and named in the
 status line. A plate opened from a project is also solved with its field, so
 the Solve button of the top bar answers in a moment.
 
-**Build the sequence...** does the whole pipeline in one click: if the plate
+**Build the sequence (comparisons)...** is the **big button** of the Photometry
+tab (ADR-038 rev): on entering you see it, the line saying what it will do, the
+tab's own guide ("Click a star...", which lives right under it) and the
+column's **cards**, all closed except the result's: **"The comparison
+sequence"**, **"The photometry recipe"** and **"Measurement"** (the last one
+appears with the first measurement). It does the whole pipeline in one
+click: if the plate
 has no WCS it solves it first (the project's field points the solver, so it
 is a moment), then it queries the catalogue (the field) and proposes. The
 manual window's **Propose sequence** fills in the missing step the same way,
@@ -170,13 +220,13 @@ comparison star) keeps the sequence you already had and says why.
   shared "Export PNG..." button in the top bar: plate, rings, labels
   and the north arrow / scale bar, exactly what you see.
 
-### Measure (bottom half)
+### Measure (the recipe block)
 
 Turns one click into a catalog-calibrated magnitude (single-plate
 differential aperture photometry):
 
 * It needs the plate with a WCS (if missing, it solves it by itself) and
-  a sequence in the top half (if there is none, a "Go to the sequence"
+  a sequence with the big button (if there is none, a "Go to the sequence"
   button takes you there).
 * **Click** on the star or the SN: sub-pixel centroid, aperture and sky
   annulus visible on the image, and the panel tells the full story:

@@ -415,8 +415,14 @@ def resolve_recipe(db, meta, tol_c=None):
                 "thermal current stay in the frame")
 
     # Flat: same filter (that is its whole point). Its exposure is not the
-    # light's, so exposure is not part of the match.
-    flat = find_master(db, "flat", camera, gain, temp, exptime_s=None,
+    # light's, so exposure is not part of the match, and NEITHER IS THE GAIN:
+    # a flat is NORMALISED before it is applied, so the gain only scales its
+    # whole level, never its shape. Requiring it was rejecting real flats
+    # (measured on the author's own 2025 FG18 night: the flats were taken at
+    # gain 3 and the lights at gain 5, so the library said "no flat" and the
+    # run fell back to a pseudo-flat). The dark DOES need the gain: there the
+    # level is the signal.
+    flat = find_master(db, "flat", camera, None, temp, exptime_s=None,
                        filter=filt, tol_c=tol_c)
     if flat is not None:
         recipe.flat = flat
@@ -514,6 +520,69 @@ PSEUDO_FLAT_RESIDUAL_PCT = 2.0
 # the same time, so the pass is done in bands. 64 rows x 139 frames x 2048
 # px x 4 B = 73 MB, which is a working set and not a problem.
 _PSEUDO_FLAT_ROWS = 64
+# ---- the star mask and the smooth model -------------------------------
+# When the frames are NOT dithered the flat carries the stars, and a flat
+# that carries the stars is worse than no flat: every star is divided by
+# itself. Measured on the author's own 2025 FG18 visit (sidereal tracking,
+# the stars do not move): a comparison star sitting on a bright star came
+# out 1.08 mag off, and the whole zero point was scrap.
+#
+# What IS still usable from those frames is the VIGNETTING, which is smooth
+# and fixed: a low-order surface fitted to the percentile where there are no
+# stars. Measured against the author's own real flat of the same night (a
+# master of 20 flats): the model agrees with it to within 3 % in the middle
+# of the field (p5-p95 of the ratio: 0.95-1.05), and the fine structure it
+# does not correct (the dust) is worth 0.6 % = 0.007 mag. The vignetting
+# itself is 13-22 % across the field, so correcting it is what matters.
+PSEUDO_FLAT_MASK_SIGMA = 5.0     # above the smoothed percentile by this many
+                                 # sigma = a source that does not move
+PSEUDO_FLAT_MASK_DILATE = 12     # px around it: the halo, the spikes, the
+                                 # bloom of a bright star
+PSEUDO_FLAT_MODEL_ORDER = 4      # the total degree of the fitted surface
+_PSEUDO_FLAT_FIT_STRIDE = 8      # fit on every 8th pixel: the vignetting is
+                                 # smooth, and 2048x2048 rows would be a
+                                 # 480 MB design matrix for nothing
+
+
+def _vignetting_model(raw, star_mask, order=PSEUDO_FLAT_MODEL_ORDER):
+    # @args: raw - the per-pixel percentile over the frames (h, w), star_mask
+    #        - True where a star does not move, order - the surface's total
+    #        degree
+    # @return: (model, None) with the model normalised to a median of one, or
+    #          (None, why) when it cannot be built
+    from scipy import ndimage
+    h, w = raw.shape
+    # the dilation is what takes the halo, the spikes and the bloom of a
+    # bright star out of the fit, not just the core the mask found
+    keep = ~ndimage.binary_dilation(star_mask,
+                                    iterations=PSEUDO_FLAT_MASK_DILATE)
+    ys, xs = np.nonzero(keep)
+    if len(ys) < 4 * (order + 1) ** 2:
+        return None, ("the stars cover almost the whole frame: there is not "
+                      "enough sky left to model the vignetting")
+    ys, xs = ys[::_PSEUDO_FLAT_FIT_STRIDE], xs[::_PSEUDO_FLAT_FIT_STRIDE]
+    yn = (ys - h / 2.0) / (h / 2.0)
+    xn = (xs - w / 2.0) / (w / 2.0)
+    terms = [(i, j) for i in range(order + 1) for j in range(order + 1)
+             if i + j <= order]
+    design = np.empty((len(xs), len(terms)), dtype=np.float64)
+    for k, (i, j) in enumerate(terms):
+        design[:, k] = (xn ** i) * (yn ** j)
+    values = raw[ys, xs].astype(np.float64)
+    try:
+        coef, *_ = np.linalg.lstsq(design, values, rcond=None)
+    except np.linalg.LinAlgError:
+        return None, "the vignetting model did not converge"
+    yy, xx = np.mgrid[0:h, 0:w]
+    yyn = (yy - h / 2.0) / (h / 2.0)
+    xxn = (xx - w / 2.0) / (w / 2.0)
+    model = np.zeros((h, w), dtype=np.float64)
+    for c, (i, j) in zip(coef, terms):
+        model += c * (xxn ** i) * (yyn ** j)
+    norm = float(np.median(model))
+    if not np.isfinite(model).all() or norm <= 0:
+        return None, "the vignetting model is not usable (it has no level)"
+    return (model / norm).astype(np.float32), None
 
 
 def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
@@ -546,7 +615,7 @@ def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
     paths = list(paths or [])
     info = {"n_frames": len(paths), "window": window, "passes": passes,
             "order": order, "median_adu": None, "residual_pct": None,
-            "note": ""}
+            "kind": "pseudo_flat", "model_range": None, "note": ""}
     if not paths:
         info["note"] = "no frames to build a flat from"
         return None, info
@@ -620,11 +689,35 @@ def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
         ratio = (inner / np.maximum(ref, 1e-6)) - 1.0
         info["residual_pct"] = float(
             100.0 * outliers.scaled_mad(ratio.ravel()))
+    # THE STAR MASK: what is well above the SMOOTHED percentile (the train's
+    # own response, stars averaged away) is a source that does not move. The
+    # noise is the MAD of the difference itself, which the stars (a small
+    # fraction of the pixels) cannot inflate.
+    diff = raw - smooth
+    noise = float(outliers.scaled_mad(diff.ravel()))
+    star_mask = diff > PSEUDO_FLAT_MASK_SIGMA * max(noise, 1e-6)
+    info["mask_pct"] = float(100.0 * star_mask.mean())
     if info["residual_pct"] is not None \
             and info["residual_pct"] > PSEUDO_FLAT_RESIDUAL_PCT:
-        info["note"] = ("the flat still carries the stars: the frames were "
-                        "not dithered, so the percentile could not average "
-                        "them away")
+        # The frames are not dithered: the stars are in the flat, and a flat
+        # that carries the stars is worse than no flat (each star divided by
+        # itself). What IS usable is the VIGNETTING, which is smooth: a
+        # low-order surface fitted to the percentile where there are no
+        # stars. The model is said for what it is: it does not correct the
+        # dust.
+        model, why = _vignetting_model(raw, star_mask)
+        if model is None:
+            info["note"] = ("the frames were not dithered, so a flat from "
+                            "them would carry the stars, and " + why)
+            return None, info
+        info["kind"] = "vignette_model"
+        info["median_adu"] = float(np.median(raw))
+        info["model_range"] = (float(model.min()), float(model.max()))
+        info["note"] = ("a smooth model of the vignetting (the frames were "
+                        "not dithered, so a flat from them would carry the "
+                        "stars): it matches a real flat to within ~3 % and "
+                        "does not correct the dust")
+        return model, info
     return flat, info
 
 

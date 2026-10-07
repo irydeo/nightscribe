@@ -61,7 +61,8 @@ visita»** (selección múltiple) en la propia ventana de la visita.
 ## 4. Flujo paso a paso
 
 1. **Prepara la secuencia de comparación** en la pestaña Fotometría del editor
-   (mitad superior, «Construir la secuencia…»). La serie usa esas comparaciones
+   (el botón grande de la pestaña, «Construir la secuencia (comparsas)…»). La
+   serie usa esas comparaciones
    en cada toma.
 2. **Mide el objetivo** una vez (un clic) para que la serie sepa dónde medir;
    o abre el editor desde la ficha con coordenadas, que se colocan solas.
@@ -458,7 +459,7 @@ numpy sigue funcionando.
 
 - **«No hay visita con tomas»**: abre el editor desde una visita; no desde el
   menú Herramientas suelto.
-- **«No hay secuencia de comparación»**: constrúyela en la mitad superior de la
+- **«No hay secuencia de comparación»**: constrúyela con el botón grande de la
   pestaña Fotometría.
 - **«Mide el objetivo una vez»**: un clic sobre el objetivo (o abre desde la
   ficha con coordenadas).

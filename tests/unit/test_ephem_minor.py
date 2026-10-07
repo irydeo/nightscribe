@@ -12,6 +12,9 @@
 ############################################################
 
 import datetime
+import math
+
+import pytest
 
 from nightscribe.core import coords, ephem_minor
 
@@ -77,6 +80,33 @@ def test_kepler_geocentric_sign_against_horizons():
     assert abs(delta - 1.7384) < 0.05
 
 
+def test_kepler_j2000_matches_horizons_far_better_than_of_date():
+    # The local fallback has to be in the SAME frame as the plate's WCS
+    # (J2000/ICRF). The of-date path mixed a J2000 object with an of-date
+    # Earth and missed by degrees on a close object (measured: 13039" on
+    # 2026 PY9); the J2000 path, with the light-time, lands within a couple
+    # of arcminutes (the residual is two-body + the coarse Earth, which the
+    # caller absorbs by widening the cutout). Ground truth from the cached
+    # Horizons ephemeris of the visit: 2026-08-16 22:25 UT, RA 313.3204,
+    # Dec -4.8532.
+    els = {"a": 2.329264345717352, "e": 0.5508738138610355,
+           "i": 11.04772931873822, "om": 148.529452272859,
+           "w": 207.3810299700251, "ma": 332.5479727971131,
+           "epoch": 2461200.5}
+    jd = 2461269.4342676736
+    truth = (313.3204143893593, -4.853223733125551)
+
+    def sep(p):
+        dra = (p[0] - truth[0]) * math.cos(math.radians(truth[1])) * 3600.0
+        return math.hypot(dra, (p[1] - truth[1]) * 3600.0)
+
+    old = ephem_minor.kepler_ra_dec(els, jd)
+    new = ephem_minor.kepler_ra_dec_j2000(els, jd)
+    assert sep(old) > 5000.0            # degrees off: unusable
+    assert sep(new) < 300.0             # arcminutes: guides the cutout
+    assert new[3] > 0                   # a distance, not a direction only
+
+
 def test_planet_mars_against_horizons():
     # Mars on 2026-Aug-24 00:00 UT (queried from Horizons): RA 06 34 31 =
     # 98.63 deg, Dec +23 36 54 = 23.615 deg. Same frame caveat as above.
@@ -120,3 +150,41 @@ def test_barker_at_perihelion():
     # at t=tp (dt=0), true anomaly must be 0
     nu = ephem_minor._barker_true_anomaly(1.0, 0.0)
     assert abs(nu) < 1e-10
+
+
+# ------------------------------------------- the H-G predicted magnitude
+
+# 2026 PY9's elements and H, as JPL's SBDB publishes them. The expected value
+# is JPL Horizons' own APmag for that instant (22.208), which is what makes
+# this a cross-check against an external truth and not a restatement of the
+# code: the two agree to 0.01 mag.
+_PY9 = {"a": 2.329264345717352, "e": 0.5508738138610355,
+        "i": 11.04772931873822, "om": 148.529452272859,
+        "w": 207.3810299700251, "ma": 332.5479727971131,
+        "tp": 2461299.514435335, "epoch": 2461200.5, "q": 1.046133612101505}
+_PY9_H = 23.356
+# 2026-10-06 00:00 UT
+_PY9_JD = 2461319.5
+
+
+def test_the_hg_magnitude_matches_horizons():
+    mag, band = ephem_minor.hg_magnitude_j2000(_PY9, _PY9_JD, _PY9_H)
+    assert band == "V"
+    assert mag == pytest.approx(22.208, abs=0.02)
+
+
+def test_the_hg_magnitude_needs_an_absolute_magnitude():
+    # Without H there is no figure to publish, and inventing one (a default,
+    # a zero) would put a number on the plate that nobody measured.
+    assert ephem_minor.hg_magnitude_j2000(_PY9, _PY9_JD, None) == (None, None)
+    assert ephem_minor.hg_magnitude_j2000(_PY9, _PY9_JD, "n.a.") == (None,
+                                                                    None)
+    assert ephem_minor.hg_magnitude_j2000({}, _PY9_JD, 20.0) == (None, None)
+
+
+def test_a_bigger_h_is_a_fainter_magnitude():
+    # The H offset is exact in the H-G system: +1 in H is +1 mag, whatever
+    # the geometry.
+    a, _b = ephem_minor.hg_magnitude_j2000(_PY9, _PY9_JD, _PY9_H)
+    b, _b2 = ephem_minor.hg_magnitude_j2000(_PY9, _PY9_JD, _PY9_H + 1.0)
+    assert b - a == pytest.approx(1.0)

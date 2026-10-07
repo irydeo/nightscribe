@@ -1117,3 +1117,45 @@ def test_an_inherited_alignment_does_not_crash_the_report(tmp_path,
     # (the previous transform's own shift, which is the honest value)
     assert "shift_median_px" in rep and "shift_max_px" in rep
     monkeypatch.setattr(register, "trusted", real)
+
+
+def test_the_aperture_tuning_never_uses_a_star_over_the_ceiling(tmp_path):
+    # ADR-066 (the rule of the house: never a saturated star, never one over
+    # the camera's linearity). The aperture tuning measured the check star
+    # WITHOUT the ceilings, so a clipped star could tune the aperture the
+    # whole night would then use. It is refused now, with the same two
+    # ceilings every other path asks for.
+    from astropy.io import fits
+    from nightscribe.core import series_measure as sm
+    size = 64
+    yy, xx = np.mgrid[0:size, 0:size]
+    # the peak lands at ~40 200 ADU: over a 30 000 ADU linearity, well under
+    # a 65 535 one (the app treats 85 % of a ceiling as saturated, so the
+    # star has to stay clear of that too)
+    star = (200.0 + 40000.0 * np.exp(-(((xx - 32.0) ** 2 + (yy - 32.0) ** 2)
+                                       / (2 * 2.0 ** 2))))
+    paths = []
+    for i in range(4):
+        p = tmp_path / f"f{i}.fits"
+        hdu = fits.PrimaryHDU(star.astype(np.float32))
+        hdu.header["DATE-OBS"] = f"2026-10-06T22:0{i}:00"
+        hdu.header["EXPTIME"] = 1.0
+        hdu.writeto(str(p), overwrite=True)
+        paths.append(str(p))
+    w = _reference_wcs()
+    ra, dec = w.pixel_to_sky(32.0, 32.0)
+    check = {"ra": ra, "dec": dec, "mag": 12.0, "id": "C1",
+             "band": "V", "bands": [{"label": "V", "value": 12.0,
+                                     "err": 0.01, "derived": False}]}
+    cfg = sm.SeriesConfig(comp_set=[{"kind": "check", "name": "CHK",
+                                     "star": check}], wcs=w,
+                          site_linear=30000.0, site_saturate=65535.0)
+    out = sm.sweep_aperture(paths, cfg)
+    # the star is over the linearity (40 200 > 30 000): nothing is tuned with
+    # it, so no night comes back
+    assert out == {}
+    # and with a linearity that clears it, the tuning happens
+    cfg2 = sm.SeriesConfig(comp_set=cfg.comp_set, wcs=w,
+                           site_linear=60000.0, site_saturate=65535.0)
+    out2 = sm.sweep_aperture(paths, cfg2)
+    assert out2, "con el techo por encima de la estrella, el ajuste sí se hace"

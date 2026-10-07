@@ -238,6 +238,19 @@ It does not replace a real flat: it measures the train's response **times**
 the sky's shape, so the flat-field error is larger. It is the honest
 fallback, and the recipe says which one was used.
 
+**When the stars do not move, there is no pseudo-flat.** With a sidereal
+mount (the normal case) the same star sits on the same pixel all night, so
+the percentile keeps it and the "flat" divides every star by itself: a flat
+that carries the stars is worse than no flat. Measured on the author's own
+2025 FG18 visit, a comparison star on a bright star came out **1.08 mag**
+off. What IS usable from those frames is the **vignetting**, which is smooth
+and fixed: the app masks the sources (what is more than 5σ above the
+smoothed percentile, dilated 12 px) and fits a degree-4 surface. Measured
+against a real master flat of the same night, the agreement is within ~3 %
+(median 0.9963, p5–p95 0.954–1.045) and the fine structure it does not
+correct (the dust) is worth 0.6 % = 0.007 mag. The recipe says
+`vignette_model` and the note says what it is and what it does not correct.
+
 ## T7. The calibration, inside the stacking
 
 A stack of uncalibrated frames keeps the pedestal, the thermal current, the

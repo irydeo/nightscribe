@@ -46,7 +46,7 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_blink)        # take the stage
+    d.open_tool("blink")                        # take the stage (ADR-044 rev)
     yield d
     d.tab_blink.shutdown()           # the blink timer never outlives it
     d.view._render_timer.stop()
@@ -113,11 +113,14 @@ class _FakeExportWorker:
         return False
 
 
-def test_tab_replaces_the_placeholder(dlg):
+def test_blink_is_a_window_and_the_place_it_left_is_free(dlg):
+    # ADR-044 rev: Blink is a non-modal window opened from the top bar, and
+    # the column keeps the two panels an observer lives in.
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Astrometry"]
-    assert dlg.tabs.indexOf(dlg.tab_blink) == 0
+    assert titles == ["Photometry", "Astrometry"]
+    window = dlg._tools["blink"]
+    assert window.panel is dlg.tab_blink
+    assert window.isVisible() and window.isModal() is False
 
 
 def test_prepare_requires_a_plate_or_a_target(dlg):
@@ -233,15 +236,18 @@ def test_marker_maps_through_the_plate_wcs(dlg):
     assert tab._items == []
 
 
-def test_leaving_the_tab_hands_the_plate_back(dlg):
+def test_leaving_the_window_hands_the_plate_back(dlg):
+    # The blink owns the plate while its window is open (it puts its own
+    # frame on the view); closing it hands the plate back to the panel in
+    # the column and stops the timer.
     tab = dlg.tab_blink
     tab._on_pair_ready(_pair(dlg), {})
     assert dlg.view._frame_override is not None
-    dlg.tabs.setCurrentIndex(1)              # the Photometry tab
+    dlg._tools["blink"].close_panel()        # the X button / a second press
     assert dlg.view._frame_override is None
     assert not tab._timer.isActive()
     assert tab._items == []
-    dlg.tabs.setCurrentWidget(tab)           # back: blink resumes
+    dlg.open_tool("blink")                   # back: blink resumes
     assert dlg.view._frame_override is not None
     assert tab._timer.isActive()
 

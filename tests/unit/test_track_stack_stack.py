@@ -481,7 +481,6 @@ def test_a_frame_without_an_object_position_is_still_left_out(tmp_path):
 
 
 # ---------------------------------------------------------------- sweep
-
 def _counting_loader(reads):
     # A loader that records the boxes it is asked for and reads like the
     # real one, so the sweep can be exercised without re-reading the disk.
@@ -498,13 +497,23 @@ def test_the_sweep_reads_each_frame_once_not_once_per_candidate(tmp_path):
     # frame is read ONCE into the union of their regions. Re-reading per
     # candidate was 25x the disk traffic for the same answer (measured on a
     # real visit: the whole sweep was the second cost of the run).
+    #
+    # The refinement (ADR-062 rev) adds 9 candidates around the winner and
+    # reads NOTHING: they sit inside the coarse grid's own union, so the
+    # pixels are reused. The disk cost of the sweep is unchanged.
     frames = _sequence(tmp_path, n=6, size=64, rate_px=1.5)
     reads = []
     result = ts.sweep(frames, frames[0].object_xy, 1.5, 90.0, (8, 18, 40, 50),
                       (64, 64), pct=5.0, steps=5, method="median",
                       loader=_counting_loader(reads))
     assert len(reads) == len(frames)          # one read per frame, not 25
-    assert len(result.grid) == 25
+    assert len(result.grid) == 25 + 9         # the coarse grid + the refinement
+    assert result.refined is True
+    # and the refinement really is finer: the PA resolution goes from the
+    # coarse 4.5 degrees to about one
+    pas = sorted({round(item["pa"], 4) for item in result.grid})
+    steps = [b - a for a, b in zip(pas, pas[1:]) if b - a > 1e-6]
+    assert min(steps) < 1.5
 
 
 def test_the_parallel_combine_is_the_serial_one():
@@ -523,6 +532,27 @@ def test_the_parallel_combine_is_the_serial_one():
         slow = ts.combine(cube, method, mask=mask,
                           cfg={"astrometry_threads": 1})
         np.testing.assert_array_equal(fast, slow)
+
+
+def test_a_sweep_that_only_finds_noise_is_not_significant(tmp_path):
+    # ADR-062 rev: the sweep's winner is only USED when it beats the
+    # ephemeris' own prediction (which is one of the grid's candidates, so it
+    # is measured on the same pixels) by more than the grid's scatter. On a
+    # faint object the score is noise, and publishing a noise maximum as the
+    # measured motion is what made the app report PA 33 where the ephemeris
+    # said 41.8 (2025 HL5) and 37 where it said 46.2 (2025 FG18): exactly one
+    # coarse step of -9 degrees.
+    frames = _sequence(tmp_path, n=8, size=64, rate_px=0.0, amp=0.0,
+                       obj=False)
+    result = ts.sweep(frames, frames[0].object_xy, 0.0, 90.0, (8, 18, 40, 50),
+                      (64, 64), pct=5.0, steps=5, method="median",
+                      loader=_counting_loader([]))
+    assert result.best is not None
+    assert result.significant is False
+    assert result.refined is False           # no refinement on noise
+    # the answer kept is the EPHEMERIS' own candidate, not the noise maximum
+    assert result.best["rate"] == pytest.approx(0.0)
+    assert result.best["pa"] == pytest.approx(90.0)
 
 
 def test_the_sweep_centre_reproduces_the_direct_stack(tmp_path):
@@ -572,3 +602,17 @@ def test_a_stack_with_nan_pixels_is_still_scorable(tmp_path):
     det = ts.detect(stack, (q[0], q[1]), None)
     assert det.detected is True
     assert np.isfinite(det.roundness)
+
+
+# ---------------------------------------------------------------- manual
+
+def test_manual_reference_replaces_the_ephemeris_and_keeps_the_offset():
+    # Manual mode (faint object): the observer's mark is the reference point,
+    # and the offset from the ephemeris is carried to every observation.
+    q_all = (100.0, 200.0)
+    assert ts.manual_reference(q_all, None) == (q_all, None)
+    q_used, offset = ts.manual_reference(q_all, (103.0, 196.0))
+    assert q_used == (103.0, 196.0)
+    assert offset == (3.0, -4.0)
+    # and applying the offset to a group's own ephemeris point is a shift
+    assert (150.0 + offset[0], 210.0 + offset[1]) == (153.0, 206.0)

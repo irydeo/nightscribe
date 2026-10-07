@@ -115,10 +115,12 @@ DEFAULTS = {
     # a pseudo-flat needs the sequence to be dithered.
     "calib_pseudo_flat": False,
     # The astrometry's own switch for ADR-061: calibrate the frames as they
-    # are read (dark/bias and flat) before stacking them. Off by default: it
-    # costs a pass over the visit, and the observer may already have
-    # calibrated copies.
-    "calib_astrometry": False,
+    # are read (dark/bias and flat) before stacking them. THREE-STATE on
+    # purpose (ADR-061 rev): None means nobody has chosen yet, and then the
+    # library decides (on when it has a dark or a flat that matches the
+    # visit, off when it has none); 0 and 1 are the observer's own word and
+    # are never overridden.
+    "calib_astrometry": None,
     # Track & stack (ADR-062): the detection gate and the submission bar
     # are DIFFERENT thresholds on purpose. The MPC recommends SNR >= 20 to
     # submit and forbids marginal detections, but that is a recommendation:
@@ -133,6 +135,11 @@ DEFAULTS = {
     "astrometry_sweep_steps": 25,
     "astrometry_method": "sigma",
     "astrometry_cutout_margin_px": 64,
+    # Extra margin added to the cutout when the ephemeris had to be
+    # propagated LOCALLY (Horizons down): two-body and a coarse Earth can
+    # put a close NEO a couple of arcminutes off, and the cutout has to
+    # still contain it. The reported position is unaffected.
+    "astrometry_fallback_margin_px": 300,
     "astrometry_full_frame_final": True,
     # Worker threads for the CPU-bound stages (register, warp, combine): 0 is
     # AUTOMATIC, computed from the cores the process may use and capped by the

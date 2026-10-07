@@ -75,10 +75,10 @@ def test_the_loader_registers_the_children_by_hand(qapp):
     from nightscribe.gui.ui_loader import _register_children
     host = QWidget()
     panel = ui_loader.load_ui("ufe_visit_panel", host)
-    assert isinstance(panel.ph_series, QWidget)
+    assert isinstance(panel.lbl_frame_file, QWidget)
     assert isinstance(panel.lbl_frame, QWidget)
     assert not hasattr(panel, "load_ui")        # a class attribute survives
     _register_children(panel)                   # idempotent
-    assert isinstance(panel.ph_series, QWidget)
+    assert isinstance(panel.lbl_frame_file, QWidget)
     host.deleteLater()
     qapp.processEvents()

@@ -240,6 +240,19 @@ No sustituye a un flat de verdad: mide la respuesta del tren **por** la
 forma del cielo, así que el error de flat es mayor. Es el respaldo honesto, y
 la receta dice cuál se usó.
 
+**Cuando las estrellas no se mueven, no hay pseudo-flat.** Con montura
+sidereal (el caso normal) la misma estrella cae en el mismo píxel toda la
+noche, así que el percentil se la queda y el «flat» divide cada estrella por
+sí misma: un flat que lleva las estrellas es peor que ningún flat. Medido en
+la visita 2025 FG18 del autor, una comparada sobre una estrella brillante
+salía **1,08 mag** desviada. Lo que sí queda de esas tomas es el
+**viñeteado**, que es suave y fijo: la app enmascara las fuentes (lo que está
+a más de 5σ sobre el percentil suavizado, dilatado 12 px) y ajusta una
+superficie de grado 4. Medido contra un master flat real de la misma noche,
+la concordancia es del ~3 % (mediana 0,9963; p5–p95 0,954–1,045) y la
+estructura fina que no corrige (el polvo) vale 0,6 % = 0,007 mag. La receta
+dice `vignette_model` y la nota dice qué es y qué no corrige.
+
 ## T7. La calibración, dentro del apilado
 
 Un apilado de tomas sin calibrar conserva el pedestal, la corriente térmica,

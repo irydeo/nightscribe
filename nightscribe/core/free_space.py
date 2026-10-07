@@ -80,11 +80,13 @@ def _project_of(db, run_id):
     return project_mod.get(db, row[0])
 
 
-def _follow_path(db, old_path, new_path):
-    # @args: db - Database, old_path/new_path - the frame
+def _follow_path(db, old_path, new_path, flag="archived"):
+    # @args: db - Database, old_path/new_path - the frame, flag - the meta
+    #        key that says WHY it moved ("archived" after a successful run,
+    #        "discarded" when the observer took it out by hand)
     # @return: True when a project_files row followed the move
     # The visit's resource list must not end up pointing at a file that is
-    # no longer there: the row follows the frame and is marked archived.
+    # no longer there: the row follows the frame and is marked.
     import json
     rows = db.execute("SELECT id, meta FROM project_files WHERE path=?",
                       (old_path,)).fetchall()
@@ -93,7 +95,7 @@ def _follow_path(db, old_path, new_path):
             meta = json.loads(row[1]) if row[1] else {}
         except (TypeError, ValueError):
             meta = {}
-        meta["archived"] = True
+        meta[flag] = True
         meta["moved_from"] = old_path
         db.execute("UPDATE project_files SET path=?, meta=? WHERE id=?",
                    (new_path, json.dumps(meta), row[0]))
@@ -239,6 +241,50 @@ def restore(db, run_id, progress=None, cancel=None):
         db.execute("UPDATE astrometry_frames SET archived=0, moved_to=NULL"
                    " WHERE id=?", (frame_id,))
         report.moved += 1
+        if progress is not None:
+            progress(index, total, src.name)
+    db.commit()
+    return report
+
+
+def discard_files(db, paths, storage_dir, progress=None, cancel=None):
+    # @args: db - Database, paths - the frames to move aside, storage_dir -
+    #        the project's storage dir (project.storage_dir), progress -
+    #        callable(done, total, name), cancel - callable() -> True
+    # @return: MoveReport (moved, bytes, skipped, errors, destination)
+    # THE FRAME AN OBSERVER DOES NOT WANT IN THE NIGHT. A trailed frame, one
+    # under a cloud, the 0-byte one a cut capture left behind: they are taken
+    # out of the visit AND out of the way, into `descartados/` inside the
+    # project. Nothing is deleted (the same rule free_space follows: the
+    # frames are the observer's data and the app only knows their path) and
+    # the registry follows the move, so the visit's list keeps pointing at a
+    # file that exists and the row can be brought back.
+    from pathlib import Path as _Path
+    report = MoveReport()
+    files = [str(p) for p in (paths or []) if p]
+    if not files:
+        return report
+    dest_dir = _Path(storage_dir) / "descartados"
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    report.destination = str(dest_dir)
+    total = len(files)
+    for index, path in enumerate(files, 1):
+        if cancel is not None and cancel():
+            break
+        src = _Path(path)
+        if not src.exists():
+            report.skipped.append(path)
+            continue
+        dest = _unique(dest_dir / src.name)
+        try:
+            size = src.stat().st_size
+            _move(src, dest)
+        except OSError as err:
+            report.errors.append(f"{src.name}: {err}")
+            continue
+        _follow_path(db, path, str(dest), flag="discarded")
+        report.moved += 1
+        report.bytes += int(size or 0)
         if progress is not None:
             progress(index, total, src.name)
     db.commit()

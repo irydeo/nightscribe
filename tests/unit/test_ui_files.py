@@ -85,8 +85,12 @@ def test_ufe_feature_tabs(qapp):
                       (d.tab_photometry, "photometry")):
         assert _margins(tab) == (9, 9, 9, 9), name
         assert not tab._ui.isVisibleTo(tab), f"{name}: husk visible"
-    # the compare tab's first field is really clickable
+    # the compare tab's first field is really clickable: since ADR-038 rev it
+    # lives inside the sequence block, so the block is opened first (the point
+    # of the check is that no Designer husk is painted over the real widgets)
     t = d.tab_compare
+    t._sections["seq"]._toggle()
+    assert t.edt_target.isVisibleTo(t)
     hit = t.childAt(t.edt_target.mapTo(t, t.edt_target.rect().center()))
     assert hit is t.edt_target
     d.deleteLater()

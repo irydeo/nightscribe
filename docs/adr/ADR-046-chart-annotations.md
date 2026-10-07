@@ -313,3 +313,52 @@ run measured, under the same colour rules:
   as `NS_RA` / `NS_DEC` (the annotation). So the band says the same right after the run
   and months later, with no database and no run in memory. The star stack carries the
   motion but never the magnitude: there the object is a trail and was not measured.
+
+**Revisión (2026-10-06): cada cifra dice de dónde sale.** Se pidió poder distinguir en
+la banda si la velocidad, el PA y la magnitud son medidas o previstas, y que la
+magnitud aparezca SIEMPRE (aunque el run no la haya medido). La regla pasa a ser
+simétrica en los dos sentidos:
+
+- **Magnitud**: medida en esta placa → rol de calidad (`mag` / `mag-fair` / `mag-doubt`)
+  y la palabra `(measured)`; predicha por la efeméride → rol nuevo **`mag-eph`**
+  (apagado, como `motion-eph`) y `(eph)`; del catálogo o del proyecto → `mag-cat` y
+  `(cat)`, como antes. La predicción gana al catálogo, porque es la misma fuente que
+  sitúa el objeto. `NS_MAGSR` (`measured` | `ephemeris`) viaja en la cabecera del stack
+  y es lo que la banda lee: sin esa tarjeta, un valor guardado se lee como medición,
+  que es lo que eran todos los stacks escritos antes.
+- **Velocidad y PA**: `(measured)` cuando los midió el barrido, `(eph)` cuando son la
+  predicción. Antes lo medido iba en tinta y sin palabra: la ausencia de etiqueta era
+  la única señal, y eso obliga a saber la regla para leer la placa.
+- **El stack base** (la secuencia entera, ADR-062) lleva su banda propia: el movimiento,
+  la magnitud con su origen y **la detección hecha sobre esa misma imagen** (`NS_FOUND`,
+  `NS_SNR`, `NS_GATE`, `NS_LIMIT` = magnitud límite), que se pinta en la línea de
+  contexto como `SNR 1.4 (gate 3.5σ) · limit 19.4`. Es la medida del stack base, y sin
+  ella la imagen apilada no decía nada del objeto.
+- **Regla de los nombres de tarjeta**: ocho caracteres o menos. El lector propio de
+  FITS (`core/fits_io.py`, ADR-018) no entiende `HIERARCH`, así que una tarjeta más
+  larga la escribe astropy y la pierde el lector: la banda diría que no hay dato.
+
+**Revision (2026-10-06): every figure says where it comes from.** Asked for: the band
+must show whether the velocity, the PA and the magnitude were measured or predicted,
+and the magnitude must ALWAYS be there (even when the run did not measure it). The rule
+is now symmetric both ways:
+
+- **Magnitude**: measured on this plate → the quality role (`mag` / `mag-fair` /
+  `mag-doubt`) plus the word `(measured)`; predicted by the ephemeris → new role
+  **`mag-eph`** (dimmed, like `motion-eph`) and `(eph)`; from the catalogue or the
+  project → `mag-cat` and `(cat)`, as before. The prediction beats the catalogue,
+  because it is the same source that places the object. `NS_MAGSR` (`measured` |
+  `ephemeris`) travels in the stack's header and is what the band reads: without that
+  card a stored value reads as a measurement, which is what every stack written before
+  it was.
+- **Velocity and PA**: `(measured)` when the sweep measured them, `(eph)` when they are
+  the prediction. Measured used to be ink with no word: the absence of a label was the
+  only signal, and that forces the reader to know the rule.
+- **The base stack** (the whole sequence, ADR-062) carries its own band: the motion, the
+  magnitude with its origin and **the detection made on that very image** (`NS_FOUND`,
+  `NS_SNR`, `NS_GATE`, `NS_LIMIT` = limit magnitude), painted on the context line as
+  `SNR 1.4 (gate 3.5σ) · limit 19.4`. It is the base stack's own measurement, and
+  without it the stacked image said nothing about the object.
+- **Card-name rule**: eight characters or fewer. The app's own FITS reader
+  (`core/fits_io.py`, ADR-018) does not understand `HIERARCH`, so a longer card is
+  written by astropy and lost by the reader: the band would say there is no datum.

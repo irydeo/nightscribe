@@ -38,7 +38,19 @@
      <item><widget class="QToolButton" name="btn_zoom_more"><property name="toolTip"><string>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</string></property><property name="text"><string>Zoom</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
      <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string/></property><property name="toolTip"><string>Current zoom: 100 % is one plate pixel per screen pixel</string></property><property name="minimumSize"><size><width>44</width><height>0</height></size></property></widget></item>
      <item><spacer name="hsp_bar_end"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_page_image"><property name="text"><string>Image</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The plate, with its marks, its annotations and the measurement overlay</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_page_curve"><property name="text"><string>Light curve</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</string></property></widget></item>
      <item><widget class="QWidget" name="ph_badge"/></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_tools">
+     <property name="spacing"><number>6</number></property>
+       <item><widget class="QPushButton" name="btn_tool_blink"><property name="text"><string>Blink</string></property><property name="toolTip"><string>Blink this plate against a survey reference (PanSTARRS): prepare the pair and switch between them to see what moved. Opens in its own window, so the plate stays in sight</string></property></widget></item>
+       <item><widget class="QPushButton" name="btn_tool_calibrate"><property name="text"><string>Calibrate</string></property><property name="toolTip"><string>The calibration of this visit: which master each piece uses (dark, flat), the pseudo-flat policy and the library it reads. The frames are calibrated when they are read (the Astrometry run); from here you can also export calibrated copies. Opens in its own window</string></property></widget></item>
+       <item><widget class="QPushButton" name="btn_tool_annotate"><property name="text"><string>Annotate</string></property><property name="toolTip"><string>Write an annotation on the plate (label, notes, marker) and save the annotated copy. Click the image to place the marker. Opens in its own window, so the plate stays in sight</string></property></widget></item>
+       <item><widget class="QPushButton" name="btn_tool_series"><property name="text"><string>Series</string></property><property name="toolTip"><string>Measure the frames of this visit as ONE photometric series (per-frame zero point, quality flags, honest errors) and everything that hangs off it: the passes, ExoClock, the night's figures, the period. Opens in its own window; it needs a visit with frames</string></property></widget></item>
+     <item><spacer name="hsp_row_tools"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
     </layout>
    </item>
    <item>
@@ -51,13 +63,6 @@
         <property name="topMargin"><number>0</number></property>
         <property name="rightMargin"><number>0</number></property>
         <property name="bottomMargin"><number>0</number></property>
-        <item>
-         <layout class="QHBoxLayout" name="row_centre_switch">
-          <item><widget class="QPushButton" name="btn_page_image"><property name="text"><string>Image</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The plate, with its marks, its annotations and the measurement overlay</string></property></widget></item>
-          <item><widget class="QPushButton" name="btn_page_curve"><property name="text"><string>Light curve</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</string></property></widget></item>
-          <item><spacer name="hsp_centre_switch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-         </layout>
-        </item>
         <item>
          <widget class="QStackedWidget" name="stack_centre">
           <widget class="QWidget" name="ph_centre_image"/>

@@ -12,6 +12,7 @@
 ############################################################
 
 import logging
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
@@ -1057,7 +1058,8 @@ class TrackStackWorker(QThread):
     def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
-                 phot_enabled=True, save_star_stack=False, calibrate=False):
+                 phot_enabled=True, save_star_stack=False, calibrate=False,
+                 manual_ref=None):
         super().__init__()
         self._paths = list(paths)
         # ADR-061 applied where the faint object is: calibrate the frames AS
@@ -1094,6 +1096,13 @@ class TrackStackWorker(QThread):
         # brightness by hand in the Photometry tab later, and that needs the
         # same frames aligned on the stars, saved next to the object's stack
         self._save_star_stack = bool(save_star_stack)
+        # MANUAL MODE (faint object): the observer's mark on the base stack,
+        # in REFERENCE-GRID pixels. When it is here the detection gate is not
+        # asked (a human mark IS the detection), the object is centred on the
+        # mark instead of the ephemeris, and the velocity sweep is skipped:
+        # over a source below the gate the sweep scores noise.
+        self._manual_ref = (None if manual_ref is None
+                            else (float(manual_ref[0]), float(manual_ref[1])))
         self._cancel = False
         self._solve_cancel = None   # SolveCancel while the solver runs
 
@@ -1254,7 +1263,8 @@ class TrackStackWorker(QThread):
                 site_aperture_m=float(self._cfg_get("aperture_inches", 10.0)
                                       or 10.0) * 0.0254,
                 site_height_m=float(self._cfg_get("height", 0) or 0.0),
-                site_dark=self._cfg_get("cam_dark_current_e_s", None))
+                site_dark=self._cfg_get("cam_dark_current_e_s", None),
+                stack_scale=self._stack_scale(groups[index]))
             res = photometry.measure_plate(stack, cfg)
             if not res.ok or res.mag is None:
                 per_obs.append(None)
@@ -1266,15 +1276,18 @@ class TrackStackWorker(QThread):
             # actually is instead of with a round PSF that is not there.
             # Measured on the 2025 UR star stack: the matched filter reaches
             # 1.55-1.63x the aperture's SNR, which is what sqrt(n_ap/n_eff)
-            # predicts.
-            shape = photometry.psf_elongation(stack, centre[0], centre[1],
+            # predicts. The name is `elong` and NOT `shape`: `shape` is the
+            # plate's (naxis1, naxis2) two lines above and it is still needed
+            # by the next observation's comp windows; clobbering it made the
+            # second observation index a dict.
+            elong = photometry.psf_elongation(stack, centre[0], centre[1],
                                               fwhm_px=fwhm)
             matched = None
-            if shape.get("ok"):
+            if elong.get("ok"):
                 psf = photometry.gaussian_psf(
-                    shape.get("fwhm_px") or fwhm,
-                    ratio=shape.get("ratio") or 1.0,
-                    pa_deg=shape.get("pa_deg") or 0.0)
+                    elong.get("fwhm_px") or fwhm,
+                    ratio=elong.get("ratio") or 1.0,
+                    pa_deg=elong.get("pa_deg") or 0.0)
                 matched = photometry.measure_matched(
                     stack, centre[0], centre[1], psf, r_ap=radii[0],
                     r_ann_in=radii[1], r_ann_out=radii[2], fwhm=fwhm)
@@ -1286,7 +1299,14 @@ class TrackStackWorker(QThread):
                                             if (e.get("kind") or "comp")
                                             == "comp"]),
                             "check": (res.check or {}).get("verdict"),
-                            "shape": shape, "matched": matched})
+                            # the check star's verdict as a yes/no/unknown:
+                            # the table colours the magnitude by it (a night
+                            # the check star says is off is not a night to
+                            # publish), and None means the sequence carried
+                            # no check star at all
+                            "check_ok": ((res.check or {}).get("ok")
+                                         if res.check else None),
+                            "shape": elong, "matched": matched})
             if diag_shape is None:
                 diag_shape = stack.shape
             for entry, cres in (res.used or []):
@@ -1353,6 +1373,25 @@ class TrackStackWorker(QThread):
                 # the run used instead of proposing a different one
                 "comps": entries, "catalog": "gaia"}
 
+    def _stack_scale(self, group):
+        # @args: group - the observation's (start, end) frames
+        # @return: how many frames this observation's stack ADDS, for the
+        #          photometry's ADU ceilings. "sum" adds them (so its level is
+        #          N times a frame's and the sensor's limits are MULTIPLIED by
+        #          N before the plate is compared against them); every other
+        #          method keeps the frame's level.
+        #          Measured on the author's own 2025 FG18 visit: with "sum"
+        #          the stack's own sky was 321 000 ADU against a camera
+        #          linearity of 53 000, so every comparison star was rejected
+        #          and the run reported no magnitude at all.
+        if str(self._method) != "sum":
+            return 1.0
+        try:
+            n = int(group[1]) - int(group[0])
+        except (TypeError, IndexError, ValueError):
+            n = 0
+        return float(n) if n > 0 else 1.0
+
     def _object_centre(self, sp, q, box):
         # @args: sp - the astrometric point of the observation (or None),
         #        q - the object's reference point, box - the stack's box
@@ -1362,10 +1401,19 @@ class TrackStackWorker(QThread):
         # instead of on the ephemeris, which can be a couple of pixels
         # away. Without it (the position was not measured) the ephemeris
         # is the honest fallback, and the flag on the point says so.
+        #
+        # The box origin comes off the EPHEMERIS and not off the centroid:
+        # the centroid was measured on the stack itself (measure_stack
+        # centres on the stack's own pixels), so it is already local, while
+        # q lives in the reference grid the frames were registered on. The
+        # old subtraction only worked while the final stack was the whole
+        # frame (box origin 0, 0): with a 512 px cutout the aperture landed
+        # box[0] pixels away, usually off the image, and the observation
+        # came back with no magnitude and no word about why.
         import math
         if sp is not None and sp.x is not None and sp.y is not None \
                 and math.isfinite(sp.x) and math.isfinite(sp.y):
-            return (float(sp.x) - box[0], float(sp.y) - box[1])
+            return (float(sp.x), float(sp.y))
         if q is None:
             return None
         return (float(q[0]) - box[0], float(q[1]) - box[1])
@@ -1529,6 +1577,9 @@ class TrackStackWorker(QThread):
             # --- solve: the grid every frame is registered on -------------
             self.progress.emit("solve", 0, 1)
             frames = track_stack.load_sequence(self._paths, self._cfg)
+            # a frame that could not be read is left out (and COUNTED: the
+            # run's note says it, because a hole in the stack is a fact)
+            out["n_unreadable"] = max(0, len(self._paths) - len(frames))
             if len(frames) < 2:
                 out.update(status="error",
                            error="the visit needs at least two frames")
@@ -1564,6 +1615,11 @@ class TrackStackWorker(QThread):
                 cancel=lambda: self._cancel, loader=self._loader)
             out["dither"] = track_stack.dither_check(frames)
             out["n_failed"] = sum(1 for f in frames if f.failed_register)
+            # WHICH frames were left out, by path: the editor's preview list
+            # marks them (2026-10-06), so a bad frame is visible in the night
+            # without opening it
+            out["failed_frames"] = [str(f.path) for f in frames
+                                    if f.failed_register]
             # the honest registration summary (P0): how many frames came
             # back, how, and whether the visit is really two runs
             out["register_report"] = track_stack.registration_report(frames)
@@ -1573,12 +1629,32 @@ class TrackStackWorker(QThread):
                 return
 
             # --- ephemeris over the visit's own window (D8) ---------------
-            motion = track_stack.sequence_motion(frames, self._name,
-                                                 site=self._site)
+            # Not one service but a CASCADE: Horizons (with retries), then the
+            # SBDB elements propagated locally, then NEOfixer. A stack must
+            # not die because JPL is having a bad moment (503), which it does
+            # often.
+            # The ephemeris answers TWO questions: where the object is and how
+            # bright it should be. The magnitude is what the band shows when
+            # the run did not measure the brightness (a faint object, the box
+            # off): without it the plate says nothing about the object's
+            # light, and the observer is left guessing.
+            ephem = track_stack.sequence_ephemeris(
+                frames, self._name, site=self._site,
+                lat=self._cfg_get("lat", None),
+                lon=self._cfg_get("lon", None))
+            motion = ephem.get("motion")
+            ephem_source = ephem.get("source")
+            ephem_reason = ephem.get("reason")
+            out["ephem_source"] = ephem_source
+            out["ephem_mag"] = ephem.get("mag")
+            out["ephem_band"] = ephem.get("band")
+            out["ephem_mag_source"] = ephem.get("mag_source")
             if motion is None:
                 out.update(status="error",
-                           error="no ephemeris for the object: Horizons did "
-                                 "not answer or the name is not resolved")
+                           error="no ephemeris for the object: JPL Horizons "
+                                 f"did not answer ({ephem_reason}) and no "
+                                 "local orbit could be propagated "
+                                 "(SBDB/NEOfixer)")
                 self.finished.emit(out)
                 return
             track_stack.object_positions(frames, motion)
@@ -1598,9 +1674,27 @@ class TrackStackWorker(QThread):
                                  "the sequence's instant")
                 self.finished.emit(out)
                 return
+            # MANUAL MODE (faint object): the observer's mark on the base
+            # stack replaces the ephemeris position. The prediction's error
+            # is assumed constant over the visit, so the SAME offset is
+            # carried to every observation. The gate below is not asked: a
+            # human mark IS the detection.
+            manual = self._manual_ref is not None
+            q_all, manual_offset = track_stack.manual_reference(
+                q_all, self._manual_ref)
+            if manual:
+                out["manual"] = True
             scale = astrometry.pixel_scale_arcsec(w0)
             margin = int(self._margin or self._cfg_get(
                 "astrometry_cutout_margin_px", 64))
+            if ephem_source and ephem_source.startswith("kepler"):
+                # A LOCAL orbit is two-body and its Earth is coarse: a close
+                # NEO can sit a couple of arcminutes off, which at 1.5"/px is
+                # more than the normal margin. The cutout is widened so the
+                # object is surely inside; the reported position is still the
+                # centroid measured on the plate, not this prediction.
+                margin += int(self._cfg_get("astrometry_fallback_margin_px",
+                                            300))
             box_all = track_stack.cutout_box(frames, (0, len(frames)), q_all,
                                              margin_px=margin, shape=shape)
 
@@ -1613,19 +1707,35 @@ class TrackStackWorker(QThread):
             self.progress.emit("detect", 0, 1)
             detection = track_stack.detect(base_stack, q_all_box, self._cfg)
             out["detection"] = detection
-            if not detection.detected:
-                # below the gate there is NO sweep: measuring noise is how
-                # a false positive is manufactured (D10)
-                out["status"] = "not_detected"
-                self.progress.emit("detect", 1, 1)
-                self.finished.emit(out)
-                return
+            # The BASE STACK travels in the payload ALWAYS, not only when the
+            # gate does not fire: it is the deepest image of the visit (the
+            # whole sequence, the object frozen), it is what the manual mode
+            # marks on, and it is saved with the run so reopening the visit
+            # shows it again (asked for). It is a cutout of the object's own
+            # trail, so keeping it costs a few MB at most.
+            out.update(base_stack=base_stack, box_all=box_all, q_all=q_all,
+                       w0=w0, shape=shape)
+            if not detection.detected and not manual:
+                # ADR-062 rev (D10 revisited): the gate still forbids the
+                # SWEEP (a noise maximum is how a false positive is
+                # manufactured), but it no longer throws the run away. The
+                # observer asked for the brightness to be measured ALWAYS and
+                # marked when it is not to be trusted: a number that says
+                # "this is below the gate, look at it" is worth more than no
+                # number at all, and the position is the ephemeris' own
+                # prediction, said as such. Every point carries the flag and
+                # the table paints the magnitude red.
+                out["below_gate"] = True
             self.progress.emit("detect", 1, 1)
 
             # --- velocity sweep, once for the whole sequence (D9/D22) -----
+            # NOT in manual mode: the mark fixes the position, and over a
+            # source below the gate the sweep's score is noise (D10's own
+            # reason). The velocity comes from the ephemeris.
             base_rate, base_pa = _rate_pa(motion, t_all)
             out["base_rate"], out["base_pa"] = base_rate, base_pa
-            if base_rate is not None:
+            if base_rate is not None and not manual \
+                    and not out.get("below_gate"):
                 # cfg stores the COMBINATION count (25 = D9's 5x5 grid);
                 # the engine wants the steps per axis
                 steps = max(2, int(round(math.sqrt(
@@ -1644,10 +1754,18 @@ class TrackStackWorker(QThread):
                     out["status"] = "cancelled"
                     self.finished.emit(out)
                     return
-                if sweep.best is not None:
+                if sweep.best is not None and sweep.significant:
                     _apply_sweep(frames, base_rate, base_pa,
                                  sweep.best["rate"], sweep.best["pa"],
                                  t_all, scale)
+                elif sweep.best is not None:
+                    # NOT significant: the winner did not beat the ephemeris'
+                    # own prediction by more than the grid's scatter, so the
+                    # frames keep the ephemeris' motion and the run says it.
+                    # A noise maximum published as a measurement is what made
+                    # the app report PA 33 where the ephemeris said 41.8
+                    # (2025 HL5) and 37 where it said 46.2 (2025 FG18).
+                    out["sweep_not_significant"] = True
 
             # --- WCS quality control: composed vs a direct solve ----------
             out["wcs_qc"] = track_stack.verify_composed_wcs(
@@ -1662,6 +1780,11 @@ class TrackStackWorker(QThread):
                     # the ephemeris failed at this instant: fall back to
                     # the sequence's point and let the flags speak
                     q_g = q_all
+                elif manual_offset is not None:
+                    # manual mode: the mark's offset from the ephemeris is
+                    # carried to this observation's own instant
+                    q_g = (q_g[0] + manual_offset[0],
+                           q_g[1] + manual_offset[1])
                 q_by_group.append(q_g)
                 mids.append(t_mid)
                 # D11: the FINAL stack of an observation is a fixed window
@@ -1714,6 +1837,12 @@ class TrackStackWorker(QThread):
                     fp.group_index = index  # group the point belongs to
                 points.append((sp, fp, flags))
                 self.progress.emit("measure", index + 1, len(stacks))
+            if manual:
+                _mark_as_manual(points)
+            if out.get("below_gate"):
+                # the flag travels with the figure: it is what colours the
+                # magnitude red in the table and what the report's audit says
+                _mark_below_gate(points)
             out.update(points=points, groups=groups, stacks=stacks,
                        boxes=boxes, qs=q_by_group, mids=mids, w0=w0,
                        frames=frames)
@@ -1843,6 +1972,30 @@ def _apply_sweep(frames, base_rate, base_pa, rate, pa, t0_jd, scale):
                            frame.object_xy[1] + ddec)
 
 
+def _mark_as_manual(points):
+    # @args: points - the (stack_point, frames_point, flags) triples of a run
+    # @return: None. In a MANUAL run a human mark replaced the detection: the
+    #          position is still measured on the plate, but the decision that
+    #          there was something to measure was the observer's, and that has
+    #          to travel with the figure (the table, the persisted row and the
+    #          report's audit all read the flags).
+    for _sp, _fp, flags in points:
+        if flags is not None and "manual" not in flags:
+            flags.append("manual")
+
+
+def _mark_below_gate(points):
+    # @args: points - the (stack_point, frames_point, flags) triples of a run
+    # @return: None. ADR-062 rev: the brightness is measured even when the
+    #          object did not clear the detection gate, and the figure says
+    #          so. The flag is what colours the magnitude red and what the
+    #          report's audit reads: a number below the gate is a number to
+    #          look at, never one to publish.
+    for _sp, _fp, flags in points:
+        if flags is not None and "below_gate" not in flags:
+            flags.append("below_gate")
+
+
 def _shift_wcs(w0, box):
     # @args: w0 - the reference astropy WCS, box - (x0, y0, x1, y1) cutout
     # @return: a WCS for the cutout's own pixel grid
@@ -1868,3 +2021,70 @@ def _window_box(cx, cy, half, shape):
     x0 = max(0, min(int(round(cx)) - int(half), shape[0] - side))
     y0 = max(0, min(int(round(cy)) - int(half), shape[1] - side))
     return (x0, y0, x0 + side, y0 + side)
+
+
+class FrameThumbWorker(QThread):
+    # Reads a SMALL sample of every frame of a visit, for the preview list of
+    # the editor's left panel (2026-10-06).
+    #
+    # One frame at a time and in order, so the list fills from the top and
+    # the observer can start looking before the last one lands. The read is
+    # SAMPLED (core/fits_io.read_sample: ~2 MB per 2048² frame instead of the
+    # 16 MB the whole frame takes), which is what makes a 200-frame visit a
+    # second of work instead of gigabytes. The sample is read at 320 px
+    # because the preview now takes the whole column (up to ~270 px): a
+    # sample smaller than the preview would be shown soft. A frame that
+    # cannot be read is
+    # NOT an error here: it comes back marked broken, because spotting it is
+    # exactly what the list is for.
+
+    sampled = Signal(int, object, dict)   # index, array or None, facts
+    done = Signal()
+
+    def __init__(self, paths, max_px=320):
+        super().__init__()
+        self._paths = list(paths or [])
+        self._max_px = int(max_px)
+        self._cancel = False
+
+    def cancel(self):
+        # @return: None. The list was rebuilt (another visit) or is going
+        #          away: the loop stops at the next frame.
+        self._cancel = True
+
+    def run(self):
+        import os
+        from ..core import fits_io
+        for index, path in enumerate(self._paths):
+            if self._cancel:
+                break
+            facts = {"path": str(path)}
+            sample = None
+            try:
+                header, sample = fits_io.read_sample(path, self._max_px)
+                facts["shape"] = (int(header.get("NAXIS1", 0)),
+                                  int(header.get("NAXIS2", 0)))
+                facts["has_wcs"] = bool(header.get("CRVAL1") is not None
+                                        and header.get("CTYPE1"))
+                facts["filter"] = header.get("FILTER")
+                facts["exptime_s"] = header.get("EXPTIME")
+                facts["date_obs"] = header.get("DATE-OBS")
+                try:
+                    facts["bytes"] = os.path.getsize(path)
+                except OSError:
+                    facts["bytes"] = None
+                # the sky of the SAMPLE: the number that says whether the
+                # frame is what it should be (a cloud, a moonlit night or a
+                # wrong exposure show up here before anybody opens it)
+                import numpy as _np
+                finite = sample[_np.isfinite(sample)]
+                if finite.size:
+                    facts["sky"] = float(_np.median(finite))
+            except Exception as err:      # a broken frame is DATA, not a crash
+                facts["broken"] = str(err)
+                logger.warning("frame preview: %s could not be read (%s)",
+                               path, err)
+            if self._cancel:
+                break
+            self.sampled.emit(index, sample, facts)
+        self.done.emit()

@@ -1,22 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   UFE Photometry tab (ADR-044 rev 2026-09-25): the Comparisons and
-  Measure sections stacked in one vertical splitter, both always
-  visible; there is no mode toggle (what a click does follows the
-  Comparisons section's "Manual tweak" fold). Loaded by
-  gui/ufe_photometry_tab.py through gui/ui_loader.py; the two sections
-  are code-built classes inserted into the placeholders (the house's
-  custom-widget rule, ADR-005).
+  Measure sections stacked in one vertical splitter; there is no mode
+  toggle (what a click does follows the Comparisons section's "Manual
+  tweak" fold). Loaded by gui/ufe_photometry_tab.py through
+  gui/ui_loader.py; the two sections are code-built classes inserted into
+  the placeholders (the house's custom-widget rule, ADR-005).
+
+  ADR-038 rev 2026-10-06: what the observer SEES on entering is ONE action
+  (btn_primary, painted in the object's hue) and a line saying what it will
+  do. Every knob lives in a collapsible block inside its own section, all
+  of them closed; the splitter stays because the two sections scroll
+  independently.
 -->
 <ui version="4.0">
  <class>UfePhotometryTab</class>
  <widget class="QWidget" name="UfePhotometryTab">
   <layout class="QVBoxLayout" name="vbox_photometry"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
    <item>
-    <widget class="QSplitter" name="splitter">
-     <property name="orientation"><enum>Qt::Vertical</enum></property>
-     <widget class="QWidget" name="ph_compare"/>
-     <widget class="QWidget" name="ph_measure"/>
+    <widget class="QPushButton" name="btn_primary">
+     <property name="minimumSize"><size><width>0</width><height>48</height></size></property>
+     <property name="text"><string>Build the sequence (comparisons)…</string></property>
+     <property name="toolTip">
+      <string>Query the catalogue around the plate centre and propose the comparison stars in one go. The sequence is saved in the project, so it comes back when the visit is reopened</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_primary_sub">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_hint">
+     <property name="text">
+      <string>Click a star (or the target) on the plate to measure it against the sequence.</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QScrollArea" name="area_column">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
+     <widget class="QWidget" name="scrollAreaWidgetContents">
+      <layout class="QVBoxLayout" name="vbox_scroll">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QWidget" name="ph_compare"/>
+       </item>
+       <item>
+        <widget class="QWidget" name="ph_measure"/>
+       </item>
+       <item>
+        <spacer name="vspacer_photo">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
   </layout>

@@ -43,13 +43,16 @@ from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
 from ..core import chart_annotate, coords, fits_meta, photometry, \
     photometry_export, \
     series_measure, stretch
+from ..config import config
 from ..viz import palette
+from . import theme
 from .ufe_advanced_dialog import UfeAdvancedDialog
 from .ufe_host import host_of
 from .ufe_centre_dialog import UfeCentreDialog
 from .ufe_series_dialog import UfeSeriesDialog
 from .ufe_passes_dialog import UfePassesDialog
 from .ui_loader import adopt_ui
+from .widgets.collapsible_section import CollapsibleSection
 from .widgets.lightcurve_widget import LightCurveChart
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
@@ -153,6 +156,28 @@ class UfeMeasureTab(QWidget):
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
         self._status_hook = None     # the window's single status line (U4)
+        # ADR-038 rev: the recipe (band, apertures, manual centre, Suggest
+        # and Advanced) lives in ONE block, closed on entry, because the
+        # panel's hero button is what the observer came for and the defaults
+        # are what most nights want. The block's container comes from the
+        # Designer file, so the structure stays there (ADR-005).
+        self._sections = {
+            "recipe": self._wrap_section(
+                "sec_recipe_content", self.tr("The photometry recipe"),
+                "photometry_recipe_open"),
+            # The measurement's own result (the panel with the numbers and
+            # the ways out of it) is a group too, and it appears with the
+            # first measurement: an empty box is furniture. It is CLOSED like
+            # every other group (asked for 2026-10-06), with a fresh key
+            # because the previous design opened it by default; the magnitude
+            # announces itself on its header (see _draw_measurement), so the
+            # observer knows there is something to read without opening it.
+            "result": self._wrap_section(
+                "sec_result_content", self.tr("Measurement"),
+                "photometry_result_open2"),
+        }
+        self._sections["result"].setVisible(False)
+        self.refresh_accent()
         self._curve_load = None      # fn() -> the visit's saved points (D)
         self._curve_clear = None     # fn() -> undo every series run (D)
         self._curve_from_visit = False   # the chart shows the visit's curve
@@ -262,6 +287,10 @@ class UfeMeasureTab(QWidget):
         # and the tests use is untouched, and their texts and tooltips keep
         # living in the Designer file (ADR-005). Same mechanism as the
         # window's doors (U2) and the series' one (U6).
+        # The actions of a measurement belong to the RESULT (ADR-038 rev):
+        # with nothing measured they are furniture, so they live in one
+        # container that appears with the panel's lines.
+        self.w_result_actions = self._ui.w_result_actions
         self.btn_export_more = self._ui.btn_export_more
         # D: the write-back of a magnitude measured by hand. The button only
         # lives when the plate is an astrometry stack that knows its run and
@@ -546,6 +575,39 @@ class UfeMeasureTab(QWidget):
 
     # ------------------------------------------------------- activation
 
+    # -------------------------------------------------------- the block
+
+    def _wrap_section(self, name, title, key, open_by_default=False):
+        # @args: name - the .ui container's objectName, title - the block's
+        #        title in plain language, key - the settings key that
+        #        remembers whether it stays open, open_by_default - the state
+        #        before the observer chooses
+        # @return: the CollapsibleSection
+        content = getattr(self._ui, name)
+        section = CollapsibleSection(title, self)
+        self.layout().replaceWidget(content, section)
+        content.setParent(None)
+        section.contentLayout().addWidget(content)
+        content.setVisible(True)
+        section.setCollapsed(
+            not bool(config.get(key, 1 if open_by_default else 0)))
+        section.sectionToggled.connect(
+            lambda opened, k=key: config.set(k, 1 if opened else 0))
+        return section
+
+    def refresh_accent(self):
+        # @return: None. The recipe block wears the object's hue on its
+        #          spine, like every other block of the panel.
+        ask = getattr(host_of(self), "project_accent", None)
+        hue = None
+        if callable(ask):
+            try:
+                hue = (ask() or {}).get("hue")
+            except Exception as err:
+                logger.warning("the project accent could not be read: %s", err)
+        for section in getattr(self, "_sections", {}).values():
+            section.setAccent(hue or theme.C_ACCENT)
+
     def set_active(self, flag, keep_overlays=False):
         # Only the section that owns the stage takes the clicks, and on
         # stage it also gets the pick cursor and the snapping reticle.
@@ -797,9 +859,15 @@ class UfeMeasureTab(QWidget):
         # auto-scale is free to size the apertures for this plate again.
         self._radii_manual = False
         self._last = None
+        # the old plate's summary goes with it: a later repaint (the chart's
+        # own notes) must not bring a stale measurement back to the panel
+        self._panel_summary = []
         self._drop_items()
         self._drop_subtraction()
         self.lbl_result.setText("–")
+        # nothing measured on this plate: the group with the result and the
+        # ways out of it is not there at all
+        self._sections["result"].setVisible(False)
         self._set_export_enabled(False)
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
@@ -840,6 +908,15 @@ class UfeMeasureTab(QWidget):
                 "which reads the comps on a second stack aligned on the "
                 "stars. Here you can still adjust the RECIPE that tab "
                 "uses: the apertures, the sky and the centroid.")
+        if kind == "base":
+            return self.tr(
+                "This plate is the WHOLE-SEQUENCE stack of a track & stack: "
+                "every frame combined with the object frozen, so the object "
+                "is as deep as the visit goes and the stars are trails. The "
+                "comparison stars cannot set a zero point here (a streak "
+                "read with a circular aperture is not a flux): the "
+                "brightness is measured in the Astrometry tab, on the "
+                "observations' own stacks.")
         return self.tr(
             "This plate is the STAR stack of a track & stack: the comps are "
             "points here, but the OBJECT is a trail, so it cannot be "
@@ -2312,7 +2389,17 @@ class UfeMeasureTab(QWidget):
             lines += ["· " + n for n in notes]
         if not lines:
             self.lbl_result.setText("–")
+            # An empty box is furniture: with nothing measured the panel and
+            # its actions are not there at all (ADR-038 rev: on entering, the
+            # action is what the observer sees). They come back the moment
+            # there is a line.
+            self._sections["result"].setVisible(False)
             return
+        self._sections["result"].setVisible(True)
+        # the news rides the header of the (closed) group: the magnitude of
+        # this plate, so the observer reads it without opening the panel
+        # (asked for 2026-10-06: a group that holds something says so)
+        self._sections["result"].setNotice(self._result_badge())
         # THE PANEL WEARS THE SAME COLOUR CODE AS THE BAND: the lines that
         # carry a magnitude keep their role (see _fill_panel) and the rest is
         # plain text. It goes out as HTML with everything escaped, so the
@@ -2966,6 +3053,14 @@ class UfeMeasureTab(QWidget):
             lines.append(self.tr(
                 "Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})")
                 .format(zp["zp"], zp["zp_err"], zp["n"], band))
+        # THE CEILING THE RULE COULD NOT ENFORCE (ADR-066): with the camera's
+        # linearity unset, a star over it but under the plate's clip slips
+        # through, and the observer has to know which limit is really being
+        # applied. Said here, where the zero point is read.
+        warning = photometry.ceiling_warning(self._state.header or {},
+                                             config)
+        if warning is not None:
+            lines.append("⚠ " + warning.get(self._lang, warning["en"]))
         if last["mag"] is not None:
             err_txt = (self.tr("± {0:.3f}").format(last["err"])
                        if last["err"] is not None else "")
@@ -3115,6 +3210,17 @@ class UfeMeasureTab(QWidget):
         self._render_panel()
 
     # ---------------------------------------------------------- overlays
+
+    def _result_badge(self):
+        # @return: the short news for the "Measurement" group's header: the
+        #          magnitude just measured (the number the observer came
+        #          for), or "new" when there is a result without one.
+        last = getattr(self, "_last", None) or {}
+        mag = last.get("mag")
+        if mag is not None:
+            band = str(last.get("band") or "")
+            return f"{float(mag):.3f} {band}".strip()
+        return self.tr("new")
 
     def _draw_measurement(self):
         # Aperture + annulus on the measured point, thin rings on the

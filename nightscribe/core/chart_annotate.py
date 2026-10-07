@@ -92,6 +92,24 @@ def format_mag_catalog(mag):
     return f"{mag:.2f} cat"
 
 
+def format_mag_ephemeris(mag, band=None):
+    # A magnitude the EPHEMERIS predicts for this instant, not a measurement:
+    # the same idea as the catalogue's "cat" and the motion's "eph", and the
+    # word rides along because the colour is not there on a printout.
+    # @args: mag - predicted magnitude, band - "V", "T" or None
+    # @return: "22.21 V (eph)" / "18.76 T (eph)"
+    text = f"{mag:.2f}" + (f" {band}" if band else "")
+    return f"{text} (eph)"
+
+
+def format_mag_measured(mag, err=None, band=None):
+    # A magnitude MEASURED on this plate. It says so too: with the ephemeris'
+    # and the catalogue's values both labelled, an unlabelled figure would be
+    # the only one whose origin has to be guessed (asked for).
+    # @return: "16.39 ± 0.04 (V) (measured)"
+    return format_mag_value(mag, err, band) + " (measured)"
+
+
 def format_exptime(exptime_s):
     # @args: exptime_s - exposure time in seconds
     # @return: "Exp: 10.0 s" ("600 s" past one minute of exposure)
@@ -251,6 +269,7 @@ ROLE_MAG = "mag"              # a CLEAN measurement of this plate (green)
 ROLE_MAG_FAIR = "mag-fair"    # usable, but not clean (orange)
 ROLE_MAG_DOUBT = "mag-doubt"  # not to report without looking (red)
 ROLE_MAG_CAT = "mag-cat"      # only a catalog value: not a measurement (white)
+ROLE_MAG_EPH = "mag-eph"      # only the ephemeris' prediction (dimmed)
 ROLE_MOTION = "motion"        # the object's motion, MEASURED on this plate
 ROLE_MOTION_EPH = "motion-eph"  # only the ephemeris' prediction, not measured
 ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
@@ -288,11 +307,15 @@ def magnitude_role(measured):
     # point of a series arrive in the same shape, so one curve and one plate
     # are coloured by the same rule.
     # @args: measured - {"mag", "err", "band", "comps", "check_ok",
-    #        "no_check", "clipped", "derived", "flags"} of a measurement of
-    #        THIS plate, or None. "check_ok" is the check star's verdict
-    #        (True/False) and "no_check" says that the sequence carried none
-    #        to begin with: a series has no check in its contract, and
-    #        that is not the same as a night nobody verified.
+    #        "no_check", "clipped", "derived", "below_gate", "flags"} of a
+    #        measurement of THIS plate, or None. "check_ok" is the check
+    #        star's verdict (True/False) and "no_check" says that the
+    #        sequence carried none to begin with: a series has no check in
+    #        its contract, and that is not the same as a night nobody
+    #        verified. "below_gate" says the object never cleared the
+    #        detection gate: the brightness was measured anyway (ADR-062
+    #        rev), at the ephemeris' own position, and that is a number to
+    #        look at, not one to publish.
     # @return: ROLE_MAG, ROLE_MAG_FAIR, ROLE_MAG_DOUBT, or None
     if not measured or measured.get("mag") is None:
         return None
@@ -301,6 +324,8 @@ def magnitude_role(measured):
     flags = list(measured.get("flags") or [])
     # FIRST WHAT MAKES A NUMBER UNREPORTABLE, then what makes it merely
     # imperfect: a serious caveat is not softened by a small error.
+    if measured.get("below_gate") or "below_gate" in flags:
+        return ROLE_MAG_DOUBT         # the object was never detected
     if err is not None and err > ERR_BAD:
         return ROLE_MAG_DOUBT
     if comps is not None and comps < 3:
@@ -372,7 +397,8 @@ def _seg(text, role, field):
 
 def build_band(name=None, meta=None, wcs_info=None, measured=None,
                catalog_mag=None, equipment=None, site=None, target=None,
-               motion=None, measured_pos=None):
+               motion=None, measured_pos=None, predicted_mag=None,
+               detection=None):
     # The plate's heading, as two lines of segments.
     # @args: name - object name (always shown when known),
     #        meta - fits_meta.meta_from_header dict (date_obs, exptime_s,
@@ -386,7 +412,11 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
     #        there is no solution to place it on the plate, motion -
     #        {"rate_arcsec_min", "pa_deg", "measured"} of the object's
     #        apparent motion or None, measured_pos - (ra_deg, dec_deg) of
-    #        the object MEASURED on this plate, which beats the catalogue's
+    #        the object MEASURED on this plate, which beats the catalogue's,
+    #        predicted_mag - {"mag", "band"} the ephemeris predicts, used
+    #        when nothing was measured here, detection - {"detected", "snr",
+    #        "gate", "limit"} the detection made on THIS plate (the whole
+    #        sequence's stack), or None
     # @return: {"lines": [[segment, ...], [segment, ...]]}: the identity
     #          line is never empty (when there is a name), the context line
     #          can be
@@ -415,11 +445,23 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
             # the catalog's position: it is NOT this plate's, and the colour
             # and the word both say so
             identity.append(_seg(text + " (cat)", ROLE_POS_CAT, "pos"))
+    # The brightness, and WHERE IT COMES FROM: a measurement on this plate
+    # (with its own quality colour), the ephemeris' prediction for this
+    # instant, or the catalogue's value. Every case carries its word, so the
+    # figure is never a number whose origin has to be guessed (asked for).
     role = magnitude_role(measured)
     if role is not None:
         identity.append(_seg(
-            format_mag_value(measured["mag"], measured.get("err"),
-                             measured.get("band")), role, "mag"))
+            format_mag_measured(measured["mag"], measured.get("err"),
+                                measured.get("band")), role, "mag"))
+    elif predicted_mag is not None and predicted_mag.get("mag") is not None:
+        try:
+            identity.append(_seg(
+                format_mag_ephemeris(float(predicted_mag["mag"]),
+                                     predicted_mag.get("band")),
+                ROLE_MAG_EPH, "mag"))
+        except (TypeError, ValueError):
+            pass
     elif catalog_mag is not None:
         try:
             identity.append(_seg(format_mag_catalog(float(catalog_mag)),
@@ -430,16 +472,15 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
     # measured (ink), the ephemeris' prediction otherwise (dimmed and with
     # the word, the same way a catalogue position says (cat)). The rate and
     # the PA are TWO segments, so the renderer joins them with the same
-    # separator it puts between every other datum; the (eph) marker rides
-    # the last one (the PA when there is one).
+    # separator it puts between every other datum; the marker rides the last
+    # one (the PA when there is one).
     if motion and motion.get("rate_arcsec_min") is not None:
-        measured = bool(motion.get("measured"))
-        role = ROLE_MOTION if measured else ROLE_MOTION_EPH
+        is_measured = bool(motion.get("measured"))
+        role = ROLE_MOTION if is_measured else ROLE_MOTION_EPH
         parts = [format_rate(motion["rate_arcsec_min"])]
         if motion.get("pa_deg") is not None:
             parts.append(format_pa(motion["pa_deg"]))
-        if not measured:
-            parts[-1] += " (eph)"
+        parts[-1] += " (measured)" if is_measured else " (eph)"
         for text in parts:
             identity.append(_seg(text, role, "motion"))
     context = []
@@ -465,4 +506,20 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
         if fov:
             context.append(_seg(format_fov(fov).split(": ", 1)[1],
                                 ROLE_CONTEXT, "fov"))
+    # The detection made on THIS plate (the whole-sequence stack): its SNR
+    # against the gate it had to clear and the limit magnitude it reached.
+    # Both are measurements of this image, so they wear the ink; the words
+    # say what each figure is (a bare "3.1" teaches nothing).
+    if detection:
+        snr = detection.get("snr")
+        if snr is not None:
+            text = f"SNR {float(snr):.1f}"
+            gate = detection.get("gate")
+            if gate is not None:
+                text += f" (gate {float(gate):.1f}σ)"
+            context.append(_seg(text, ROLE_MOTION, "det"))
+        limit = detection.get("limit")
+        if limit is not None:
+            context.append(_seg(f"limit {float(limit):.1f}", ROLE_CONTEXT,
+                                "limit"))
     return {"lines": [identity, context]}

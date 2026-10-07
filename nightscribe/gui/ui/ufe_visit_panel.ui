@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   The visit strip of the editor's left panel (ADR-048 follow-up): the
-  frame navigator over the series block, plus the EXOTIC reduction block
-  for transit projects. Loaded by gui/ufe_dialog.py through
-  gui/ui_loader.py; the series group lands in ph_series (a placeholder,
-  ADR-005) and the class tag is UfeDialog so the i18n context carries
-  over. The count, the file name and the status line are data, set in
-  code.
+  frame navigator and the frame previews. Loaded by gui/ufe_dialog.py
+  through gui/ui_loader.py; the class tag is UfeDialog so the i18n context
+  carries over. The count, the file name and the status line are data, set in
+  code. The series group used to land here in a ph_series placeholder, and
+  the EXOTIC reduction block lived here too: since ADR-044 rev
+  (2026-10-06) both are in the series window (Tools ▾ → Series), which is
+  what a transit reduction belongs to.
 -->
 <ui version="4.0">
  <class>UfeDialog</class>
@@ -31,26 +32,15 @@
     </layout>
    </item>
    <item><widget class="QLabel" name="lbl_frame_file"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-   <item><widget class="QWidget" name="ph_series"/></item>
    <item>
-    <widget class="QGroupBox" name="grp_exotic">
-     <property name="title"><string>Transit reduction (EXOTIC)</string></property>
-     <property name="visible"><bool>false</bool></property>
-     <layout class="QVBoxLayout" name="vbox_exotic">
-      <item><widget class="QPushButton" name="btn_exotic_reduce"><property name="text"><string>Reduce and fit with EXOTIC…</string></property><property name="toolTip"><string>Generate the visit's inits.json, run EXOTIC headless and import its light curve and fitted parameters. Uses the open frame as the reference and the sequence built above</string></property></widget></item>
-      <item><widget class="QPushButton" name="btn_exotic_export"><property name="text"><string>Export to EXOTIC (inits.json)…</string></property><property name="toolTip"><string>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter</string></property></widget></item>
-      <item><widget class="QLabel" name="lbl_exotic_result"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="toolTip"><string>The last reduction of this visit: its transit time and radius ratio. «See the result» opens the numbers, the light curve and every file it wrote</string></property></widget></item>
-      <item>
-       <layout class="QHBoxLayout" name="row_exotic_result">
-        <item><widget class="QPushButton" name="btn_exotic_result"><property name="text"><string>See the result…</string></property><property name="toolTip"><string>The fitted parameters, the light curve EXOTIC drew and every file the reduction wrote (field figures, diagnostics, the AAVSO report), each one a double click from the system</string></property><property name="enabled"><bool>false</bool></property></widget></item>
-        <item><widget class="QPushButton" name="btn_exotic_folder"><property name="text"><string>Open the folder</string></property><property name="toolTip"><string>Open the project's EXOTIC work folder with the file manager</string></property><property name="enabled"><bool>false</bool></property></widget></item>
-       </layout>
-      </item>
-      <item><widget class="QLabel" name="lbl_exotic_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-     </layout>
-    </widget>
+    <layout class="QHBoxLayout" name="row_frames_head">
+     <item><widget class="QLabel" name="lbl_frames_count"><property name="text"><string>Frames</string></property><property name="toolTip"><string>The frames of this visit, one preview each. The list fills as they are read (a small sample of each, not the whole frame). Right-click a preview to take it out of the visit or move it aside</string></property></widget></item>
+     <item><spacer name="hsp_frames"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>10</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QCheckBox" name="chk_frames_problems"><property name="text"><string>Only problems</string></property><property name="toolTip"><string>Show only the frames with something to look at: the ones that cannot be read, the ones without an astrometric solution and the ones the last run could not register. It is the fast way through a visit of hundreds of frames</string></property></widget></item>
+    </layout>
    </item>
-   <item><spacer name="vsp_visit"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+   <item><widget class="QWidget" name="ph_frames"/></item>
+   <item><spacer name="vsp_visit"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
   </layout>
  </widget>
  <resources/>

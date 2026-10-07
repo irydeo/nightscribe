@@ -96,6 +96,23 @@ def test_load_sequence_sorts_by_time(tmp_path):
 
 # --------------------------------------------------------- solve reference
 
+def test_a_frame_that_cannot_be_read_is_left_out_not_fatal(tmp_path):
+    # A real capture ends with a half-written file (the author's own 2025
+    # FG18 visit ends with a 0-byte frame). One of those used to take the
+    # whole visit down: the exception came out of load_sequence and the
+    # Astrometry tab never armed. It is SKIPPED now, and the caller can tell
+    # how many were left out by comparing with what it handed over.
+    good = _write(tmp_path / "good.fits", np.zeros((8, 8), dtype=np.int16),
+                  DATE__OBS="2026-10-06T22:00:00", EXPTIME=5.0)
+    empty = tmp_path / "half_written.fits"
+    empty.write_bytes(b"")
+    frames = ts.load_sequence([good, str(empty)])
+    assert len(frames) == 1
+    assert frames[0].path == good
+    # and a visit where NOTHING can be read is an empty sequence, not a crash
+    assert ts.load_sequence([str(empty)]) == []
+
+
 def test_solve_reference_reads_a_solved_header(tmp_path):
     hdu = _wcs_header()
     path = str(tmp_path / "solved.fits")

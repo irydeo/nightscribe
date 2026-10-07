@@ -43,11 +43,14 @@ from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
 
 from ..core import compstars, photometry
 from ..core.sources import vizier
+from ..config import config
 from ..viz import palette
+from . import theme
 from .ufe_manual_dialog import UfeManualDialog
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
 from .ufe_host import host_of
+from .widgets.collapsible_section import CollapsibleSection
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -204,6 +207,17 @@ class UfeCompareTab(QWidget):
         self.btn_dss.clicked.connect(self._on_load_survey)
         self.lbl_status = self._ui.lbl_status
         self._status_hook = None     # the window's single status line (U4)
+        # ADR-038 rev: the knobs of the sequence live in ONE block, closed
+        # on entry, and the panel's hero button is the way in. The container
+        # comes from the Designer file; the block only decides whether it is
+        # shown, and the status line stays OUTSIDE it (it is the news of the
+        # action, not a knob).
+        self._sections = {
+            "seq": self._wrap_section(
+                "sec_seq_content", self.tr("The comparison sequence"),
+                "photometry_seq_open"),
+        }
+        self.refresh_accent()
 
         # the manual tweak: its controls are translatable, so they live
         # in their own window (ui/ufe_manual_dialog.ui). The toggle
@@ -297,6 +311,68 @@ class UfeCompareTab(QWidget):
         return self._manual.isVisible()
 
     # ------------------------------------------------------- activation
+
+    # -------------------------------------------------------- the block
+
+    def _wrap_section(self, name, title, key, open_by_default=False):
+        # @args: name - the .ui container's objectName, title - the block's
+        #        title in plain language, key - the settings key that
+        #        remembers whether it stays open, open_by_default - the state
+        #        before the observer chooses
+        # @return: the CollapsibleSection
+        # Same mechanism as the astrometry tab's: the container comes out of
+        # the column and into the block, so the Designer file keeps owning
+        # the structure and the block only decides whether it is shown.
+        content = getattr(self._ui, name)
+        section = CollapsibleSection(title, self)
+        self.layout().replaceWidget(content, section)
+        content.setParent(None)
+        section.contentLayout().addWidget(content)
+        content.setVisible(True)
+        section.setCollapsed(
+            not bool(config.get(key, 1 if open_by_default else 0)))
+        section.sectionToggled.connect(
+            lambda opened, k=key: config.set(k, 1 if opened else 0))
+        return section
+
+    def refresh_accent(self):
+        # @return: None. The block wears the object's hue on its spine, like
+        #          every other block of the panel (the list grammar: the hue
+        #          carries the meaning).
+        ask = getattr(host_of(self), "project_accent", None)
+        hue = None
+        if callable(ask):
+            try:
+                hue = (ask() or {}).get("hue")
+            except Exception as err:
+                logger.warning("the project accent could not be read: %s", err)
+        for section in getattr(self, "_sections", {}).values():
+            section.setAccent(hue or theme.C_ACCENT)
+
+    def primary_subtitle(self):
+        # @return: the line under the panel's hero button: what building the
+        #          sequence will do with what there is, or what is missing.
+        #          Built from the SAME widgets the block shows, so the two
+        #          cannot disagree.
+        if self._entries:
+            return self.tr(
+                "%1 comparison stars in the sequence, saved in the project"
+            ).replace("%1", str(len(self._entries)))
+        if self._state.wcs is None and self._field is None:
+            return self.tr(
+                "No plate yet: open a frame, or load the field from the "
+                "survey in the block below.")
+        catalog = self.cmb_catalog.currentText() or "Gaia"
+        if self.spn_mag.value() == self.spn_mag.minimum():
+            # the "No data" sentinel: the proposal starts from a declared
+            # guess and says so, instead of using a number nobody chose
+            return self.tr(
+                "%1 around the plate centre · no target magnitude yet: the "
+                "proposal starts from a declared guess and says so").replace(
+                    "%1", catalog)
+        return self.tr(
+            "%1 around the plate centre · comparisons for a mag %2 target"
+        ).replace("%1", catalog).replace("%2", f"{self.spn_mag.value():.1f}")
 
     def set_active(self, flag, keep_overlays=False):
         # Stage handoff, two distinct concepts (ADR-044 rev): the CLICKS
@@ -1071,9 +1147,9 @@ class UfeCompareTab(QWidget):
             return None
         from ..config import config
         from ..core import compstars, photometry
-        sat = photometry.saturation_ceiling(
-            state.header, {"ccd_saturate": config.get("ccd_saturate")})
-        lin = photometry.linearity_ceiling(config)
+        # the two ceilings from their one home (ADR-066): a candidate that
+        # reaches either one is never proposed as a comparison star
+        sat, lin = photometry.star_ceilings(state.header, config)
         gain = config.get("ccd_gain")
         ron = config.get("ccd_read_noise")
         # the Compare tab owns no aperture spins (the Measure tab does), so
@@ -1224,6 +1300,10 @@ class UfeCompareTab(QWidget):
                          + ([seq["check"]] if seq["check"] else []))
         self._redraw_entries()
         self._reload_table()
+        # the group is closed by default (2026-10-06): the news (how many
+        # stars came back) rides its header, so the observer knows what is
+        # inside without opening it
+        self._sections["seq"].setNotice(str(len(self._entries)))
         text = self.tr("Proposed {0} comparisons (tweak by clicking "
                        "stars).").format(len(self._entries))
         rejected = seq.get("rejected") or []

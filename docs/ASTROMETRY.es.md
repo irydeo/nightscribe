@@ -31,8 +31,13 @@ Un objeto débil no emerge si la imagen trae el patrón térmico del sensor y
 las motas del tren óptico. NightScribe usa una **biblioteca de masters**
 (bias, dark, flat) que tú construyes fuera; la app solo los apunta.
 
-- En **Ajustes** se da de alta cada master. Se indexa por cámara, ganancia,
-  temperatura, exposición y filtro, que es lo que hace válido un master.
+- Cada master se da de alta desde la **pestaña Calibración** del editor (o
+  desde Ajustes → Calibración). Se indexa por cámara, ganancia, temperatura,
+  exposición y filtro, que es lo que hace válido un master. Un **flat no
+  tiene que compartir la ganancia** de las tomas: se normaliza antes de
+  aplicarlo, así que la ganancia solo escala su nivel entero, nunca su forma
+  (medido: los flats del propio autor se tomaron a ganancia 3 y las tomas a
+  ganancia 5, y exigir la misma ganancia hacía perder el flat).
 - Para el light se prefiere un **dark a su misma exposición** (ya incluye el
   bias; restar además el bias sería restarlo dos veces). Si no hay dark, se
   resta el bias y la app avisa de que la corriente térmica queda.
@@ -47,23 +52,33 @@ silencio ni inventa una calibración.
 Todo empieza en una **visita** (una noche de un proyecto NEO, cometa o
 PCCP). Sin visita no hay serie: es la regla de la casa.
 
-1. **Abre la pestaña Astrometría** desde la visita. Arriba verás el objeto, sus
-   tomas y la ventana de la visita; la velocidad aparente y el ángulo de
-   posición los trae Horizons al arrancar y quedan en las notas del run.
+1. **Abre la pestaña Astrometría** desde la visita y pulsa el botón grande:
+   **Stack the sequence**. Al entrar verás tres cosas y nada más: el objeto con
+   sus tomas y su ventana, el botón (pintado en el **color del tipo de
+   objeto**, con su glifo) y una línea que dice **qué va a hacer** con los
+   valores actuales («8 tomas · 1 observación · brillo con G 5.0/9.0/14.0 ·
+   calibración: dark + flat · comprobación con otros observadores»). Todo lo
+   demás vive en **tarjetas** con título (un grupo con borde, para que al
+   desplegarlo se vea dónde acaba): las **decisiones** («Cuántas
+   observaciones» y «Ajustes del apilado») están siempre y arrancan cerradas;
+   y el **resultado** aparece con la ejecución, abierto, en sus propias
+   tarjetas («Lo que encontró la ejecución», «Las observaciones», «Medición
+   por observación», «Marca manual», «Comprobación con otros observadores» y
+   «Reporte»). Las acciones ocasionales (la figura de parpadeo, deshacer la
+   ejecución) están detrás del menú **⋯** de la cabecera. Nada ha
+   desaparecido: está a un clic, y el defecto es lo que la mayoría de las
+   noches quiere. Fuera de las tarjetas solo quedan el objeto, el botón, su
+   subtítulo y la barra de progreso con su línea de estado.
 
-   La pestaña está ordenada por lo que haces cada noche: el objeto, las
-   **observaciones** con su SNR previsto en una línea, el botón de **apilar**,
-   el **resultado** (la tira, el visor y la tabla de medidas) y el **reporte**.
-   Lo que se toca de vez en cuando vive **plegado** en bloques con título
-   («Ajustes del apilado», «SNR previsto por observación», «Comprobación con
-   Find_Orb», «Texto del reporte»), y las acciones ocasionales (la figura de
-   parpadeo, deshacer la ejecución) detrás del menú **⋯** de la cabecera.
-   Antes de apilar, la casilla **Calibrar las tomas** aplica la receta de la
-   pestaña Calibración (dark/bias y flat) a cada toma **según se lee**, sin
-   copias en disco. Con un objeto débil importa para la magnitud: sin flat, el
-   objeto y las comparsas caen en zonas distintas del viñeteado, y eso vale
-   **0,087 mag** medidos en una visita real. Si no tienes flat, la app
-   construye uno de las propias tomas (necesita dither y te avisa).
+   La velocidad aparente y el ángulo de posición los trae Horizons al arrancar
+   y quedan en las notas del run. La calibración (la receta de la pestaña
+   Calibración: dark/bias y flat) se aplica a cada toma **según se lee**, sin
+   copias en disco, y **se enciende sola cuando la biblioteca tiene un master
+   que casa** con esa cámara y ese filtro: con un objeto débil importa para la
+   magnitud, porque sin flat el objeto y las comparsas caen en zonas distintas
+   del viñeteado y eso vale **0,087 mag** medidos en una visita real. En cuanto
+   la tocas, tu elección manda. Si no tienes flat, la app construye uno de las
+   propias tomas (necesita dither y te avisa).
 2. **Elige cuántas observaciones quieres.** El MPC prefiere varias medidas
    repartidas en el tiempo antes que una sola. Dices un número y el
    software reparte la secuencia en grupos contiguos iguales. La tabla
@@ -95,10 +110,35 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    **con su motivo**, nunca en silencio. Medido en una visita de 2025 UR:
    recuperar la segunda tanda subió el SNR del apilado de estrellas de
    **1.826 a 2.702 (×1,48)**.
+   El apilado usa **todos los núcleos que puede**: el número de hilos se
+   calcula solo, a partir del procesador y de la memoria que cada tarea
+   necesita, así que no hay que configurar nada. Medido en un equipo de 16
+   núcleos con 60 tomas de 1024²: el barrido bajó de 6,3 s a **1,3 s** (×5,0),
+   el apilado final de 10,1 s a **2,7 s** (×3,7) y la combinación de 957 ms a
+   **298 ms** (×3,2). Si quieres capar los hilos (por ejemplo, porque estés
+   usando el equipo para otra cosa), el ajuste **`astrometry_threads`** lo
+   permite: 0 es automático.
+   Además de las pilas de cada observación, la app guarda en el proyecto la
+   pila de **toda la secuencia** (`<objeto>_base.fits`): todas las tomas
+   combinadas con el objeto congelado, la imagen más profunda de la visita. Es
+   la que usa el modo manual para marcar y la que puedes abrir en la pestaña
+   Fotometría para mirar el campo. Lleva su propia cabecera (WCS del recorte,
+   fecha, exposición, filtro, movimiento y magnitud con su origen y la
+   detección que se hizo sobre ella), así que al reabrirla la banda dice lo
+   mismo que el día del run.
 4. **Barrido de velocidad.** La efeméride y la montura tienen pequeñas
    derivas reales, así que alrededor de la velocidad teórica se prueban 25
    combinaciones (±5 %) y se elige la que da un objeto más brillante **y**
-   más redondo. Es el *fine-tuning*.
+   más redondo. Es el *fine-tuning*, con dos guardas (ADR-062 rev): la
+   predicción de la efeméride es **uno de los candidatos**, medido sobre los
+   mismos píxeles, y el ganador del barrido solo se usa si la supera por más
+   de tres veces la dispersión de la propia rejilla. Cuando la supera, una
+   segunda pasada más fina (3×3, sin leer un píxel más) lleva la resolución
+   en PA de los 4,5° de la rejilla a unos 0,9°. Medido antes de esto: la app
+   publicaba PA 33 donde la efeméride dice 41,8 (2025 HL5) y 37 donde dice
+   46,2 (2025 FG18), exactamente un paso de la rejilla. Cuando el barrido no
+   mejora a la efeméride, la velocidad y el PA publicados son su predicción y
+   la nota lo dice.
 5. **Secuencia centrada.** Se monta un GIF o un montaje con las N
    observaciones, todas centradas en el objeto: si está en todas, la
    detección es sólida; si en alguna no, se ve. En la pestaña tienes además
@@ -154,15 +194,49 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
     ejecución entera (sus posiciones se van; la fila queda marcada como
     deshecha). Una ejecución **sin detección** también se lista: «se buscó y
     no había nada» es un dato, y la noche siguiente necesita saberlo.
+    Al reabrir la visita, la ejecución **se vuelve a mostrar** sin apilar
+    nada: las notas, la tabla, el visor, la tira, el blink y el **informe**
+    vuelven de lo guardado (el resumen del propio run en la base de datos, sus
+    puntos y los ficheros de pila que escribió, uno por observación más la
+    pila de toda la secuencia, dentro del proyecto). La línea de estado lo
+    dice, y **Apilar** sigue ahí para rehacerla. Un run guardado que no
+    encontró nada vuelve con sus notas (hasta dónde llegó la noche), no con
+    una columna vacía.
+11. **El modo manual, cuando quieras.** La casilla **«Modo manual (objeto
+    débil)»** aparece con **cualquier ejecución** (no solo con un «no
+    detectado»): sirve para un objeto por debajo de la puerta y también para
+    colocar a ojo el centroide de uno que sí se detectó. Abre una ventana pequeña donde marcas el objeto
+    sobre la **pila de toda la secuencia**: el clic se ajusta al **centroide
+    gaussiano** de la fuente más cercana, una **cruz corta** enseña dónde
+    queda la marca (con su propio interruptor) y las flechas la afinan en
+    pasos de **0,1 px**. **«Medir en la marca»** vuelve a ejecutar el pipeline
+    desde tu marca, llevando su offset (el error de la predicción, constante a
+    lo largo de la visita) a cada observación, con la puerta saltada y el
+    barrido de velocidad omitido. La nota dice que la posición salió de una
+    **marca humana** y la tabla marca el punto como medido desde tu marca: la
+    marca es tu firma y viaja con la cifra. La cruz roja de la posición medida
+    se queda en la placa: está anclada al cielo, así que sobrevive a cargar
+    otra imagen de la serie y a cambiar a la pestaña Fotometría.
 
 ## 4. Qué significa cada cifra
 
 - **SNR**: cuántas veces supera la señal del objeto al ruido del fondo. Por
   debajo de 3,5σ la app **no** ejecuta el barrido: barrer sobre ruido y
-  quedarse con el máximo es fabricar un falso positivo.
+  quedarse con el máximo es fabricar un falso positivo. Pero **sí mide el
+  brillo** (ADR-062 rev), en la posición de la efeméride, y lo marca en
+  **rojo** con su nota: un número marcado vale más que ningún número. La
+  magnitud de la tabla sale verde cuando la medida es limpia, naranja cuando
+  es utilizable pero no limpia (error grande, solo tres comparsas, sin
+  estrella de control) y roja cuando no es publicable sin mirarla.
 - **SNR de envío**: distinto del anterior. El MPC recomienda **20 o más**
   para enviar y prohíbe las detecciones marginales, así que un grupo por
-  debajo del listón no entra en el reporte y se explica por qué.
+  debajo del listón no entra en el reporte y se explica por qué. La app trae
+  **10** (los envíos Tycho del autor iban a ~16 y fueron aceptados) y se
+  cambia en **Ajustes → Astrometría**, junto con el umbral de detección, el
+  barrido de velocidad, el margen del recorte, la comprobación y los hilos.
+  Cuando **ninguna** observación lo supera, el propio grupo del reporte lo
+  dice, con el número del listón y dónde se ajusta, y el botón que envía el
+  reporte queda deshabilitado: un reporte sin observaciones no es un reporte.
 - **Residual**: cuánto se separa tu medida de lo que predice la órbita, en
   segundos de arco.
 - **Dispersión de los demás**: cuánto se separan ellos. Es la escala justa:
@@ -181,6 +255,15 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 - **Observatorios distintos y última observación** (en la ficha del objeto):
   muchos y reciente significa objeto vivo y bien determinado; uno solo y
   hace meses, candidato a perderse.
+- **La banda de la placa** (la franja de arriba, sobre la imagen) dice de
+  dónde sale cada cifra, y por eso **cada número lleva su palabra**: la
+  velocidad y el PA van con **`(measured)`** cuando los midió el barrido de
+  velocidad y con **`(eph)`** cuando son la predicción de la efeméride; la
+  magnitud va con `(measured)` si se midió en esa placa, con `(eph)` si es la
+  que predice la efeméride (aparece siempre, aunque el run no haya medido el
+  brillo) y con `(cat)` si es la del catálogo o del proyecto. Sobre la pila de
+  toda la secuencia la banda añade además la **detección hecha sobre ella**:
+  `SNR 1.4 (gate 3.5σ)` y `limit 19.4` (la magnitud límite).
 
 ## 5. Cuándo fiarse y cuándo no
 

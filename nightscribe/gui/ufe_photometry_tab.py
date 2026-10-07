@@ -30,10 +30,18 @@ ui/ufe_photometry_tab.ui; this class loads it and inserts the two
 code-built sections into the splitter's placeholders.
 """
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtWidgets import (QFrame, QScrollArea, QWidget)
+import logging
 
-from .ui_loader import adopt_ui
+from PySide6.QtCore import QSize
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QWidget
+
+from . import theme
+from .ui_loader import adopt_ui, drop_in
+from .ufe_host import host_of
+from .widgets.kind_glyph import kind_glyph_pixmap
+
+logger = logging.getLogger("nightscribe.gui.ufe_photometry_tab")
 
 
 class UfePhotometryTab(QWidget):
@@ -63,32 +71,22 @@ class UfePhotometryTab(QWidget):
         self._ui = adopt_ui(self, "ufe_photometry_tab")
                                             # over: no wrapper, no extra
                                             # margins
-        self.splitter = self._ui.splitter
-        # Each half lives inside a SCROLL AREA of its own (reported: the
-        # series' summary box "is still small and has no scroll"). The
-        # halves are tall forms — the sequence, the measurement, the
-        # summary — and a splitter cannot scroll: in a 800 px window the
-        # Measure half was clamped to 345 px, the summary box fell to its
-        # 160 px floor and the rest of the form was cut off with no way to
-        # reach it (measured at 1000/800/700/600 px: the content needs
-        # 446 px and only the first case had room).
-        #
-        # With widgetResizable, a tall window still stretches the half (the
-        # summary box, the only expanding piece, grows with it) and a short
-        # one scrolls instead of clipping. The widgets stay the same ones:
-        # tab_compare and tab_measure are the halves, exactly as before, so
-        # the click routing, the aliases and the tests are untouched.
-        self.area_compare = self._scrollable(self.tab_compare)
-        self.area_measure = self._scrollable(self.tab_measure)
-        self.splitter.replaceWidget(0, self.area_compare)
-        self.splitter.replaceWidget(1, self.area_measure)
-        # setMinimumSize (not the 6.3 "hint" variant: this Qt build's
-        # bindings lack it) keeps the top half from collapsing; the
-        # compare half is compact now (its table lives in its own
-        # window), so it gets the smaller share
-        self.tab_compare.setMinimumSize(QSize(0, 200))
-        self.tab_measure.setMinimumSize(QSize(0, 260))
-        self.splitter.setSizes([320, 540])
+        # ONE scroll area for the whole column (ADR-038 rev): with every
+        # group folded the content is short, and the old splitter kept
+        # handing each half a share of the height, so the air collected in
+        # the middle (the reported vertical gaps). The two sections are
+        # stacked inside it, with a trailing stretch that keeps everything at
+        # the top. Each half is still the object every other piece of code
+        # reaches for; only its container changed.
+        # ('scroll' would collide with QWidget.scroll, a method: the loader
+        # skips names that belong to the class)
+        self.area_column = self._ui.area_column
+        self._contents = self._ui.scrollAreaWidgetContents
+        drop_in(self._contents.layout(), self._ui.ph_compare, self.tab_compare)
+        drop_in(self._contents.layout(), self._ui.ph_measure, self.tab_measure)
+        # the sections size to their content (no share to defend)
+        self.tab_compare.setMinimumSize(0, 0)
+        self.tab_measure.setMinimumSize(0, 0)
 
         # the manual window decides what a click does (open: pick stars;
         # closed: measure); re-arm on every visibility change
@@ -98,24 +96,81 @@ class UfePhotometryTab(QWidget):
         # Measure band combo without waiting for a first measurement
         self.tab_compare.sequence_changed.connect(
             self.tab_measure.refresh_bands)
+        # THE action of the panel (ADR-038 rev): one hero button, in the
+        # object's hue, that does what the flow needs next: today, always
+        # the comparison sequence, which is what a photometry session starts
+        # with. It DELEGATES to the section's own button, which stays hidden
+        # while the hero offers it: one action, one visible place.
+        self.btn_primary = self._ui.btn_primary
+        # the same fit as the Astrometry panel's hero (asked for 2026-10-06:
+        # "Construir la secuencia (comparsas)…" asks for 329 px and the
+        # column can be 262)
+        from .widgets.hero_fit import install_hero_fit
+        install_hero_fit(self.btn_primary)
+        self.lbl_primary_sub = self._ui.lbl_primary_sub
+        # the guide of the tab, right under the action: what to do with the
+        # panel (it used to live inside the Measure half, where the observer
+        # had to find it)
+        self.lbl_hint = self._ui.lbl_hint
+        self.btn_primary.clicked.connect(self.tab_compare.btn_auto.click)
+        self.tab_compare.btn_auto.setVisible(False)
+        self.tab_compare.sequence_changed.connect(self._sync_primary)
+        self._hue = theme.C_ACCENT
+        self._accent = None
+        self.refresh_accent()
 
-    def _scrollable(self, widget):
-        # Wraps a form in a scroll area: the form keeps its natural height
-        # and the column scrolls when the window is short.
-        # @args: widget - the form
-        # @return: the scroll area holding it (the splitter's child)
-        area = QScrollArea(self)
-        area.setWidgetResizable(True)
-        area.setFrameShape(QFrame.NoFrame)
-        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        area.setWidget(widget)
-        return area
+    # ------------------------------------------------------ the one action
+
+    def refresh_accent(self):
+        # @return: None. The panel speaks in the object's hue (the same
+        #          grammar the masthead's active tab uses): the hero button
+        #          and the block spines of both sections. Without a project
+        #          the app's own accent is used, with no kind glyph.
+        ask = getattr(host_of(self), "project_accent", None)
+        accent = None
+        if callable(ask):
+            try:
+                accent = ask()
+            except Exception as err:
+                logger.warning("the project accent could not be read: %s", err)
+        self._accent = accent
+        self._hue = (accent or {}).get("hue") or theme.C_ACCENT
+        self.btn_primary.setStyleSheet(theme.hero_button_style(self._hue))
+        kind = (accent or {}).get("kind")
+        if kind:
+            self.btn_primary.setIcon(QIcon(kind_glyph_pixmap(
+                kind, 22, color=theme.chip_text_for(self._hue))))
+            self.btn_primary.setIconSize(QSize(22, 22))
+        else:
+            self.btn_primary.setIcon(QIcon())
+        for half in (self.tab_compare, self.tab_measure):
+            refresh = getattr(half, "refresh_accent", None)
+            if callable(refresh):
+                refresh()
+        self._sync_primary()
+
+    def _sync_primary(self):
+        # @return: None. The button follows the section's own state (it can
+        #          be busy, or there may be no plate to work on) and the
+        #          line under it says what pressing it will do, or what is
+        #          missing. A dead button with no explanation is the fastest
+        #          way to lose the observer (ADR-038).
+        target = self.tab_compare.btn_auto
+        self.btn_primary.setEnabled(target.isEnabled())
+        self.btn_primary.setToolTip(target.toolTip())
+        self._set_sub(self.tab_compare.primary_subtitle())
+
+    def _set_sub(self, text):
+        # @args: text - the line under the hero button
+        # @return: None
+        self.lbl_primary_sub.setText(text or "")
+        self.lbl_primary_sub.setVisible(bool(text))
 
     # -------------------------------------------------------- activation
 
     def _on_manual_toggled(self, _visible):
         # Window-driven (ADR-044 rev 2026-09-26): the manual tweak lives
-        # in a floating window of its own, so the splitter keeps its
+        # in a floating window of its own, so the column keeps its
         # fixed share and there is nothing to re-deal; only the click
         # routing flips.
         self._apply()
@@ -137,6 +192,8 @@ class UfePhotometryTab(QWidget):
         # @args: flag - on stage or not
         self._on_stage = bool(flag)
         if flag:
+            # the object's hue may have arrived after this tab was armed
+            self.refresh_accent()
             self._apply()
         else:
             self.tab_compare.set_active(False)

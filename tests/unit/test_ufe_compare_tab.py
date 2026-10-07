@@ -54,7 +54,7 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    d.tab_photometry.set_active(True)           # take the stage
     # the picking state: manual window open, clicks add stars
     d.tab_compare.btn_manual.click()
     qapp.processEvents()
@@ -129,8 +129,7 @@ class _HoldingFieldWorker(_FakeFieldWorker):
 
 def test_tab_is_real_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate",
-                      "Calibration", "Astrometry"]
+    assert titles == ["Photometry", "Astrometry"]   # ADR-044 rev
     assert dlg.tab_compare.isEnabled()
     assert dlg.tab_compare.edt_target.text() == "sn2026zji_new_image"
 
@@ -436,14 +435,14 @@ def test_probe_star_info_and_pixel_fallback(dlg):
     assert hit and "DN" in lines[0]              # the state's pixel probe
 
 
-def test_leaving_the_tab_restores_the_pixel_probe(dlg):
+def test_leaving_the_panel_restores_the_pixel_probe(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
     assert dlg.view._hover_probe == tab._probe
-    dlg.tabs.setCurrentIndex(0)
+    dlg.tabs.setCurrentIndex(1)                     # the Astrometry panel
     assert dlg.view._hover_probe == dlg.state.probe_text
     assert tab._items == []
-    dlg.tabs.setCurrentWidget(dlg.tab_photometry)   # back: sequence resumes
+    dlg.tabs.setCurrentIndex(0)                     # back: sequence resumes
     assert len(tab._items) > 0
 
 
@@ -498,7 +497,7 @@ def test_sequence_overlays_survive_closing_the_manual_window(dlg, qapp):
     dlg.tab_photometry._apply()
     assert tab._active and not dlg.tab_measure._active
     assert len(tab._items) > 0
-    dlg.tabs.setCurrentWidget(dlg.tab_annotate)
+    dlg.tabs.setCurrentIndex(1)                 # leave for the other panel
     assert tab._items == []
 
 
@@ -513,7 +512,7 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
     d = UfeDialog()
     d.resize(1280, 860)
     d.show()
-    d.tabs.setCurrentWidget(d.tab_photometry)
+    d.tab_photometry.set_active(True)
     d.state.load(MONO)
     try:
         tab = d.tab_compare

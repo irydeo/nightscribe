@@ -490,8 +490,6 @@
         </layout>
        </item>
        <item><widget class="QLabel" name="lblH_master_kind"><property name="text"><string>The four kinds, in the order of the night: Bias, the shortest exposure with no light at all; Dark, at the same exposure as the lights (it already carries the bias, so it is used alone); Dark of the flats, a dark at the flat's own exposure, which cleans the flat before dividing; and Flat, the illumination and the dust of the train, taken with the filter of the lights.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-       <item><widget class="QCheckBox" name="chk_calib_pseudo_flat"><property name="text"><string>Build a flat from the frames when the library has none</string></property><property name="toolTip"><string>Default for the Calibration tab and for the astrometry: when a filter has no flat in the library, one is built from the frames themselves (the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not). It needs the sequence to be dithered, and the run says so when it is not. A real flat always wins. Off by default</string></property></widget></item>
-       <item><widget class="QLabel" name="lblH_calib_pseudo_flat"><property name="text"><string>This is the default, not the switch: the astrometry has its own checkbox, so a single run can be calibrated without changing what the app does from then on.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
        <item>
         <widget class="QTableWidget" name="tbl_masters">
          <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
@@ -516,6 +514,107 @@
        </item>
        <item><widget class="QLabel" name="lbl_master_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
        <item><spacer name="vspacer_calibration"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_astrometry">
+      <attribute name="title"><string>Astrometry</string></attribute>
+      <layout class="QVBoxLayout" name="vbox_astrometry">
+       <item>
+        <widget class="QGroupBox" name="grp_astro_gate">
+         <property name="title"><string>Detection and submission</string></property>
+         <layout class="QVBoxLayout" name="vbox_astro_gate">
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_gate">
+            <item><widget class="QLabel" name="lbl_astro_gate"><property name="text"><string>Detection gate (σ):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_astro_gate"><property name="value"><double>3.5</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>20.0</double></property><property name="singleStep"><double>0.5</double></property></widget></item>
+            <item><spacer name="hsp_astro_gate"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_gate"><property name="text"><string>How many times the object's signal must beat the background noise for the run to call it detected. Below it the velocity sweep is not run (a noise maximum is how a false positive is made), but the brightness IS still measured at the ephemeris' position and marked as not to be published without looking at it</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_floor">
+            <item><widget class="QLabel" name="lbl_astro_floor"><property name="text"><string>MPC submission floor (SNR):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_astro_floor"><property name="value"><double>10.0</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>200.0</double></property><property name="singleStep"><double>1.0</double></property></widget></item>
+            <item><spacer name="hsp_astro_floor"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_floor"><property name="text"><string>Per observation. The MPC recommends 20 or more and forbids marginal detections, so an observation below this floor does not go into the report and says why. The app ships 10 on purpose: it is a recommendation, and real submissions at about 16 have been accepted. Lowering it further is taking the risk of a false tracklet; a report whose observations all fall below it comes out empty and says so</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_astro_sweep">
+         <property name="title"><string>Velocity sweep and cutout</string></property>
+         <layout class="QVBoxLayout" name="vbox_astro_sweep">
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_sweep">
+            <item><widget class="QLabel" name="lbl_astro_sweep"><property name="text"><string>Sweep span (%):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_astro_sweep_pct"><property name="value"><double>5.0</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>0.5</double></property><property name="maximum"><double>50.0</double></property><property name="singleStep"><double>0.5</double></property></widget></item>
+            <item><widget class="QLabel" name="lbl_astro_steps"><property name="text"><string>Velocities scored:</string></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_astro_steps"><property name="value"><number>25</number></property><property name="minimum"><number>4</number></property><property name="maximum"><number>400</number></property><property name="singleStep"><number>5</number></property></widget></item>
+            <item><spacer name="hsp_astro_sweep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_sweep"><property name="text"><string>How far around the ephemeris' own velocity the run searches, and how many combinations it scores (25 = a 5x5 grid). The ephemeris' prediction is one of the candidates and the sweep is only used when it beats it by more than the grid's own scatter, so a wide grid cannot invent a motion</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_margin">
+            <item><widget class="QLabel" name="lbl_astro_margin"><property name="text"><string>Cutout margin (px):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_astro_margin"><property name="value"><number>64</number></property><property name="minimum"><number>8</number></property><property name="maximum"><number>1024</number></property><property name="singleStep"><number>8</number></property></widget></item>
+            <item><spacer name="hsp_astro_margin"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_margin"><property name="text"><string>Extra pixels around the object's own trail in the cutout the detection and the velocity sweep work on. Bigger is safer and slower; when the ephemeris had to be propagated locally the run widens it by itself</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_astro_check">
+         <property name="title"><string>Check against other observers</string></property>
+         <layout class="QVBoxLayout" name="vbox_astro_check">
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_check">
+            <item><widget class="QLabel" name="lbl_astro_check"><property name="text"><string>Check every run:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_astro_check"><property name="checked"><bool>true</bool></property></widget></item>
+            <item><widget class="QLabel" name="lbl_astro_check_sigma"><property name="text"><string>Outlier at (σ):</string></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_astro_check_sigma"><property name="value"><double>3.0</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>0.5</double></property><property name="maximum"><double>20.0</double></property><property name="singleStep"><double>0.5</double></property></widget></item>
+            <item><spacer name="hsp_astro_check"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_check"><property name="text"><string>Compares our measurement with the observations other stations have published (needs Find_Orb, in Integrations) and blocks the report when our point stands out of the cloud. It filters, it does not prove: on a short arc a wrong observation fits just as well</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_check_more">
+            <item><widget class="QLabel" name="lbl_astro_check_floor"><property name="text"><string>Residual floor (″):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_astro_check_floor"><property name="value"><double>1.0</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>60.0</double></property><property name="singleStep"><double>0.5</double></property></widget></item>
+            <item><widget class="QLabel" name="lbl_astro_check_window"><property name="text"><string>Window (days):</string></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_astro_check_window"><property name="value"><number>30</number></property><property name="minimum"><number>1</number></property><property name="maximum"><number>365</number></property><property name="singleStep"><number>5</number></property></widget></item>
+            <item><spacer name="hsp_astro_check_more"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_check_more"><property name="text"><string>A residual below the floor in arcseconds is never an outlier (the other stations' own noise is bigger than that), and only the observations inside the window are compared</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_astro_work">
+         <property name="title"><string>Work</string></property>
+         <layout class="QVBoxLayout" name="vbox_astro_work">
+          <item>
+           <layout class="QHBoxLayout" name="row_astro_threads">
+            <item><widget class="QLabel" name="lbl_astro_threads"><property name="text"><string>Threads:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_astro_threads"><property name="minimum"><number>0</number></property><property name="maximum"><number>256</number></property><property name="toolTip"><string>0 = automatic</string></property></widget></item>
+            <item><spacer name="hsp_astro_threads"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astro_threads"><property name="text"><string>0 computes it from the cores this process may use and from the memory each task needs; a positive value caps it by hand for a machine that is busy with something else</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="vspacer_astrometry">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+        </spacer>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tab_integrations">

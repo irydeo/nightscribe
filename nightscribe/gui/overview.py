@@ -846,12 +846,11 @@ class ObjectPanel(QWidget):
         # "YYYY-MM-DD HH:MM" form; passes through anything else unchanged.
         # @args: epoch - string
         # @return: ISO-style string
-        import datetime
-        try:
-            t = datetime.datetime.strptime(epoch, "%Y-%b-%d %H:%M")
-            return t.strftime("%Y-%m-%d %H:%M")
-        except (ValueError, TypeError):
+        from ..core import ephemeris as _eph
+        t = _eph.parse_horizons_time(epoch)
+        if t is None:
             return epoch
+        return t.strftime("%Y-%m-%d %H:%M")
 
     def _copy_coords(self):
         # Copies the coordinates (decimal + sexagesimal) to the clipboard.

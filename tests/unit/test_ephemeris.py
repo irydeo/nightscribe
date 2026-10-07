@@ -92,6 +92,29 @@ def test_fmt_time_locale_proof():
     assert ephemeris._fmt_time(jd) == "2026-Aug-24 22:30"
 
 
+def test_parse_horizons_time_is_locale_proof():
+    # The PARSER too: strptime("%b") follows LC_TIME, and Qt sets the process
+    # locale to the user's at startup. On a Spanish machine "Aug" stopped
+    # matching, every ephemeris row was dropped, and a run said "no
+    # ephemeris" with the table right there. The month is looked up in the
+    # module's own English table, so the locale cannot touch it.
+    import locale
+    t = ephemeris.parse_horizons_time("2026-Aug-16 22:00")
+    assert t is not None and t.month == 8 and t.hour == 22
+    assert ephemeris.parse_horizons_time("not a date") is None
+    assert ephemeris.parse_horizons_time(None) is None
+    original = locale.setlocale(locale.LC_TIME)
+    try:
+        try:
+            locale.setlocale(locale.LC_TIME, "es_ES.UTF-8")
+        except locale.Error:
+            return                       # no Spanish locale installed here
+        assert ephemeris.parse_horizons_time("2026-Aug-16 22:00") == t
+        assert ephemeris.parse_horizons_time("2026-ago-16 22:00") is None
+    finally:
+        locale.setlocale(locale.LC_TIME, original)
+
+
 def test_preliminary_rows_and_banner(tmp_path):
     # A preliminary orbit must produce well-formed rows, flagged, and the
     # CSV header must carry the bilingual preliminary banner.
@@ -178,3 +201,21 @@ def test_one_row_is_not_a_table():
     assert ephemeris.motion_interpolator(
         [{"jd": 2460298.0, "ra_deg": 49.0, "dec_deg": 10.0}]) is None
     assert ephemeris.motion_interpolator([]) is None
+
+
+def test_motion_from_elements_propagates_or_refuses():
+    # The local fallback: a position function built from the elements, no
+    # table. Junk is refused (a motion that answers None for every frame is
+    # worse than no motion), and real elements answer at any jd.
+    from nightscribe.core import ephemeris
+    assert ephemeris.motion_from_elements(None) is None
+    assert ephemeris.motion_from_elements({}) is None
+    assert ephemeris.motion_from_elements({"a": 2.3}) is None   # no e
+    motion = ephemeris.motion_from_elements(
+        {"a": 2.329264345717352, "e": 0.5508738138610355,
+         "i": 11.04772931873822, "om": 148.529452272859,
+         "w": 207.3810299700251, "ma": 332.5479727971131,
+         "epoch": 2461200.5})
+    assert motion is not None
+    ra, dec = motion(2461269.434)
+    assert 310.0 < ra < 316.0 and -8.0 < dec < -2.0

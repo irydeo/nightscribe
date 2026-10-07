@@ -61,11 +61,12 @@ def _tab_widgets(dlg, index):
 def test_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    # Interfaz 1.4 added the Interface tab (the Welcome motion switch) and
-    # ADR-061 the Calibration tab (the master library), so the count went
-    # from four to six; Integrations, Interface and Development keep their
-    # order behind them.
-    assert len(tabs) == 6
+    # Interfaz 1.4 added the Interface tab (the Welcome motion switch),
+    # ADR-061 the Calibration tab (the master library) and 2026-10-06 the
+    # Astrometry one (the gate, the MPC floor, the sweep, the check), so the
+    # count went from four to seven; Integrations, Interface and Development
+    # keep their order behind them.
+    assert len(tabs) == 7
     # the last tab is Development (the UFE default switch, ADR-044)
     assert tabs[-1] in ("Development", "Desarrollo")
     assert tabs[-2] in ("Interface", "Interfaz")
@@ -229,3 +230,44 @@ def _dlg():
     # @return: a loaded settings dialog (caller deletes it)
     from nightscribe.gui.main_window import _load_ui
     return _load_ui("settings_dialog")
+
+
+def test_the_astrometry_settings_are_editable_at_last(qapp):
+    # Asked for 2026-10-06: "¿dónde puedo ajustar la SNR para el MPC?".
+    # Answer then: nowhere in the interface. These settings lived only in the
+    # config file while the report's own message promised "Settings →
+    # Astrometry". The tab is here now, with the fields and the explanation,
+    # and on_open_settings maps every one of them to its key (the dialog is
+    # modal, so the source is what pins the wiring, the house's own pattern:
+    # see test_settings_storage.py).
+    import inspect
+    import nightscribe.gui.main_window as mw
+    dlg = _dlg()
+    names = _tab_names(dlg)
+    assert "Astrometry" in names or "Astrometría" in names
+    fields = {
+        "spn_astro_gate": "astrometry_snr_sigma",
+        "spn_astro_floor": "astrometry_submit_snr",
+        "spn_astro_sweep_pct": "astrometry_sweep_pct",
+        "spn_astro_steps": "astrometry_sweep_steps",
+        "spn_astro_margin": "astrometry_cutout_margin_px",
+        "chk_astro_check": "astrometry_check_enabled",
+        "spn_astro_check_sigma": "astrometry_check_sigma",
+        "spn_astro_check_floor": "astrometry_check_floor_arcsec",
+        "spn_astro_check_window": "astrometry_check_window_days",
+        "spn_astro_threads": "astrometry_threads",
+    }
+    widgets = set(_tab_widgets(dlg, names.index("Astrometry")
+                               if "Astrometry" in names
+                               else names.index("Astrometría")))
+    for widget, key in fields.items():
+        assert widget in widgets, widget
+        assert hasattr(dlg, widget), widget
+    src = inspect.getsource(mw.MainWindow.on_open_settings)
+    for widget, key in fields.items():
+        assert widget in src, f"on_open_settings must read {widget}"
+        assert key in src, f"on_open_settings must map {key}"
+    # the help of the floor says what the MPC recommends and what the app
+    # ships: it is the whole reason the tab exists
+    help_text = dlg.lblH_astro_floor.text()
+    assert "recommends 20" in help_text and "ships 10" in help_text

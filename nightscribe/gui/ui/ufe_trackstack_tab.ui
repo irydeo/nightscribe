@@ -42,63 +42,102 @@
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="row_nobs">
-     <item>
-      <widget class="QLabel" name="lbl_nobs">
-       <property name="text"><string>Observations:</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="spn_nobs">
-       <property name="enabled"><bool>false</bool></property>
-       <property name="minimum"><number>1</number></property>
-       <property name="maximum"><number>999</number></property>
-       <property name="toolTip">
-        <string>How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal, and the line beside this one shows what each would reach</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="lbl_snr_line">
-       <property name="text"><string/></property>
-       <property name="toolTip">
-        <string>The SNR each observation is expected to reach, from the frames it gets: the SNR grows with the square root of the frames, so asking for more observations splits the signal. The full table is below, in its own fold</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="hsp_nobs">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-      </spacer>
-     </item>
-    </layout>
+    <widget class="QPushButton" name="btn_stack">
+     <property name="enabled"><bool>false</bool></property>
+     <property name="minimumSize"><size><width>0</width><height>48</height></size></property>
+     <property name="text"><string>Stack the sequence</string></property>
+     <property name="toolTip">
+      <string>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</string>
+     </property>
+    </widget>
    </item>
    <item>
-    <widget class="QWidget" name="sec_snr_content" native="true">
-     <layout class="QVBoxLayout" name="vbox_snr">
+    <widget class="QLabel" name="lbl_plan_line">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QProgressBar" name="prg_stack">
+     <property name="visible"><bool>false</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_status">
+     <property name="visible"><bool>false</bool></property>
+     <property name="minimumSize"><size><width>0</width><height>34</height></size></property>
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="sec_plan_content" native="true">
+     <layout class="QVBoxLayout" name="vbox_plan">
       <property name="leftMargin"><number>0</number></property>
       <property name="topMargin"><number>0</number></property>
       <property name="rightMargin"><number>0</number></property>
       <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <layout class="QHBoxLayout" name="row_nobs">
       <item>
-       <widget class="QTableWidget" name="tbl_snr">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
-        <property name="toolTip">
-         <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</string>
-        </property>
-        <column><property name="text"><string>Obs.</string></property></column>
-        <column><property name="text"><string>Frames</string></property></column>
-        <column><property name="text"><string>T_mid (UT)</string></property></column>
-        <column><property name="text"><string>Expected SNR</string></property></column>
+       <widget class="QLabel" name="lbl_nobs">
+        <property name="text"><string>Observations:</string></property>
        </widget>
       </item>
+      <item>
+       <widget class="QSpinBox" name="spn_nobs">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="minimum"><number>1</number></property>
+        <property name="maximum"><number>999</number></property>
+        <property name="toolTip">
+         <string>How many observations the sequence is split into: contiguous groups of frames, each with its own middle-of-exposure instant. The SNR grows with the square root of the frames, so asking for more observations splits the signal, and the line beside this one shows what each would reach</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_snr_line">
+        <property name="text"><string/></property>
+        <property name="toolTip">
+         <string>The SNR each observation is expected to reach, from the frames it gets: the SNR grows with the square root of the frames, so asking for more observations splits the signal. The full table is below, in its own fold</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="hsp_nobs">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QWidget" name="sec_snr_content" native="true">
+      <layout class="QVBoxLayout" name="vbox_snr">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+       <item>
+        <widget class="QTableWidget" name="tbl_snr">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
+         <property name="toolTip">
+          <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</string>
+         </property>
+         <column><property name="text"><string>Obs.</string></property></column>
+         <column><property name="text"><string>Frames</string></property></column>
+         <column><property name="text"><string>T_mid (UT)</string></property></column>
+         <column><property name="text"><string>Expected SNR</string></property></column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
      </layout>
     </widget>
    </item>
@@ -118,6 +157,8 @@
         </item>
         <item>
          <widget class="QComboBox" name="cmb_method">
+          <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
+          <property name="minimumContentsLength"><number>10</number></property>
           <property name="toolTip">
            <string>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean's SNR while rejecting the trails (the default); weighted is the same clip with each frame counting by 1/sigma^2 of its own sky, which is the same on a stable night and what saves a night with thin cloud or moon</string>
           </property>
@@ -132,11 +173,23 @@
         </item>
         <item>
          <widget class="QComboBox" name="cmb_final_size">
+          <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
+          <property name="minimumContentsLength"><number>10</number></property>
           <property name="toolTip">
            <string>How much sky the FINAL stack of each observation covers. The whole frame is the field with the comparison stars around it; a smaller window is faster and lighter. The velocity sweep always works on the object's own trail cutout, whatever this says.</string>
           </property>
          </widget>
         </item>
+        <item>
+         <spacer name="hsp_field">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_margin">
         <item>
          <widget class="QLabel" name="lbl_margin"><property name="text"><string>Margin:</string></property></widget>
         </item>
@@ -152,7 +205,7 @@
          </widget>
         </item>
         <item>
-         <spacer name="hsp_field">
+         <spacer name="hsp_margin">
           <property name="orientation"><enum>Qt::Horizontal</enum></property>
           <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
          </spacer>
@@ -182,9 +235,17 @@
        <layout class="QHBoxLayout" name="row_calibrate">
         <item>
          <widget class="QCheckBox" name="chk_calibrate">
-          <property name="text"><string>Calibrate the frames</string></property>
+          <property name="text"><string>Apply the calibration</string></property>
           <property name="toolTip">
-           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves (needs the sequence to be dithered, and the run says so); a real flat always wins</string>
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves (needs the sequence to be dithered, and the run says so); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_calibration">
+          <property name="text"><string>Calibration…</string></property>
+          <property name="toolTip">
+           <string>Opens the Calibration tab: the master library, the resolved recipe and the pseudo-flat policy that this checkbox applies</string>
           </property>
          </widget>
         </item>
@@ -195,6 +256,12 @@
          </spacer>
         </item>
        </layout>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_calibration_hint">
+        <property name="text"><string/></property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
       </item>
       <item>
        <layout class="QHBoxLayout" name="row_starstack">
@@ -239,114 +306,121 @@
     </widget>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="row_run">
-     <item>
-      <spacer name="hsp_run">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_stack">
-       <property name="enabled"><bool>false</bool></property>
-       <property name="text"><string>Stack the sequence</string></property>
-       <property name="toolTip">
-        <string>Run the whole pipeline: solve the reference, register the frames, stack, detect, sweep the velocity, stack each observation, measure and check. While it runs, this button is the Cancel</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QProgressBar" name="prg_stack">
-     <property name="visible"><bool>false</bool></property>
+    <widget class="QWidget" name="sec_notes_content" native="true">
+     <layout class="QVBoxLayout" name="vbox_notes">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <widget class="QPlainTextEdit" name="txt_notes">
+      <property name="visible"><bool>false</bool></property>
+      <property name="minimumSize"><size><width>0</width><height>90</height></size></property>
+      <property name="maximumSize"><size><width>16777215</width><height>170</height></size></property>
+      <property name="readOnly"><bool>true</bool></property>
+      <property name="toolTip">
+       <string>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness. The box keeps its own height and scrolls, so a long night never pushes the rest out of the panel and nothing is cut</string>
+      </property>
+     </widget>
+    </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="lbl_status">
-     <property name="visible"><bool>false</bool></property>
-     <property name="minimumSize"><size><width>0</width><height>34</height></size></property>
-     <property name="text"><string/></property>
-     <property name="wordWrap"><bool>true</bool></property>
+    <widget class="QWidget" name="sec_view_content" native="true">
+     <layout class="QVBoxLayout" name="vbox_view">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <layout class="QHBoxLayout" name="row_view">
+      <item>
+       <widget class="QLabel" name="lbl_view">
+        <property name="text"><string>Observation:</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="cmb_group">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="toolTip">
+         <string>Which observation's stack is shown below, with the measured position marked</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_blink">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="text"><string>Blink / montage…</string></property>
+        <property name="toolTip">
+         <string>Writes one figure with every observation's stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <widget class="QWidget" name="ph_thumbs" native="true">
+      <property name="minimumSize"><size><width>0</width><height>86</height></size></property>
+      <property name="toolTip">
+       <string>Every observation's stack, centred on the object. Click one to bring it to the main view</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QWidget" name="ph_stack_view" native="true">
+      <property name="minimumSize"><size><width>0</width><height>220</height></size></property>
+     </widget>
+    </item>
+     </layout>
     </widget>
    </item>
    <item>
-    <widget class="QPlainTextEdit" name="txt_notes">
-     <property name="visible"><bool>false</bool></property>
-     <property name="minimumSize"><size><width>0</width><height>90</height></size></property>
-     <property name="maximumSize"><size><width>16777215</width><height>170</height></size></property>
-     <property name="readOnly"><bool>true</bool></property>
+    <widget class="QWidget" name="sec_points_content" native="true">
+     <layout class="QVBoxLayout" name="vbox_points">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <widget class="QLabel" name="lbl_points_title">
+      <property name="visible"><bool>false</bool></property>
+      <property name="text"><string>Measurement per observation</string></property>
+      <property name="toolTip">
+       <string>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QTableWidget" name="tbl_points">
+      <property name="visible"><bool>false</bool></property>
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
+      <column><property name="text"><string>Obs.</string></property></column>
+      <column><property name="text"><string>T_mid</string></property></column>
+      <column><property name="text"><string>RA</string></property></column>
+      <column><property name="text"><string>Dec</string></property></column>
+      <column><property name="text"><string>Δ″</string></property></column>
+      <column><property name="text"><string>SNR</string></property></column>
+      <column><property name="text"><string>Mag</string></property></column>
+      <column><property name="text"><string>!</string></property></column>
+     </widget>
+    </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chk_manual">
+     <property name="enabled"><bool>false</bool></property>
+     <property name="text"><string>Manual mode (faint object)…</string></property>
      <property name="toolTip">
-      <string>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness. The box keeps its own height and scrolls, so a long night never pushes the rest out of the panel and nothing is cut</string>
+      <string>Mark the object by hand on the whole-sequence stack and measure from your mark: the position is yours (snapped to the centroid, nudged in 0.1 px steps), the velocity is the ephemeris' and the sweep is not run. Useful for an object below the detection gate, and to place a detected one's centroid by eye. Needs a visit with frames</string>
      </property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_view">
-     <item>
-      <widget class="QLabel" name="lbl_view">
-       <property name="text"><string>Observation:</string></property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QComboBox" name="cmb_group">
-       <property name="enabled"><bool>false</bool></property>
-       <property name="toolTip">
-        <string>Which observation's stack is shown below, with the measured position marked</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_blink">
-       <property name="enabled"><bool>false</bool></property>
-       <property name="text"><string>Blink / montage…</string></property>
-       <property name="toolTip">
-        <string>Writes one figure with every observation's stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QWidget" name="ph_thumbs" native="true">
-     <property name="minimumSize"><size><width>0</width><height>86</height></size></property>
-     <property name="toolTip">
-      <string>Every observation's stack, centred on the object. Click one to bring it to the main view</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QWidget" name="ph_stack_view" native="true">
-     <property name="minimumSize"><size><width>0</width><height>220</height></size></property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="lbl_points_title">
-     <property name="visible"><bool>false</bool></property>
-     <property name="text"><string>Measurement per observation</string></property>
-     <property name="toolTip">
-      <string>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QTableWidget" name="tbl_points">
-     <property name="visible"><bool>false</bool></property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
-     <column><property name="text"><string>Obs.</string></property></column>
-     <column><property name="text"><string>T_mid</string></property></column>
-     <column><property name="text"><string>RA</string></property></column>
-     <column><property name="text"><string>Dec</string></property></column>
-     <column><property name="text"><string>Δ″</string></property></column>
-     <column><property name="text"><string>SNR</string></property></column>
-     <column><property name="text"><string>Mag</string></property></column>
-     <column><property name="text"><string>!</string></property></column>
     </widget>
    </item>
    <item>
@@ -383,9 +457,12 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="grp_report">
-     <property name="title"><string>Report</string></property>
+    <widget class="QWidget" name="grp_report" native="true">
      <layout class="QVBoxLayout" name="vbox_report">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
       <item>
        <layout class="QHBoxLayout" name="row_format">
         <item>
@@ -433,28 +510,37 @@
         </item>
        </layout>
       </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QWidget" name="sec_report_content" native="true">
-     <layout class="QVBoxLayout" name="vbox_report_text">
-      <property name="leftMargin"><number>0</number></property>
-      <property name="topMargin"><number>0</number></property>
-      <property name="rightMargin"><number>0</number></property>
-      <property name="bottomMargin"><number>0</number></property>
       <item>
-       <widget class="QPlainTextEdit" name="txt_report">
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="minimumSize"><size><width>0</width><height>80</height></size></property>
-        <property name="maximumSize"><size><width>16777215</width><height>140</height></size></property>
-        <property name="readOnly"><bool>true</bool></property>
-        <property name="font"><font><family>Monospace</family></font></property>
+       <widget class="QWidget" name="sec_report_content" native="true">
+        <layout class="QVBoxLayout" name="vbox_report_text">
+         <property name="leftMargin"><number>0</number></property>
+         <property name="topMargin"><number>0</number></property>
+         <property name="rightMargin"><number>0</number></property>
+         <property name="bottomMargin"><number>0</number></property>
+         <item>
+          <widget class="QLabel" name="lbl_report_note">
+           <property name="text"><string/></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="toolTip">
+            <string>What came out of the report: how many observations it carries and, when some were left out, why and where the submission floor is set. A report with no observations is not a report: the button that sends it stays disabled</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPlainTextEdit" name="txt_report">
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
+             <horstretch>0</horstretch>
+             <verstretch>0</verstretch>
+            </sizepolicy>
+           </property>
+           <property name="minimumSize"><size><width>0</width><height>80</height></size></property>
+           <property name="maximumSize"><size><width>16777215</width><height>140</height></size></property>
+           <property name="readOnly"><bool>true</bool></property>
+           <property name="font"><font><family>Monospace</family></font></property>
+          </widget>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>

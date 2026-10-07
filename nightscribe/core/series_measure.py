@@ -1316,11 +1316,20 @@ def sweep_aperture(paths, cfg, ks=None):
             continue
         night = _night_of(fits_meta.meta_from_header(header).get("mjd"))
         fwhm = photometry.estimate_fwhm(data, positions)
+        # THE CEILINGS, from their one home (ADR-066): a star at or above the
+        # detector's saturation or the camera's linearity is NEVER used, and
+        # this path (tuning the aperture on the check star) used to measure
+        # without them, so a clipped star could tune the aperture that the
+        # whole night would then use.
+        sat_adu, lin_adu = photometry.star_ceilings(
+            header, None, linear_adu=cfg.site_linear,
+            saturate=cfg.site_saturate)
         slots = by_night.setdefault(night, {k: ([], []) for k in ks})
         for k in ks:
             r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm, k=k)
             r = photometry.measure_point(data, cx, cy, r_ap=r_ap,
-                                         r_ann_in=r_in, r_ann_out=r_out)
+                                         r_ann_in=r_in, r_ann_out=r_out,
+                                         sat_adu=sat_adu, linear_adu=lin_adu)
             if not r["ok"] or r["flux"] is None or r["flux"] <= 0:
                 continue
             mags, fwhms = slots[k]

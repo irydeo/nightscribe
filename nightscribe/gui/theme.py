@@ -166,6 +166,101 @@ def _c(hex_):
     return QColor(hex_)
 
 
+def hero_button_style(hue):
+    # The ONE action of a panel (ADR-038), painted in the object's own hue.
+    # @args: hue - the project's kind hue (a KIND_COLORS value), or the app
+    #        accent when there is no project
+    # @return: a stylesheet for that button, applied to the INSTANCE (the
+    #          hue changes with the project, so it cannot live in the
+    #          global sheet).
+    #
+    # Three decisions, each with its measurement:
+    #
+    # * The gradient goes from a LIGHTER tone at the top down to the hue.
+    #   The chip grammar picks the text by contrast (chip_text_for) and every
+    #   kind hue takes the DARK text: darkening the fill downwards would eat
+    #   the contrast (measured: the SN red at -20% drops from 4.7:1 to
+    #   3.2:1), while lifting the top stop raises it (5.1:1 for the same red).
+    # * The border stays 2 px in every state and only changes COLOUR on
+    #   focus: a border that grows would move the button under the cursor.
+    # * Solid fills, never an alpha wash: over the dark panel a translucent
+    #   hue reads muddy (the lesson the chips already carry).
+    #
+    # The horizontal padding is 16 px, not 20, and the caller draws the glyph
+    # at 18 px: the panel's column is 380 px wide and the longest label
+    # ("Construir la secuencia (comparsas)…") measured 363 px with 20/22, one
+    # pixel MORE than the 362 it has. With 16/18 it is 351 px, so the label
+    # fits in both languages with room to spare.
+    text = chip_text_for(hue)
+    top = composite(hue, "f0", over="#ffffff")      # +6% toward white
+    hover = composite(hue, "e6", over="#ffffff")    # +10%
+    pressed = composite(hue, "e6", over="#000000")  # -10%
+    rim = composite(hue, "8c", over="#000000")      # 55% of the hue
+    return (
+        f"QPushButton {{"
+        f" background: qlineargradient(x1:0, y1:0, x2:0, y2:1,"
+        f" stop:0 {top}, stop:1 {hue});"
+        f" color: {text}; border: 2px solid {rim}; border-radius: 12px;"
+        f" padding: 12px 16px; font-size: 16px; font-weight: 700; }}"
+        f"QPushButton:hover {{ background: {hover}; }}"
+        f"QPushButton:pressed {{ background: {pressed};"
+        f" padding-top: 13px; }}"
+        f"QPushButton:focus {{ border: 2px solid #ffffff; }}"
+        f"QPushButton:disabled {{ background: {C_DIM_FILL};"
+        f" color: {C_TEXT_DIM}; border: 2px solid {C_LINE}; }}")
+
+
+def hero_cancel_style():
+    # What the hero button becomes WHILE it runs: the same size and weight,
+    # but quiet and outlined, because it is no longer the action of the panel
+    # (the run is). The label changes to Cancel in the same move.
+    # @return: a stylesheet for that button
+    return (f"QPushButton {{ background: transparent; color: {C_TEXT};"
+            f" border: 2px solid {C_LINE}; border-radius: 12px;"
+            f" padding: 12px 16px; font-size: 16px; font-weight: 700; }}"
+            f"QPushButton:hover {{ background: {C_HOVER};"
+            f" border-color: {C_WARN}; color: {C_WARN}; }}")
+
+
+def block_header_style(hue=None):
+    # The header of a collapsible CARD: transparent (the card paints the
+    # surface and its border) with the title in the card's accent, which is
+    # the same grammar the object card's sections use (theme.section_card_style
+    # + a title in the accent). The card itself is what tells the observer
+    # where the group begins and ends when it is expanded.
+    # @args: hue - the project's kind hue, or None for the app's accent
+    # @return: a stylesheet for that header button
+    accent = hue or C_ACCENT
+    hover = composite(accent, "e6", over="#ffffff")   # +10% toward white
+    return (f"QPushButton {{ background: transparent; border: none;"
+            f" text-align: left; color: {accent}; padding: 8px 10px; }}"
+            f"QPushButton:hover {{ color: {hover}; }}")
+
+
+def block_card_style(hue=None):
+    # The card a collapsible group lives in: the object card's own section
+    # skin (a hairline border, a 10 px radius and a 3 px spine in the quiet
+    # composite of the object's hue), so the two views share one voice and
+    # the group has a visible end.
+    # @args: hue - the project's kind hue, or None for the app's accent
+    # @return: a stylesheet for the card frame
+    accent = hue or C_ACCENT
+    return (f"QFrame#sectionCard {{ background: {C_BASE};"
+            f" border: 1px solid {C_LINE}; border-radius: 10px;"
+            f" border-left: 3px solid {composite(accent, '70', over=C_BASE)};"
+            f" }}")
+
+
+def progress_style(hue):
+    # A progress bar that fills in the object's hue: the run is this
+    # project's, and the bar says so with the same colour the panel uses.
+    # @args: hue - the project's kind hue
+    # @return: a stylesheet for that QProgressBar
+    return (f"QProgressBar {{ border: 1px solid {C_LINE}; border-radius: 3px;"
+            f" background: {C_BASE}; text-align: center; }}"
+            f"QProgressBar::chunk {{ background: {hue}; border-radius: 2px; }}")
+
+
 def chip_style(color, font_size=11):
     # @args: a hex surface color (e.g. KIND_COLORS['comet']), px font size
     # @return: a stylesheet string for a small pill label.

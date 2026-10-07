@@ -349,11 +349,10 @@ def _nearest_ephemeris_row(rows, date=None):
     if target.tzinfo is None:
         target = target.replace(tzinfo=datetime.timezone.utc)
     best, best_dt = rows[0], None
+    from . import ephemeris as _eph
     for r in rows:
-        try:
-            t = datetime.datetime.strptime(r["time"], "%Y-%b-%d %H:%M")
-            t = t.replace(tzinfo=datetime.timezone.utc)
-        except (ValueError, KeyError):
+        t = _eph.parse_horizons_time(r.get("time"))
+        if t is None:
             continue
         if best_dt is None or abs((t - target).total_seconds()) < \
                 abs((best_dt - target).total_seconds()):

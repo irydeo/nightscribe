@@ -106,6 +106,32 @@ def cross_marker_items(x, y, scene_w, scene_h, color, box_half,
     return items
 
 
+def mark_cross_items(x, y, color, arm=12.0, pen_width=1.4, alpha=200):
+    # A SHORT crosshair centred on a point, for a mark the observer placed
+    # (the manual mode's centroid): two lines that cross at (x, y) with a
+    # dark shadow, so they read on sky, on stars and on a core alike. It is
+    # deliberately NOT the full-frame cross of cross_marker_items: this one
+    # says "the point is here", not "the object is here on the plate".
+    # @args: x, y - position in scene (plate px) coordinates, color - hex
+    #        string or QColor, arm - half length in scene px, pen_width -
+    #        cosmetic pen width in screen px, alpha - 0-255 for the colour
+    # @return: [4 QGraphicsLineItem] (2 shadow, 2 coloured)
+    items = []
+    for width, col, opacity in ((pen_width + 1.2, QColor(0, 0, 0), 160),
+                                (pen_width, QColor(color), alpha)):
+        col = QColor(col)
+        col.setAlpha(int(opacity))
+        pen = QPen(col)
+        pen.setWidthF(width)
+        pen.setCosmetic(True)
+        for x0, y0, x1, y1 in ((x - arm, y, x + arm, y),
+                               (x, y - arm, x, y + arm)):
+            ln = QGraphicsLineItem(x0, y0, x1, y1)
+            ln.setPen(pen)
+            items.append(ln)
+    return items
+
+
 def ring_marker_items(x, y, color, radius,
                       tick_inner=0.5, tick_outer=1.6, pen_width=2.0):
     # The classic "ring" object marker (ADR-046): a circle with four

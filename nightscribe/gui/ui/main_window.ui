@@ -127,7 +127,6 @@
      <addaction name="separator"/>
         <addaction name="action_skycal"/>
         <addaction name="action_explore"/>
-        <addaction name="action_blink"/>
         <addaction name="action_journal"/>
         <addaction name="action_campaigns"/>
         <addaction name="action_ufe"/>
@@ -153,9 +152,6 @@
   </action>
   <action name="action_explore">
    <property name="text"><string>Explore object…</string></property>
-  </action>
-  <action name="action_blink">
-   <property name="text"><string>Blink (ad-hoc)…</string></property>
   </action>
    <action name="action_journal">
     <property name="text"><string>Observing journal…</string></property>

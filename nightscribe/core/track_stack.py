@@ -45,7 +45,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import calibration, coords, fits_meta, outliers, parallel, register, solve
+from . import (calibration, coords, ephem_minor, fits_meta, outliers,
+               parallel, register, solve)
 
 logger = logging.getLogger(__name__)
 
@@ -114,12 +115,23 @@ class WcsQCReport:
 def load_sequence(paths, cfg=None):
     # @args: paths - the visit's FITS paths, cfg - Config (unused for now,
     #        kept for the callers that will pass thresholds)
-    # @return: list[Frame]
+    # @return: list[Frame], with the frames that could NOT be read left out
     # The header is all we read here: the pixels are not touched until the
     # stacking asks for them (and then only the region it needs).
+    #
+    # A frame that cannot be read is SKIPPED and not fatal: a real capture
+    # ends with a half-written file (measured on the author's own 2025 FG18
+    # visit: the last frame is 0 bytes, the sequence stopped), and one of
+    # those used to take the whole visit down with it (the exception came
+    # out of here and the Astrometry tab never armed). The caller can tell
+    # how many were left out by comparing with the paths it handed over.
     out = []
     for path in paths:
-        header = calibration.read_header(path)
+        try:
+            header = calibration.read_header(path)
+        except Exception as err:
+            logger.warning("frame left out (unreadable): %s (%s)", path, err)
+            continue
         meta = fits_meta.meta_from_header(header)
         frame = Frame(path=str(path), header=header,
                       filter=meta.get("filter"), exptime_s=meta.get("exptime_s"),
@@ -561,23 +573,137 @@ def _arcsec_per_pixel(wcs):
     return scale * 3600.0
 
 
+def manual_reference(q_all, manual_ref):
+    # The manual mode's arithmetic, in one pure place: the observer's mark on
+    # the base stack replaces the ephemeris point at the sequence's T_mid, and
+    # the SAME offset (the prediction's error, assumed constant over the
+    # visit) is carried to each observation's own ephemeris point.
+    # @args: q_all - the ephemeris point (reference grid), manual_ref - the
+    #        mark (reference grid) or None
+    # @return: (q_all_used, offset) with offset None for a normal run
+    if manual_ref is None:
+        return q_all, None
+    mark = (float(manual_ref[0]), float(manual_ref[1]))
+    return mark, (mark[0] - q_all[0], mark[1] - q_all[1])
+
+
 def sequence_motion(frames, name, site="", lat=None, lon=None):
-    # @args: frames - list[Frame], name - Horizons designation, site - MPC
-    #        code, lat/lon - site coordinates when known
+    # @args: frames - list[Frame], name - designation, site - MPC code,
+    #        lat/lon - site coordinates when known
     # @return: a callable(jd) -> (ra_deg, dec_deg), or None
-    # A thin wrapper so the caller does not have to remember the Horizons
-    # step: one minute over the sequence's own span, interpolated.
+    # The position alone, for the callers that only want it. The SOURCE and
+    # the reason are in sequence_motion_solution.
+    return sequence_motion_solution(frames, name, site=site, lat=lat,
+                                    lon=lon)[0]
+
+
+def sequence_ephemeris(frames, name, site="", lat=None, lon=None):
+    # Where the object is AND how bright it should be, over the visit's own
+    # window, from the first source that answers: JPL Horizons (with retries),
+    # then the SBDB elements propagated locally (two-body Kepler, J2000), then
+    # NEOfixer for an unconfirmed object. The stack must NOT die because one
+    # service is down, and the same goes for the predicted magnitude: a run
+    # that cannot say how bright the object is still reports its position.
+    #
+    # The magnitude is asked of the SAME cascade, because it is the same
+    # question ("what does the sky say about this object tonight?"): Horizons
+    # answers it with a table of its own (quantity 9, V for an asteroid, T for
+    # a comet), and the local orbit with the IAU H-G system from the H and G
+    # the elements come with.
+    # @args: frames - list[Frame], name - designation, site - MPC code,
+    #        lat/lon - site coordinates when known (topocentric Kepler)
+    # @return: {"motion", "source", "reason", "mag", "band", "mag_source"}
+    #          with motion a callable(jd) -> (ra_deg, dec_deg) or None, mag
+    #          the predicted magnitude at the sequence's middle instant (None
+    #          when nobody can say), mag_source "horizons" | "kepler:sbdb" |
+    #          None.
     from . import ephemeris
     from .sources import horizons
+    out = {"motion": None, "source": None, "reason": "", "mag": None,
+           "band": None, "mag_source": None}
     stamps = [f.t_mid_jd for f in frames if f.t_mid_jd is not None]
     if not stamps:
-        return None
+        out["reason"] = "no frame times"
+        return out
+    t_mid = sorted(stamps)[len(stamps) // 2]
     day = coords.datetime_from_jd(min(stamps)).date()
-    rows = horizons.ephemeris(name, center=site or "",
-                              start=str(day),
-                              stop=str(day + datetime.timedelta(days=1)),
-                              step="1 m")
-    return ephemeris.motion_interpolator(rows) if rows else None
+    start = str(day)
+    stop = str(day + datetime.timedelta(days=1))
+    # 1 · Horizons: the reference ephemeris, with retries and a clear reason
+    rows, reason = horizons.ephemeris_ex(name, center=site or "", start=start,
+                                         stop=stop, step="1 m")
+    if rows:
+        interp = ephemeris.motion_interpolator(rows)
+        if interp is not None:
+            out["motion"] = interp
+            out["source"] = "horizons"
+            # the magnitude, in a call of its own (see magnitude_rows): if it
+            # fails the position still stands and the band says "catalog"
+            mag_rows, band, _mreason = horizons.magnitude_rows(
+                name, center=site or "", start=start, stop=stop, step="30 m")
+            mag, _when = ephemeris.magnitude_at(mag_rows, t_mid)
+            if mag is not None:
+                out["mag"], out["band"] = float(mag), band
+                out["mag_source"] = "horizons"
+            return out
+    # 2 · SBDB elements, propagated locally: works offline and for objects
+    #     Horizons does not resolve. The frame is J2000, the plate's own.
+    try:
+        from .sources import sbdb
+        body = sbdb.get(name)
+    except Exception as err:
+        logger.warning("SBDB fallback failed for %s: %s", name, err)
+        body = None
+    if body and body.get("elements"):
+        motion = ephemeris.motion_from_elements(body["elements"], lat=lat,
+                                                lon=lon)
+        if motion is not None:
+            out["motion"] = motion
+            out["source"] = "kepler:sbdb"
+            phys = body.get("phys") or {}
+            mag, band = ephem_minor.hg_magnitude_j2000(
+                body["elements"], t_mid, phys.get("H"), phys.get("G"),
+                lat_deg=lat, lon_deg=lon)
+            if mag is not None:
+                out["mag"], out["band"] = float(mag), band
+                out["mag_source"] = "kepler:sbdb"
+            return out
+    # 3 · NEOfixer (Find_Orb): the only route for an unconfirmed object
+    try:
+        from .sources import neofixer
+        orb = neofixer.orbit(name)
+    except Exception as err:
+        logger.warning("NEOfixer fallback failed for %s: %s", name, err)
+        orb = None
+    if orb and orb.get("elements"):
+        motion = ephemeris.motion_from_elements(orb["elements"], lat=lat,
+                                                lon=lon)
+        if motion is not None:
+            out["motion"] = motion
+            out["source"] = "kepler:neofixer"
+            phys = orb.get("phys") or {}
+            if phys.get("H") is not None:
+                mag, band = ephem_minor.hg_magnitude_j2000(
+                    orb["elements"], t_mid, phys.get("H"), phys.get("G"),
+                    lat_deg=lat, lon_deg=lon)
+                if mag is not None:
+                    out["mag"], out["band"] = float(mag), band
+                    out["mag_source"] = "kepler:neofixer"
+            return out
+    out["reason"] = reason or "no source resolved the object"
+    return out
+
+
+def sequence_motion_solution(frames, name, site="", lat=None, lon=None):
+    # @args: frames - list[Frame], name - designation, site - MPC code,
+    #        lat/lon - site coordinates when known (topocentric Kepler)
+    # @return: (motion, source, reason) as before; the position alone, for the
+    #          callers that only want it. The predicted magnitude and the rest
+    #          are in sequence_ephemeris, which does the work.
+    out = sequence_ephemeris(frames, name, site=site, lat=lat, lon=lon)
+    return out["motion"], out["source"], out["reason"]
+
+
 
 
 # ======================================================================
@@ -1192,6 +1318,15 @@ class SweepResult:
     best: dict | None = None
     grid: list = field(default_factory=list)
     method: str = "median"
+    # Was the winner better than the ephemeris' own prediction by more than
+    # the grid's scatter? When it was not, `best` IS the seed (the ephemeris'
+    # rate and PA, measured on the same pixels) and the caller must keep the
+    # ephemeris' motion and say so: a noise maximum published as a measurement
+    # is what made the app report PA 33 where the ephemeris said 41.8.
+    significant: bool = True
+    seed_score: float | None = None
+    scatter: float | None = None
+    refined: bool = False
 
 
 def _score(stack, q_box, cfg=None):
@@ -1320,19 +1455,81 @@ def sweep(frames, q, base_rate, base_pa, box, shape, pct=5.0, steps=5,
     deltas = _sweep_deltas(base, base_rate, base_pa, cands, scale)
     preloaded = _sweep_regions(base, deltas, box, shape, loader)
     grid = []
-    best = None
-    total = len(cands)
+    _sweep_pass(base, deltas, cands, q, box, shape, method, cfg, loader,
+                sigma, iterations, grid, preloaded, progress, cancel,
+                done=0, total=len(cands))
+    best = max(grid, key=lambda item: item["score"]) if grid else None
+    if best is None:
+        return SweepResult(best=None, grid=grid, method=method)
+    # THE SEED IS IN THE GRID: factor 1.0 and no PA offset is the ephemeris'
+    # own prediction, so "did the sweep improve on it?" is answered against a
+    # candidate that was measured on the same pixels.
+    seed = min(grid, key=lambda item: abs(item["rate"] - base_rate)
+               + abs(item["pa"] - base_pa) * scale * 0.01)
+    seed_score = float(seed["score"])
+    scatter = _grid_scatter([float(item["score"]) for item in grid])
+    # The sweep's answer is only USED when it beats the ephemeris by more
+    # than the grid's own scatter (3 sigma): on a faint object the score is
+    # noise, and publishing a noise maximum as the measured motion is how the
+    # app reported PA 33 where the ephemeris said 41.8 (measured on the
+    # author's own 2025 HL5 visit: 46.2 against 37 on 2025 FG18, exactly one
+    # coarse step of -9 degrees).
+    significant = bool(best["score"] > seed_score + 3.0 * scatter)
+    if not significant:
+        return SweepResult(best=seed, grid=grid, method=method,
+                           significant=False, seed_score=seed_score,
+                           scatter=scatter)
+    # A SECOND, FINER PASS around the winner: the coarse grid's PA step is
+    # 4.5 degrees (a +/-9 degree span in 5 steps), which is a lot for a figure
+    # that goes into a report. Half a step with 3 steps per axis takes the
+    # resolution to ~0.9 degrees for 9 more candidates.
+    span = (pct / 100.0) / max(1, steps - 1) / 2.0
+    fine_factors = np.linspace(best["rate"] * (1.0 - span),
+                               best["rate"] * (1.0 + span), 3)
+    fine_pas = np.linspace(best["pa"] - span * 180.0,
+                           best["pa"] + span * 180.0, 3)
+    fine = [(float(r), float(p)) for r in fine_factors for p in fine_pas]
+    fine_deltas = _sweep_deltas(base, base_rate, base_pa, fine, scale)
+    # The refinement reuses the pixels the coarse pass already read: its
+    # candidates sit inside the coarse grid's own union (they are half a step
+    # around a candidate that was in it), so the disk is not touched again.
+    _sweep_pass(base, fine_deltas, fine, q, box, shape, method, cfg, loader,
+                sigma, iterations, grid, preloaded, progress, cancel,
+                done=len(grid), total=len(grid) + len(fine))
+    best = max(grid, key=lambda item: item["score"])
+    return SweepResult(best=best, grid=grid, method=method,
+                       significant=True, seed_score=seed_score,
+                       scatter=scatter, refined=True)
+
+
+def _grid_scatter(scores):
+    # @args: scores - the grid's scores
+    # @return: a robust scatter (the scaled MAD), 0 when there are too few.
+    # The MAD and not the standard deviation: the winner itself is an
+    # outlier by construction and would inflate a sigma.
+    if len(scores) < 4:
+        return 0.0
+    arr = np.asarray(scores, dtype=np.float64)
+    med = float(np.median(arr))
+    return float(outliers.scaled_mad(arr - med))
+
+
+def _sweep_pass(base, deltas, cands, q, box, shape, method, cfg, loader,
+                sigma, iterations, grid, preloaded, progress, cancel,
+                done=0, total=0):
+    # @args: everything the scoring needs, grid - the list to APPEND to,
+    #        done/total - where this pass starts and ends, for the progress
+    # @return: None. One pass over one set of candidates: the same code for
+    #          the coarse grid and for the refinement, so the two cannot
+    #          score differently.
     for index, (rate, pa) in enumerate(cands):
         if solve.is_cancelled(cancel):
             break
         _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
                  loader, sigma, iterations, grid, preloaded)
         if progress is not None:
-            progress(index + 1, total, f"rate {rate:.2f} PA {pa:.1f}")
-    for item in grid:
-        if best is None or item["score"] > best["score"]:
-            best = item
-    return SweepResult(best=best, grid=grid, method=method)
+            progress(done + index + 1, total,
+                     f"rate {rate:.2f} PA {pa:.1f}")
 
 
 def _sweep_base(frames, q, shape):

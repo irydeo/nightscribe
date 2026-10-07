@@ -142,18 +142,21 @@ def test_save_hook_fires_and_clears(dlg):
     assert seen == ["fits"]
 
 
-def test_routing_blink_tools_menu(window, monkeypatch):
-    calls = []
-    monkeypatch.setattr(window, "_ufe_open",
-                        lambda tab, hook_pid=None: calls.append(
-                            ("ufe", tab)))
-    monkeypatch.setattr(window, "_open_blink_dialog",
-                        lambda *a, **k: calls.append(("legacy",)))
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
-    window._tools_blink()
-    monkeypatch.setattr(window, "_use_ufe", lambda: False)
-    window._tools_blink()
-    assert calls == [("ufe", "blink"), ("legacy",)]
+def test_blink_has_no_ad_hoc_entry_in_the_tools_menu(window, monkeypatch):
+    # Asked for 2026-10-06: "quita Blink (ad hoc) del menú Herramientas". With
+    # the unified editor on (the default) that entry opened the editor's own
+    # Blink window, which is already its own button in the workbench, so it
+    # was redundant. The menu entry, its action and its handler are gone; the
+    # classic dialog stays in the code without a door (the observer's own
+    # choice) and nothing in the interface reaches it.
+    assert not hasattr(window._menus, "action_blink")
+    assert not hasattr(window, "_tools_blink")
+    assert hasattr(window, "_open_blink_dialog")     # kept, unreachable
+    # and the workbench's Blink tool is still the door
+    dlg = window._ufe_build()
+    assert dlg._tools["blink"].panel is dlg.tab_blink
+    dlg.show_tab("blink")
+    assert dlg._tools["blink"].isVisible()
 
 
 def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
@@ -559,13 +562,15 @@ def test_files_window_opens_ufe_for_a_project_plate(window):
         # (tests/unit/test_tonight_table.py does the same).
         fd.tbl.itemDoubleClicked.emit(fd.tbl.item(0, 0))
 
-        # The editor opened on the plate, Annotate tab, object attached.
-        # Interfaz 1.0: "opened" means the shell is on the workbench view.
+        # The editor opened on the plate, with the Annotate window up (it is
+        # a tool window of its own since ADR-044 rev, not a tab). Interfaz
+        # 1.0: "opened" means the shell is on the workbench view.
         from nightscribe.gui.main_window import VIEW_UFE
         uf = window._ufe
         assert uf is not None
         assert window._shell_stack().currentIndex() == VIEW_UFE
-        assert uf.tabs.currentWidget() is uf.tab_annotate
+        assert uf._tools["annotate"].isVisible()
+        assert uf._active_tool == "annotate"
         assert uf.state.has_image
         assert uf.state.path == str(MONO)
         assert uf.object() == {"name": "SN 2110ff", "ra": 275.0,

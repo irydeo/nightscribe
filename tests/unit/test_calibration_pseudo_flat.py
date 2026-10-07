@@ -101,10 +101,15 @@ def test_the_pseudo_flat_recovers_the_pattern(tmp_path):
     assert info["residual_pct"] is not None
 
 
-def test_a_static_sequence_is_flagged(tmp_path):
+def test_a_static_sequence_gets_the_vignetting_model(tmp_path):
     # Without dithering the stars do not move, so the percentile keeps them
-    # and the flat carries their bumps: the residual is measured ON THE FLAT
-    # and the note says it, instead of leaving a wrong flat on the frames.
+    # and the flat carries their bumps: a flat that carries the stars is
+    # worse than no flat, because every star is divided by itself (measured
+    # on the author's own 2025 FG18 visit: a comparison star sitting on a
+    # bright star came out 1.08 mag off, and the whole zero point was scrap).
+    # What IS still usable from those frames is the VIGNETTING, which is
+    # smooth and fixed: a low-order surface fitted to the percentile where
+    # there are no stars, said for what it is.
     os.makedirs(tmp_path / "still", exist_ok=True)
     os.makedirs(tmp_path / "moving", exist_ok=True)
     still, _ = _frames(tmp_path / "still", dither_px=0.0, seed=5)
@@ -113,8 +118,22 @@ def test_a_static_sequence_is_flagged(tmp_path):
     flat_moving, info_moving = cal.pseudo_flat(moving, window=21)
     assert flat_still is not None and flat_moving is not None
     assert info_still["residual_pct"] > info_moving["residual_pct"]
-    assert info_still["note"]                     # it says so
+    # the dithered set gives the full flat; the static one the smooth model
+    assert info_moving["kind"] == "pseudo_flat"
     assert info_moving["note"] == ""
+    assert info_still["kind"] == "vignette_model"
+    assert info_still["note"]                     # it says what it is
+    assert info_still["mask_pct"] > 0.0           # the stars were found
+    # the model recovers the VIGNETTING (the smooth part), not the dust: the
+    # fitted surface follows the radial falloff
+    inner = slice(20, SIZE - 20)
+    got = flat_still[inner, inner] / float(np.median(flat_still[inner, inner]))
+    yy, xx = np.mgrid[0:SIZE, 0:SIZE]
+    r2 = (((xx - SIZE / 2.0) ** 2 + (yy - SIZE / 2.0) ** 2)
+          / ((SIZE / 2.0) ** 2))
+    radial = 1.0 - 0.35 * r2
+    want = radial[inner, inner] / float(np.median(radial[inner, inner]))
+    assert float(np.median(np.abs(got / want - 1.0))) < 0.03
 
 
 def test_the_library_flat_always_wins(tmp_path):

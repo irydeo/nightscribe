@@ -726,6 +726,18 @@ class Database:
             )
             self._conn.commit()
 
+    def cache_delete(self, key):
+        # Drops a cache entry. The caller that finds a response USELESS (an
+        # empty ephemeris, a body that does not parse) removes it here, so a
+        # transient bad answer does not sit in the cache for its whole TTL
+        # and keep answering the same nothing: that is exactly how a 200 with
+        # no rows poisoned the ephemeris for twelve hours.
+        # @args: key - cache key
+        # @return: None
+        with self._lock:
+            self._conn.execute("DELETE FROM http_cache WHERE key=?", (key,))
+            self._conn.commit()
+
     def http_get(self, key, source, fetch_fn, force=False):
         # Cache-aside helper: returns cached bytes or calls fetch_fn(),
         # stores the result and returns it.

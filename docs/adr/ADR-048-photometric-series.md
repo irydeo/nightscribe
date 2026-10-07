@@ -802,3 +802,13 @@ a frame registered in two visits files its point in its own and not in
 whichever came last. Measured on his database: project 113's curve goes from
 282 to **244** points (one night, 244 frames) and project 96's from 284 to
 142.
+
+**Nota (2026-10-06)**: la serie mide cada fotograma con los techos de la cámara
+(ADR-066), y también su **ajuste de apertura (T3)**: la estrella de control se
+mide con los mismos dos límites, así que una recortada no puede afinar la
+apertura que usará la noche entera.
+
+**Note (2026-10-06)**: the series measures every frame with the camera's
+ceilings (ADR-066), and so does its **aperture tuning (T3)**: the check star is
+measured with the same two limits, so a clipped one cannot tune the aperture the
+whole night will use.

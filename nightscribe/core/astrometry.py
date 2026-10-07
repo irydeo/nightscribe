@@ -407,6 +407,13 @@ def measure_groups(stacks, qs, wcs, frames=None, groups=None, cfg=None,
     #        each, wcs - the reference WCS, frames/groups - for the per-frame
     #        path, cfg - Config, mjd_by_group - the T_mid per group
     # @return: list of (stack_point, frames_point, flags)
+    # The loader belongs to the PER-FRAME path only (it reads pixels);
+    # measure_stack measures the already-combined image and never reads, so
+    # it must not receive it. It is pulled out of the shared kwargs here
+    # instead of being tolerated by measure_stack, because a parameter that
+    # is silently ignored is how this broke: the worker passed loader and
+    # the blind `**kwargs` handed it to a function that cannot take it.
+    loader = kwargs.pop("loader", None)
     out = []
     for index, (stack, q) in enumerate(zip(stacks, qs)):
         mjd = mjd_by_group[index] if mjd_by_group else None
@@ -414,7 +421,8 @@ def measure_groups(stacks, qs, wcs, frames=None, groups=None, cfg=None,
         fp = None
         if frames is not None and groups is not None:
             fp = measure_frames(frames, groups[index], lambda f: f.wcs,
-                                mjd=mjd, group_index=index, **kwargs)
+                                mjd=mjd, group_index=index, loader=loader,
+                                **kwargs)
             sp.flags.extend(compare(sp, fp, cfg))
         out.append((sp, fp, sp.flags))
     return out

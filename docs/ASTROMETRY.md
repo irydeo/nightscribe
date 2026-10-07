@@ -31,8 +31,13 @@ thermal pattern and the optical train's dust. NightScribe uses a **master
 library** (bias, dark, flat) that you build elsewhere; the app only points
 at it.
 
-- In **Settings** you index each master. It is keyed by camera, gain,
-  temperature, exposure and filter, which is what makes a master valid.
+- You index each master from the **Calibration tab** of the editor (or from
+  Settings → Calibration). It is keyed by camera, gain, temperature, exposure
+  and filter, which is what makes a master valid. A **flat does not have to
+  share the lights' gain**: it is normalised before it is applied, so the gain
+  only scales its whole level, never its shape (measured: the author's own
+  flats were taken at gain 3 and the lights at gain 5, and requiring the same
+  gain used to lose the flat).
 - For the light a **dark at its own exposure** is preferred (it already
   includes the bias; subtracting a bias as well would subtract it twice).
   Without a dark the bias is subtracted and the app warns that the thermal
@@ -48,25 +53,33 @@ silently or invents a calibration.
 Everything starts in a **visit** (one night of a NEO, comet or PCCP
 project). No visit, no series: that is the house rule.
 
-1. **Open the Astrometry tab** from the visit. At the top you see the object,
-   its frames and the visit's window; the apparent rate and the position
-   angle come from Horizons when the run starts and land in the run's notes.
+1. **Open the Astrometry tab** from the visit and press the big button:
+   **Stack the sequence**. On entering you see three things and nothing else:
+   the object with its frames and its window, the button (painted in the
+   **object kind's colour**, with its glyph) and a line saying **what it will
+   do** with the current values ("8 frames · 1 observation · brightness with
+   G 5.0/9.0/14.0 · calibration: dark + flat · check against other
+   observers"). Everything else lives in **cards** with a title (a bordered
+   group, so an expanded one shows where it ends): the **decisions** ("How many
+   observations" and "Stacking settings") are always there and start closed,
+   and the **result** appears with the run, open, in cards of its own ("What
+   the run found", "The observations", "Measurement per observation", "Manual
+   mark", "Check against other observers" and "Report"). The occasional actions
+   (the blink figure, undoing the run) are behind the **⋯** menu in the header.
+   Nothing has disappeared: it is one click away, and the default is what most
+   nights want. Outside the cards there are only the object, the button, its
+   subtitle and the progress bar with its status line.
 
-   The tab is ordered by what you do every night: the object, the
-   **observations** with their expected SNR on one line, the **Stack**
-   button, the **result** (the strip, the viewer and the measurement table)
-   and the **report**. What you touch once in a while lives **folded** in
-   blocks with a title ("Stacking settings", "Expected SNR per observation",
-   "Check against other observers", "Report text"), and the occasional
-   actions (the blink figure, undoing the run) behind the **⋯** menu in the
-   header.
-   Before stacking, the **Calibrate the frames** checkbox applies the
-   Calibration tab's recipe (dark/bias and flat) to each frame **as it is
-   read**, with no copies on disk. For a faint object it matters for the
-   magnitude: without a flat the object and the comparisons fall in different
-   parts of the vignetting, and that is **0.087 mag** measured on a real
-   visit. If you have no flat, the app builds one from the frames themselves
-   (it needs dither and tells you).
+   The apparent rate and the position angle come from Horizons when the run
+   starts and land in the run's notes. The calibration (the Calibration tab's
+   recipe: dark/bias and flat) is applied to each frame **as it is read**, with
+   no copies on disk, and it **comes on by itself when the library has a master
+   that matches** this camera and filter: for a faint object it matters for the
+   magnitude, because without a flat the object and the comparisons fall in
+   different parts of the vignetting and that is **0.087 mag** measured on a
+   real visit. The moment you touch it, your choice rules. If you have no flat,
+   the app builds one from the frames themselves (it needs dither and tells
+   you).
 2. **Choose how many observations you want.** The MPC prefers several
    measurements spread in time over a single one. You give a number and the
    software splits the sequence into contiguous equal groups. The table
@@ -96,10 +109,33 @@ project). No visit, no series: that is the house rule.
    that really do not fit (a cloud, a satellite trail) are left out **with
    their reason**, never silently. Measured on a 2025 UR visit: recovering
    the second run took the star stack's SNR from **1826 to 2702 (x1.48)**.
+   The stacking uses **every core it can**: the number of threads is computed
+   by itself, from the processor and the memory one task needs, so there is
+   nothing to configure. Measured on a 16-core machine with 60 frames of
+   1024²: the sweep fell from 6.3 s to **1.3 s** (x5.0), the final stack from
+   10.1 s to **2.7 s** (x3.7) and the combination from 957 ms to **298 ms**
+   (x3.2). If you want to cap the threads (because the machine is busy with
+   something else), the **`astrometry_threads`** setting allows it: 0 is
+   automatic.
+   Besides each observation's stack, the app saves the **whole sequence's**
+   stack into the project (`<object>_base.fits`): every frame combined with
+   the object frozen, the deepest image of the visit. It is the one the manual
+   mode marks on, and you can open it in the Photometry tab to look at the
+   field. It carries its own header (the cutout's WCS, date, exposure, filter,
+   the motion and the magnitude with their source, and the detection made on
+   it), so reopening it the band says the same as on the night of the run.
 4. **Velocity sweep.** The ephemeris and the mount have real small drifts,
    so 25 combinations (±5 %) around the theoretical velocity are tried and
    the one that gives a brighter **and** rounder object is kept. That is the
-   fine tuning.
+   fine tuning, with two guards (ADR-062 rev): the ephemeris' own prediction
+   is **one of the candidates**, measured on the same pixels, and the sweep's
+   winner is only used when it beats it by more than three times the grid's
+   own scatter. When it does, a second finer pass (3×3, no extra disk reads)
+   takes the PA resolution from the grid's 4.5° to about 0.9°. Measured
+   before this: the app published PA 33 where the ephemeris says 41.8
+   (2025 HL5) and 37 where it says 46.2 (2025 FG18), exactly one grid step.
+   When the sweep does not improve on the ephemeris, the reported rate and PA
+   are the ephemeris' prediction and the note says so.
 5. **Centred sequence.** A GIF or a montage of the N observations, all
    centred on the object: if it is there in every panel the detection is
    solid; if one panel is empty, you see it. The tab also carries a **strip
@@ -156,15 +192,49 @@ project). No visit, no series: that is the house rule.
     the row stays marked as undone). A run with **no detection** is listed
     too: "we looked and there was nothing" is data, and the next night
     needs to know it.
+    Reopening the visit shows the run again, without stacking anything: the
+    notes, the table, the group viewer, the strip, the blink and the
+    **report** come back from what was saved (the run's own summary in the
+    database, its points and the stack files it wrote, one per observation
+    plus the whole sequence's stack, inside the project). The status line says
+    so, and **Stack** is still there if you want to redo it. A saved run that
+    found nothing comes back with its notes (how deep the night reached), not
+    with an empty column.
+11. **The manual mode, whenever you want.** The **"Manual mode (faint
+    object)"** box appears with **any run** (not only a "not detected" one): it
+    is useful for an object below the gate and also to place by eye the
+    centroid of one that WAS detected. It opens a small window where you mark the object on the
+    **whole sequence's stack**: the click snaps to the **gaussian centroid**
+    of the nearest source, a short **cross** shows where the mark is (with its
+    own switch), and the arrows nudge it in **0.1 px** steps. **Measure at the
+    mark** runs the pipeline again from your mark, carrying its offset (the
+    prediction's error, constant over the visit) to every observation, with
+    the gate bypassed and the velocity sweep skipped. The note says the
+    position came from a **human mark** and the table flags the point as
+    measured from your mark: the mark is your signature and it travels with
+    the figure. The red cross of the measured position stays on the plate: it
+    is anchored to the sky, so it survives loading another image of the series
+    and switching to the Photometry tab.
 
 ## 4. What each figure means
 
 - **SNR**: how many times the object's signal beats the background noise.
   Below 3.5σ the app does **not** run the sweep: sweeping over noise and
-  keeping the best is how a false positive is made.
+  keeping the best is how a false positive is made. It still **measures the
+  brightness** (ADR-062 rev), at the ephemeris' own position, and marks it
+  **red** with a note: a marked number is worth more than no number. The
+  table's magnitude is green when the measurement is clean, orange when it is
+  usable but not clean (a large error, only three comps, no check star) and
+  red when it is not to be published without looking at it.
 - **Submission SNR**: a different threshold. The MPC recommends **20 or
   more** to submit and forbids marginal detections, so a group below the bar
-  does not go into the report and the reason is explained.
+  does not go into the report and the reason is explained. The app ships **10**
+  (the author's own Tycho submissions ran at about 16 and were accepted) and
+  you change it in **Settings → Astrometry**, together with the detection gate,
+  the velocity sweep, the cutout margin, the check and the threads. When **no**
+  observation clears it, the report's own group says so, with the floor's
+  number and where it is set, and the button that sends the report stays
+  disabled: a report with no observations is not a report.
 - **Residual**: how far your measurement is from what the orbit predicts,
   in arcseconds.
 - **Scatter of the others**: how far they are. It is the fair scale: with a
@@ -183,6 +253,16 @@ project). No visit, no series: that is the house rule.
 - **Distinct observatories and last observation** (on the object card):
   many and recent means a live, well-determined object; one and months ago,
   a candidate to be lost.
+- **The plate's band** (the strip at the top, over the image) says where each
+  figure comes from, and that is why **every number carries its word**: the
+  velocity and the PA go with **`(measured)`** when the velocity sweep
+  measured them and with **`(eph)`** when they are the ephemeris' prediction;
+  the magnitude goes with `(measured)` if it was measured on that plate, with
+  `(eph)` if it is what the ephemeris predicts (it always appears, even when
+  the run did not measure the brightness) and with `(cat)` if it is the
+  catalogue's or the project's. Over the whole-sequence stack the band adds
+  the **detection made on it**: `SNR 1.4 (gate 3.5σ)` and `limit 19.4` (the
+  limit magnitude).
 
 ## 5. When to trust it and when not to
 

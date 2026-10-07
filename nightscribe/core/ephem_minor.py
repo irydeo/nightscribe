@@ -473,3 +473,130 @@ def kepler_ra_dec(elements, jd, lat_deg=None, lon_deg=None, height_m=0.0):
     delta = math.sqrt(xg * xg + yg * yg + zg * zg)
     ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
     return ra, dec, r, delta
+
+
+# J2000 obliquity (IAU 1976), the frame the orbital elements and the plate
+# WCS share.
+_J2000_OBLIQUITY_DEG = 23.43929111
+
+
+def earth_ecliptic_xyz_j2000(jd):
+    # Heliocentric ecliptic position of Earth in the J2000 frame.
+    # earth_ecliptic_xyz gives it in the frame OF DATE (Schlyter's Sun is
+    # of-date), while the orbital elements are J2000. Mixing the two put
+    # ~0.4 deg of precession into every local propagation: invisible on a
+    # chart, fatal for a stack cutout, where 0.4 deg is 1440 arcsec and the
+    # cutout's margin is 64 px. The of-date vector is rotated back by the
+    # general precession in longitude (IAU 1976), good to arcsec for decades.
+    # @args: jd - Julian date
+    # @return: (x, y, z) heliocentric ecliptic J2000 position of Earth in AU
+    x, y, z = earth_ecliptic_xyz(jd)
+    t = (jd - 2451545.0) / 36525.0
+    p = math.radians((5029.0966 * t + 1.11113 * t * t) / 3600.0)
+    c, s = math.cos(p), math.sin(p)
+    return x * c + y * s, -x * s + y * c, z
+
+
+def _ecliptic_to_ra_dec_j2000(x, y, z):
+    # Ecliptic J2000 -> equatorial J2000 (fixed obliquity), degrees.
+    ecl = math.radians(_J2000_OBLIQUITY_DEG)
+    xe = x
+    ye = y * math.cos(ecl) - z * math.sin(ecl)
+    ze = y * math.sin(ecl) + z * math.cos(ecl)
+    ra = _rev(math.degrees(math.atan2(ye, xe)))
+    dec = math.degrees(math.atan2(ze, math.sqrt(xe * xe + ye * ye)))
+    return ra, dec
+
+
+def kepler_ra_dec_j2000(elements, jd, lat_deg=None, lon_deg=None,
+                        height_m=0.0, light_time=True):
+    # Geocentric (or topocentric) RA/Dec of a minor body from its elements,
+    # in the J2000 frame the plate's WCS uses, with the light-time the
+    # ephemeris the app reports carries. This is the frame-honest twin of
+    # kepler_ra_dec (which is of-date and stays for the charts).
+    # @args: elements - dict like kepler_ra_dec (a/e/i/om/w + ma+epoch or tp),
+    #        jd - Julian date of interest, lat_deg/lon_deg/height_m - observer
+    #        site (topocentric when given), light_time - iterate t - delta/c
+    # @return: (ra_deg, dec_deg, r_au, delta_au) or None if invalid
+    def one(t):
+        e = elements.get("e")
+        if e is None:
+            return None
+        if e >= 1.0:
+            q = elements.get("q")
+            tp = elements.get("tp")
+            if q is None or tp is None or q <= 0:
+                return None
+            nu = _barker_true_anomaly(q, t - tp)
+            xo, yo, zo, r = _open_orbit_ecliptic(
+                elements.get("om", 0.0), elements.get("i", 0.0),
+                elements.get("w", 0.0), q, e, nu)
+        else:
+            a = elements.get("a")
+            if a is None or a <= 0:
+                return None
+            m = _mean_anomaly(elements, t)
+            if m is None:
+                return None
+            xo, yo, zo, r = _elements_to_ecliptic(
+                elements.get("om", 0.0), elements.get("i", 0.0),
+                elements.get("w", 0.0), a, e, m)
+        xe, ye, ze = earth_ecliptic_xyz_j2000(t)
+        xg, yg, zg = xo - xe, yo - ye, zo - ze
+        if lat_deg is not None:
+            ox, oy, oz = observer_offset_ecliptic(lat_deg, lon_deg, height_m,
+                                                  t)
+            xg, yg, zg = xg - ox, yg - oy, zg - oz
+        delta = math.sqrt(xg * xg + yg * yg + zg * zg)
+        ra, dec = _ecliptic_to_ra_dec_j2000(xg, yg, zg)
+        return ra, dec, r, delta
+
+    out = one(jd)
+    if out is None:
+        return None
+    if light_time:
+        # what we SEE left the object when it was at t - delta/c: 1 AU is
+        # 499.004784 light-seconds, so delta AU is delta*499/86400 days
+        for _ in range(2):
+            out = one(jd - out[3] * 499.004784 / 86400.0) or out
+    return out
+
+
+def hg_magnitude_j2000(elements, jd, h, g=None, lat_deg=None, lon_deg=None,
+                       height_m=0.0):
+    # The predicted apparent magnitude of an asteroid from its elements, with
+    # the IAU H-G system (Bowell et al. 1989): the same geometry the RA/Dec
+    # comes from (r, delta and the phase angle), so a run that fell back to a
+    # LOCAL orbit can still say how bright the object should be. Horizons
+    # remains the reference when it answers; this is the honest second.
+    # @args: elements - as kepler_ra_dec_j2000, jd - Julian date, h - absolute
+    #        magnitude, g - slope parameter (0.15 when not published),
+    #        lat/lon/height_m - the observer's site (topocentric)
+    # @return: (mag, "V") or (None, None) when the geometry is degenerate
+    try:
+        h = float(h)
+    except (TypeError, ValueError):
+        return None, None
+    g = 0.15 if g is None else float(g)
+    out = kepler_ra_dec_j2000(elements, jd, lat_deg, lon_deg, height_m)
+    if out is None:
+        return None, None
+    _ra, _dec, r, delta = out
+    sun = earth_ecliptic_xyz_j2000(jd)
+    sun_earth = math.sqrt(sun[0] ** 2 + sun[1] ** 2 + sun[2] ** 2)
+    if r <= 0 or delta <= 0 or sun_earth <= 0:
+        return None, None
+    # the phase angle, from the triangle Sun-object-Earth
+    cos_a = (r * r + delta * delta - sun_earth * sun_earth) / (2.0 * r * delta)
+    cos_a = max(-1.0, min(1.0, cos_a))
+    alpha = math.acos(cos_a)
+    if alpha < 1e-6:
+        phase = 1.0
+    else:
+        tan_half = math.tan(alpha / 2.0)
+        phi1 = math.exp(-3.33 * tan_half ** 0.63)
+        phi2 = math.exp(-1.87 * tan_half ** 1.22)
+        phase = (1.0 - g) * phi1 + g * phi2
+    if phase <= 0:
+        return None, None
+    return h + 5.0 * math.log10(r * delta) - 2.5 * math.log10(phase), "V"

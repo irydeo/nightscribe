@@ -41,6 +41,7 @@ from .ufe_state import UfeImageState
 from .ui_loader import adopt_ui, drop_in, load_ui
 from .widgets.collapsible_section import CollapsibleSection
 from .widgets.histogram_widget import HistogramWidget
+from .widgets.frame_previews import FramePreviews
 from .widgets.ufe_image_view import UfeImageView
 from .widgets.ufe_project_badge import UfeProjectBadge
 
@@ -60,9 +61,16 @@ _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
 _SOLVE_SHOW_MS = 250
 
 _SERIES_W = 300
-_TABS_W = 380
+# The panel column. It was 380 (362 usable) and the Astrometry panel's own
+# content needed 396: a horizontal scrollbar appeared and the labels that
+# stuck out were cut (reported 2026-10-06: "los mensajes de la derecha se
+# cortan"). The panel's minimum came down to 331 (the two knobs that forced
+# it were split and shortened) AND the column opens wider, so there is air
+# for the messages and the hero button. The splitter still drags, and the
+# plate keeps the rest.
+_TABS_W = 420
 _SERIES_MAX_W = 420
-_TABS_MAX_W = 520
+_TABS_MAX_W = 560
 
 # ADR-044 rev (2026-09-24): the top-bar button table for the bar style
 # (icons-only vs icon + text). `base` is the asset stem in assets/;
@@ -78,6 +86,14 @@ _BAR_BUTTONS = {
     "btn_boxes": {"base": "ufe_boxes", "icon_only": True, "toggle": True},
     "btn_mark": {"base": "ufe_mark", "icon_only": True, "toggle": True},
     "btn_solve": {"base": "ufe_solve", "icon_only": False},
+    # ADR-044 rev: the four tools are their own buttons in the bar (asked
+    # for, 2026-10-06). They follow the bar's icon mode like the rest: in
+    # the default icon-only mode they are glyphs with their tooltip, and
+    # with the labels on ("icon + text" in Settings) they show their name.
+    "btn_tool_blink": {"base": "ufe_blink", "icon_only": True},
+    "btn_tool_calibrate": {"base": "ufe_calibrate", "icon_only": True},
+    "btn_tool_annotate": {"base": "ufe_annotate", "icon_only": True},
+    "btn_tool_series": {"base": "ufe_series", "icon_only": True},
 }
 _ZOOM_ICONS = {"Fit": "ufe_zoom_fit", "50": "ufe_zoom_50",
                "100": "ufe_zoom_100", "200": "ufe_zoom_200",
@@ -130,6 +146,18 @@ class UfeDialog(QWidget):
                                                # the host (the tab never
                                                # touches the database)
         self._astrometry_undo_hook = None      # "undo this run"
+        self._astrometry_result_hook = None    # what the visit already holds
+                                               # (ADR-065: reopen and SEE it)
+        self._add_masters_hook = None          # the library is filled from
+                                               # the Calibration tab (ADR-061)
+        # ADR-044 rev: the tools that used to be tabs (Blink, Calibration,
+        # Annotate and the photometric series) live in non-modal windows of
+        # their own, opened from the top bar. `_tools` is {key: window} and
+        # `_active_tool` is the one that owns the view while it is open (the
+        # blink frame override, the annotate pick cursor): ONE at a time, and
+        # the stage goes back to the panel in the column when it closes.
+        self._tools = {}
+        self._active_tool = None
         self._mpc_send_hook = None
         # the passes of the visit (one night, one curve, 2026-09-30): the
         # list and which of them the chart shows
@@ -208,8 +236,11 @@ class UfeDialog(QWidget):
         self._ui = adopt_ui(self, "ufe_dialog")
                                             # over: no wrapper margins
         self.splitter = self._ui.splitter
-        # ph_series (0) | centre (1) | tabs (2): the series panel sits at
-        # the left of the image; hidden unless a visit arms the series.
+        # visit pane (0) | centre (1) | panels (2): the visit's frame
+        # navigator and the EXOTIC block sit at the left of the image,
+        # hidden unless a visit arms them. (The photometric series used to
+        # be a third thing in there; it is a window of its own now, ADR-044
+        # rev.)
         #
         # The centre is a SWITCH (V2): the plate or the light curve, in the
         # same place and full size. The curve used to live in a small box
@@ -286,18 +317,14 @@ class UfeDialog(QWidget):
         self._bar_doors()
         self._apply_bar_style()          # the doors' panels included
         self._wire_status()
-        # the series block lives at the left of the image (its own pane,
-        # hidden unless a visit arms it): the visit strip (frame navigator
-        # + the EXOTIC reduction for transit projects) carries it in its
-        # ph_series placeholder (ADR-005)
+        # the visit strip (frame navigator + the EXOTIC reduction for transit
+        # projects) at the left of the image, hidden unless a visit arms it.
+        # The photometric series used to be dropped in here too; it is a tool
+        # window of its own now (ADR-044 rev), opened from the top bar.
         self.series_pane = QWidget(self)
         series_lay = QVBoxLayout(self.series_pane)
         series_lay.setContentsMargins(0, 0, 0, 0)
         self.visit_panel = load_ui("ufe_visit_panel", self)
-        grp = getattr(self.tab_measure, "grp_series", None)
-        if grp is not None:
-            drop_in(self.visit_panel.layout(), self.visit_panel.ph_series,
-                    grp)
         series_lay.addWidget(self.visit_panel)
         self.series_pane.setMinimumWidth(300)
         self.splitter.replaceWidget(0, self.series_pane)
@@ -366,13 +393,21 @@ class UfeDialog(QWidget):
     def _bar_doors(self):
         # U2: the bar keeps what a visit needs (open, export, solve, the two
         # zooms that are used all the time and the current factor) and puts
-        # the rest behind two doors. They are not deletions: the view
-        # switches (north, scale, annotations, boxes, mark) and the three
-        # occasional zoom factors are the SAME widgets, moved one by one
-        # into their panel (a layout removed from its parent is deleted by
-        # the binding). Their texts and tooltips keep living in the Designer
-        # file (ADR-005), and every name the code and the tests use is
-        # untouched.
+        # the rest behind three doors. They are not deletions: the view
+        # switches (north, scale, annotations, boxes, mark), the three
+        # occasional zoom factors and the four tool windows (Blink,
+        # Calibrate, Annotate, Series) are the SAME widgets, moved one by
+        # one into their panel (a layout removed from its parent is deleted
+        # by the binding). Their texts and tooltips keep living in the
+        # Designer file (ADR-005), and every name the code and the tests use
+        # is untouched.
+        #
+        # The tools are a door and not four buttons in the bar (measured
+        # 2026-10-06: four labels cost 331 px, the bar went to 1039 and the
+        # project badge - the one thing that says WHICH project you are
+        # working on - was squeezed to "…" from 1100 px down). Inside the
+        # door each one keeps its icon and its label, which is what was
+        # asked for; what is not spent is the row.
         # @return: None
         self.btn_view = self._ui.btn_view
         self.btn_zoom_more = self._ui.btn_zoom_more
@@ -381,6 +416,12 @@ class UfeDialog(QWidget):
                         "btn_mark"))
         self._bar_menu(self.btn_zoom_more,
                        ("btn_zoom_50", "btn_zoom_200", "btn_zoom_400"))
+        # The four tools are NOT behind a door (asked for): they are their
+        # own buttons in the bar, and they follow the bar's icon mode like
+        # every other one. Measured 2026-10-06: with the labels on (the
+        # "icon + text" mode) the bar asks for 899 px and the project badge
+        # starts eliding below ~1000; in the default icon-only mode it is
+        # 704 px and the badge keeps its full name down to 900 px.
 
     def _bar_menu(self, tool, names):
         # Puts a set of existing buttons inside a dropdown hanging from a
@@ -403,13 +444,18 @@ class UfeDialog(QWidget):
 
     def _wire_status(self):
         # Every tab reports to the window's single line (U4). The tabs keep
-        # their own label (hidden) as a record, so nothing that read it had
-        # to change.
+        # their own label as a record, so nothing that read it had to change.
+        # Astrometry and Calibration were MISSING here (2026-10-06): their
+        # messages only ever landed in their own panel, so a run that said
+        # "the report is blocked" said it in one place and the window's line
+        # stayed empty. They are wired like the rest now.
         # @return: None
         for tab in (getattr(self, "tab_measure", None),
                     getattr(self, "tab_compare", None),
                     getattr(self, "tab_annotate", None),
-                    getattr(self, "tab_blink", None)):
+                    getattr(self, "tab_blink", None),
+                    getattr(self, "tab_calibration", None),
+                    getattr(self, "tab_trackstack", None)):
             hook = getattr(tab, "set_status_hook", None)
             if callable(hook):
                 hook(self._on_status_hook)
@@ -450,6 +496,23 @@ class UfeDialog(QWidget):
         self.btn_load.clicked.connect(self._on_load)
         self.btn_export = self._ui.btn_export
         self.btn_export.clicked.connect(self._on_export_png)
+        # ADR-044 rev: the tools that left the tab column. Each button is a
+        # door to its window (a second press closes it, like the manual
+        # tweak window), and while one is open it owns the plate (see
+        # _on_tool_state).
+        self.btn_tool_blink = self._ui.btn_tool_blink
+        self.btn_tool_blink.clicked.connect(lambda: self.toggle_tool("blink"))
+        self.btn_tool_calibrate = self._ui.btn_tool_calibrate
+        self.btn_tool_calibrate.clicked.connect(
+            lambda: self.toggle_tool("calibrate"))
+        self.btn_tool_annotate = self._ui.btn_tool_annotate
+        self.btn_tool_annotate.clicked.connect(
+            lambda: self.toggle_tool("annotate"))
+        self.btn_tool_series = self._ui.btn_tool_series
+        self.btn_tool_series.clicked.connect(
+            lambda: self.toggle_tool("series"))
+        # the .ui owns the wording; the disarmed case needs its own reason
+        self._series_tool_tip = self.btn_tool_series.toolTip()
         self.btn_north = self._ui.btn_north
         self.btn_north.toggled.connect(
             lambda checked: self.view.set_hud(north=checked))
@@ -521,6 +584,12 @@ class UfeDialog(QWidget):
             "btn_boxes": self.btn_boxes.text(),
             "btn_mark": self.btn_mark.text(),
             "btn_solve": self.btn_solve.text(),
+            # the tools keep their text in both bar modes (like Solve): the
+            # glyph alone would be a riddle for "Calibrate" or "Series"
+            "btn_tool_blink": self.btn_tool_blink.text(),
+            "btn_tool_calibrate": self.btn_tool_calibrate.text(),
+            "btn_tool_annotate": self.btn_tool_annotate.text(),
+            "btn_tool_series": self.btn_tool_series.text(),
         }
         for label, btn in self.btn_zoom.items():
             self._bar_labels["zoom_" + label] = btn.text()
@@ -604,10 +673,16 @@ class UfeDialog(QWidget):
         # Measure share the Photometry tab (ADR-044 rev, 2026-09-24); the
         # tab_compare / tab_measure aliases keep the legacy deep links,
         # prefills and tests working.
+        #
+        # ADR-044 rev (2026-10-06): Blink, Calibration and Annotate left the
+        # column. They were tabs an observer visits for an errand, paying for
+        # it with a permanent 380 px column and a title each; now each is a
+        # button in the top bar and a non-modal window over the plate (asked
+        # for). The panels and their names are the same objects: the deep
+        # links, the tests and the host keep reaching them as before.
         from .ufe_blink_tab import UfeBlinkTab
         self.tab_blink = UfeBlinkTab(self.state, self._lang,
                                      view=self.view)
-        self.tabs.addTab(self.tab_blink, self.tr("Blink"))
         from .ufe_photometry_tab import UfePhotometryTab
         self.tab_photometry = UfePhotometryTab(
             self.state, self._lang, view=self.view)
@@ -617,21 +692,184 @@ class UfeDialog(QWidget):
         from .ufe_annotate_tab import UfeAnnotateTab
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)
-        self.tabs.addTab(self.tab_annotate, self.tr("Annotate"))
         # astrometry plan, phase 7 (D4/D15): calibration is a step of the
-        # app with its own tab, and track & stack turns the visit's
+        # app with its own panel, and track & stack turns the visit's
         # sequence into MPC observations. Both work from the visit the
         # host hooks (set_astrometry_hook); without one they stay disarmed.
         from .ufe_calibration_tab import UfeCalibrationTab
         self.tab_calibration = UfeCalibrationTab(self.state, self._lang)
-        self.tabs.addTab(self.tab_calibration, self.tr("Calibration"))
         from .ufe_trackstack_tab import UfeTrackStackTab
         self.tab_trackstack = UfeTrackStackTab(self.state, self._lang,
                                                view=self.view)
         self.tabs.addTab(self.tab_trackstack, self.tr("Astrometry"))
+        # the tools, in their windows (built up front: the series group has
+        # to LEAVE the Photometry column as soon as the workbench exists, or
+        # it would show in two places, and the other three are cheap: their
+        # panels are built either way).
+        #
+        # `stage` says whether the window owns the PLATE while it is open:
+        # Blink puts its own frame on the view and Annotate marks and takes
+        # the clicks, so they do; Calibration is a recipe panel and the
+        # series is a run panel, and neither has anything to do with what a
+        # click on the plate means (taking the stage from the Photometry
+        # panel would drop the sequence's rings while a series runs, which
+        # is exactly when the observer wants to see them).
+        self._tool_specs = {
+            "blink": {"panel": self.tab_blink, "title": self.tr("Blink"),
+                      "icon": "ufe_blink", "min_width": 460, "stage": True},
+            "calibrate": {"panel": self.tab_calibration,
+                          "title": self.tr("Calibration"),
+                          "icon": "ufe_calibrate", "min_width": 460,
+                          "stage": False},
+            "annotate": {"panel": self.tab_annotate,
+                         "title": self.tr("Annotate"),
+                         "icon": "ufe_annotate", "min_width": 460,
+                         "stage": True},
+        }
+        grp = getattr(self.tab_measure, "grp_series", None)
+        if grp is not None:
+            # out of the Photometry column first (the widget is the SAME
+            # object the Measure tab wires: same names, same signals)
+            lay = self.tab_measure.layout()
+            if lay is not None:
+                lay.removeWidget(grp)
+            grp.setParent(None)
+            # and the EXOTIC reduction goes WITH the series (asked for
+            # 2026-10-06): a transit reduction is the series of a transit
+            # visit, so it lives in the series window, under the series
+            # block, and the visit panel keeps the navigator and the
+            # previews. Both blocks are the same objects as before; only
+            # their home changed.
+            self.exotic = load_ui("ufe_exotic_block", self)
+            body = QWidget(self)
+            body_lay = QVBoxLayout(body)
+            body_lay.setContentsMargins(0, 0, 0, 0)
+            body_lay.setSpacing(8)
+            body_lay.addWidget(grp)
+            body_lay.addWidget(self.exotic)
+            self._tool_specs["series"] = {
+                "panel": body, "title": self.tr("Photometric series"),
+                "icon": "ufe_series", "min_width": 470, "stage": False}
+        for key in list(self._tool_specs):
+            self._tool_window(key)
+        # the series door starts closed: without a visit there is no series
+        # (D8), and the host arms the hook right after the construction
+        self._sync_series_tool()
         # only the current tab owns the view's clicks and overlays
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
         self._on_feature_tab_changed(self.tabs.currentIndex())
+
+    # --------------------------------------------------- the tool windows
+
+    # The button each tool hangs from, so a door that is closed (the series
+    # without a visit) cannot be opened by a deep link either.
+    _TOOL_BUTTONS = {"blink": "btn_tool_blink",
+                     "calibrate": "btn_tool_calibrate",
+                     "annotate": "btn_tool_annotate",
+                     "series": "btn_tool_series"}
+
+    def _tool_window(self, key):
+        # @args: key - "blink" | "calibrate" | "annotate" | "series"
+        # @return: the UfeToolDialog of that tool, built once and kept (its
+        #          panel holds the blink pair, the annotation in progress or
+        #          the series context: destroying it would lose the errand)
+        window = self._tools.get(key)
+        if window is not None:
+            return window
+        from .ufe_tool_dialog import UfeToolDialog
+        spec = getattr(self, "_tool_specs", {}).get(key)
+        if spec is None:
+            return None
+        window = UfeToolDialog(spec["title"], spec["panel"],
+                               icon=self._icon(spec["icon"]),
+                               min_width=spec["min_width"], parent=self)
+        window.openStateChanged.connect(
+            lambda open_, k=key: self._on_tool_state(k, open_))
+        self._tools[key] = window
+        return window
+
+    def _on_tool_state(self, key, opened):
+        # @args: key - the tool, opened - True when its window rose
+        # @return: None. ONE tool at a time: opening one closes the others,
+        #          so there is never a question of which window is in front.
+        #          The stage (what a click on the plate does) only goes to
+        #          the tools that NEED it (see _tool_specs); closing that one
+        #          hands it back to the panel in the column.
+        if opened:
+            for other in list(self._tools):
+                if other != key:
+                    self._tools[other].hide()
+            self._active_tool = key
+            if key == "series":
+                # the series header is a word-wrapped label that asks for its
+                # height at the width it really has (see
+                # UfeMeasureTab._fit_series_hint): in a window of its own
+                # that width is known only once the window is on screen
+                fit = getattr(self.tab_measure, "_fit_series_hint", None)
+                if callable(fit):
+                    QTimer.singleShot(0, fit)
+        elif self._active_tool == key:
+            self._active_tool = None
+        self._apply_stage()
+
+    def open_tool(self, key):
+        # @args: key - "blink" | "calibrate" | "annotate" | "series"
+        # @return: the window (or None when there is no such tool, or when
+        #          its door is closed: the series needs a visit (D8), and a
+        #          deep link must not put an empty panel over the plate)
+        button = getattr(self, self._TOOL_BUTTONS.get(key, ""), None)
+        if button is not None and not button.isEnabled():
+            return None
+        window = self._tool_window(key)
+        if window is None:
+            return None
+        window.open_panel()
+        return window
+
+    def toggle_tool(self, key):
+        # @args: key - the tool the bar button points at
+        # @return: None. The button is a door: a second press closes the
+        #          window it opened (the same behaviour as the manual tweak
+        #          window of the Photometry panel).
+        window = self._tools.get(key)
+        if window is not None and window.isVisible():
+            window.close_panel()
+        else:
+            self.open_tool(key)
+
+    def close_tools(self):
+        # @return: None. Called when the shell leaves the workbench: the
+        #          windows are children of this page and would otherwise hang
+        #          over the project the observer went back to. HIDDEN, never
+        #          destroyed: coming back finds them where they were.
+        for window in list(self._tools.values()):
+            window.close_panel()
+
+    def _apply_stage(self):
+        # @return: None. Who owns the plate right now: the open tool that
+        #          NEEDS it (Blink's frame, Annotate's clicks), or the panel
+        #          selected in the column. The others are told to let go
+        #          (their overlays and frame overrides), and the pick cursor
+        #          (crosshair + snapping reticle) follows the owner: the
+        #          panels and the tools declare `pick_clicks`.
+        owner = None
+        spec = getattr(self, "_tool_specs", {}).get(self._active_tool or "")
+        if spec is not None and spec.get("stage"):
+            window = self._tools.get(self._active_tool)
+            owner = getattr(window, "panel", None)
+        if owner is None:
+            owner = self.tabs.currentWidget()
+        for i in range(self.tabs.count()):
+            widget = self.tabs.widget(i)
+            setter = getattr(widget, "set_active", None)
+            if callable(setter):
+                setter(widget is owner)
+        for window in self._tools.values():
+            setter = getattr(window.panel, "set_active", None)
+            if callable(setter):
+                setter(window.panel is owner)
+        self.view.set_pick_cursor(
+            bool(getattr(owner, "pick_clicks", False)))
 
     def _on_feature_tab_changed(self, idx):
         # Hands the stage to the freshly selected tab (set_active) and
@@ -640,14 +878,18 @@ class UfeDialog(QWidget):
         # overlays survive a section switch but not a full leave).
         # The pick cursor (crosshair + snapping reticle) follows the
         # stage from here: tabs declare `pick_clicks = True`.
-        incoming = self.tabs.widget(idx)
-        for i in range(self.tabs.count()):
-            w = self.tabs.widget(i)
-            setter = getattr(w, "set_active", None)
-            if callable(setter):
-                setter(i == idx)
-        self.view.set_pick_cursor(
-            bool(getattr(incoming, "pick_clicks", False)))
+        # With a tool window open the tool keeps the stage: switching the
+        # panel in the column does not steal the plate from a blink.
+        self._apply_stage()
+
+    def leave_view(self):
+        # The shell is leaving the workbench for another view. The workbench
+        # itself STAYS ALIVE (ADR-047: its plate, its stretch and its workers
+        # are kept), but its tool windows are children of this page and would
+        # otherwise hang over the project the observer went back to. They are
+        # HIDDEN, never destroyed: coming back finds them where they were.
+        # @return: None
+        self.close_tools()
 
     def shutdown(self):
         # The blink timer must not fire into a hidden/closing workbench,
@@ -656,6 +898,7 @@ class UfeDialog(QWidget):
         # writing runs into the DB forever (this cancels both and waits).
         # Idempotent: the host calls it when leaving the UFE view, and
         # closeEvent calls it too when the window itself goes away.
+        self.close_tools()
         blink = getattr(self, "tab_blink", None)
         if blink is not None:
             blink.shutdown()
@@ -678,6 +921,8 @@ class UfeDialog(QWidget):
                     tab.shutdown()
                 except Exception as err:   # a failed cleanup never blocks
                     logger.warning("%s shutdown failed: %s", name, err)
+        # the frame previews' reader: same trap, same rule
+        self._stop_thumbs()
         # and the visit's batch: a QThread destroyed while it runs aborts
         # the whole application (the same trap the tabs document)
         worker = getattr(self, "_visit_worker", None)
@@ -718,27 +963,58 @@ class UfeDialog(QWidget):
         self._sync_frame_nav()
         return True
 
+    # The names a deep link may use for a tool whose key is not the name the
+    # panels call it by: the Astrometry panel's button says "calibration" and
+    # the tool is keyed "calibrate" (measured 2026-10-06: the mismatch sent
+    # the name to setCurrentWidget and raised a TypeError on every press).
+    _TOOL_ALIASES = {"calibration": "calibrate"}
+
     def show_tab(self, tab):
-        # Brings one feature tab to the front (Blink / Photometry /
-        # Annotate) so the host can deep-link a workflow into the
-        # editor. The Photometry sections still accept the legacy names:
-        # tab_compare / tab_measure by widget or "compare" / "measure"
-        # by name; there are no modes anymore, they all land on the same
-        # Photometry tab (ADR-044 rev 2026-09-25).
+        # Brings one feature panel to the front (Photometry / Astrometry) or
+        # opens the tool window of the ones that left the column (Blink /
+        # Calibration / Annotate / Series), so the host can deep-link a
+        # workflow into the editor. The Photometry sections still accept the
+        # legacy names: tab_compare / tab_measure by widget or "compare" /
+        # "measure" by name; there are no modes anymore, they all land on
+        # the same Photometry panel (ADR-044 rev 2026-09-25).
         # @args: tab - a top-level tab widget, an inner Photometry
-        #        section widget, or "compare" / "measure"
+        #        section widget, a tool panel widget, or "compare" /
+        #        "measure" / "blink" / "calibrate" (or "calibration") /
+        #        "annotate" / "series" / "trackstack"
         if tab in (self.tab_compare, self.tab_measure) \
                 or tab in ("compare", "measure"):
             self.tabs.setCurrentWidget(self.tab_photometry)
             return
-        # the astrometry tabs by name too, so the host can deep-link into
-        # them (ADR-062): "calibration" | "trackstack"
-        by_name = {"calibration": getattr(self, "tab_calibration", None),
-                   "trackstack": getattr(self, "tab_trackstack", None)}
+        # the tools by name (or by the name their button uses) or by their
+        # panel widget: the window is opened, not selected (ADR-044 rev)
+        wanted = self._TOOL_ALIASES.get(tab, tab) if isinstance(tab, str) \
+            else tab
+        for key, spec in getattr(self, "_tool_specs", {}).items():
+            if wanted == key or tab is spec["panel"]:
+                self.open_tool(key)
+                return
+        # the astrometry panel by name too, so the host can deep-link into
+        # it (ADR-062): "trackstack"
+        by_name = {"trackstack": getattr(self, "tab_trackstack", None)}
         if tab in by_name and by_name[tab] is not None:
             self.tabs.setCurrentWidget(by_name[tab])
+            self._apply_stage()
+            return
+        # A NAME THAT MATCHES NOTHING IS SAID, NEVER PASSED ON. This used to
+        # be setCurrentWidget(tab) with whatever arrived: a name that no
+        # panel claimed reached Qt as a string and raised a TypeError on
+        # every press (the Calibration button of the Astrometry panel,
+        # 2026-10-06). A deep link that is not understood is a bug of the
+        # caller, and it belongs in the log, not in the observer's face.
+        if not isinstance(tab, QWidget):
+            logger.warning("show_tab: no panel or tool is called %r", tab)
             return
         self.tabs.setCurrentWidget(tab)
+        # a deep link into the panel that is ALREADY selected emits no
+        # currentChanged, and the stage would stay as it was (the host opens
+        # the editor on the visit's first plate and asks for Measure: the
+        # panel has to be armed even when it was the one on screen)
+        self._apply_stage()
 
     def set_save_hook(self, fn):
         # @args: fn - callable(paths: list[str], kind: str, payload: dict)
@@ -786,6 +1062,38 @@ class UfeDialog(QWidget):
         badge = getattr(self, "badge", None)
         if badge is not None:
             badge.set_badge(payload)
+        # The same payload carries the object's KIND and its hue, and the
+        # panels that speak for one object paint their action with it (the
+        # hero button, the progress, the block spines). The badge arrives
+        # after the tabs have been armed, so the panels are told to repaint.
+        self._project_accent = None
+        if payload:
+            self._project_accent = {
+                "hue": payload.get("kind_color") or theme.C_ACCENT,
+                "kind": payload.get("kind"),
+                "label": payload.get("kind_label") or "",
+            }
+        for name in ("tab_trackstack", "tab_photometry"):
+            tab = getattr(self, name, None)
+            refresh = getattr(tab, "refresh_accent", None)
+            if callable(refresh):
+                try:
+                    refresh()
+                except Exception as err:       # never a dead window
+                    logger.warning("accent refresh failed for %s: %s",
+                                   type(tab).__name__, err)
+        # the frame previews wear it too: their caption is painted in the
+        # object's hue (asked for 2026-10-06: red is for problems, and the
+        # kind's colour is the app's grammar for "this object")
+        if hasattr(self, "frames_list"):
+            self.frames_list.set_accent((self._project_accent or {}).get("hue"))
+
+    def project_accent(self):
+        # @return: {"hue", "kind", "label"} of the project this window is
+        #          open for, or None (ad-hoc open: no object to wear). The
+        #          panels fall back to the app's own accent, and `kind` is
+        #          the id whose glyph the project rows already draw.
+        return getattr(self, "_project_accent", None)
 
     def set_visit_curve_hooks(self, load, clear):
         # The visit's curve, through the project (D): the Measure tab draws
@@ -968,8 +1276,31 @@ class UfeDialog(QWidget):
             self.tab_measure.set_series_attached(self._series_hook is not None)
         if hasattr(self, "series_pane"):
             self.series_pane.setVisible(self._series_hook is not None)
+        # ADR-044 rev: the series is a tool window now, so its button is the
+        # door. Without a visit there is no series (D8), so the button says
+        # so instead of opening an empty window (ADR-038: a disabled action
+        # explains itself).
+        self._sync_series_tool()
         self._sync_frame_nav()
         self._sync_exotic_block()
+
+    def _sync_series_tool(self):
+        # @return: None. The series button follows the visit hook, and a
+        #          window left open when the visit goes away is closed: it
+        #          would be a panel about a visit that is no longer there.
+        button = getattr(self, "btn_tool_series", None)
+        if button is None:
+            return
+        armed = self._series_hook is not None
+        button.setEnabled(armed)
+        button.setToolTip(self._series_tool_tip if armed else self.tr(
+            "The photometric series needs a visit with frames: open the "
+            "editor from a visit and this measures its frames as one "
+            "series"))
+        if not armed:
+            window = self._tools.get("series")
+            if window is not None and window.isVisible():
+                window.close_panel()
 
     def series_context(self, scope="visit"):
         # @args: scope - "visit" (the night open) | "project" (every night
@@ -1031,6 +1362,55 @@ class UfeDialog(QWidget):
             return None
         return state.get("measure") or None
 
+    def calibration_summary(self):
+        # @return: the Calibration tab's one-line summary of what the recipe
+        #          will do to the pixels (offset, flat or pseudo-flat), or
+        #          None when there is no tab
+        # The astrometry tab's hint shows it BEFORE a run, so the observer
+        # learns the vignetting's fate where the run is launched. The recipe
+        # is resolved in ONE place (the Calibration tab): this only forwards.
+        tab = getattr(self, "tab_calibration", None)
+        ask = getattr(tab, "short_recipe", None)
+        if not callable(ask):
+            return None
+        try:
+            return ask()
+        except Exception as err:
+            logger.warning("calibration summary failed: %s", err)
+            return None
+
+    def calibration_masters(self):
+        #          this visit, False when it has none, None when it is not
+        #          known yet. The astrometry tab's calibration default
+        #          follows this answer while nobody has chosen (ADR-061 rev).
+        tab = getattr(self, "tab_calibration", None)
+        ask = getattr(tab, "has_masters", None)
+        if not callable(ask):
+            return None
+        try:
+            return ask()
+        except Exception as err:
+            logger.warning("calibration masters failed: %s", err)
+            return None
+
+    def set_add_masters_hook(self, fn):
+        # @args: fn - callable(kind) -> the result in words, or None
+        # @return: None. ADR-061 rev: the Calibration tab fills the library
+        #          from where the recipe is read; the host owns the file
+        #          dialog and the database, as everywhere else.
+        self._add_masters_hook = fn if callable(fn) else None
+
+    def add_masters(self, kind):
+        # @args: kind - one of core.calibration.KINDS
+        # @return: what happened, in words, or ""
+        if self._add_masters_hook is None:
+            return ""
+        try:
+            return self._add_masters_hook(kind) or ""
+        except Exception as err:
+            logger.warning("add masters hook failed: %s", err)
+            return ""
+
     def set_mpc_send_hook(self, fn):
         # @args: fn - callable(text) -> True when the visit's MPC block
         #        received the report, or None
@@ -1085,6 +1465,32 @@ class UfeDialog(QWidget):
             logger.warning("astrometry undo hook failed: %s", err)
             return None
 
+    def set_astrometry_result_hook(self, fn):
+        # @args: fn - callable() -> {"run", "points", "stacks"} or None
+        # @return: None. ADR-065: the visit already holds a run, so the tab
+        #          paints it instead of an empty column when it opens. The
+        #          host answers with what was SAVED; the tab never reads the
+        #          database itself.
+        self._astrometry_result_hook = fn if callable(fn) else None
+        # The host may set the context hook BEFORE this one: refreshing here
+        # means the tab can show the saved run as soon as it is armed,
+        # whatever order the hooks arrive in.
+        for name in ("tab_calibration", "tab_trackstack"):
+            tab = getattr(self, name, None)
+            refresh = getattr(tab, "refresh_context", None)
+            if callable(refresh):
+                refresh()
+
+    def astrometry_result(self):
+        # @return: the saved run of the current visit, or None
+        if self._astrometry_result_hook is None:
+            return None
+        try:
+            return self._astrometry_result_hook()
+        except Exception as err:
+            logger.warning("astrometry result hook failed: %s", err)
+            return None
+
     def set_manual_magnitude_hook(self, fn):
         # @args: fn - callable(run_id, group_index, mag, band) -> True when
         #        the observation took it, or None
@@ -1118,12 +1524,192 @@ class UfeDialog(QWidget):
         vp.btn_frame_next.clicked.connect(
             lambda: self._goto_frame(self._frame_index + 1))
         vp.btn_frame_first.clicked.connect(self._frame_first)
-        vp.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
-        vp.btn_exotic_export.clicked.connect(self._notify_exotic_export)
-        vp.btn_exotic_result.clicked.connect(self._notify_exotic_result)
-        vp.btn_exotic_folder.clicked.connect(self._notify_exotic_folder)
+        self._wire_exotic()
         self.tab_compare.sequence_changed.connect(self._sync_exotic_block)
+        # the previews of the visit's frames (2026-10-06): a scrollable list
+        # of thumbnails to flick through the night and act on what is wrong
+        self.frames_list = FramePreviews(self)
+        drop_in(vp.layout(), vp.ph_frames, self.frames_list)
+        self.lbl_frames_count = vp.lbl_frames_count
+        self.chk_frames_problems = vp.chk_frames_problems
+        self.chk_frames_problems.toggled.connect(
+            self.frames_list.set_problems_only)
+        self.frames_list.picked.connect(self._goto_frame)
+        self.frames_list.remove_requested.connect(self._remove_frames)
+        self.frames_list.discard_requested.connect(self._discard_frames)
+        self.frames_list.open_folder_requested.connect(self._open_folder)
+        self._thumb_worker = None
+        self._previews_paths = []
+        self._unregistered = set()
+        self._frames_remove_hook = None
+        self._frames_discard_hook = None
         self._sync_frame_nav()
+
+    # ------------------------------------------------ the frame previews
+
+    def _sync_frame_list(self, paths):
+        # @args: paths - the visit's frames, in the order to show
+        # @return: None. Rebuilds the previews (a new visit, or frames taken
+        #          out) and restarts the reader. The list is only built when
+        #          the panel is on screen: without a visit there is nothing
+        #          to preview and nothing is read.
+        if not hasattr(self, "frames_list"):
+            return
+        previous = self.frames_list.paths()
+        self._stop_thumbs()
+        self.frames_list.set_frames(paths)
+        self._sync_frames_count()
+        if not paths:
+            return
+        # the frames the LAST run could not register are marked before
+        # anybody opens them: it is the run's own report, not a guess
+        for index, path in enumerate(paths):
+            if path in getattr(self, "_unregistered", set()):
+                self.frames_list.set_fact(index, None, {"path": path,
+                                                        "failed_register": True})
+        if paths == previous:
+            return              # same visit: the marks above are enough
+        from .workers import FrameThumbWorker
+        worker = FrameThumbWorker(paths)
+        worker.sampled.connect(self._on_frame_sampled)
+        worker.done.connect(self._on_thumbs_done)
+        self._thumb_worker = worker
+        worker.start()
+
+    def _stop_thumbs(self):
+        # @return: None. A QThread destroyed while it runs aborts the whole
+        #          application: the reader is always asked to stop first.
+        worker = getattr(self, "_thumb_worker", None)
+        if worker is not None:
+            worker.cancel()
+            worker.wait(5000)
+        self._thumb_worker = None
+
+    def _on_frame_sampled(self, index, sample, facts):
+        # @args: index - the frame, sample - its small array (None when it
+        #        could not be read), facts - what the read learned
+        # @return: None
+        if not hasattr(self, "frames_list"):
+            return
+        self.frames_list.set_fact(index, sample, facts)
+        self._sync_frames_count()
+
+    def _on_thumbs_done(self):
+        # @return: None. The count's last word (it grew while reading).
+        self._sync_frames_count()
+
+    def _sync_frames_count(self):
+        # @return: None. "N frames · M with problems", which is the line
+        #          that makes a visit of hundreds of frames navigable.
+        if not hasattr(self, "lbl_frames_count"):
+            return
+        n = self.frames_list.count()
+        bad = self.frames_list.problems()
+        if not n:
+            self.lbl_frames_count.setText(self.tr("No frames"))
+            return
+        text = self.tr("%1 frames").replace("%1", str(n))
+        if bad:
+            text += " · " + self.tr("%1 with problems").replace(
+                "%1", str(bad))
+        self.lbl_frames_count.setText(text)
+
+    def set_visit_frames_hooks(self, remove_fn=None, discard_fn=None):
+        # @args: remove_fn - callable(paths) -> the result in words, or None;
+        #        discard_fn - the same for the move aside
+        # @return: None. The editor never touches the registry: it asks the
+        #          host, like everywhere else (ADR-045).
+        self._frames_remove_hook = remove_fn if callable(remove_fn) else None
+        self._frames_discard_hook = discard_fn if callable(discard_fn) else None
+
+    def _remove_frames(self, paths):
+        # @args: paths - the frames to take out of the visit
+        # @return: None
+        self._act_on_frames(paths, self._frames_remove_hook,
+                            self.tr("Taken out of the visit"))
+
+    def _discard_frames(self, paths):
+        # @args: paths - the frames to move aside
+        # @return: None. A real move: it asks first (nothing destructive is
+        #          done in silence, ADR-062).
+        if not paths:
+            return
+        from PySide6.QtWidgets import QMessageBox
+        answer = QMessageBox.question(
+            self, self.tr("Move the frames aside"),
+            self.tr("Move %1 frame(s) into the project's discarded/ folder?"
+                    "\n\nNothing is deleted: the files move, the registry "
+                    "follows them, and they can be brought back.").replace(
+                        "%1", str(len(paths))),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        self._act_on_frames(paths, self._frames_discard_hook,
+                            self.tr("Moved aside"))
+
+    def _act_on_frames(self, paths, hook, headline):
+        # @args: paths - the frames, hook - the host's callable, headline -
+        #        what happened, in words
+        # @return: None. The list is rebuilt from the visit's frames after
+        #          the host has done its part: what is on screen is what the
+        #          visit holds, never what it held.
+        if not paths:
+            return
+        if hook is None:
+            self.set_status(self.tr(
+                "This window has no project to change."), "warn")
+            return
+        try:
+            answer = hook(list(paths))
+        except Exception as err:
+            logger.warning("acting on the visit's frames failed: %s", err)
+            self.set_status(f"{headline}: {err}", "warn")
+            return
+        self._sync_frame_nav()
+        self._sync_frame_list(self._visit_paths())
+        self.set_status(f"{headline}: {answer}" if answer else headline)
+
+    def _open_folder(self, folder):
+        # @args: folder - the directory to show
+        # @return: None. The system's file manager, like everywhere else in
+        #          the app: the editor does not grow its own file browser.
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+
+    def refresh_visit_context(self):
+        # @return: None. The visit CHANGED while the editor was open (the
+        #          host took frames out of it, or moved them aside): the
+        #          frame list, its previews and every tab that reads the
+        #          visit's frames are brought up to date. The host calls it
+        #          after its own part is done.
+        self._previews_paths = list(self._visit_paths())
+        self._sync_frame_nav()
+        self._sync_frame_list(self._previews_paths)
+        astro = getattr(self, "tab_trackstack", None)
+        sync = getattr(astro, "refresh_context", None)
+        if callable(sync):
+            try:
+                sync()
+            except Exception as err:
+                logger.warning("the astrometry context could not refresh: %s",
+                               err)
+        self.tab_measure.refresh_bands()
+
+    def mark_unregistered_frames(self, paths):
+        # @args: paths - the frames the last run could NOT register
+        # @return: None. The astrometry tab knows them (its own report); the
+        #          previews say so before anybody opens the frame.
+        self._unregistered = {str(p) for p in paths or ()}
+        if not hasattr(self, "frames_list"):
+            return
+        for index, path in enumerate(self.frames_list.paths()):
+            if path in self._unregistered:
+                self.frames_list.set_fact(index, None,
+                                          {"path": path,
+                                           "failed_register": True})
+        self._sync_frames_count()
+
 
     def _visit_paths(self):
         # @return: the visit's sorted frame paths, or [] (no visit armed)
@@ -1156,6 +1742,13 @@ class UfeDialog(QWidget):
         vp.btn_frame_prev.setEnabled(n > 0 and self._frame_index > 0)
         vp.btn_frame_next.setEnabled(n > 0 and self._frame_index < n - 1)
         vp.btn_frame_first.setEnabled(n > 0 and self._frame_index > 0)
+        # the previews follow the same list, and the open frame is the one
+        # highlighted (asked for 2026-10-06)
+        if hasattr(self, "frames_list"):
+            if paths != self._previews_paths:
+                self._previews_paths = list(paths)
+                self._sync_frame_list(paths)
+            self.frames_list.set_current_index(self._frame_index)
         self._sync_visit_solve()
 
     def _visit_running(self):
@@ -1398,33 +1991,46 @@ class UfeDialog(QWidget):
         # @return: the open plate path, or None
         return self.state.path if self.state.has_image else None
 
+    def _wire_exotic(self):
+        # The transit reduction block (EXOTIC) lives in the SERIES window
+        # (2026-10-06): the buttons keep their names and their slots, they
+        # only hang from another panel.
+        # @return: None
+        ex = getattr(self, "exotic", None)
+        if ex is None:
+            return
+        ex.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
+        ex.btn_exotic_export.clicked.connect(self._notify_exotic_export)
+        ex.btn_exotic_result.clicked.connect(self._notify_exotic_result)
+        ex.btn_exotic_folder.clicked.connect(self._notify_exotic_folder)
+
     def _sync_exotic_block(self):
-        # The EXOTIC block lives only in a transit visit; the reduction
+        # The EXOTIC block appears only in a transit visit; the reduction
         # waits for a comparison sequence and says why when it is missing.
-        if not hasattr(self, "visit_panel"):
+        ex = getattr(self, "exotic", None)
+        if ex is None:
             return
         ctx = self.series_context() or {}
         armed = self._exotic_reduce_hook is not None \
             and ctx.get("kind") == "transit" and bool(ctx.get("paths"))
-        grp = self.visit_panel.grp_exotic
-        grp.setVisible(bool(armed))
+        ex.grp_exotic.setVisible(bool(armed))
         if not armed:
             return
         n = len(self.sequence_entries())
-        self.visit_panel.btn_exotic_reduce.setEnabled(n > 0)
-        self.visit_panel.btn_exotic_export.setEnabled(n > 0)
+        ex.btn_exotic_reduce.setEnabled(n > 0)
+        ex.btn_exotic_export.setEnabled(n > 0)
         # the last reduction, if the visit has one: the numbers here and the
         # whole result (figure, files) one click away. Nothing to show is
         # said with an empty line and a disabled button, never with zeros.
-        self.visit_panel.lbl_exotic_result.setText(self._exotic_result_text)
+        ex.lbl_exotic_result.setText(self._exotic_result_text)
         has_result = bool(self._exotic_result_text)
-        self.visit_panel.btn_exotic_result.setEnabled(
+        ex.btn_exotic_result.setEnabled(
             has_result and self._exotic_result_hook is not None)
-        self.visit_panel.btn_exotic_folder.setEnabled(
+        ex.btn_exotic_folder.setEnabled(
             has_result and self._exotic_folder_hook is not None)
-        self.visit_panel.lbl_exotic_status.setText(
-            self.tr("Uses the open frame and the sequence above.")
-            if n else self.tr(
+        ex.lbl_exotic_status.setText(
+            self.tr("Uses the open frame and the comparison sequence of "
+                    "this series.") if n else self.tr(
                 "Build the comparison sequence first (Photometry, "
                 "«Build the sequence…»)."))
 
@@ -1700,7 +2306,7 @@ class UfeDialog(QWidget):
         last = tab._last
         from_visit = bool(getattr(tab, "_curve_from_visit", False))
         measured = None
-        if str(header.get("NS_STACK") or "") in ("object", "stars"):
+        if str(header.get("NS_STACK") or "") in ("object", "stars", "base"):
             # On one of the astrometry run's stacks only the brightness the
             # RUN measured on it counts: a stale measurement of the
             # Photometry tab must not colour the band over it.
@@ -1738,6 +2344,8 @@ class UfeDialog(QWidget):
             catalog_mag=catalog_mag, target=target,
             motion=facts.get("motion"),
             measured_pos=facts.get("measured_pos"),
+            predicted_mag=facts.get("predicted"),
+            detection=facts.get("detection"),
             equipment=chart_annotate.equipment_from_header(
                 self.state.header or {}, config),
             site=chart_annotate.site_from_config(config))

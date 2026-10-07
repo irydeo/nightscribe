@@ -36,10 +36,60 @@ _KM_S_PER_AU_DAY = orbits.AU_KM / 86400.0
 _MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
+_MONTHS_EN_INDEX = {name.lower(): i + 1 for i, name in enumerate(_MONTHS_EN)}
+
+
+def parse_horizons_time(text):
+    # Parse a Horizons timestamp ("2026-Aug-16 22:00") WITHOUT the C locale.
+    # strptime("%b") follows LC_TIME, and Qt sets the process locale to the
+    # user's at startup: on a Spanish machine "Aug" stopped matching, EVERY
+    # ephemeris row was dropped, and a run said "no ephemeris" with the table
+    # right there. The month name is looked up in the English table this
+    # module already owns for formatting.
+    # @args: text - "YYYY-Mon-DD HH:MM" (the Horizons format)
+    # @return: aware UTC datetime, or None when it does not parse
+    try:
+        date_part, _sep, time_part = str(text).strip().partition(" ")
+        year, mon, day = date_part.split("-")
+        month = _MONTHS_EN_INDEX.get(mon.strip().lower())
+        if month is None:
+            return None
+        hh, mm = (time_part.split(":") + ["0", "0"])[:2]
+        return datetime.datetime(int(year), month, int(day), int(hh), int(mm),
+                                 tzinfo=datetime.timezone.utc)
+    except (ValueError, AttributeError):
+        return None
+
+
+def magnitude_at(rows, jd):
+    # @args: rows - rows of a magnitude table ({"time", "mag"}), jd - the
+    #        instant of interest (JD)
+    # @return: (mag, jd_of_row) of the row nearest that instant, or
+    #          (None, None). The magnitude of an asteroid changes by
+    #          thousandths over a night, so the nearest row is the honest
+    #          answer and interpolating it would only add arithmetic.
+    best, best_dt = None, None
+    for row in rows or []:
+        when = parse_horizons_time(row.get("time"))
+        if when is None:
+            continue
+        jd_row = _jd_of(when)
+        dt = abs(jd_row - float(jd))
+        if best_dt is None or dt < best_dt:
+            best, best_dt = row, dt
+    if best is None:
+        return None, None
+    return best.get("mag"), parse_horizons_time(best.get("time"))
+
+
+def _jd_of(when):
+    # @args: when - an aware UTC datetime
+    # @return: its Julian date (Unix epoch = JD 2440587.5)
+    return 2440587.5 + when.timestamp() / 86400.0
+
 
 def generate(name, site, lat=None, lon=None, start=None, stop=None,
              step="30m"):
-    # Queries Horizons for the ephemeris and enriches each row with
     # alt/az computed locally (pure math, no extra network call). When
     # Horizons does not know the object (unconfirmed NEOCP), falls back
     # to the preliminary NEOfixer orbit propagated locally; those rows
@@ -67,14 +117,13 @@ def generate(name, site, lat=None, lon=None, start=None, stop=None,
         except (ValueError, KeyError):
             continue
         # alt/az at the ephemeris time
-        try:
-            t = datetime.datetime.strptime(r["time"], "%Y-%b-%d %H:%M")
-            t = t.replace(tzinfo=datetime.timezone.utc)
+        t = parse_horizons_time(r.get("time"))
+        if t is None:
+            alt, az = None, None
+        else:
             jd = coords.jd_from_datetime(t)
             alt, az = coords.altaz(ra_deg, dec_deg, lat,
                                    coords.lst_degrees(jd, lon))
-        except ValueError:
-            alt, az = None, None
         row = {"time": r["time"], "ra": r["ra"], "dec": r["dec"],
                "ra_deg": round(ra_deg, 6),
                "dec_deg": round(dec_deg, 6),
@@ -824,6 +873,43 @@ def motion_interpolator(rows, max_gap_days=0.5, warn=None):
     return position
 
 
+def motion_from_elements(elements, lat=None, lon=None):
+    # A position function built from ORBITAL ELEMENTS, not from a table: the
+    # local fallback for when no ephemeris service answers (or does not know
+    # the object). Two-body Kepler in the J2000 frame (the plate's own) plus
+    # the light-time, so the object lands where the ephemeris would put it.
+    #
+    # Its accuracy is NOT the same as Horizons': two-body ignores planetary
+    # perturbations and the Earth model is coarse, so a close NEO can sit a
+    # couple of arcminutes off. That is enough to GUIDE the stack (the
+    # reported position is the centroid measured on the plate, not this one),
+    # and the caller widens the cutout when it knows the motion is local.
+    # @args: elements - dict with a/e/i/om/w and (ma+epoch or tp); the epoch
+    #        is REQUIRED with ma, or the mean anomaly is frozen, lat/lon -
+    #        observer site (topocentric when given)
+    # @return: a callable(jd) -> (ra_deg, dec_deg) or None, or None when the
+    #          elements cannot be propagated at all
+    if not elements or elements.get("e") is None:
+        return None
+    if elements.get("a") is None and elements.get("q") is None:
+        return None
+
+    def position(jd):
+        try:
+            pos = ephem_minor.kepler_ra_dec_j2000(elements, jd, lat_deg=lat,
+                                                  lon_deg=lon)
+        except (ValueError, ZeroDivisionError):
+            return None
+        return (pos[0], pos[1]) if pos else None
+
+    # a probe at the elements' own epoch: a set that cannot even answer there
+    # is not a motion, and returning it would make every frame answer None
+    probe = elements.get("epoch") or elements.get("tp")
+    if probe is not None and position(probe) is None:
+        return None
+    return position
+
+
 def _maybe_deg(value, parser):
     # @args: value - a number or an "hh mm ss" / "dd mm ss" string,
     #        parser - coords.ra_hms_to_deg or coords.dec_dms_to_deg
@@ -868,12 +954,10 @@ def rows_from_csv(path):
 def _row_jd(row):
     # @args: row - Horizons-style row with "time" "YYYY-Mon-DD HH:MM"
     # @return: Julian date (float) or None on parse error
-    try:
-        t = datetime.datetime.strptime(row["time"], "%Y-%b-%d %H:%M")
-        return coords.jd_from_datetime(
-            t.replace(tzinfo=datetime.timezone.utc))
-    except (ValueError, KeyError):
+    t = parse_horizons_time(row.get("time"))
+    if t is None:
         return None
+    return coords.jd_from_datetime(t)
 
 
 def _motion(j0, ra0, dec0, j1, ra1, dec1):
@@ -957,14 +1041,15 @@ def _interpolate(rows, jd):
 def _kepler_at(elements, jd):
     # Local two-body propagation: position at jd plus a numerical rate from
     # a +1 h delta. RA is unwrapped before differencing so the rate does not
-    # spike across the 0h/24h seam.
+    # spike across the 0h/24h seam. J2000, like the plate's WCS: the of-date
+    # path missed by ~0.4 deg, which a goto can shrug off but is not free.
     # @return: {ra_deg, dec_deg, rate_arcsec_min, pa_deg} or None
-    p0 = ephem_minor.kepler_ra_dec(elements, jd)
+    p0 = ephem_minor.kepler_ra_dec_j2000(elements, jd)
     if not p0:
         return None
     ra0, dec0 = p0[0], p0[1]
     dh = 1.0 / 24.0
-    p1 = ephem_minor.kepler_ra_dec(elements, jd + dh)
+    p1 = ephem_minor.kepler_ra_dec_j2000(elements, jd + dh)
     if not p1:
         return {"ra_deg": ra0 % 360, "dec_deg": dec0,
                 "rate_arcsec_min": 0.0, "pa_deg": 0.0}

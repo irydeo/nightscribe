@@ -44,6 +44,8 @@ class UfeCalibrationTab(QWidget):
         self._lang = lang
         self._worker = None        # CalibrationWorker while it runs
         self._ctx_paths = None     # the visit's frames (or None)
+        self._recipe = None        # the resolved Recipe of the first frame
+        self._status_hook = None   # the window's single line (U4)
         self._build_ui()
         self._sync_context()
 
@@ -60,14 +62,65 @@ class UfeCalibrationTab(QWidget):
         self.chk_export = self._ui.chk_export
         self.btn_calibrate = self._ui.btn_calibrate
         self.prg_calib = self._ui.prg_calib
+        # ADR-061 rev: the library is FILLED from here. It used to be only in
+        # Settings, so this tab could report what was missing and nothing
+        # else; an observer with real flats (measured: 150 of them for one
+        # night) had no way to put them in from where the recipe is read.
+        self.cmb_master_kind = self._ui.cmb_master_kind
+        self.btn_master_add = self._ui.btn_master_add
+        self.lbl_master_status = self._ui.lbl_master_status
+        from ..core import calibration
+        for kind in calibration.KINDS:
+            self.cmb_master_kind.addItem(self._master_kind_label(kind), kind)
+        self.btn_master_add.clicked.connect(self._on_master_add)
         # D6: exporting calibrated copies is explicit; the checkbox's
         # default is the setting's, so the choice survives sessions
         self.chk_export.setChecked(bool(config.get("calib_export", False)))
-        # P5: the pseudo-flat is opt-in, and the choice survives sessions
+        self.chk_export.toggled.connect(
+            lambda on: config.set("calib_export", 1 if on else 0))
+        # P5: the pseudo-flat is the calibration's OWN policy, and this tab is
+        # its single home (the stack and every other pipeline read the same
+        # key). The switch has to WRITE it: reading it and never saving it is
+        # how the checkbox came to look like it did nothing.
         self.chk_pseudo_flat.setChecked(
             bool(config.get("calib_pseudo_flat", False)))
+        self.chk_pseudo_flat.toggled.connect(self._on_pseudo_flat)
         self.btn_calibrate.clicked.connect(self._on_calibrate)
         self._btn_label = self.btn_calibrate.text()
+
+    def _on_pseudo_flat(self, on):
+        # @args: on - the new state of the policy switch
+        # @return: None. The key is shared: the astrometry hint and the next
+        #          stack read it, so the choice has to outlive the session.
+        config.set("calib_pseudo_flat", 1 if on else 0)
+        self._sync_context()      # the recipe line's flat row changes
+
+    def _master_kind_label(self, kind):
+        # @args: kind - one of core.calibration.KINDS
+        # @return: its name in the observer's language: the four kinds are
+        #          four different arithmetics, not synonyms.
+        return {"bias": self.tr("Bias"), "dark": self.tr("Dark"),
+                "dark_flat": self.tr("Dark of the flats"),
+                "flat": self.tr("Flat")}.get(kind, kind)
+
+    def _on_master_add(self):
+        # @return: None. The host opens the file dialog and indexes what it
+        #          gets (the tab never touches the database, like every other
+        #          panel); the answer comes back as words and the recipe is
+        #          re-resolved, so the line above says what changed.
+        ask = getattr(host_of(self), "add_masters", None)
+        if not callable(ask):
+            self.lbl_master_status.setText(self.tr(
+                "This window has no library to write to."))
+            return
+        kind = self.cmb_master_kind.currentData() or "dark"
+        try:
+            text = ask(kind)
+        except Exception as err:
+            logger.warning("adding masters failed: %s", err)
+            text = self.tr("The masters could not be indexed:") + f" {err}"
+        self.lbl_master_status.setText(text or "")
+        self._sync_context()
 
     # ------------------------------------------------------- host wiring
 
@@ -107,11 +160,21 @@ class UfeCalibrationTab(QWidget):
             logger.warning("astrometry hook failed: %s", err)
             return None
 
+    def set_status_hook(self, fn):
+        # @args: fn - callable(text, level) the window's single line listens
+        #        with (U4), or None
+        # @return: None
+        self._status_hook = fn if callable(fn) else None
+
     def _say(self, text):
         # @args: text - the status line's text ("" hides it)
-        # @return: None
+        # @return: None. The panel keeps its own line as the record and the
+        #          window's line gets it too (U4).
         self.lbl_status.setVisible(bool(text))
         self.lbl_status.setText(text or "")
+        if self._status_hook is not None and text:
+            self._status_hook(str(text),
+                              "warn" if str(text).startswith("⚠") else "info")
 
     # ------------------------------------------------------------ recipe
 
@@ -127,6 +190,7 @@ class UfeCalibrationTab(QWidget):
         self.btn_calibrate.setEnabled(bool(paths) and not running)
         if not paths:
             self._ctx_paths = None
+            self._recipe = None
             self.lbl_recipe.setText(self.tr(
                 "Open the editor from a visit to see its recipe."))
             self.lbl_warnings.setText("")
@@ -137,6 +201,7 @@ class UfeCalibrationTab(QWidget):
         try:
             header = calibration.read_header(paths[0])
         except Exception as err:
+            self._recipe = None
             self.lbl_recipe.setText(
                 self.tr("The first frame could not be read:") + f" {err}")
             self.lbl_warnings.setText("")
@@ -144,9 +209,48 @@ class UfeCalibrationTab(QWidget):
         meta = calibration.meta_from_header(header)
         tol = float(config.get("calib_temp_tol_c", 3.0))
         recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        self._recipe = recipe
         self.lbl_recipe.setText(self._recipe_text(meta, recipe))
         self.lbl_warnings.setText("\n".join(
             "• " + self._warning_text(w) for w in recipe.warnings))
+
+    def has_masters(self):
+        # Whether the library has anything that MATCHES this visit, asked by
+        # the astrometry tab to decide its calibration default (ADR-061 rev):
+        # with a dark or a flat for this camera and filter, applying the
+        # calibration is what the measurement needs.
+        # @return: True / False, or None when the recipe is not known yet (no
+        #          visit armed, or the first frame could not be read): the
+        #          caller leaves the calibration off rather than promising
+        #          one nobody verified.
+        recipe = self._recipe
+        if recipe is None:
+            return None
+        return bool(recipe.offset is not None or recipe.flat is not None)
+
+    def short_recipe(self):
+        # One line saying what the calibration will DO to the pixels, for the
+        # pipelines that opt in (the astrometry hint). It is built from the
+        # SAME resolved recipe the tab shows, so the hint and the recipe
+        # cannot disagree about what is missing or what stands in for it.
+        # @return: the one-liner, in the GUI's language
+        recipe = self._recipe
+        if recipe is None:
+            return self.tr("The visit's recipe is not known")
+        parts = []
+        if recipe.offset is not None:
+            parts.append(self.tr("dark") if recipe.offset_kind == "dark"
+                         else self.tr("bias"))
+        else:
+            parts.append(self.tr("no dark/bias"))
+        if recipe.flat is not None:
+            parts.append(self.tr("flat: %1").replace(
+                "%1", Path(recipe.flat.path).name))
+        elif self.chk_pseudo_flat.isChecked():
+            parts.append(self.tr("pseudo-flat from the frames"))
+        else:
+            parts.append(self.tr("no flat: the vignetting stays"))
+        return " · ".join(parts)
 
     def _recipe_text(self, meta, recipe):
         # @args: meta - the light's metadata, recipe - the resolved Recipe
@@ -177,8 +281,13 @@ class UfeCalibrationTab(QWidget):
                 line += " " + self.tr(
                     "(no dark-flat: the flat keeps its own pedestal)")
             lines.append(line)
+        elif self.chk_pseudo_flat.isChecked():
+            lines.append(self.tr(
+                "Flat: none in the library; a pseudo-flat will be built "
+                "from the frames"))
         else:
-            lines.append(self.tr("Flat: missing for this filter"))
+            lines.append(self.tr(
+                "Flat: missing for this filter (the vignetting stays)"))
         return "\n".join(lines)
 
     def _warning_text(self, warning):
@@ -309,5 +418,11 @@ class UfeCalibrationTab(QWidget):
                     "%1", str(info.get("n_frames"))).replace(
                     "%2", f"{float(info['median_adu']):.0f}")
             if info.get("note"):
-                note += " " + self.tr("Warning:") + " " + info["note"]
+                if info.get("kind") == "vignette_model":
+                    # the smooth model is not a caveat, it is what was
+                    # applied: it says what it is and what it does not
+                    # correct (ADR-061 rev)
+                    note += " " + info["note"]
+                else:
+                    note += " " + self.tr("Warning:") + " " + info["note"]
             self._say(note)

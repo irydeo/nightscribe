@@ -407,3 +407,219 @@ and with no new dependency:
   gain of a GPU is x1.5-2 in exchange for a dependency, per-device kernels and packaging,
   and the floor it cannot accelerate (FITS, ASTAP, Find_Orb) is already 30-40 %. It stays
   a written decision, not an implicit debt.
+
+**Revisión (2026-10-06): el recorte se convierte una vez.** Un stack de
+observación es un RECORTE de la rejilla de referencia (`box_around`), y dos
+sitios confundían la rejilla con los píxeles del recorte. Con el campo por
+defecto (fotograma completo, origen 0,0) el error era invisible; con un recorte
+de 512 px, no:
+
+- **El centro del brillo** (`_object_centre`) restaba el origen de la caja al
+  centroide medido. El centroide ya está en los píxeles del stack
+  (`measure_stack` centra sobre el stack), así que la apertura caía `box[0]`
+  píxeles fuera, casi siempre fuera de la imagen: la observación volvía **sin
+  magnitud y sin decir por qué**. Ahora el origen solo se resta al punto
+  efemérico, que sí vive en la rejilla.
+- **La tira** (`_thumbs.set_stacks`) recibía el punto de la efeméride en la
+  rejilla y lo usaba para recortar el thumbnail: con un recorte, el panel se
+  centraba en un punto que no está en la imagen. Ahora se le pasa el punto en
+  los píxeles del stack.
+
+**Revision (2026-10-06): the cutout is converted once.** An observation's stack
+is a CUTOUT of the reference grid (`box_around`), and two places confused the
+grid with the cutout's pixels. With the default field (whole frame, origin 0,0)
+the mistake was invisible; with a 512 px cutout, it was not:
+
+- **The brightness centre** (`_object_centre`) subtracted the box origin from
+  the measured centroid. The centroid is already in the stack's pixels
+  (`measure_stack` centres on the stack), so the aperture landed `box[0]`
+  pixels away, usually off the image: the observation came back **with no
+  magnitude and no word about why**. The origin is now subtracted only from the
+  ephemeris point, which does live in the grid.
+- **The strip** (`_thumbs.set_stacks`) was given the ephemeris point in the
+  grid and used it to crop the thumbnail: with a cutout, the panel centred on a
+  point that is not in the image. It is now given the point in the stack's own
+  pixels.
+
+**Revisión (2026-10-06): el stack base es un producto del run.** El apilado de
+toda la secuencia (el objeto congelado, el más profundo de la visita) solo se
+conservaba cuando la puerta NO disparaba, y su fichero solo se escribía si el
+observador pulsaba «Mostrar» en el modo manual. Se pidió que se guarde y se cargue
+con el run, con sus medidas:
+
+- **Siempre en el payload**: `base_stack`, `box_all`, `q_all`, `w0` y `shape` van
+  en el resultado de cualquier run, no solo en el «no detectado». Es el recorte de
+  la traza del objeto (unos MB), no el fotograma completo.
+- **Siempre a disco**: al terminar, la pestaña escribe `<objeto>_base.fits` en el
+  proyecto y lo registra en la visita, con las mismas tarjetas que una observación
+  (WCS del recorte, `NS_STACK="base"`, `NS_WHOLE`, `NS_RUN`, `NS_NFRAM`, meta del
+  fotograma, movimiento y magnitud con su origen) más la **detección hecha sobre
+  esa misma imagen** (`NS_FOUND`, `NS_SNR`, `NS_GATE`, `NS_LIMIT`). Escribir todas
+  las pilas, y el base, es lo que hace que un run se pueda REABRIR en vez de
+  recalcular: el precio es un fichero por producto.
+- **Al reabrir**: el resumen del run lleva `box_all` (lo que el modo manual
+  necesita para llevar la marca a la rejilla de referencia), `base_rate`/`base_pa`
+  y la magnitud de efeméride; el stack base se recarga del proyecto. El fichero se
+  llama igual siempre (`<slug>_base.fits`), así que la ruta se recalcula sola.
+- **El lector propio de FITS no entiende `HIERARCH`** (ADR-018): toda tarjeta nueva
+  tiene 8 caracteres o menos, o la escribe astropy y la pierde la app. Medido: con
+  `NS_DETSNR` (9) el lector devolvía la cabecera sin la tarjeta.
+
+**Revision (2026-10-06): the base stack is a product of the run.** The whole-sequence
+stack (the object frozen, the deepest of the visit) was kept only when the gate did
+NOT fire, and its file was written only if the observer pressed "Show" in the manual
+mode. Asked for: it must be saved and loaded with the run, together with its
+measurements:
+
+- **Always in the payload**: `base_stack`, `box_all`, `q_all`, `w0` and `shape`
+  travel in any run's result, not only in a "not detected" one. It is the object's
+  own trail cutout (a few MB), not the whole frame.
+- **Always on disk**: when the run ends, the tab writes `<object>_base.fits` into the
+  project and registers it on the visit, with the same cards as an observation's
+  stack (the cutout's WCS, `NS_STACK="base"`, `NS_WHOLE`, `NS_RUN`, `NS_NFRAM`, the
+  frame metadata, the motion and the magnitude with their source) plus **the
+  detection made on that very image** (`NS_FOUND`, `NS_SNR`, `NS_GATE`,
+  `NS_LIMIT`). Writing every stack, and the base one, is what makes a run
+  RESTORABLE instead of recomputed: the price is one file per product.
+- **On reopen**: the run's summary carries `box_all` (what the manual mode needs to
+  carry the mark to the reference grid), `base_rate`/`base_pa` and the ephemeris'
+  magnitude; the base stack is read back from the project. The file always has the
+  same name (`<slug>_base.fits`), so the path recomputes itself.
+- **The app's own FITS reader does not understand `HIERARCH`** (ADR-018): every new
+  card is 8 characters or fewer, or astropy writes it and the app loses it.
+  Measured: with `NS_DETSNR` (9) the reader returned the header without the card.
+
+**Revisión (2026-10-06): la velocidad se mide o se predice, nunca se inventa.**
+Cuatro defectos medidos sobre las visitas reales del autor (2025 HL5 y 2025
+FG18), y lo que se decidió con ellos:
+
+1. **El barrido de velocidad tenía que significar algo.** La rejilla 5×5 cubre
+   ±9° de PA en pasos de **4,5°**, así que el «mejor» candidato es siempre un
+   punto de la rejilla, y en un objeto débil es el máximo del ruido. Medido: la
+   app publicaba PA 33 donde la efeméride (Horizons) dice 41,8 para 2025 HL5, y
+   37 donde dice 46,2 para 2025 FG18: exactamente un paso de −9°. Ahora el
+   barrido guarda **la semilla** (factor 1.0 y ΔPA 0, que ES la predicción de la
+   efeméride, medida sobre los mismos píxeles) y solo se usa su ganador si
+   supera a la semilla por **más de 3 veces la dispersión robusta de la propia
+   rejilla** (`SweepResult.significant`). Si no, la velocidad que se reporta es
+   la efeméride y se dice. Cuando sí es significativo, una **segunda pasada** de
+   3×3 alrededor del ganador baja la resolución de ~4,5° a ~0,9° sin leer un solo
+   píxel más (los candidatos finos caen dentro de la unión que la pasada gruesa
+   ya leyó: medido, las lecturas de disco del barrido no cambian).
+2. **La escala del stack entra en los guardas fotométricos.** Los techos
+   (saturación, linealidad) son del **sensor**, en ADU de **un** fotograma, y un
+   stack `sum` tiene N veces el nivel. Medido en la visita 2025 FG18 (cielo 1552
+   ADU, 207 tomas, linealidad de cámara 53 000): el cielo del `sum` solo ya son
+   321 000 ADU, seis veces la linealidad, así que **todas** las comparadas se
+   rechazaban y el run no daba magnitud. `PlateConfig.stack_scale` multiplica los
+   techos antes de compararlos con la placa.
+3. **La puerta de detección ya no tira el run a la basura.** Sigue prohibiendo el
+   **barrido** (un máximo de ruido es como se fabrica un falso positivo), pero la
+   **medida fotométrica se intenta siempre**: la posición es la predicción de la
+   efeméride, la magnitud se mide ahí y el punto se marca (`below_gate`), la
+   celda de magnitud sale **en rojo** (el mismo rol de `chart_annotate` que usa
+   la banda) y la nota dice que la magnitud límite del stack es lo que la noche
+   alcanzó de verdad. Un número marcado vale más que ningún número.
+4. **Un fotograma ilegible no se lleva la visita por delante.** Medido: la última
+   toma de 2025 FG18 es un fichero de 0 bytes (la captura se cortó) y
+   `load_sequence` lanzaba, así que la pestaña de Astrometría no llegaba ni a
+   armarse. Ahora la toma se deja fuera, se cuenta y se dice: en la línea del
+   objeto («N no se pudieron leer») y en la nota del run.
+
+**Revision (2026-10-06): the velocity is measured or predicted, never invented.**
+Four defects measured on the author's real visits (2025 HL5 and 2025 FG18), and
+what was decided with them:
+
+1. **The velocity sweep had to mean something.** The 5×5 grid spans ±9° of PA in
+   steps of **4.5°**, so the "best" candidate is always a grid point, and on a
+   faint object it is the noise maximum. Measured: the app published PA 33 where
+   the ephemeris (Horizons) says 41.8 for 2025 HL5, and 37 where it says 46.2 for
+   2025 FG18: exactly one step of −9°. The sweep now keeps **the seed** (factor
+   1.0 and ΔPA 0, which IS the ephemeris' prediction, measured on the same
+   pixels) and its winner is only used if it beats the seed by **more than 3
+   times the grid's own robust scatter** (`SweepResult.significant`). If not, the
+   reported velocity is the ephemeris' and it says so. When it IS significant, a
+   **second pass** of 3×3 around the winner takes the resolution from ~4.5° to
+   ~0.9° without reading a single extra pixel (the fine candidates fall inside
+   the union the coarse pass already read: measured, the sweep's disk reads do
+   not change).
+2. **The stack's scale enters the photometry guards.** The ceilings (saturation,
+   linearity) are the **sensor's**, in ADU of **one** frame, and a `sum` stack
+   has N times the level. Measured on the 2025 FG18 visit (sky 1552 ADU, 207
+   frames, camera linearity 53 000): the `sum`'s own sky is 321 000 ADU, six
+   times the linearity, so **every** comparison star was rejected and the run
+   reported no magnitude. `PlateConfig.stack_scale` multiplies the ceilings
+   before the plate is compared against them.
+3. **The detection gate no longer throws the run away.** It still forbids the
+   **sweep** (a noise maximum is how a false positive is manufactured), but the
+   **photometric measurement is always attempted**: the position is the
+   ephemeris' prediction, the magnitude is measured there and the point is
+   flagged (`below_gate`), the magnitude cell comes out **red** (the same
+   `chart_annotate` role the band uses) and the note says that the stack's limit
+   magnitude is what the night really reached. A marked number is worth more
+   than no number.
+4. **An unreadable frame does not take the visit down.** Measured: the last frame
+   of 2025 FG18 is a 0-byte file (the capture was cut) and `load_sequence` raised,
+   so the Astrometry tab never even armed. The frame is now left out, counted and
+   said: in the object line ("N could not be read") and in the run's note.
+
+**Revisión (2026-10-06): el reporte dice lo que ha salido, y no se envía
+vacío.** Medido en una visita real de 2025 FG18 con **dos observaciones**: el
+listón de envío configurado (D26; el MPC **recomienda** 20 y la app trae 10,
+que es lo que el autor usó en sus envíos Tycho) dejaba fuera las dos, así que
+el generador devolvía **solo la cabecera del formato** y el observador leía
+«no genera nada». El motivo sí se decía, pero en dos sitios que no ayudan: la
+línea de estado y el grupo «What the run found», que ahora **nace cerrado**
+(ADR-038 rev).
+
+- **Una línea en el grupo del reporte**, junto a la fila de Generar, dice qué
+  ha salido: «N de M observaciones están en el reporte» o, cuando no hay
+  ninguna, que ninguna supera el listón, **con el número del listón y dónde se
+  cambia** (Ajustes → Astrometría), que es lo que faltaba para poder actuar.
+- **«Send to the MPC block» exige al menos una observación conservada**: la
+  caja lleva la cabecera del formato aunque no haya líneas, así que el texto
+  solo bastaba para habilitar el botón y se podía pegar en la visita un reporte
+  sin observaciones.
+- **El grupo de notas recibe su aviso** (⚠) cuando el reporte deja
+  observaciones fuera, para que se encuentre sin abrir todos los grupos.
+- El listón **no se toca**: 20 es la recomendación explícita del MPC, la app
+  trae 10 y bajarlo o subirlo es una decisión del observador, que ahora lo
+  cambia en **Ajustes → Astrometría** (esa pestaña existe desde esta revisión:
+  antes estos ajustes solo vivían en el fichero de configuración y el mensaje
+  del reporte prometía un sitio que no estaba).
+
+**Revision (2026-10-06): the report says what came out, and an empty one is
+never sent.** Measured on a real 2025 FG18 visit with **two observations**: the
+configured submission floor (D26; the MPC **recommends** 20 and the app ships
+10, which is what the author's own Tycho submissions used) left both out, so the generator
+returned **the format's header alone** and the observer read "it generates
+nothing". The reason was said, but in two places that do not help: the status
+line and the "What the run found" group, which is now **born closed**
+(ADR-038 rev).
+
+- **A line in the report's own group**, next to the Generate row, says what came
+  out: "N of M observations are in the report" or, when there are none, that
+  none clears the floor, **with the floor's number and where it is changed**
+  (Settings → Astrometry), which is what was missing to be able to act.
+- **"Send to the MPC block" needs at least one kept observation**: the box
+  carries the format's header even with no lines, so the text alone enabled the
+  button and a report with no observations could be pasted into the visit.
+- **The notes group gets its notice** (⚠) when the report leaves observations
+  out, so it is found without opening every group.
+- The floor is **not** touched: 20 is the MPC's explicit recommendation, the
+  app ships 10, and raising or lowering it is the observer's call, which they
+  now make in **Settings → Astrometry** (that tab exists since this revision:
+  these settings used to live only in the config file and the report's message
+  promised a place that was not there).
+
+**Nota (2026-10-06)**: la fotometría del run (objeto en su pila, comparsas en la
+pila de estrellas) obedece la regla de **ADR-066**: ninguna comparsa ni la
+estrella de control entra en el cero punto si toca la saturación o la
+linealidad, y si el perfil de cámara no tiene linealidad el run lo dice en sus
+notas en vez de caer al recorte de la placa en silencio.
+
+**Note (2026-10-06)**: the run's photometry (the object on its stack, the
+comparisons on the star stack) obeys the rule of **ADR-066**: no comparison and
+no check star enters the zero point if it touches the saturation or the
+linearity, and if the camera profile has no linearity the run says so in its
+notes instead of falling back to the plate's clip in silence.

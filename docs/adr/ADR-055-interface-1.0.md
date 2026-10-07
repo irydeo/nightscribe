@@ -580,3 +580,39 @@ with its verdict in Capture, the visit's frames drawn in Analysis, and the
 CCDciel state as colour with meaning. The detail, the measured numbers and
 the acceptance criterion (all four tabs fit at 1360x940 and 1360x860,
 Capture included with CCDciel connected) live in ADR-041.
+
+**Revisión (2026-10-06): la noche sale del banco de imágenes.** La Interfaz
+1.6 subió el cielo (la Luna con su fase, la ventana de oscuridad, los planetas
+al anochecer, los chips de eventos y el enlace al calendario) a la barra de
+navegación y lo dejó **visible desde todas las vistas**. Dentro del banco de
+imágenes eso es ruido: el observador está mirando una placa, no la noche, y la
+barra de navegación es justo el cromo que el banco no puede esconder. Se pidió
+quitarlo de ahí, y solo de ahí:
+
+- `MainWindow._sync_sky_bar(index)` esconde **el widget entero** (los cinco
+  elementos viven en `gui/widgets/sky_bar.py`, así que se van juntos) al entrar
+  en `VIEW_UFE` y lo devuelve en cualquier otra vista.
+- **No se destruye**: al volver, los textos y los chips están donde estaban.
+- **Mientras está fuera no se recalcula** (`refresh_sky_bar` sale sin hacer
+  nada): los chips se rehacen al volver, que es cuando alguien los va a mirar.
+- El calendario no queda inalcanzable: sigue en **Herramientas → Calendario
+  del cielo…** y en Bienvenida, que es adonde llevaban los chips.
+
+**Revision (2026-10-06): the night leaves the image workbench.** Interface 1.6
+moved the sky (the Moon at its phase, the darkness window, the planets at dusk,
+the event chips and the calendar link) into the navigation bar and left it
+**visible from every view**. Inside the image workbench that is noise: the
+observer is looking at a plate, not at tonight, and the navigation bar is
+precisely the chrome the workbench cannot hide. It was asked out of there, and
+only out of there:
+
+- `MainWindow._sync_sky_bar(index)` hides **the whole widget** (the five pieces
+  live in `gui/widgets/sky_bar.py`, so they leave together) when `VIEW_UFE` is
+  opened and brings it back in every other view.
+- **It is not destroyed**: coming back, the texts and the chips are where they
+  were.
+- **While it is out nothing is recomputed** (`refresh_sky_bar` returns without
+  working): the chips are rebuilt on the way back, which is when somebody is
+  going to look at them.
+- The calendar is not out of reach: it is still in **Tools → Sky calendar…** and
+  in Welcome, which is where the chips led anyway.

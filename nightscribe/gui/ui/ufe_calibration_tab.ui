@@ -30,10 +30,46 @@
     </widget>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="row_masters">
+     <item>
+      <widget class="QLabel" name="lbl_master_add">
+       <property name="text"><string>Library:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_master_kind">
+       <property name="toolTip">
+        <string>What the files you are about to index ARE: a bias (no exposure of its own), a dark (the light's exposure), a dark of the flats (the flat's exposure) or a flat (per filter, normalised). The kind decides the arithmetic, so it is asked here and not guessed</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_master_add">
+       <property name="text"><string>Add masters…</string></property>
+       <property name="toolTip">
+        <string>Index one or more FITS as masters of the kind above: the files are indexed, never copied or moved, and what makes them valid (camera, gain, temperature, exposure, filter) is read from their own headers. A flat does not have to share the lights' gain: a flat is normalised, so its shape does not depend on it</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_masters">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_master_status">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
     <widget class="QCheckBox" name="chk_pseudo_flat">
      <property name="text"><string>Build a flat from the frames when the library has none</string></property>
      <property name="toolTip">
-      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It needs the sequence to be dithered: without dithering the stars survive the percentile and the app says so</string>
+      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It needs the sequence to be dithered: without dithering the stars survive the percentile and the app says so. This is the calibration's own policy and this tab is its single home: every pipeline that applies the calibration reads this same switch, the stack included</string>
      </property>
     </widget>
    </item>
@@ -52,7 +88,7 @@
        <property name="enabled"><bool>false</bool></property>
        <property name="text"><string>Calibrate the visit</string></property>
        <property name="toolTip">
-        <string>Apply the recipe to every frame of the visit (offset first, flat second). While it runs, this button is the Cancel</string>
+        <string>Applies the recipe to every frame of the visit NOW (offset first, flat second), reports what each master did, and exports the copies only if the box above is checked. This is a one-off run, NOT the switch that calibrates the stack: every pipeline that applies the calibration has its own checkbox in its own tab. While it runs, this button is the Cancel</string>
        </property>
       </widget>
      </item>

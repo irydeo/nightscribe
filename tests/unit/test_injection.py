@@ -175,6 +175,21 @@ def test_the_cli_runs_the_instrument(tmp_path, capsys):
     from nightscribe.__main__ import main
     code = main(["inject", str(tmp_path), "--flujos", "6000", "--tomas", "4",
                  "--salida", str(tmp_path / "out")])
+    # main() sets the application's logging up (handlers marked on the ROOT
+    # logger), and that is a global side effect a unit test has no business
+    # leaving behind: test_logging asserts the file its own setup creates, and
+    # with the handlers already there that setup is a no-op BY DESIGN, so the
+    # file never appears and the failure looks like test_logging's fault.
+    # Undo it here, where it was done.
+    import logging
+    root = logging.getLogger()
+    for handler in [h for h in root.handlers
+                    if getattr(h, "_nightscribe", False)]:
+        root.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:
+            pass
     assert code == 0
     out = capsys.readouterr().out
     assert "injected motion" in out
@@ -237,3 +252,43 @@ def test_the_motion_is_the_injected_one_in_the_sky(tmp_path):
         # (CD1_1 < 0), so the two are checked against each other and not
         # against a remembered sign
         assert 0.0 <= pa < 360.0
+
+
+def test_the_magnitude_error_needs_no_catalogue():
+    # -2.5 log10(measured / injected): the zero point cancels in the ratio,
+    # which is what makes the pipeline's brightness error measurable offline.
+    # A positive number means the pipeline read the source FAINTER than it
+    # is, which is a systematic and not a scatter.
+    assert injection.mag_error(1000.0, 1000.0) == pytest.approx(0.0)
+    assert injection.mag_error(900.0, 1000.0) == pytest.approx(0.114, abs=0.002)
+    assert injection.mag_error(1100.0, 1000.0) == pytest.approx(-0.103, abs=0.002)
+    # a measurement that did not happen is not a zero error
+    assert injection.mag_error(None, 1000.0) is None
+    assert injection.mag_error(0.0, 1000.0) is None
+
+
+def test_the_injected_flux_comes_back_unbiased(tmp_path):
+    # The end-to-end photometric check: inject a KNOWN flux, measure it on
+    # the stack with the app's own aperture rule and with the matched filter,
+    # and ask how far each lands. A bias here is a systematic error of every
+    # magnitude the pipeline publishes, which is why it is measured before
+    # trusting any of them.
+    paths = _sequence(tmp_path)
+    w = _wcs()
+    got = injection.inject_sequence(paths, 12000.0, rate_px_min=1.0,
+                                    pa_deg=90.0, psf_fwhm=3.5,
+                                    out_dir=tmp_path / "inj", ref_wcs=w)
+    res = injection.recover(got["paths"], got["motion"], w,
+                            psf_fwhm=got["psf_fwhm"])
+    assert res["detected"] is True
+    assert res["flux"] is not None and res["flux_mf"] is not None
+    err = injection.mag_error(res["flux"], got["flux_adu"])
+    err_mf = injection.mag_error(res["flux_mf"], got["flux_adu"])
+    # both have to land within a tenth of a magnitude of the truth
+    assert abs(err) < 0.10, err
+    assert abs(err_mf) < 0.10, err_mf
+    # and the completeness table carries both medians
+    rows = injection.completeness(paths, [12000.0], w, trials=1,
+                                  out_root=tmp_path / "curva")
+    assert rows[0]["err_mag_median"] is not None
+    assert rows[0]["err_mag_mf_median"] is not None

@@ -330,14 +330,25 @@ def cmd_inject(args):
     rows = injection.completeness(
         paths, fluxes, w, trials=max(1, int(args.intentos)),
         out_root=args.salida)
-    print(f"{'flux ADU':>10} {'rate':>7} {'SNR':>7} {'err px':>8}")
+    print(f"{'flux ADU':>10} {'rate':>7} {'SNR':>7} {'err px':>8} "
+          f"{'d mag':>8} {'d mag mf':>9}")
     for row in rows:
         snr = row["snr_median"]
         err = row["err_px_median"]
+        # The brightness error is the RATIO of the measured flux to the
+        # injected one, in magnitudes: the zero point cancels, so it needs no
+        # catalogue and it says whether the pipeline biases the brightness
+        # (a systematic) or only scatters it (a random error). The second
+        # column is the same with the matched filter, which is what decides
+        # whether it is worth reporting the brightness that way.
+        d_mag = row.get("err_mag_median")
+        d_mf = row.get("err_mag_mf_median")
         print(f"{row['flux']:10.0f} "
               f"{row['detected']}/{row['trials']:>5} "
               f"{(f'{snr:.1f}' if snr is not None else '-'):>7} "
-              f"{(f'{err:.2f}' if err is not None else '-'):>8}")
+              f"{(f'{err:.2f}' if err is not None else '-'):>8} "
+              f"{(f'{d_mag:+.3f}' if d_mag is not None else '-'):>8} "
+              f"{(f'{d_mf:+.3f}' if d_mf is not None else '-'):>9}")
     return 0
 
 

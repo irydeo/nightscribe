@@ -159,12 +159,12 @@ def test_the_badge_keeps_the_whole_thing_when_there_is_room():
 
 def test_the_two_labels_never_overlap_in_a_tight_bar():
     # The end-to-end version of the report: whatever the window width, the
-    # name and the next action are two boxes that never run into each other.
-    # How much room the pill gets from the bar is font-driven (the Windows
-    # font is wider, so it is squeezed earlier), so "not collapsed" is asked
-    # only while the pill still has room for its chip plus a few characters.
+    # name and the next action are two boxes that never run into each other,
+    # and the pill always says SOMETHING (the whole identity is in the
+    # tooltip). How much of the name survives is font-driven (the Windows
+    # font squeezes the pill earlier): the "kept whole when there is room"
+    # and "elided when there is not" cases have their own tests.
     _app()
-    from PySide6.QtGui import QFontMetrics
     from nightscribe.gui.ufe_dialog import UfeDialog
     for width in (1400, 1100, 1000, 950, 900, 860):
         d = UfeDialog()
@@ -175,10 +175,8 @@ def test_the_two_labels_never_overlap_in_a_tight_bar():
         name = d.badge.lbl_name.geometry()
         nxt = d.badge.lbl_next.geometry()
         assert name.right() <= nxt.x(), f"overlap at {width}"
-        metrics = QFontMetrics(d.badge.lbl_name.font())
-        floor = d.badge.lbl_kind.width() + metrics.horizontalAdvance("V05")
-        if d.badge.width() >= floor:
-            assert d.badge.lbl_name.text() != "…", f"collapsed at {width}"
+        assert d.badge.lbl_name.text() != "", f"empty at {width}"
+        assert "C/2025 A1 (ATLAS)" in d.badge.toolTip()
         d.close()
 
 

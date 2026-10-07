@@ -323,10 +323,18 @@ def test_the_matched_filter_is_the_app_default():
     dlg = _load_ui("ufe_measure_tab")
     assert dlg.chk_matched.isChecked() is True
     # the tooltip has to say what it is, what it produces AND the risks:
-    # a figure or a switch without its meaning is what ADR-058 forbids
+    # a figure or a switch without its meaning is what ADR-058 forbids. Since
+    # 2026-10-07 it says it in WORDS and not with the figures of the case it
+    # was measured on: those live in ADR-067 and in the code, and a help that
+    # cites one visit ages badly (AGENTS.md, and the guard in
+    # tests/unit/test_help_texts.py).
     tip = dlg.chk_matched.toolTip()
     assert "best linear estimator" in tip
-    assert "1.55 to 1.63" in tip
+    assert "about half as much again" in tip
+    assert "two and a half times smaller" in tip
+    assert "a few hundredths of a magnitude" in tip
+    assert "1.55 to 1.63" not in tip
+    assert "2025 UR" not in tip
     assert "RISKS" in tip
     # and the risks have to carry the measurement that was made, including
     # the one that goes AGAINST the filter (its flux follows the PSF, and

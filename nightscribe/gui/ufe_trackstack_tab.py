@@ -1300,6 +1300,16 @@ class UfeTrackStackTab(QWidget):
             m = _OBS_RE.search(Path(str(path)).name)
             if m:
                 by_obs[int(m.group(1))] = str(path)
+        # The star stack of each observation (the pair the Photometry tab
+        # measures by hand): the run's own record, so a reopened run brings
+        # its pair back instead of leaving the tab to hunt it on disk.
+        stars_by_obs = {}
+        for path in (data.get("stacks") or []):
+            if not str(path).endswith("_stars.fits"):
+                continue
+            m = _OBS_RE.search(Path(str(path)).name)
+            if m:
+                stars_by_obs[int(m.group(1))] = str(path)
         # the two ways of an observation, paired by its group, and the stack
         # that goes with it: the file's number is the group's (index + 1),
         # NOT the position in this list (an observation that failed to
@@ -1310,6 +1320,7 @@ class UfeTrackStackTab(QWidget):
             by_group.setdefault(gi, {})[row.get("source") or "stack"] = row
         points, groups, mids, qs = [], [], [], []
         stacks, stack_paths, boxes = [], [], []
+        star_stacks = []
         # The frames of each observation: the run's own PLAN when it saved it
         # (exact: "Observation 1 (103 frames)"), else what the points say.
         # The stack point carries n_frames = 0 on purpose (core/astrometry.py:
@@ -1353,8 +1364,19 @@ class UfeTrackStackTab(QWidget):
             stack_paths.append(path)
             boxes.append((0, 0, arr.shape[1] if arr is not None else 0,
                           arr.shape[0] if arr is not None else 0))
+            star_path = stars_by_obs.get(gi + 1)
+            star_stacks.append(
+                (self._load_stack(star_path) if star_path else None, None))
         if status == "complete" and not points:
             return None
+        # The two verdicts the run carries in its POINTS (where they belong:
+        # they are facts about each measurement) and that the notes and the
+        # magnitude's colour read from the payload: a run below the gate must
+        # not reopen saying it was detected, and one measured from a human
+        # mark must say so.
+        point_flags = set()
+        for _sp, _fp, flags in points:
+            point_flags.update(flags or ())
         det = summary.get("detection") or {}
         dither = summary.get("dither") or {}
         qc = summary.get("wcs_qc") or {}
@@ -1363,8 +1385,13 @@ class UfeTrackStackTab(QWidget):
         return {
             "status": "ok" if status == "complete" else "not_detected",
             "restored": True, "stack_paths": stack_paths,
-            "stacks": stacks, "boxes": boxes, "qs": qs, "mids": mids,
+            "stacks": stacks, "star_stacks": star_stacks,
+            "boxes": boxes, "qs": qs, "mids": mids,
             "groups": groups, "points": points,
+            "below_gate": "below_gate" in point_flags,
+            "manual": "manual" in point_flags,
+            "n_unreadable": summary.get("n_unreadable") or 0,
+            "failed_frames": list(summary.get("failed_frames") or []),
             "method": summary.get("method") or run.get("method"),
             "ephem_source": summary.get("ephem_source"),
             "n_failed": summary.get("n_failed"),
@@ -1626,11 +1653,20 @@ class UfeTrackStackTab(QWidget):
         path = self._base_stack_path()
         if path.exists():
             return path
+        # A run written before the base stack carried its run id shares ONE
+        # file per project (`<object>_base.fits`), overwritten by every pass:
+        # it is the best that run can offer, and the manual window says which
+        # plate is being marked anyway.
+        legacy = self._base_stack_path(legacy=True)
+        if legacy.exists():
+            return legacy
         if result.get("base_stack") is not None:
             return self._save_base_stack(result)
         return None
 
-    def _base_stack_path(self):
+    def _base_stack_path(self, legacy=False):
+        # @args: legacy - True asks for the old shared name (see
+        #        _base_stack_name)
         # @return: where the whole-sequence stack is written for the mark:
         #          the project's own folder when the host points at one, the
         #          system temp otherwise
@@ -1647,15 +1683,24 @@ class UfeTrackStackTab(QWidget):
             base.mkdir(parents=True, exist_ok=True)
         except OSError:
             base = Path(tempfile.gettempdir())
-        return base / self._base_stack_name()
+        return base / self._base_stack_name(legacy=legacy)
 
-    def _base_stack_name(self):
-        # @return: "<object>_base.fits"
+    def _base_stack_name(self, legacy=False):
+        # @args: legacy - True for the name every run used to share
+        # @return: "<object>_base_r<run>.fits", the whole-sequence stack of
+        #          THIS run. It used to be one name per project and every run
+        #          overwrote it, so reopening an old run marked on the newest
+        #          pass's stack (reported 2026-10-07): the run id in the name
+        #          is what gives each pass its own base. Without a run id
+        #          (an ad-hoc run) there is nothing to tell them apart, and
+        #          the shared name is used.
         ctx = self._context() or {}
         raw = (ctx.get("object_name") or "object").strip() or "object"
         slug = "".join(ch if (ch.isalnum() or ch in "-_") else "_"
                        for ch in raw.replace(" ", "")) or "object"
-        return f"{slug}_base.fits"
+        if legacy or self._run_id is None:
+            return f"{slug}_base.fits"
+        return f"{slug}_base_r{int(self._run_id)}.fits"
 
     def _write_provenance_cards(self, header, result, report=None):
         # HOW THIS IMAGE WAS MADE, written into the file (2026-10-07).

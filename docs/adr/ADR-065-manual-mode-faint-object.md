@@ -97,6 +97,13 @@ fichero por observación (el mismo que ya se escribía para la primera, ahora
 para todas): es el precio de un resultado que se puede reabrir en vez de
 recalcular.
 
+**Revisión (2026-10-07): el stack del conjunto es de SU ejecución.** El fichero
+donde se coloca la marca se llamaba `<objeto>_base.fits` para todo el proyecto, y cada
+pasada lo sobrescribía: reabrir un run antiguo marcaba sobre el stack de la más reciente
+(otra imagen, otra WCS, otro `box_all`). Ahora el nombre lleva el id del run
+(`<objeto>_base_r<id>.fits`); un run escrito antes de este cambio cae al nombre compartido
+que tenga en disco, y el modo manual sigue diciendo sobre qué placa se está marcando.
+
 ## English
 
 **Context.** Stacking decides whether there is an object with a **detection
@@ -248,3 +255,10 @@ what does not:
    deterministic, so it is rebuilt in its box (quietly: the notes box keeps the
    run's own story, which the report must not overwrite). It is not sent
    anywhere: that is still the button.
+
+**Revision (2026-10-07): the whole-sequence stack belongs to ITS run.** The file the mark
+is placed on was named `<object>_base.fits` for the whole project, and every pass
+overwrote it: reopening an old run marked on the newest pass's stack (another image,
+another WCS, another `box_all`). The name now carries the run id
+(`<object>_base_r<id>.fits`); a run written before this change falls back to the shared
+name it has on disk, and the manual window still says which plate is being marked.

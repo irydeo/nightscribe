@@ -58,6 +58,13 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
   acompañado de qué significa y por qué importa. Las taxonomías y las cifras se explican
   una sola vez en `core/explain.py` (dos densidades: `short` para hooks/tooltips, `long`
   para fichas y posts); ningún módulo duplica ese conocimiento. Ver ADR-058.
+- **Las ayudas no nombran el caso concreto (regla permanente)**: los tooltips y los
+  textos de ayuda explican **por qué** y, como mucho, el **orden de magnitud**
+  («pierde alrededor de un cuarto de magnitud», «una décima de magnitud»); nunca citan
+  la visita, la fecha, el objeto ni el número de tomas del que salió la medida, ni
+  ponen un ejemplo con nombre propio («T CrB 2026 eruption»). Las cifras exactas viven
+  en el ADR y en los comentarios del código, que es donde se pueden revisar; la ayuda
+  es para decidir, no para auditar. El guardián es `tests/unit/test_help_texts.py`.
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, sin magia, y **numpy primero**:
@@ -360,6 +367,13 @@ drafts + tweet + ready-to-attach PNG charts). And between planning and reporting
   why it matters. Taxonomies and figures are explained once in `core/explain.py` (two
   densities: `short` for hooks/tooltips, `long` for cards and posts); no module
   duplicates that knowledge. See ADR-058.
+- **The help texts name no concrete case (permanent rule)**: tooltips and help strings
+  explain **why** and, at most, the **order of magnitude** ("loses about a quarter of a
+  magnitude", "a tenth of a magnitude"); they never cite the visit, the date, the
+  object or the number of frames the measurement came from, nor give an example with a
+  proper name ("T CrB 2026 eruption"). The exact figures live in the ADR and in the
+  code's comments, which is where they can be checked; the help is for deciding, not
+  for auditing. The guard is `tests/unit/test_help_texts.py`.
 - **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
   and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
 - **The interface is defined in `gui/ui/*.ui` (ADR-005)**: every window, dialog or tab

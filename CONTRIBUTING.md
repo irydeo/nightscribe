@@ -37,6 +37,15 @@ pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compile .qm
 English is the base language in code; Spanish is a translation. Tests fail if any
 string is left `unfinished`.
 
+**A help names no concrete case** (AGENTS.md, permanent rule): a tooltip or a help
+string explains WHY and, at most, the ORDER OF MAGNITUDE ("loses about a quarter of a
+magnitude"); it never cites the visit, the date, the object or the number of frames the
+measurement came from, and it never gives an example with a proper name. The exact
+figures live in the ADR and in the code's comments, which is where they can be checked.
+`tests/unit/test_help_texts.py` walks every tooltip, label and `tr()` string and fails
+on a case; if a string is legitimately about the vigils (whose list IS T CrB and
+R CrB), the test says so in its own words.
+
 ## Tests
 
 ```bash

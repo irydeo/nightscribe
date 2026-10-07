@@ -195,6 +195,24 @@ def _payload(mag=18.42):
     }
 
 
+def _flagged_payload(flags=("below_gate",), failed=("bad.fits",),
+                     unreadable=2, mag=18.0):
+    # @args: flags - the verdicts the POINTS carry (they are facts about each
+    #        measurement: below the gate, a human mark), failed - the frames
+    #        the run could not register, unreadable - the frames it could not
+    #        even read
+    # @return: the worker's dict for such a run
+    payload = _payload(mag=mag)
+    for sp, fp, _f in payload["points"]:
+        sp.flags = list(flags)
+        fp.flags = list(flags)
+    payload["below_gate"] = "below_gate" in flags
+    payload["manual"] = "manual" in flags
+    payload["failed_frames"] = list(failed)
+    payload["n_unreadable"] = unreadable
+    return payload
+
+
 def test_the_run_is_written_with_a_summary_the_visit_can_read_back(window,
                                                                   visit):
     # The run's own words ride in cfg_json: the detection, the sweep, the
@@ -303,6 +321,73 @@ def test_the_stacks_are_not_offered_twice(window, visit):
     window._ufe_astrometry_persist(pid, sid, _payload())
     data = window._ufe_astrometry_result(pid, sid)
     assert data["stacks"] == [path]
+
+
+def test_the_frames_the_run_could_not_use_are_written_down(window, visit):
+    # Which frames could not be read or registered is the run's own record
+    # (neither the points nor the stacks say it): it rides in the summary, so
+    # reopening the visit can mark them again instead of forgetting them.
+    pid, sid, _path = visit
+    window._ufe_astrometry_persist(
+        pid, sid, _flagged_payload(flags=(), failed=("a.fits", "b.fits"),
+                                   unreadable=3))
+    summary = window._ufe_astrometry_result(pid, sid)["run"]["cfg"]["result"]
+    assert summary["failed_frames"] == ["a.fits", "b.fits"]
+    assert summary["n_unreadable"] == 3
+
+
+def test_the_run_verdicts_travel_in_its_points(window, visit):
+    # below_gate and manual are facts about each measurement, so they are
+    # stored with the points (where the report's audit reads them) and not in
+    # a payload key that a restore would have to guess.
+    pid, sid, _path = visit
+    window._ufe_astrometry_persist(
+        pid, sid, _flagged_payload(flags=("below_gate", "manual")))
+    data = window._ufe_astrometry_result(pid, sid)
+    flags = {f for p in data["points"] for f in (p.get("flags") or [])}
+    assert {"below_gate", "manual"} <= flags
+
+
+def test_the_tab_paints_the_verdicts_and_the_bad_frames_again(window, visit,
+                                                              tmp_path, qapp):
+    # The whole seam: the host writes a run below the gate, measured from a
+    # human mark and with a frame it could not register; the tab paints it
+    # again with those verdicts in the payload and marks the frame. It used to
+    # say it had been detected and to clear the marks.
+    import numpy as np
+    from astropy.io import fits
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    pid, sid, stack_path = visit
+    fits.PrimaryHDU(np.zeros((16, 16), dtype=np.float32)).writeto(
+        stack_path, overwrite=True)
+    frames = []
+    for i in range(4):
+        p = tmp_path / f"f{i}.fits"
+        hdu = fits.PrimaryHDU(np.zeros((32, 32), dtype=np.float32))
+        hdu.header["DATE-OBS"] = f"2026-10-06T22:{i * 5:02d}:00"
+        hdu.header["EXPTIME"] = 60.0
+        hdu.writeto(str(p), overwrite=True)
+        frames.append(str(p))
+    window._ufe_astrometry_persist(
+        pid, sid, _flagged_payload(flags=("below_gate", "manual"),
+                                   failed=[frames[0]], unreadable=1))
+    marked = []
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": pid, "session_id": sid,
+                                       "paths": frames,
+                                       "object_name": "2026 PY9"}
+    host.export_folder = lambda: str(tmp_path)
+    host.astrometry_result = lambda: window._ufe_astrometry_result(pid, sid)
+    host.mark_unregistered_frames = lambda paths: marked.append(list(paths))
+    tab = UfeTrackStackTab(UfeImageState(host), "en", parent=host)
+    tab.refresh_context()
+    assert tab._result["below_gate"] is True
+    assert tab._result["manual"] is True
+    assert tab._result["n_unreadable"] == 1
+    assert tab._result["failed_frames"] == [frames[0]]
+    assert marked and marked[-1] == [frames[0]]
 
 
 def test_an_undone_run_is_not_handed_back(window, visit):

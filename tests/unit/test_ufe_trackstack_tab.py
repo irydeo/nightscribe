@@ -1318,11 +1318,14 @@ def test_the_base_stack_is_saved_with_its_own_band_cards(qapp, tmp_path):
         "ephem_mag_source": "horizons",
     }
     tab._save_base_stack(tab._result)
-    path = tmp_path / "2026PY9_base.fits"
+    # The base stack belongs to ITS run: the name carries the run id, so a
+    # visit with several passes does not have them all overwrite each other
+    # (the manual mark of a reopened old run used to land on the newest one)
+    path = tmp_path / "2026PY9_base_r7.fits"
     assert path.exists()
     # and it is registered on the visit, like the observations' stacks
     assert saved and saved[0][1] == "stack"
-    assert saved[0][0][0].endswith("2026PY9_base.fits")
+    assert saved[0][0][0].endswith("2026PY9_base_r7.fits")
     header = fits.getheader(str(path))
     assert header["NS_STACK"] == "base"
     assert header["NS_RUN"] == 7
@@ -1347,6 +1350,52 @@ def test_the_base_stack_is_saved_with_its_own_band_cards(qapp, tmp_path):
     assert "measured" not in facts
     assert facts["detection"]["snr"] == pytest.approx(1.4)
     assert facts["detection"]["limit"] == pytest.approx(19.4)
+
+
+def test_the_base_stack_belongs_to_its_run(qapp, tmp_path):
+    # The whole-sequence stack used to be ONE file per project, overwritten by
+    # every pass, so reopening an old run placed its manual mark on the newest
+    # pass's stack (reported 2026-10-07). The run id in the name gives each
+    # pass its own, and a run written before this falls back to the shared
+    # file it has on disk.
+    tab, _host = _tab(qapp, tmp_path)
+    tab.parent().export_folder = lambda: str(tmp_path)
+    tab._run_id = 3
+    assert tab._base_stack_name() == "2026QX_base_r3.fits"
+    tab._run_id = 9
+    assert tab._base_stack_name() == "2026QX_base_r9.fits"
+    assert tab._base_stack_name(legacy=True) == "2026QX_base.fits"
+    # with no run (an ad-hoc run) there is nothing to tell them apart
+    tab._run_id = None
+    assert tab._base_stack_name() == "2026QX_base.fits"
+    # the fallback: an old run's shared file is used when its own is missing
+    legacy = tmp_path / "2026QX_base.fits"
+    legacy.write_bytes(b"x")
+    tab._run_id = 3
+    assert tab._ensure_base_stack({}) == legacy
+
+
+def test_the_restore_brings_the_star_stacks_back(qapp, tmp_path):
+    # The object's stack and the star stack are a PAIR (NS_PAIR): a reopened
+    # run carries both, instead of leaving the Photometry tab to hunt for the
+    # second file on disk.
+    from astropy.io import fits
+    tab, _host = _tab(qapp, tmp_path)
+    tab.parent().export_folder = lambda: str(tmp_path)
+    obj = tmp_path / "2026QX_obs1.fits"
+    stars = tmp_path / "2026QX_obs1_stars.fits"
+    fits.PrimaryHDU(np.zeros((16, 16), dtype=np.float32)).writeto(str(obj))
+    fits.PrimaryHDU(np.ones((16, 16), dtype=np.float32)).writeto(str(stars))
+    tab._run_id = 5
+    data = {"run": {"id": 5, "status": "complete", "cfg": {"result": {}}},
+            "points": [{"group_index": 0, "source": "stack", "ra": 30.0,
+                        "dec": 10.0, "x": 8.0, "y": 8.0, "snr": 12.0,
+                        "mjd": 61000.5, "n_frames": 4, "flags": []}],
+            "stacks": [str(obj), str(stars)]}
+    payload = tab._restored_payload(data)
+    assert payload["stacks"][0][0] is not None
+    assert payload["star_stacks"][0][0] is not None
+    assert payload["star_stacks"][0][0].mean() == pytest.approx(1.0)
 
 
 def test_the_band_says_when_the_brightness_is_a_prediction(qapp, tmp_path):
@@ -1451,7 +1500,11 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     tab, _host = _tab(qapp, tmp_path)
     assert tab.chk_calibrate.text()
     assert tab.chk_calibrate.isChecked() is False
-    assert "0.087" in tab.chk_calibrate.toolTip()      # the why, measured
+    assert "tenth of a magnitude" in tab.chk_calibrate.toolTip()
+    # and it says it in words, not with the figure of the case it came from:
+    # the exact numbers live in the ADR and in the code, and a help that cites
+    # one visit ages badly (2026-10-07, the same rule the other helps follow)
+    assert "0.087" not in tab.chk_calibrate.toolTip()
     # ADR-069: it no longer needs dither (the stars are masked, so a static
     # field works); what it does need is a dark/bias, or the pedestal
     # compresses the flat, and the tooltip says so.

@@ -3881,9 +3881,9 @@ class MainWindow(QMainWindow):
             w.lbl_cmeta.setText("—")
             w.lbl_cgoal.setText(self.tr(
                 "A campaign groups the projects of one shared observation "
-                "effort — several nights, several observatories, one goal "
-                "(e.g. “T CrB 2026 eruption”). A project is one object "
-                "with its three steps: capture, track, follow-up."))
+                "effort: several nights, several observatories, one goal. "
+                "A project is one object with its three steps: capture, "
+                "track, follow-up."))
             w.lbl_urls.setText("")
             w.lbl_protocol.setText("—")
             tbl.setRowCount(0)
@@ -7408,7 +7408,7 @@ class MainWindow(QMainWindow):
                 if float(ctx["mag"]) <= 10.0:
                     lbl_sat = QLabel(self.tr(
                         "⚠ Bright star: watch the saturation — a slight "
-                        "defocus helps (T CrB lesson)"))
+                        "defocus helps"))
                     lbl_sat.setWordWrap(True)
                     lbl_sat.setStyleSheet("color: #e0c060;")
                     gl.addWidget(lbl_sat)
@@ -9661,16 +9661,15 @@ class MainWindow(QMainWindow):
 
     def _campaign_help(self):
         # The ⓘ next to "New campaign…" (UX-PC U5, plain-language rule):
-        # what a campaign IS, with a real example, right where the user
-        # meets the concept.
+        # what a campaign IS, right where the user meets the concept. It
+        # explains the idea and does NOT name an example: a help that cites a
+        # particular object ages badly and reads as if that were the only
+        # case (the same rule the stacking helps follow).
         QMessageBox.information(
             self, self.tr("What is a campaign?"),
             self.tr("A campaign groups the projects of one shared "
-                    "observation effort — several nights, several "
+                    "observation effort: several nights, several "
                     "observatories, one goal.\n\n"
-                    "Example: “T CrB 2026 eruption” (obsSN group) — every "
-                    "night you measure T CrB with the same protocol and "
-                    "report the results together.\n\n"
                     "A project is one object with its three steps: plan, "
                     "process, publish."))
 
@@ -11527,6 +11526,13 @@ class MainWindow(QMainWindow):
             "photometry": _scalar(payload.get("photometry")),
             "register_report": _scalar(payload.get("register_report")),
             "calibration": _scalar(payload.get("calibration")),
+            # The run's own record of what it could NOT use: the frames it
+            # could not read and the ones it could not register (by path).
+            # They live here because neither the points nor the stacks say
+            # them, and reopening the visit must mark the bad frames again
+            # instead of forgetting them (2026-10-07).
+            "n_unreadable": _scalar(payload.get("n_unreadable")),
+            "failed_frames": _scalar(payload.get("failed_frames")),
             # The PLAN of the run: which frames went into each observation.
             # Without it a reopened run can only guess the "N frames" of each
             # observation from its points, and the stack point carries 0 on

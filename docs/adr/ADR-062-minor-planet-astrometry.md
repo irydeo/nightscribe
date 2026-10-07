@@ -726,3 +726,23 @@ pass's image) and are not offered twice, and the **run's plan** (which frames we
 each observation) travels in its summary, so a reopened run says "Observation 1 (103
 frames)" instead of the stack point's 0 read as "1 frames".
 
+
+**Nota (2026-10-07): reabrir un run lo recupera TODO, no sólo los puntos.** El restore
+reconstruye también los dos veredictos que viajan en los puntos (`below_gate` y `manual`),
+así que las notas y el color de la magnitud son los del run y no los de un run detectado;
+las tomas que el run no pudo **leer** o **registrar** vuelven con él (su resumen guarda
+`n_unreadable` y `failed_frames`) y el editor las vuelve a marcar en la lista de la visita;
+los **star stacks** del par se cargan con los del objeto; y el **stack del conjunto** lleva
+el id del run en el nombre (`<objeto>_base_r<id>.fits`), porque antes era uno por proyecto
+y cada pasada sobrescribía al anterior, de modo que el modo manual de un run antiguo
+marcaba sobre el stack de la pasada más nueva.
+
+**Note (2026-10-07): reopening a run brings ALL of it back, not only the points.** The
+restore also rebuilds the two verdicts that travel in the points (`below_gate` and
+`manual`), so the notes and the magnitude's colour are the run's and not a detected run's;
+the frames the run could not **read** or **register** come back with it (its summary keeps
+`n_unreadable` and `failed_frames`) and the editor marks them again in the visit's list;
+the **star stacks** of the pair are loaded with the object's; and the **whole-sequence
+stack** carries the run id in its name (`<object>_base_r<id>.fits`), because it used to be
+one per project and every pass overwrote it, so an old run's manual mode marked on the
+newest pass's stack.

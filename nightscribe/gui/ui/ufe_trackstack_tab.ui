@@ -166,7 +166,7 @@
           <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
           <property name="minimumContentsLength"><number>10</number></property>
           <property name="toolTip">
-           <string>How the frames of each group are combined, and what it costs. Measured on a real visit (2025 FG18, 207 frames, injecting sources of a known brightness and measuring them back): the sigma-clipped mean (the default) reaches magnitude 18.23; the median reaches 17.97, a quarter of a magnitude less, because a median is 1.25x noisier than a mean; the plain mean is as deep as the clip but keeps the star trails, which are what the clip is for. Weighted is the same clip with each frame counting by 1/sigma^2 of its own sky: it changes nothing on a stable night and it is what saves a night with thin cloud or moon. Sum and mean differ only in scale. Use the median only when something must be rejected outright and the clip cannot.</string>
+           <string>How the frames of each group are combined, and what it costs. Measured by injecting sources of a known brightness into real frames and measuring them back: the sigma-clipped mean (the default) goes deeper than the median by about a quarter of a magnitude, because a median is 1.25x noisier than a mean; the plain mean is as deep as the clip but keeps the star trails, which are what the clip is for. Weighted is the same clip with each frame counting by 1/sigma^2 of its own sky: it changes nothing on a stable night and it is what saves a night with thin cloud or moon. Sum and mean differ only in scale. Use the median only when something must be rejected outright and the clip cannot.</string>
           </property>
          </widget>
         </item>
@@ -184,7 +184,7 @@
           <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
           <property name="minimumContentsLength"><number>10</number></property>
           <property name="toolTip">
-           <string>How the frames are resampled onto the output grid. The bilinear (the default) makes the image visibly cleaner at NO cost in depth: measured on a real visit (2025 FG18, 207 frames, injecting sources of a known brightness and measuring them back), the bilinear and the cubic tie at magnitude 18.20 against 18.21, while the pixel noise differs by 29 % (6.58 against 8.49 ADU/px). A smoother image is not a deeper one: the depth is decided by the combination above and by the frames that go in, and the pixel noise of a smoothed stack is not a measure of how faint it reaches. The cubic keeps a marginally sharper point spread and a grainier image: use it if you are chasing detail in a crowded field.</string>
+           <string>How the frames are resampled onto the output grid. The bilinear (the default) makes the image visibly cleaner at NO cost in depth, and that is measured, not assumed: injecting sources of a known brightness into real frames and measuring them back, the interpolation orders tie in depth while the pixel noise differs noticeably. A smoother image is not a deeper one: the depth is decided by the combination above and by the frames that go in, and the pixel noise of a smoothed stack is not a measure of how faint it reaches. The cubic keeps a marginally sharper point spread and a grainier image: use it if you are chasing detail in a crowded field.</string>
           </property>
          </widget>
         </item>
@@ -261,7 +261,7 @@
          <widget class="QCheckBox" name="chk_calibrate">
           <property name="text"><string>Apply the calibration</string></property>
           <property name="toolTip">
-           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves, with no star in it, and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: the smooth vignetting alone is worth a systematic error of a tenth of a magnitude. When the library has no flat for this filter, a flat is built from the frames themselves, with no star in it, and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
           </property>
          </widget>
         </item>

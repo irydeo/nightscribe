@@ -485,11 +485,15 @@ def sky_sigma(values):
 
 def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
                     r_ann_out=R_ANN_OUT, sat_adu=None, fwhm=None,
-                    centroid_mode="gaussian"):
+                    centroid_mode="gaussian", sigma_clip=True,
+                    linear_adu=None, sky_mode="median", robust=True):
     # @args: data - 2D array (ADU), x/y - the object's position, psf - a
     #        normalised PSF (sums to one) on an odd grid, the same
     #        apertures as measure_point, sat_adu - the ceiling, fwhm - the
-    #        seeing, centroid_mode - as measure_point
+    #        seeing, centroid_mode/sigma_clip/linear_adu/sky_mode/robust -
+    #        as measure_point: the filter has to honour the SAME recipe as
+    #        the aperture, or a plate measured one way and the other would
+    #        not be comparable
     # @return: {"ok", "reason", "x", "y", "flux", "flux_ap", "snr",
     #          "snr_ap", "n_eff", "n_pix", "sky_pp", "sigma_pp", "peak"}
     # THE MATCHED FILTER. With a known shape m (summing to one) and white
@@ -514,7 +518,9 @@ def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
     # inside the difference of two other estimates.
     ap = measure_point(data, x, y, r_ap=r_ap, r_ann_in=r_ann_in,
                        r_ann_out=r_ann_out, sat_adu=sat_adu, fwhm=fwhm,
-                       centroid_mode=centroid_mode)
+                       centroid_mode=centroid_mode, sigma_clip=sigma_clip,
+                       linear_adu=linear_adu, sky_mode=sky_mode,
+                       robust=robust)
     if not ap.get("ok"):
         out = dict(ap)
         out.update(flux=None, flux_ap=None, snr=None, snr_ap=None,
@@ -2097,6 +2103,12 @@ class PlateConfig:
                                     # centroid): "none" pins the hand-placed
                                     # centre, for a very faint SN
     sigmaclip: bool = True
+    # P4c/P3: measure the target AND the comps with the matched filter
+    # instead of the aperture, so the zero point comes from the SAME method
+    # as the target. P2 measured the filter at 1.55-1.63x the aperture's SNR
+    # on real data and P4c measured it less biased at low SNR; off by
+    # default, and the aperture's value is kept beside it for the audit.
+    matched: bool = False
     sky_mode: str = "median"
     color: bool = False
     target_bv: float = 0.0
@@ -2230,6 +2242,29 @@ def measure_plate(image, cfg):
     scale = float(cfg.comp_scale) if cfg.comp_image is not None else 1.0
     radii = tuple(cfg.radii) if cfg.radii else (R_AP, R_ANN_IN, R_ANN_OUT)
     fwhm = cfg.fwhm
+    # THE MEASUREMENT ITSELF, chosen in ONE place (P3 of the SNR campaign).
+    # The aperture is the proven path; the matched filter is the one P2
+    # measured at 1.55-1.63x its SNR on real data and P4c measured less
+    # biased at low SNR. Both share the centroid, the sky and the sigma, so a
+    # plate measured one way and a plate measured the other stay comparable,
+    # and the ZERO POINT is measured with the same method as the target:
+    # mixing them (the target with the filter, the comps with the aperture)
+    # would put the difference between the two methods straight into the
+    # magnitude.
+    _psf = None
+    if getattr(cfg, "matched", False) and fwhm:
+        # the Gaussian from the measured seeing: P2 measured that on the real
+        # 2025 UR stack it agrees with the empirical profile to the last
+        # digit, and it does not drag the comps' noise into the shape
+        _psf = gaussian_psf(float(fwhm))
+
+    def _one(img, x, y, **kw):
+        # @args: img/x/y - where to measure, kw - the aperture, centroid and
+        #        sky knobs the call sites pass
+        # @return: the measurement dict, from whichever method was asked for
+        if _psf is None:
+            return measure_point(img, x, y, **kw)
+        return measure_matched(img, x, y, _psf, **kw)
     # The ceilings are the SENSOR's, in the units of ONE frame; a stack that
     # ADDS its frames ("sum") has N times the level. A pixel saturates when
     # the FRAME it came from did, and on a sum stack the per-frame equivalent
@@ -2273,7 +2308,7 @@ def measure_plate(image, cfg):
             # the star stack of the same frames) the camera's ceilings
             # apply to the target too; on a resampled difference image they
             # do not, because those ADU are not the sensor's.
-            target = measure_point(
+            target = _one(
                 image, tx / scale, ty / scale,
                 r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
                 r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
@@ -2283,7 +2318,7 @@ def measure_plate(image, cfg):
                 centroid_mode=cfg.centroid_mode,
                 fwhm=(fwhm / scale if fwhm else None))
         else:
-            target = measure_point(
+            target = _one(
                 image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
                 r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
                 linear_adu=lin, sky_mode=cfg.sky_mode,
@@ -2327,7 +2362,7 @@ def measure_plate(image, cfg):
             # the comp on its own small stack, already aligned on the
             # stars: the aperture and the annulus fit inside it by
             # construction (the caller sized the window for them)
-            r = measure_point(
+            r = _one(
                 own[0], own[1], own[2], r_ap=radii[0], r_ann_in=radii[1],
                 r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
                 linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
@@ -2339,14 +2374,14 @@ def measure_plate(image, cfg):
                 skipped["off"] = skipped.get("off", 0) + 1
                 continue
             if cfg.comp_image is not None:
-                r = measure_point(
+                r = _one(
                     cfg.comp_image, ccol / scale, crow / scale,
                     r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
                     r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
                     sat_adu=None, sky_mode=cfg.sky_mode,
                     fwhm=(fwhm / scale if fwhm else None))
             else:
-                r = measure_point(image, ccol, crow, r_ap=radii[0],
+                r = _one(image, ccol, crow, r_ap=radii[0],
                                   r_ann_in=radii[1], r_ann_out=radii[2],
                                   sigma_clip=cfg.sigmaclip, sat_adu=sat,
                                   linear_adu=lin, sky_mode=cfg.sky_mode,

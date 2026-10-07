@@ -46,6 +46,9 @@ class UfeAdvancedDialog(QDialog):
         self.cmb_sky.addItem(self.tr("Plane (galactic cores)"), "plane")
         self.chk_sigmaclip = self._ui.chk_sigmaclip
         self.chk_seeing = self._ui.chk_seeing
+        # P3 de la campana de SNR: medir con el filtro adaptado (el objetivo
+        # Y las comparsas), para que el cero punto salga del mismo metodo
+        self.chk_matched = self._ui.chk_matched
         self.chk_color = self._ui.chk_color
         self.spn_target_bv = self._ui.spn_target_bv
         self.chk_subtract = self._ui.chk_subtract

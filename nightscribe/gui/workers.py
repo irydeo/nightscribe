@@ -1250,6 +1250,7 @@ class TrackStackWorker(QThread):
                 centroid_mode=("none" if recipe.get("manual_centre")
                                else "gaussian"),
                 sigmaclip=bool(recipe.get("sigmaclip", True)),
+                matched=bool(recipe.get("matched", False)),
                 sky_mode=recipe.get("sky") or "median",
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),

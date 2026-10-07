@@ -8705,17 +8705,17 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Plane (galactic cores)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="66"/>
+        <location filename="../ufe_advanced_dialog.py" line="69"/>
         <source>Off (raw curve)</source>
         <translation>Off (raw curve)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="67"/>
+        <location filename="../ufe_advanced_dialog.py" line="70"/>
         <source>Airmass (minimum)</source>
         <translation>Airmass (minimum)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="68"/>
+        <location filename="../ufe_advanced_dialog.py" line="71"/>
         <source>Auto (FWHM, sky, x-y)</source>
         <translation>Auto (FWHM, sky, x-y)</translation>
     </message>
@@ -8745,112 +8745,122 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="21"/>
+        <source>Matched filter (weight each pixel by the star&apos;s shape)</source>
+        <translation>Matched filter (weight each pixel by the star&apos;s shape)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="21"/>
+        <source>Measures the target AND the comparison stars by weighting each pixel with the expected point spread instead of summing a circle, so the zero point comes from the same method as the target. It is the statistically optimal linear filter, and measured on real data it reaches 1.55 to 1.63 times the aperture&apos;s signal-to-noise and halves the brightness bias at low signal-to-noise (from +0.54 to +0.23 magnitudes on a 30-frame stack at SNR 9). Costs the same: the shape is built from the measured seeing. Off by default: the aperture is the proven path and the run keeps its value beside it for the audit</source>
+        <translation>Measures the target AND the comparison stars by weighting each pixel with the expected point spread instead of summing a circle, so the zero point comes from the same method as the target. It is the statistically optimal linear filter, and measured on real data it reaches 1.55 to 1.63 times the aperture&apos;s signal-to-noise and halves the brightness bias at low signal-to-noise (from +0.54 to +0.23 magnitudes on a 30-frame stack at SNR 9). Costs the same: the shape is built from the measured seeing. Off by default: the aperture is the proven path and the run keeps its value beside it for the audit</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="24"/>
         <source>Colour term</source>
         <translation>Colour term</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="24"/>
         <source>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</source>
         <translation>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="24"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="25"/>
         <source>B−V target:</source>
         <translation>B−V target:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="25"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="26"/>
         <source>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</source>
         <translation>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="29"/>
         <source>Subtract host galaxy (PS1 reference)</source>
         <translation>Subtract host galaxy (PS1 reference)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="29"/>
         <source>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</source>
         <translation>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="31"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="32"/>
         <source>Group frames:</source>
         <translation>Group frames:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="32"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="33"/>
         <source>Series only: combine N frames per point in the measurement domain (fluxes with 1/σ² weights), never pixel stacking. 1 = one point per frame (the default for transits and variables)</source>
         <translation>Series only: combine N frames per point in the measurement domain (fluxes with 1/σ² weights), never pixel stacking. 1 = one point per frame (the default for transits and variables)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="37"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="38"/>
         <source>Detrend:</source>
         <translation>Detrend:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="38"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="39"/>
         <source>Series only: off keeps the raw curve; airmass removes the minimum (a1·exp(a2·X)+a3); auto adds FWHM/sky/x-y only when the residual really improves. The raw curve is always kept</source>
         <translation>Series only: off keeps the raw curve; airmass removes the minimum (a1·exp(a2·X)+a3); auto adds FWHM/sky/x-y only when the residual really improves. The raw curve is always kept</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="47"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="48"/>
         <source>Aperture sweep per night (T3)</source>
         <translation>Aperture sweep per night (T3)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="47"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="48"/>
         <source>Series only: pick the aperture k in [1.0, 2.0]·FWHM whose check-star scatter is smallest, one choice per night</source>
         <translation>Series only: pick the aperture k in [1.0, 2.0]·FWHM whose check-star scatter is smallest, one choice per night</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="50"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="51"/>
         <source>Saturation (ADU):</source>
         <translation>Saturation (ADU):</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="51"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="52"/>
         <source>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Ajustes value (the line at the right shows what 0 resolves to)</source>
         <translation>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Ajustes value (the line at the right shows what 0 resolves to)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="55"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="56"/>
         <source>Restore defaults</source>
         <translation>Restore defaults</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="55"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="56"/>
         <source>Back to the recipe the editor ships with: sky medians with sigma-clip, seeing apertures, colour term, no grouping, no detrend</source>
         <translation>Back to the recipe the editor ships with: sky medians with sigma-clip, seeing apertures, colour term, no grouping, no detrend</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="43"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="44"/>
         <source>Align frames:</source>
         <translation>Align frames:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_advanced_dialog.ui" line="44"/>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="45"/>
         <source>Series only: the frames of a visit rarely sit on the same pixels (the mount drifts, or the telescope was re-pointed). Auto measures each frame on its own grid at the mapped coordinates, so the star never leaves the aperture and the point spread is never resampled. Off assumes the frames are already aligned (a solved WCS per frame does the same job)</source>
         <translation>Series only: the frames of a visit rarely sit on the same pixels (the mount drifts, or the telescope was re-pointed). Auto measures each frame on its own grid at the mapped coordinates, so the star never leaves the aperture and the point spread is never resampled. Off assumes the frames are already aligned (a solved WCS per frame does the same job)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="59"/>
+        <location filename="../ufe_advanced_dialog.py" line="62"/>
         <source>Auto (recommended)</source>
         <translation>Auto (recommended)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="60"/>
+        <location filename="../ufe_advanced_dialog.py" line="63"/>
         <source>Off (frames already aligned)</source>
         <translation>Off (frames already aligned)</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="62"/>
+        <location filename="../ufe_advanced_dialog.py" line="65"/>
         <source>Translation only</source>
         <translation>Translation only</translation>
     </message>
     <message>
-        <location filename="../ufe_advanced_dialog.py" line="63"/>
+        <location filename="../ufe_advanced_dialog.py" line="66"/>
         <source>Rotation and translation</source>
         <translation>Rotation and translation</translation>
     </message>
@@ -10774,22 +10784,22 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="811"/>
+        <location filename="../ufe_measure_tab.py" line="814"/>
         <source>Nothing to save yet: measure a point first.</source>
         <translation>Nothing to save yet: measure a point first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="817"/>
+        <location filename="../ufe_measure_tab.py" line="820"/>
         <source>This plate has no observation date in its header: the point cannot be dated, so it cannot be saved.</source>
         <translation>This plate has no observation date in its header: the point cannot be dated, so it cannot be saved.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="834"/>
+        <location filename="../ufe_measure_tab.py" line="837"/>
         <source>Could not save the point in the project.</source>
         <translation>Could not save the point in the project.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="837"/>
+        <location filename="../ufe_measure_tab.py" line="840"/>
         <source>Point saved in the project: it is on the light curve and counts for the campaign summary.</source>
         <translation>Point saved in the project: it is on the light curve and counts for the campaign summary.</translation>
     </message>
@@ -10809,133 +10819,133 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="971"/>
-        <location filename="../ufe_measure_tab.py" line="1701"/>
+        <location filename="../ufe_measure_tab.py" line="974"/>
+        <location filename="../ufe_measure_tab.py" line="1706"/>
         <source>No comparison sequence yet: build one above with «Build the sequence…».</source>
         <translation>No comparison sequence yet: build one above with «Build the sequence…».</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1147"/>
+        <location filename="../ufe_measure_tab.py" line="1152"/>
         <source>Measure the target first (a click on it).</source>
         <translation>Measure the target first (a click on it).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3031"/>
+        <location filename="../ufe_measure_tab.py" line="3036"/>
         <source>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</source>
         <translation>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3033"/>
+        <location filename="../ufe_measure_tab.py" line="3038"/>
         <source>Instrumental mag: {0:.3f}</source>
         <translation>Instrumental mag: {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3037"/>
+        <location filename="../ufe_measure_tab.py" line="3042"/>
         <source>No comparison star could be used: no calibration.</source>
         <translation>No comparison star could be used: no calibration.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3040"/>
+        <location filename="../ufe_measure_tab.py" line="3045"/>
         <source>Why: {0} (of {1} sequence stars).</source>
         <translation>Why: {0} (of {1} sequence stars).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3044"/>
+        <location filename="../ufe_measure_tab.py" line="3049"/>
         <source>The proposed comps are too bright for this plate: re-propose with a fainter target magnitude, or check the saturation ceiling.</source>
         <translation>The proposed comps are too bright for this plate: re-propose with a fainter target magnitude, or check the saturation ceiling.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3049"/>
+        <location filename="../ufe_measure_tab.py" line="3054"/>
         <source>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</source>
         <translation>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3054"/>
+        <location filename="../ufe_measure_tab.py" line="3059"/>
         <source>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</source>
         <translation>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3065"/>
+        <location filename="../ufe_measure_tab.py" line="3070"/>
         <source>± {0:.3f}</source>
         <translation>± {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3067"/>
+        <location filename="../ufe_measure_tab.py" line="3072"/>
         <source>Magnitude: {0:.3f} {1} ({2})</source>
         <translation>Magnitude: {0:.3f} {1} ({2})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3086"/>
+        <location filename="../ufe_measure_tab.py" line="3091"/>
         <source>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</source>
         <translation>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3089"/>
+        <location filename="../ufe_measure_tab.py" line="3094"/>
         <source> · Δ {0:+.2f}</source>
         <translation> · Δ {0:+.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3096"/>
+        <location filename="../ufe_measure_tab.py" line="3101"/>
         <source>No catalogued source within 8″ of the target (a new object?)</source>
         <translation>No catalogued source within 8″ of the target (a new object?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3110"/>
+        <location filename="../ufe_measure_tab.py" line="3115"/>
         <source>the centroid landed {0:.1f} px from the click</source>
         <translation>the centroid landed {0:.1f} px from the click</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3114"/>
+        <location filename="../ufe_measure_tab.py" line="3119"/>
         <source>no source could be locked: measured where you clicked</source>
         <translation>no source could be locked: measured where you clicked</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3117"/>
+        <location filename="../ufe_measure_tab.py" line="3122"/>
         <source>The sequence carries no Johnson V: calibrating in catalog {0} (for red stars it can differ from V by more than 1 mag)</source>
         <translation>The sequence carries no Johnson V: calibrating in catalog {0} (for red stars it can differ from V by more than 1 mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3123"/>
+        <location filename="../ufe_measure_tab.py" line="3128"/>
         <source>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</source>
         <translation>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3127"/>
+        <location filename="../ufe_measure_tab.py" line="3132"/>
         <source>apertures set by hand (the seeing auto-scale is paused)</source>
         <translation>apertures set by hand (the seeing auto-scale is paused)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3016"/>
+        <location filename="../ufe_measure_tab.py" line="3021"/>
         <source>{0} saturated/clipped</source>
         <translation>{0} saturated/clipped</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="769"/>
+        <location filename="../ufe_measure_tab.py" line="772"/>
         <source>Load a plate first: there is no state to reset.</source>
         <translation>Load a plate first: there is no state to reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="772"/>
+        <location filename="../ufe_measure_tab.py" line="775"/>
         <source>Plate state reset.</source>
         <translation>Plate state reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="775"/>
+        <location filename="../ufe_measure_tab.py" line="778"/>
         <source>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</source>
         <translation>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="786"/>
+        <location filename="../ufe_measure_tab.py" line="789"/>
         <source>Load a plate first: there are no plate points to reset.</source>
         <translation>Load a plate first: there are no plate points to reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="789"/>
+        <location filename="../ufe_measure_tab.py" line="792"/>
         <source>Reset the points of this plate</source>
         <translation>Reset the points of this plate</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="791"/>
+        <location filename="../ufe_measure_tab.py" line="794"/>
         <source>Delete every measurement point saved on this plate?
 They leave the light curve; the CSV files on disk are
 not touched.</source>
@@ -10944,12 +10954,12 @@ They leave the light curve; the CSV files on disk are
 not touched.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="799"/>
+        <location filename="../ufe_measure_tab.py" line="802"/>
         <source>The plate&apos;s measurement points were deleted.</source>
         <translation>The plate&apos;s measurement points were deleted.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="802"/>
+        <location filename="../ufe_measure_tab.py" line="805"/>
         <source>No measurement points saved on this plate.</source>
         <translation>No measurement points saved on this plate.</translation>
     </message>
@@ -10962,398 +10972,398 @@ not touched.</translation>
         <translation type="vanished">This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="930"/>
+        <location filename="../ufe_measure_tab.py" line="933"/>
         <source>The plate has no WCS and it could not be solved: the comparison stars cannot be located.</source>
         <translation>The plate has no WCS and it could not be solved: the comparison stars cannot be located.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="937"/>
+        <location filename="../ufe_measure_tab.py" line="940"/>
         <source>The plate has no WCS and it could not be solved: no aligned reference.</source>
         <translation>The plate has no WCS and it could not be solved: no aligned reference.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="958"/>
+        <location filename="../ufe_measure_tab.py" line="961"/>
         <source>The plate has no WCS: solving it to locate the comparison stars…</source>
         <translation>The plate has no WCS: solving it to locate the comparison stars…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1304"/>
+        <location filename="../ufe_measure_tab.py" line="1309"/>
         <source>override: {0} ADU</source>
         <translation>override: {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1309"/>
+        <location filename="../ufe_measure_tab.py" line="1314"/>
         <source>SATURATE/ccd_saturate {0} ADU</source>
         <translation>SATURATE/ccd_saturate {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1313"/>
+        <location filename="../ufe_measure_tab.py" line="1318"/>
         <source>camera linearity {0} ADU</source>
         <translation>camera linearity {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1314"/>
+        <location filename="../ufe_measure_tab.py" line="1319"/>
         <source>auto: {0}</source>
         <translation>auto: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1315"/>
+        <location filename="../ufe_measure_tab.py" line="1320"/>
         <source>auto: no ceiling known (plateau only)</source>
         <translation>auto: no ceiling known (plateau only)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1358"/>
+        <location filename="../ufe_measure_tab.py" line="1363"/>
         <source>The comparison stars are read on the star stack of these same frames: on this plate they are trails.</source>
         <translation>The comparison stars are read on the star stack of these same frames: on this plate they are trails.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1517"/>
+        <location filename="../ufe_measure_tab.py" line="1522"/>
         <source>This project has one visit with frames, so there is nothing to choose yet: measure the next night and this becomes a choice between this visit and every visit of the project.</source>
         <translation>This project has one visit with frames, so there is nothing to choose yet: measure the next night and this becomes a choice between this visit and every visit of the project.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1540"/>
+        <location filename="../ufe_measure_tab.py" line="1545"/>
         <source>All the visits: {0} night(s), {1} frames. One pass, one run per night; the chart shows the project&apos;s curve.</source>
         <translation>All the visits: {0} night(s), {1} frames. One pass, one run per night; the chart shows the project&apos;s curve.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1545"/>
+        <location filename="../ufe_measure_tab.py" line="1550"/>
         <source>This visit: {0} frame(s).</source>
         <translation>This visit: {0} frame(s).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1564"/>
+        <location filename="../ufe_measure_tab.py" line="1569"/>
         <source>Live mode watches the folder of ONE visit (tonight&apos;s). With «all the visits» the frames come from every night, so live mode is off: choose «this visit» to watch tonight.</source>
         <translation>Live mode watches the folder of ONE visit (tonight&apos;s). With «all the visits» the frames come from every night, so live mode is off: choose «this visit» to watch tonight.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1574"/>
+        <location filename="../ufe_measure_tab.py" line="1579"/>
         <source>Discarding is per visit: open the visit whose curve you want to undo. With «all the visits» in scope there is no single night to undo.</source>
         <translation>Discarding is per visit: open the visit whose curve you want to undo. With «all the visits» in scope there is no single night to undo.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1661"/>
+        <location filename="../ufe_measure_tab.py" line="1666"/>
         <source>Frames: {0}</source>
         <translation>Frames: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1663"/>
+        <location filename="../ufe_measure_tab.py" line="1668"/>
         <source>Frames: {0} · points: {1}</source>
         <translation>Frames: {0} · points: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1668"/>
+        <location filename="../ufe_measure_tab.py" line="1673"/>
         <source>group {0} · cadence from the frames</source>
         <translation>group {0} · cadence from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1675"/>
+        <location filename="../ufe_measure_tab.py" line="1680"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1689"/>
+        <location filename="../ufe_measure_tab.py" line="1694"/>
         <source>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</source>
         <translation>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1695"/>
+        <location filename="../ufe_measure_tab.py" line="1700"/>
         <source>No visit with frames: open the editor from a visit to measure a series.</source>
         <translation>No visit with frames: open the editor from a visit to measure a series.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1707"/>
+        <location filename="../ufe_measure_tab.py" line="1712"/>
         <source>The plate has no WCS: solving it to place the series…</source>
         <translation>The plate has no WCS: solving it to place the series…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1713"/>
-        <location filename="../ufe_measure_tab.py" line="1717"/>
+        <location filename="../ufe_measure_tab.py" line="1718"/>
+        <location filename="../ufe_measure_tab.py" line="1722"/>
         <source>The plate has no WCS and it could not be solved: the series cannot be placed.</source>
         <translation>The plate has no WCS and it could not be solved: the series cannot be placed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1723"/>
+        <location filename="../ufe_measure_tab.py" line="1728"/>
         <source>Measure the target once (a click on it) so the series knows where to measure.</source>
         <translation>Measure the target once (a click on it) so the series knows where to measure.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1740"/>
+        <location filename="../ufe_measure_tab.py" line="1745"/>
         <source>Measuring the series…</source>
         <translation>Measuring the series…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1911"/>
+        <location filename="../ufe_measure_tab.py" line="1916"/>
         <source>These points carry neither the airmass nor the measured position (they were measured before the app stored them): measure the series again to have the night figures.</source>
         <translation>These points carry neither the airmass nor the measured position (they were measured before the app stored them): measure the series again to have the night figures.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1951"/>
+        <location filename="../ufe_measure_tab.py" line="1956"/>
         <source>The airmass figure is missing: these points do not carry it.</source>
         <translation>The airmass figure is missing: these points do not carry it.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1955"/>
+        <location filename="../ufe_measure_tab.py" line="1960"/>
         <source>The drift figure is missing: these points do not carry the measured position.</source>
         <translation>The drift figure is missing: these points do not carry the measured position.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2176"/>
+        <location filename="../ufe_measure_tab.py" line="2181"/>
         <source>This chart does not belong to a visit: there are no passes to choose from.</source>
         <translation>This chart does not belong to a visit: there are no passes to choose from.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2194"/>
+        <location filename="../ufe_measure_tab.py" line="2199"/>
         <source>Could not show that pass: {0}</source>
         <translation>Could not show that pass: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2209"/>
+        <location filename="../ufe_measure_tab.py" line="2214"/>
         <source>Pass undone: {0} points removed.</source>
         <translation>Pass undone: {0} points removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2252"/>
+        <location filename="../ufe_measure_tab.py" line="2257"/>
         <source>This chart is the WHOLE PROJECT: {0} points of every night (one pass per night). Choose «this visit» above to see the night you have open.</source>
         <translation>This chart is the WHOLE PROJECT: {0} points of every night (one pass per night). Choose «this visit» above to see the night you have open.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2263"/>
+        <location filename="../ufe_measure_tab.py" line="2268"/>
         <source>This visit&apos;s curve: {0} points, the pass the visit shows (nothing was read from the frames). The visit also holds {1} earlier pass(es) ({2} points) that are not drawn: choose another one in Series ▾ → Passes of this visit…</source>
         <translation>This visit&apos;s curve: {0} points, the pass the visit shows (nothing was read from the frames). The visit also holds {1} earlier pass(es) ({2} points) that are not drawn: choose another one in Series ▾ → Passes of this visit…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2448"/>
+        <location filename="../ufe_measure_tab.py" line="2453"/>
         <source>Series cancelled: it stays “incomplete”; the points measured so far are kept.</source>
         <translation>Series cancelled: it stays “incomplete”; the points measured so far are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2510"/>
+        <location filename="../ufe_measure_tab.py" line="2515"/>
         <source>Series: {0} points from {1} frames</source>
         <translation>Series: {0} points from {1} frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2518"/>
+        <location filename="../ufe_measure_tab.py" line="2523"/>
         <source>Flagged points: {0} ({1})</source>
         <translation>Flagged points: {0} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2543"/>
+        <location filename="../ufe_measure_tab.py" line="2548"/>
         <source>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</source>
         <translation>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2549"/>
+        <location filename="../ufe_measure_tab.py" line="2554"/>
         <source>Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</source>
         <translation>Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2577"/>
+        <location filename="../ufe_measure_tab.py" line="2582"/>
         <source>Cadence too short for the transit ingress</source>
         <translation>Cadence too short for the transit ingress</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2752"/>
+        <location filename="../ufe_measure_tab.py" line="2757"/>
         <source>Measure the series first.</source>
         <translation>Measure the series first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2773"/>
+        <location filename="../ufe_measure_tab.py" line="2778"/>
         <source>ExoClock submission</source>
         <translation>ExoClock submission</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2781"/>
+        <location filename="../ufe_measure_tab.py" line="2786"/>
         <source>NightScribe series: {0} points, group {1}, detrend {2}</source>
         <translation>NightScribe series: {0} points, group {1}, detrend {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2810"/>
+        <location filename="../ufe_measure_tab.py" line="2815"/>
         <source>ExoClock files written. Upload them at exoclock.space</source>
         <translation>ExoClock files written. Upload them at exoclock.space</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2835"/>
+        <location filename="../ufe_measure_tab.py" line="2840"/>
         <source>Run undone: {0} points removed.</source>
         <translation>Run undone: {0} points removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2857"/>
+        <location filename="../ufe_measure_tab.py" line="2862"/>
         <source>Live mode off.</source>
         <translation>Live mode off.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2864"/>
+        <location filename="../ufe_measure_tab.py" line="2869"/>
         <source>Live mode needs a visit with frames, a sequence and a measured target.</source>
         <translation>Live mode needs a visit with frames, a sequence and a measured target.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2900"/>
+        <location filename="../ufe_measure_tab.py" line="2905"/>
         <source>Live mode on: watching the visit folder…</source>
         <translation>Live mode on: watching the visit folder…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2998"/>
+        <location filename="../ufe_measure_tab.py" line="3003"/>
         <source>Advanced defaults restored.</source>
         <translation>Advanced defaults restored.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3019"/>
+        <location filename="../ufe_measure_tab.py" line="3024"/>
         <source>{0} above your camera&apos;s linearity limit</source>
         <translation>{0} above your camera&apos;s linearity limit</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3022"/>
+        <location filename="../ufe_measure_tab.py" line="3027"/>
         <source>{0} off the plate</source>
         <translation>{0} off the plate</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3025"/>
+        <location filename="../ufe_measure_tab.py" line="3030"/>
         <source>{0} without the {1} band</source>
         <translation>{0} without the {1} band</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3028"/>
+        <location filename="../ufe_measure_tab.py" line="3033"/>
         <source>{0} not measurable</source>
         <translation>{0} not measurable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3103"/>
+        <location filename="../ufe_measure_tab.py" line="3108"/>
         <source>manual centre: measured exactly where you placed it (no centroid)</source>
         <translation>manual centre: measured exactly where you placed it (no centroid)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3132"/>
+        <location filename="../ufe_measure_tab.py" line="3137"/>
         <source>{0} of {1} sequence stars not usable: {2}</source>
         <translation>{0} of {1} sequence stars not usable: {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3136"/>
+        <location filename="../ufe_measure_tab.py" line="3141"/>
         <source>⚠ comps at the plate&apos;s clipping level: a zero point built on compressed cores lies LOW (faint targets read too bright). Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps at the plate&apos;s clipping level: a zero point built on compressed cores lies LOW (faint targets read too bright). Propose fainter comps or shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3144"/>
+        <location filename="../ufe_measure_tab.py" line="3149"/>
         <source>⚠ comps above your camera&apos;s linearity limit (≈{0:.0f} ADU, per gain): their flux is not proportional, so they calibrate nothing. Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps above your camera&apos;s linearity limit (≈{0:.0f} ADU, per gain): their flux is not proportional, so they calibrate nothing. Propose fainter comps or shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3158"/>
+        <location filename="../ufe_measure_tab.py" line="3163"/>
         <source>Colour term not fitted (too few comps or too little colour spread): plain zero point</source>
         <translation>Colour term not fitted (too few comps or too little colour spread): plain zero point</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3161"/>
+        <location filename="../ufe_measure_tab.py" line="3166"/>
         <source>assumed</source>
         <translation>assumed</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3162"/>
+        <location filename="../ufe_measure_tab.py" line="3167"/>
         <source>from the field star</source>
         <translation>from the field star</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3163"/>
+        <location filename="../ufe_measure_tab.py" line="3168"/>
         <source>from the project</source>
         <translation>from the project</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3164"/>
+        <location filename="../ufe_measure_tab.py" line="3169"/>
         <source>by hand</source>
         <translation>by hand</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3167"/>
+        <location filename="../ufe_measure_tab.py" line="3172"/>
         <source>Colour term applied with target B−V = {0:.2f} ({1})</source>
         <translation>Colour term applied with target B−V = {0:.2f} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3173"/>
+        <location filename="../ufe_measure_tab.py" line="3178"/>
         <source>⚠ B−V assumed: with k = {0:+.2f}, a red star (B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; enter its real B−V</source>
         <translation>⚠ B−V assumed: with k = {0:+.2f}, a red star (B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; enter its real B−V</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3223"/>
+        <location filename="../ufe_measure_tab.py" line="3228"/>
         <source>new</source>
         <translation>new</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3285"/>
+        <location filename="../ufe_measure_tab.py" line="3290"/>
         <source>The plate has no WCS: solving it for the aligned reference…</source>
         <translation>The plate has no WCS: solving it for the aligned reference…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3178"/>
+        <location filename="../ufe_measure_tab.py" line="3183"/>
         <source>No gain in the header or settings: the photon noise is not in the error</source>
         <translation>No gain in the header or settings: the photon noise is not in the error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3182"/>
+        <location filename="../ufe_measure_tab.py" line="3187"/>
         <source>Scintillation included ({0:.3f} mag)</source>
         <translation>Scintillation included ({0:.3f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3186"/>
+        <location filename="../ufe_measure_tab.py" line="3191"/>
         <source>Host galaxy subtracted (PS1 reference scaled by the comps)</source>
         <translation>Host galaxy subtracted (PS1 reference scaled by the comps)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3190"/>
+        <location filename="../ufe_measure_tab.py" line="3195"/>
         <source>Error: {0:.3f} internal · {1:.3f} total</source>
         <translation>Error: {0:.3f} internal · {1:.3f} total</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3196"/>
+        <location filename="../ufe_measure_tab.py" line="3201"/>
         <source>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</source>
         <translation>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3202"/>
+        <location filename="../ufe_measure_tab.py" line="3207"/>
         <source>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</source>
         <translation>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3298"/>
+        <location filename="../ufe_measure_tab.py" line="3303"/>
         <source>Fetching the reference and subtracting…</source>
         <translation>Fetching the reference and subtracting…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3325"/>
+        <location filename="../ufe_measure_tab.py" line="3330"/>
         <source>The subtraction found no usable comparison star to scale the reference.</source>
         <translation>The subtraction found no usable comparison star to scale the reference.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3341"/>
+        <location filename="../ufe_measure_tab.py" line="3346"/>
         <source>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</source>
         <translation>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3151"/>
+        <location filename="../ufe_measure_tab.py" line="3156"/>
         <source>Few comparisons: the scatter dominates the error</source>
         <translation>Few comparisons: the scatter dominates the error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3154"/>
+        <location filename="../ufe_measure_tab.py" line="3159"/>
         <source>Band {0} estimated from Gaia (Riello 2021)</source>
         <translation>Band {0} estimated from Gaia (Riello 2021)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3428"/>
+        <location filename="../ufe_measure_tab.py" line="3433"/>
         <source>Export measurement</source>
         <translation>Export measurement</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3438"/>
+        <location filename="../ufe_measure_tab.py" line="3443"/>
         <source>Export measurement (AAVSO EFF)</source>
         <translation>Export measurement (AAVSO EFF)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3462"/>
+        <location filename="../ufe_measure_tab.py" line="3467"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2528"/>
+        <location filename="../ufe_measure_tab.py" line="2533"/>
         <source>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</source>
         <translation>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</translation>
     </message>
@@ -11368,92 +11378,92 @@ not touched.</translation>
         <translation>Measurement</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="728"/>
+        <location filename="../ufe_measure_tab.py" line="731"/>
         <source>The report will use this measurement: %1 %2</source>
         <translation>The report will use this measurement: %1 %2</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="732"/>
+        <location filename="../ufe_measure_tab.py" line="735"/>
         <source>The measurement could not be written to the observation.</source>
         <translation>The measurement could not be written to the observation.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="904"/>
+        <location filename="../ufe_measure_tab.py" line="907"/>
         <source>This plate is an object&apos;s track &amp; stack: its stars are TRAILS, so the comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux). The brightness is measured in the Astrometry tab, which reads the comps on a second stack aligned on the stars. Here you can still adjust the RECIPE that tab uses: the apertures, the sky and the centroid.</source>
         <translation>This plate is an object&apos;s track &amp; stack: its stars are TRAILS, so the comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux). The brightness is measured in the Astrometry tab, which reads the comps on a second stack aligned on the stars. Here you can still adjust the RECIPE that tab uses: the apertures, the sky and the centroid.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="913"/>
+        <location filename="../ufe_measure_tab.py" line="916"/>
         <source>This plate is the WHOLE-SEQUENCE stack of a track &amp; stack: every frame combined with the object frozen, so the object is as deep as the visit goes and the stars are trails. The comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux): the brightness is measured in the Astrometry tab, on the observations&apos; own stacks.</source>
         <translation>This plate is the WHOLE-SEQUENCE stack of a track &amp; stack: every frame combined with the object frozen, so the object is as deep as the visit goes and the stars are trails. The comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux): the brightness is measured in the Astrometry tab, on the observations&apos; own stacks.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="921"/>
+        <location filename="../ufe_measure_tab.py" line="924"/>
         <source>This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there. Here you can still adjust the RECIPE the Astrometry tab uses.</source>
         <translation>This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there. Here you can still adjust the RECIPE the Astrometry tab uses.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2534"/>
+        <location filename="../ufe_measure_tab.py" line="2539"/>
         <source>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</source>
         <translation>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2586"/>
+        <location filename="../ufe_measure_tab.py" line="2591"/>
         <source>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</source>
         <translation>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2591"/>
+        <location filename="../ufe_measure_tab.py" line="2596"/>
         <source>{0} frame(s) could not be read: they are not on the curve</source>
         <translation>{0} frame(s) could not be read: they are not on the curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2595"/>
+        <location filename="../ufe_measure_tab.py" line="2600"/>
         <source>Frame {0} could not be read: {1}</source>
         <translation>Frame {0} could not be read: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2612"/>
+        <location filename="../ufe_measure_tab.py" line="2617"/>
         <source>the file is empty</source>
         <translation>the file is empty</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2614"/>
+        <location filename="../ufe_measure_tab.py" line="2619"/>
         <source>the file is truncated (was it still being written?)</source>
         <translation>the file is truncated (was it still being written?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2617"/>
+        <location filename="../ufe_measure_tab.py" line="2622"/>
         <source>the file has no image</source>
         <translation>the file has no image</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2619"/>
+        <location filename="../ufe_measure_tab.py" line="2624"/>
         <source>the pixel format is not supported</source>
         <translation>the pixel format is not supported</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2621"/>
+        <location filename="../ufe_measure_tab.py" line="2626"/>
         <source>the file could not be read</source>
         <translation>the file could not be read</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2807"/>
+        <location filename="../ufe_measure_tab.py" line="2812"/>
         <source>The ExoClock files could not be written: {0}</source>
         <translation>The ExoClock files could not be written: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2945"/>
+        <location filename="../ufe_measure_tab.py" line="2950"/>
         <source>Live: {0} new frame(s) in the folder</source>
         <translation>Live: {0} new frame(s) in the folder</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2947"/>
+        <location filename="../ufe_measure_tab.py" line="2952"/>
         <source>Live mode stopped.</source>
         <translation>Live mode stopped.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2956"/>
+        <location filename="../ufe_measure_tab.py" line="2961"/>
         <source>Live batch lost: {0} frame(s) were not measured ({1})</source>
         <translation>Live batch lost: {0} frame(s) were not measured ({1})</translation>
     </message>
@@ -11468,72 +11478,72 @@ not touched.</translation>
         <translation>Search the project&apos;s curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1975"/>
+        <location filename="../ufe_measure_tab.py" line="1980"/>
         <source>The period search works on a project&apos;s curve: open the editor from a project to reach it.</source>
         <translation>The period search works on a project&apos;s curve: open the editor from a project to reach it.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="418"/>
+        <location filename="../ufe_measure_tab.py" line="421"/>
         <source>None (one point per frame)</source>
         <translation>None (one point per frame)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="420"/>
+        <location filename="../ufe_measure_tab.py" line="423"/>
         <source>Every N frames</source>
         <translation>Every N frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="421"/>
+        <location filename="../ufe_measure_tab.py" line="424"/>
         <source>Every N minutes</source>
         <translation>Every N minutes</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1992"/>
+        <location filename="../ufe_measure_tab.py" line="1997"/>
         <source>The fixed range is empty or inverted: the faintest magnitude must be larger than the brightest.</source>
         <translation>The fixed range is empty or inverted: the faintest magnitude must be larger than the brightest.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2044"/>
+        <location filename="../ufe_measure_tab.py" line="2049"/>
         <source>No outlier is marked: switch the detector on first.</source>
         <translation>No outlier is marked: switch the detector on first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2054"/>
+        <location filename="../ufe_measure_tab.py" line="2059"/>
         <source>No point selected: click one on the chart first.</source>
         <translation>No point selected: click one on the chart first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2434"/>
+        <location filename="../ufe_measure_tab.py" line="2439"/>
         <source>{0} selected · {1} excluded · {2} marked</source>
         <translation>{0} selected · {1} excluded · {2} marked</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1777"/>
+        <location filename="../ufe_measure_tab.py" line="1782"/>
         <source>PNG image (*.png)</source>
         <translation>PNG image (*.png)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1765"/>
+        <location filename="../ufe_measure_tab.py" line="1770"/>
         <source>Measure the series first: the figure is the curve.</source>
         <translation>Measure the series first: the figure is the curve.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1815"/>
+        <location filename="../ufe_measure_tab.py" line="1820"/>
         <source>{0} frames</source>
         <translation>{0} frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1817"/>
+        <location filename="../ufe_measure_tab.py" line="1822"/>
         <source>{0:g} s</source>
         <translation>{0:g} s</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1820"/>
+        <location filename="../ufe_measure_tab.py" line="1825"/>
         <source>band {0}</source>
         <translation>band {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1821"/>
+        <location filename="../ufe_measure_tab.py" line="1826"/>
         <source>NightScribe</source>
         <translation>NightScribe</translation>
     </message>
@@ -11548,67 +11558,67 @@ not touched.</translation>
         <translation>Write the two figures that explain the night: the airmass of every point (a curve that fades and comes back is often the sky) and the position of the target (with the alignment on, this is the guide residual: the frame that jumped shows as a spike). Both are scientific figures, ready for the report</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1896"/>
+        <location filename="../ufe_measure_tab.py" line="1901"/>
         <source>Measure the series first: the figures are its night.</source>
         <translation>Measure the series first: the figures are its night.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1944"/>
+        <location filename="../ufe_measure_tab.py" line="1949"/>
         <source>Could not write the night figures: {0}</source>
         <translation>Could not write the night figures: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1947"/>
+        <location filename="../ufe_measure_tab.py" line="1952"/>
         <source>Night figures written: {0}</source>
         <translation>Night figures written: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1960"/>
+        <location filename="../ufe_measure_tab.py" line="1965"/>
         <source>Night conditions</source>
         <translation>Night conditions</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="380"/>
+        <location filename="../ufe_measure_tab.py" line="383"/>
         <source>Calibrated magnitude</source>
         <translation>Calibrated magnitude</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="382"/>
+        <location filename="../ufe_measure_tab.py" line="385"/>
         <source>Δ magnitude (differential)</source>
         <translation>Δ magnitude (differential)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2705"/>
+        <location filename="../ufe_measure_tab.py" line="2710"/>
         <source>Fixed magnitude range cleared: the axis changed what it measures.</source>
         <translation>Fixed magnitude range cleared: the axis changed what it measures.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1774"/>
+        <location filename="../ufe_measure_tab.py" line="1779"/>
         <source>Save the chart</source>
         <translation>Save the chart</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1788"/>
+        <location filename="../ufe_measure_tab.py" line="1793"/>
         <source>Chart written as you see it: {0}</source>
         <translation>Chart written as you see it: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1785"/>
+        <location filename="../ufe_measure_tab.py" line="1790"/>
         <source>Could not write the chart: {0}</source>
         <translation>Could not write the chart: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2638"/>
+        <location filename="../ufe_measure_tab.py" line="2643"/>
         <source>The series failed and stopped: {0}</source>
         <translation>The series failed and stopped: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2973"/>
+        <location filename="../ufe_measure_tab.py" line="2978"/>
         <source>Live mode failed and stopped: {0}</source>
         <translation>Live mode failed and stopped: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="364"/>
+        <location filename="../ufe_measure_tab.py" line="367"/>
         <source>Click a point to select it; drag to move the view; the wheel zooms BOTH axes around the cursor, Shift zooms the time only and Ctrl the magnitudes only; double-click frames the whole curve again</source>
         <translation>Click a point to select it; drag to move the view; the wheel zooms BOTH axes around the cursor, Shift zooms the time only and Ctrl the magnitudes only; double-click frames the whole curve again</translation>
     </message>
@@ -11637,37 +11647,37 @@ not touched.</translation>
         <translation>The occasional series actions: undo the last run, ExoClock, the night&apos;s figures, save the chart, period and phase, the guide</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2257"/>
+        <location filename="../ufe_measure_tab.py" line="2262"/>
         <source>This visit&apos;s curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</source>
         <translation>This visit&apos;s curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2143"/>
+        <location filename="../ufe_measure_tab.py" line="2148"/>
         <source>Curve loaded from the visit: {0} points.</source>
         <translation>Curve loaded from the visit: {0} points.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2277"/>
+        <location filename="../ufe_measure_tab.py" line="2282"/>
         <source>This curve does not belong to a visit: there is nothing to discard.</source>
         <translation>This curve does not belong to a visit: there is nothing to discard.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2282"/>
+        <location filename="../ufe_measure_tab.py" line="2287"/>
         <source>Discard the visit&apos;s curve</source>
         <translation>Discard the visit&apos;s curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2283"/>
+        <location filename="../ufe_measure_tab.py" line="2288"/>
         <source>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</source>
         <translation>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2293"/>
+        <location filename="../ufe_measure_tab.py" line="2298"/>
         <source>Could not discard the curve: {0}</source>
         <translation>Could not discard the curve: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2306"/>
+        <location filename="../ufe_measure_tab.py" line="2311"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</source>
         <translation>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</translation>
     </message>

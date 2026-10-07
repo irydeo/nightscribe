@@ -242,6 +242,7 @@ class UfeMeasureTab(QWidget):
         # the public attributes the tests and the measure flow pin
         self.chk_sigmaclip = self._advanced.chk_sigmaclip
         self.chk_seeing = self._advanced.chk_seeing
+        self.chk_matched = self._advanced.chk_matched
         self.chk_color = self._advanced.chk_color
         self.chk_subtract = self._advanced.chk_subtract
         self.cmb_sky = self._advanced.cmb_sky
@@ -251,6 +252,8 @@ class UfeMeasureTab(QWidget):
             lambda _i: self._remeasure())
         self.chk_sigmaclip.toggled.connect(lambda _c: self._remeasure())
         self.chk_seeing.toggled.connect(self._on_seeing_toggled)
+        # el metodo de medida cambia el numero: la medida viva se rehace
+        self.chk_matched.toggled.connect(lambda _c: self._remeasure())
         self.chk_color.toggled.connect(lambda _c: self._remeasure())
         self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
         self.chk_subtract.toggled.connect(self._on_subtract_toggled)
@@ -1073,6 +1076,7 @@ class UfeMeasureTab(QWidget):
             "sky": self.cmb_sky.currentData() or "median",
             "target_bv": float(self.spn_target_bv.value()),
             "manual_centre": bool(self.chk_manual_centre.isChecked()),
+            "matched": bool(self.chk_matched.isChecked()),
         }
 
     def apply_state(self, st):
@@ -1097,7 +1101,8 @@ class UfeMeasureTab(QWidget):
         self._radii_manual = False
         for chk, key in ((self.chk_sigmaclip, "sigmaclip"),
                          (self.chk_seeing, "seeing"),
-                         (self.chk_color, "color")):
+                         (self.chk_color, "color"),
+                         (self.chk_matched, "matched")):
             want = bool(st.get(key, False))
             if chk.isChecked() != want:
                 chk.setChecked(want)

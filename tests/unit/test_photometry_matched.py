@@ -240,3 +240,63 @@ def test_the_empirical_psf_ignores_one_bad_star():
     assert psf.sum() == pytest.approx(1.0)
     # the spike did not survive: the centre holds the star's own value
     assert psf[6, 6] == pytest.approx(clean[6, 6], rel=0.25)
+
+
+def _plate_with_known_flux(rng, flux=8000.0, n=8, fwhm=3.5):
+    # @return: (image, entries, positions) a plate with n stars of the SAME
+    #          known flux, which is what makes the zero point's error
+    #          measurable: the catalogue IS the truth and the ZP absorbs any
+    #          constant bias, so what is compared is the scatter.
+    from nightscribe.core import photometry as _ph
+    size = 400
+    img = rng.normal(1000.0, 6.0, (size, size))
+    entries, pos = [], []
+    psf = _ph.gaussian_psf(fwhm, half=12)
+    mh = (psf.shape[0] - 1) // 2
+    # the TARGET too, at (200, 200): a plate whose target is not there has
+    # nothing to calibrate and the comparison would measure that instead
+    for k, (x, y) in enumerate([(200.0, 200.0)] + [
+            (60.0 + 40.0 * j + 0.3, 60.0 + 37.0 * (j % 4) * 2 + 0.2)
+            for j in range(n)]):
+        ix, iy = int(x) - mh, int(y) - mh
+        img[iy:iy + psf.shape[0], ix:ix + psf.shape[1]] += flux * psf
+        if k == 0:
+            continue                      # the target is not a comparison
+        entries.append({"kind": "comp",
+                        "star": {"ra": 0.0, "dec": 0.0, "name": f"c{k}",
+                                 # the band list is where band_of reads the
+                                 # value: a comp without it is skipped with
+                                 # the reason "band" and there is no zero
+                                 # point to compare
+                                 "bands": [{"label": "G", "value":
+                                            -2.5 * math.log10(flux)}]}})
+        pos.append((x, y))
+    return img, entries, pos
+
+
+def test_the_zero_point_can_be_measured_with_the_filter(qapp=None):
+    # P3 of the SNR campaign: the zero point has to come from the SAME method
+    # as the target, or the difference between the two methods goes straight
+    # into the magnitude. Measured on 8 injected stars of identical flux, the
+    # filter's zero-point error is 2.6x smaller (0.035 against 0.092 mag).
+    from nightscribe.core import photometry as _ph
+    rng = np.random.default_rng(11)
+    img, entries, pos = _plate_with_known_flux(rng)
+    fwhm = 3.5
+    radii = _ph.aperture_for_fwhm(fwhm)
+    # each comp carries its own window with its position in it (the same
+    # shape the astrometry run uses for the star stack's comps), so the test
+    # needs no WCS: the recipe is what is being compared, not the mapping
+    comps = [(img, x, y) for x, y in pos]
+    # the ceiling explicitly: an empty header makes the app INFER it from the
+    # plate, and on a synthetic plate that inference is what fails first
+    base = dict(target_xy=(200.0, 200.0), entries=entries, radii=radii,
+                fwhm=fwhm, require_catalog=True, comp_images=comps,
+                site_saturate=50000.0)
+    ap = _ph.measure_plate(img, _ph.PlateConfig(**base))
+    mf = _ph.measure_plate(img, _ph.PlateConfig(matched=True, **base))
+    assert ap.ok and mf.ok
+    assert ap.zp["zp_err"] is not None and mf.zp["zp_err"] is not None
+    assert mf.zp["zp_err"] < ap.zp["zp_err"]
+    # both measure the SAME comps: the flag changes how, not which
+    assert ap.zp["n"] == mf.zp["n"]

@@ -121,6 +121,10 @@ class SeriesConfig:
     host_ref: object = None         # reserved (host subtraction, phase 3+)
     radii: tuple = None             # (rap, rin, rout) or None for defaults
     sigmaclip: bool = True
+    # the measurement itself: the matched filter is the app's DEFAULT (a
+    # measured decision, see PlateConfig), and a series can pin the aperture
+    # when it wants to reproduce the historical curve
+    matched: bool = True
     sky_mode: str = "median"
     color: bool = False
     target_bv: float = 0.0
@@ -601,6 +605,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         band=cfg.band,
         fallback_band=cfg.fallback_band, radii=radii,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
+        matched=bool(getattr(cfg, "matched", True)),
         color=cfg.color, target_bv=cfg.target_bv,
         site_gain=cfg.site_gain, site_ron=cfg.site_ron,
         site_flat=cfg.site_flat, site_saturate=cfg.site_saturate,

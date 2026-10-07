@@ -1735,3 +1735,22 @@ def test_the_report_says_what_came_out_and_never_sends_nothing(qapp,
     assert tab.lbl_report_note.text() == "2 of 2 observations are in the report."
     assert tab.btn_send_mpc.isEnabled() is True
     assert tab.txt_report.toPlainText().count("\n") >= 2   # header + rows
+
+
+def test_the_run_says_which_method_measured_the_brightness(qapp, tmp_path):
+    # The filter is the default and it MOVES the published magnitude: the run
+    # has to say which method it used and keep the other value beside it, so
+    # a curve that steps by a tenth of a magnitude can be explained.
+    tab, _host = _tab(qapp, tmp_path)
+    text = tab._method_note({"matched": True, "band": "G",
+                             "mag_aperture": 18.243})
+    assert "matched filter" in text
+    assert "the aperture would give 18.243" in text
+    # with the aperture, the note says so and quotes nothing else
+    text = tab._method_note({"matched": False, "band": "G",
+                             "mag_aperture": 18.243})
+    assert "with the aperture" in text
+    assert "would give" not in text
+    # a run without the key (an old plate) says nothing rather than guessing
+    assert tab._method_note({"mag": 18.2}) == ""
+    assert tab._method_note(None) == ""

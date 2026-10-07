@@ -293,10 +293,37 @@ def test_the_zero_point_can_be_measured_with_the_filter(qapp=None):
     base = dict(target_xy=(200.0, 200.0), entries=entries, radii=radii,
                 fwhm=fwhm, require_catalog=True, comp_images=comps,
                 site_saturate=50000.0)
-    ap = _ph.measure_plate(img, _ph.PlateConfig(**base))
+    # the method is pinned on BOTH sides: the filter is the default now, and
+    # a test that compares two methods has to say which one each call is
+    ap = _ph.measure_plate(img, _ph.PlateConfig(matched=False, **base))
     mf = _ph.measure_plate(img, _ph.PlateConfig(matched=True, **base))
     assert ap.ok and mf.ok
     assert ap.zp["zp_err"] is not None and mf.zp["zp_err"] is not None
     assert mf.zp["zp_err"] < ap.zp["zp_err"]
     # both measure the SAME comps: the flag changes how, not which
     assert ap.zp["n"] == mf.zp["n"]
+
+
+def test_the_matched_filter_is_the_app_default():
+    # A MEASURED decision, not a taste: on real data the filter reaches 1.55
+    # to 1.63x the aperture's SNR, its zero-point error is 2.6x smaller and
+    # the brightness bias at low SNR is halved, for +3 % of runtime. The
+    # default lives in the config, so every caller that does not say
+    # otherwise measures with it, and the checkbox that turns it off starts
+    # ticked.
+    from nightscribe.core import photometry as _ph
+    assert _ph.PlateConfig().matched is True
+    # and the recipe that travels to the plate says the same
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.main_window import _load_ui
+    dlg = _load_ui("ufe_advanced_dialog")
+    assert dlg.chk_matched.isChecked() is True
+    # the tooltip has to say what it is, what it produces AND the risks:
+    # a figure or a switch without its meaning is what ADR-058 forbids
+    tip = dlg.chk_matched.toolTip()
+    assert "best linear estimator" in tip
+    assert "1.55 to 1.63" in tip
+    assert "RISKS" in tip
+    assert "has NOT been checked with a real comparison catalogue" in tip
+    dlg.deleteLater()

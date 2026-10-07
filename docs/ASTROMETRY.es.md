@@ -165,11 +165,14 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    La ejecución te dice además **la forma del objeto** en su apilado: si
    sale **estelado** (por ejemplo 2,4 px según PA 245°) es que la exposición
    fue larga para ese movimiento, y acortarla es la mejora más barata que
-   existe. Y te dice cuánto leería el **filtro adaptado** (pesar cada píxel
-   por la forma esperada en vez de sumar un círculo): medido sobre un
-   apilado real de 139 tomas, **1,55 a 1,63× el SNR de la apertura**. El
-   reporte sigue usando la magnitud de la apertura, que es la que valida el
-   validador; el filtro se enseña al lado.
+   existe. Y **mide con el filtro adaptado** (pesar cada píxel por la forma
+   esperada en vez de sumar un círculo), que es el **método por defecto**
+   desde el 2026-10-07: medido sobre un apilado real de 139 tomas da **1,55 a
+   1,63× el SNR de la apertura** y un cero punto **2,6× mejor**, por un 3 %
+   más de tiempo. Mueve la magnitud que publicas (0,05 a 0,1 mag, hacia la
+   verdad) y tiene caminos sin comprobar; la casilla de los ajustes avanzados
+   de Fotometría lo apaga y la ejecución dice qué método midió y qué daría el
+   otro.
 8. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube

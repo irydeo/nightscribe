@@ -41,12 +41,25 @@ on a night with thin cloud or moon it is what keeps a bad frame from
 dragging the mean. It is opt-in because, measured, on a good night it
 changes nothing.
 
-**3. It measures with the matched filter.** Besides the aperture
-measurement, the app tells you what the **matched filter** would read, which
-weights each pixel by the star's expected shape instead of summing a circle.
-Measured on your frames: **1.55 to 1.63x the aperture's SNR**. The report
-still uses the aperture's magnitude (it is the one the MPC's validator
-checks); the filter is shown beside it.
+**3. It measures with the matched filter, and that is the default.** The
+**matched filter** weights each pixel by the star's expected shape instead of
+summing a circle, and it is applied to the target **and to the comparisons**,
+so the zero point comes from the same arithmetic. Measured on your frames:
+**1.55 to 1.63x the SNR**, the zero point's error **2.6x smaller** and the
+brightness bias at low SNR **halved**, for 3 % more time.
+
+**What you can expect, and what you cannot.** The good: a faint object enters
+where it did not before, and the magnitude lands closer to the truth
+(measured: the bias drops from +0.54 to +0.23 mag at SNR 9). The risks, said
+plainly: it **moves the magnitude that gets published**, so a curve started
+before this will show a step of 0.05 to 0.1 mag (towards the truth, not away
+from it); it assumes the star's shape is the same across the plate, so in a
+field with strong coma or with saturated stars it can bias differently than
+the aperture; and it has **not** been checked with a real comparison
+catalogue, nor on host-subtracted images, nor with a trailed object. The
+aperture's value is kept beside the reported one and the run says which method
+measured, so you can always compare. To go back to the proven path, untick
+the box in the Photometry tab's advanced settings.
 
 **4. It tells you whether the object came out trailed.** If the object moved
 during the exposure it comes out elongated, and the app says it with a
@@ -151,7 +164,26 @@ insurance for the night that breaks, not a silver bullet.
 It has a second role: the per-frame `sigma_i` is the **noise model** the
 matched filter needs.
 
-## T3. The matched filter
+## T3. The matched filter (the default since 2026-10-07)
+
+**The default, by measurement and not by taste.** On the real 139-frame stack
+of 2025 UR it wins on all three counts: **1.55 to 1.63x** the SNR, the zero
+point's error **2.6x smaller** (0.035 against 0.092 mag, with 8 sources of
+known flux) and the brightness bias at SNR 9 **halved** (+0.234 against
++0.541 mag), for **+3 %** of runtime. And at the edge that matters: with 30
+frames of 3 s the MPC's submission floor (SNR 20) is reached around mag 18.5
+and the detection gate is crossed between 19.9 and 20.9, so a 1.6x SNR is the
+difference between being able to send an observation and not.
+
+**The limits, measured and pending**: the zero point has been compared with 8
+injected sources of the same flux (method against method), **not** with a real
+catalogue; the filter's PSF is a Gaussian from the measured seeing, which
+agrees with the empirical profile on this stack but might not in a field with
+coma or with saturated stars; the **host-subtracted image** path has not been
+validated with the filter (in one test it recovers 9.6 % less flux than the
+aperture); and neither has a **trailed** object (line PSF). None of that is
+hidden: the aperture's value goes beside the reported one and the run says
+which method measured.
 
 With a known shape `m` (normalised, `sum m = 1`) and white noise `sigma` per
 pixel, the best **linear** estimate of the flux is

@@ -41,12 +41,25 @@ cielo. En una noche estable sale lo mismo que el recorte sigma; en una noche
 con nubes finas o Luna es lo que evita que una toma mala arrastre la media.
 Es opt-in porque, medido, en una noche buena no cambia nada.
 
-**3. Mide con el filtro adaptado.** Además de la medida por apertura, la app
-te dice lo que leería el **filtro adaptado**, que pesa cada píxel por la
-forma esperada de la estrella en vez de sumar un círculo. Medido sobre tus
-tomas: **1,55 a 1,63× más SNR** que la apertura. El reporte sigue usando la
-magnitud de la apertura (es la que valida el validador del MPC); el filtro
-se enseña al lado.
+**3. Mide con el filtro adaptado, y eso es el valor por defecto.** El
+**filtro adaptado** pesa cada píxel por la forma esperada de la estrella en
+vez de sumar un círculo, y se aplica al objeto **y a las comparsas**, para
+que el cero punto salga de la misma aritmética. Medido sobre tus tomas:
+**1,55 a 1,63× más SNR**, el error del cero punto **2,6× menor** y el sesgo
+de brillo a bajo SNR **a la mitad**, por un 3 % más de tiempo.
+
+**Qué puedes esperar, y qué no.** Lo bueno: el objeto débil entra donde
+antes no entraba, y la magnitud queda más cerca de la verdad (medido: el
+sesgo baja de +0,54 a +0,23 mag a SNR 9). Los riesgos, dichos claros: **mueve
+la magnitud que publicas**, así que una curva empezada antes mostrará un
+escalón de 0,05 a 0,1 mag (hacia la verdad, no al revés); supone que la
+forma de la estrella es la misma en toda la placa, así que en un campo con
+coma fuerte o con estrellas saturadas puede sesgar distinto que la apertura;
+y **no** se ha comprobado con un catálogo de comparación real, ni en imágenes
+con el anfitrión restado, ni con un objeto estelado. El valor de la apertura
+se guarda al lado del reportado, y la ejecución dice qué método midió: puedes
+comparar siempre. Si quieres volver al camino probado, desmarca la casilla
+en los ajustes avanzados de Fotometría.
 
 **4. Te dice si el objeto sale estelado.** Si el objeto se ha movido durante
 la exposición, sale alargado, y la app te lo dice con un número: «el objeto
@@ -151,7 +164,26 @@ del **28 %**: es un seguro para la noche que se rompe, no una bala de plata.
 Y tiene un segundo papel: el `σ_i` por fotograma es el **modelo de ruido**
 que necesita el filtro adaptado.
 
-## T3. El filtro adaptado
+## T3. El filtro adaptado (el método por defecto desde 2026-10-07)
+
+**Por defecto, por medida, no por gusto.** En el apilado real de 139 tomas de
+2025 UR gana en las tres cosas: **1,55 a 1,63×** de SNR, el error del cero
+punto **2,6× menor** (0,035 frente a 0,092 mag, con 8 fuentes de flujo
+conocido) y el sesgo de brillo a SNR 9 **a la mitad** (+0,234 frente a
++0,541 mag), por un **+3 %** de tiempo. Y en el borde que importa: con 30
+tomas de 3 s el suelo de envío del MPC (SNR 20) se alcanza hacia mag 18,5 y
+la puerta de detección se cruza entre 19,9 y 20,9, así que un 1,6× de SNR es
+la diferencia entre poder enviar una observación y no poderla enviar.
+
+**Los límites, medidos y pendientes**: el cero punto se ha comparado con 8
+fuentes inyectadas del mismo flujo (método contra método), **no** con un
+catálogo real; la PSF del filtro es una gaussiana del seeing medido, que en
+este apilado coincide con el perfil empírico pero que en un campo con coma o
+con estrellas saturadas podría no coincidir; el camino de **imagen con
+anfitrión restado** no se ha validado con el filtro (en una prueba recupera
+un 9,6 % menos de flujo que la apertura); y el objeto **estelado** (PSF de
+línea) tampoco. Nada de eso se esconde: el valor de la apertura va al lado
+del reportado y la ejecución dice qué método midió.
 
 Con una forma conocida `m` (normalizada, `Σm = 1`) y ruido blanco `σ` por
 píxel, el mejor estimador **lineal** del flujo es

@@ -1370,6 +1370,10 @@ class UfeMeasureTab(QWidget):
             band=self.cmb_band.currentText() or self._band,
             radii=radii, fwhm=fwhm,
             sigmaclip=self.chk_sigmaclip.isChecked(),
+            # the measurement the LIVE tab shows follows the checkbox: the
+            # default of the config is the filter, and a tab that ignored the
+            # checkbox would measure with one method and say another
+            matched=self.chk_matched.isChecked(),
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
             target_bv=self.spn_target_bv.value(),
@@ -1613,6 +1617,7 @@ class UfeMeasureTab(QWidget):
                                      self.spn_rin.value(),
                                      self.spn_rout.value()),
             sigmaclip=self.chk_sigmaclip.isChecked(),
+            matched=self.chk_matched.isChecked(),
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
             target_bv=self.spn_target_bv.value(),

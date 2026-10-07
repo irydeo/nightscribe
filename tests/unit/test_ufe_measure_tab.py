@@ -482,6 +482,15 @@ class _FakeSubWorker:
 
 def test_host_subtraction_recovers_the_target(dlg, monkeypatch):
     from nightscribe.core import photometry as phot
+    # The APERTURE is pinned BEFORE the sequence, because the sequence SAVES
+    # the recipe and the restore brings it back: pinning it later is pinning
+    # nothing. This test is about the host SUBTRACTION (the difference
+    # image's flux recovery) and the app's default is the matched filter now;
+    # on a difference image the filter recovers 9.6 % less flux than the
+    # aperture here, and that path has NOT been validated with the filter, so
+    # it is written down in the comparative report as a pending check instead
+    # of being hidden by the default.
+    dlg.tab_measure.chk_matched.setChecked(False)
     _sequence(dlg, dlg._test_comps)
     # the reference: the same field WITHOUT the target (a fresh plate)
     data, target, comps = _plate()

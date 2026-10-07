@@ -1250,7 +1250,9 @@ class TrackStackWorker(QThread):
                 centroid_mode=("none" if recipe.get("manual_centre")
                                else "gaussian"),
                 sigmaclip=bool(recipe.get("sigmaclip", True)),
-                matched=bool(recipe.get("matched", False)),
+                # the filter is the DEFAULT (a measured decision): a plate
+                # saved before the key existed measures with it too
+                matched=bool(recipe.get("matched", True)),
                 sky_mode=recipe.get("sky") or "median",
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),
@@ -1294,8 +1296,24 @@ class TrackStackWorker(QThread):
                     r_ann_in=radii[1], r_ann_out=radii[2], fwhm=fwhm)
                 if not matched.get("ok"):
                     matched = None
+            # WHAT THE APERTURE WOULD HAVE SAID, when the plate was
+            # measured with the filter: the run says which method it used and
+            # keeps the other value beside it, so nothing is published
+            # without the observer being able to compare. It is the same
+            # zero point and the two fluxes of the SAME measurement, so the
+            # difference between the two magnitudes is the difference
+            # between the two methods, exactly.
+            mag_ap = None
+            tgt = getattr(res, "target", None) or {}
+            if tgt.get("flux_ap") and tgt.get("flux"):
+                try:
+                    mag_ap = float(res.mag) + 2.5 * math.log10(
+                        float(tgt["flux"]) / float(tgt["flux_ap"]))
+                except (TypeError, ValueError):
+                    mag_ap = None
             per_obs.append({"mag": float(res.mag),
                             "err": float(res.err_total or 0.0),
+                            "mag_ap": mag_ap,
                             "n_comps": len([1 for e, _r in (res.used or [])
                                             if (e.get("kind") or "comp")
                                             == "comp"]),
@@ -1359,9 +1377,14 @@ class TrackStackWorker(QThread):
         limit = photometry.limiting_magnitude(diag_pairs)
         grid = (photometry.quality_grid(diag_points, diag_shape)
                 if diag_shape else {"ok": False})
+        ap_mags = [p["mag_ap"] for p in good if p.get("mag_ap") is not None]
         return {"mag": float(np.median(mags)),
                 "err": float(np.median([p["err"] for p in good])),
                 "band": band,
+                # which method measured, and what the other one would say
+                "matched": bool((self._recipe or {}).get("matched", True)),
+                "mag_aperture": (float(np.median(ap_mags)) if ap_mags
+                                 else None),
                 "trail_px": (float(np.median(trails)) if trails else None),
                 "trail_pa_deg": (float(np.median(pas)) if pas else None),
                 "snr_gain": (float(np.median(gains)) if gains else None),

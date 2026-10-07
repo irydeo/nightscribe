@@ -62,10 +62,10 @@ objeto débil.
 
 ## La decisión
 
-**El filtro queda como opción, apagado por defecto.** El motivo no es la
-duda sobre los números (son claros) sino la naturaleza del cambio: mueve la
-magnitud que se publica, y eso es una decisión del autor, no un ajuste de
-implementación. Lo que hay montado:
+**El filtro es el método por defecto, con una sola casilla para apagarlo.**
+La decisión es del autor y está tomada sobre la medida, no sobre la
+intuición: gana en SNR, en error del cero punto y en sesgo, y cuesta un 3 %.
+Lo que hay montado:
 
 - casilla **«Filtro adaptado»** en los ajustes avanzados de la pestaña
   Fotometría, con el porqué medido en su tooltip;
@@ -78,5 +78,23 @@ implementación. Lo que hay montado:
 - el valor de la apertura **se conserva al lado** cuando se mide con el
   filtro, para que la auditoría tenga las dos.
 
-Cuando la comprobación pendiente (el cero punto con catálogo real) esté
-hecha, girar el valor por defecto es una línea.
+### Los riesgos que van con el valor por defecto
+
+Decirlos es parte de la decisión:
+
+1. **La magnitud publicada se mueve** entre 0,05 y 0,1 mag (hacia la verdad).
+   Una curva empezada antes mostrará un escalón, y la ejecución dice qué
+   método midió y qué daría el otro, para poder explicarlo.
+2. **El cero punto con un catálogo real no está comprobado.** Lo medido son 8
+   fuentes inyectadas del mismo flujo: método contra método, limpio, pero sin
+   la variedad de brillos y colores de un catálogo.
+3. **La PSF es una gaussiana del seeing medido.** En este apilado coincide con
+   el perfil empírico; en un campo con coma o con estrellas saturadas podría
+   no coincidir.
+4. **El camino de imagen con anfitrión restado no está validado con el
+   filtro**: en una prueba recupera un 9,6 % menos de flujo que la apertura
+   (está fijado en su test, con el motivo escrito).
+5. **El objeto estelado** (PSF de línea) tampoco se ha comparado.
+
+Las tres últimas son las comprobaciones que quedan; la primera es la que pide
+una noche con red y catálogo.

@@ -50,7 +50,7 @@ vez de suponerla.
 | **P4** | Inyección y recuperación (el instrumento) | **Hecho** (`p4-inyeccion-recuperacion.md`) |
 | **P4b** | El barrido del movimiento, medido | **Hecho** (`p4b-barrido-del-movimiento.md`) |
 | **P4c** | El error fotométrico del pipeline, medido | **Hecho** (`p4c-error-fotometrico.md`) |
-| **P3** | Apertura frente a filtro adaptado en la magnitud | **Hecho** (`INFORME-APERTURA-FILTRO.md`) |
+| **P3** | Apertura frente a filtro adaptado en la magnitud | **Hecho**, y el filtro es el **método por defecto** (`INFORME-APERTURA-FILTRO.md`) |
 | **P1** | Co-adición con pesos y normalización | **Hecho** (`p1-co-adicion-ponderada.md`) |
 | **P2** | Filtro adaptado y la estela | **Hecho** (`p2-filtro-adaptado-y-estela.md`) |
 | **P3** | Diagnóstico: magnitud límite y calidad de la solución | **Hecho** (`p3-diagnostico.md`) |

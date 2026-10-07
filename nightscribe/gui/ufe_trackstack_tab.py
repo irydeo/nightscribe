@@ -1938,6 +1938,9 @@ class UfeTrackStackTab(QWidget):
         cal = self._calibration_note(self._result.get("calibration"))
         if cal:
             details.append(cal)
+        method = self._method_note(self._result.get("photometry"))
+        if method:
+            details.append(method)
         # THE CEILING THE RULE COULD NOT ENFORCE (ADR-066): without the
         # camera's linearity the brightness is measured with the SATURATE
         # card or the plate's own clip, and a star over the (unknown)
@@ -1986,6 +1989,31 @@ class UfeTrackStackTab(QWidget):
         section = self._sections.get(key)
         if section is not None:
             section.setNotice(text, level=level)
+
+    def _method_note(self, phot):
+        # @args: phot - the run's photometry dict (or None)
+        # @return: which method measured the brightness and what the other
+        #          one would say (or "")
+        # The matched filter is the app's DEFAULT, and that is a measured
+        # decision (the Photometry tab's tooltip carries the numbers and the
+        # risks). It MOVES the magnitude that gets published, so the run has
+        # to say which method it used and keep the other value beside it: a
+        # curve that steps by a tenth of a magnitude can then be explained
+        # instead of being a mystery.
+        phot = phot or {}
+        if "matched" not in phot:
+            return ""
+        text = (self.tr("Brightness measured with the matched filter")
+                if phot.get("matched")
+                else self.tr("Brightness measured with the aperture"))
+        other = phot.get("mag_aperture") if phot.get("matched") else None
+        if other is not None:
+            text += self.tr(" (the aperture would give %1)").replace(
+                "%1", f"{float(other):.3f}")
+            band = phot.get("band")
+            if band:
+                text += f" {band}"
+        return text + "."
 
     def _calibration_note(self, cal):
         # @args: cal - the run's calibration summary (or None)

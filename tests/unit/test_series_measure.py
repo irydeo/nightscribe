@@ -140,10 +140,14 @@ def _comp_set(wcs):
 
 
 def _config(wcs, comps, **over):
+    # The APERTURE is pinned here on purpose: these tests are about the
+    # aperture (its scaling with the seeing, the radii, the detrend), and the
+    # app's default is the matched filter. A test that measures a method has
+    # to say which one, or it pins whatever the default happens to be.
     base = dict(wcs=wcs, target_xy=TARGET_XY, comp_set=tuple(comps),
                 band="V", site_gain=2.0, site_ron=5.0,
                 site_lat=40.0, site_lon=-3.0, site_aperture_m=0.254,
-                site_height_m=650.0)
+                site_height_m=650.0, matched=False)
     base.update(over)
     return sm.SeriesConfig(**base)
 

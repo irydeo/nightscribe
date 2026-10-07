@@ -18,6 +18,9 @@ astronómicos amateur. Tres misiones:
 3. **Contarlo**: genera borradores de posts bilingües (ES/EN) + tuit + gráficos PNG listos
    para redes sociales.
 
+Y entre planificar y publicar también **captura y reduce**: maneja CCDciel, y calibra,
+apila y mide (astrometría, fotometría, períodos) en su editor FITS unificado.
+
 Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia GPL v3.
 
 ### Reglas de código (obligatorias)
@@ -75,7 +78,9 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 ```
 nightscribe/
   __main__.py        # CLI: tonight | explore | post | solar | blink | history |
-                     #   sequence (secuencia fotométrica + carta, ADR-042) | gui
+                     #   sequence (secuencia fotométrica + carta, ADR-042) |
+                     #   inject (inyección/recuperación: hasta dónde llega de
+                     #   verdad el pipeline) | project (gestión mínima) | gui
   config.py          # configuración persistente (observatorio, idioma, claves)
   paths.py           # rutas por SO (platformdirs)
   core/
@@ -85,6 +90,16 @@ nightscribe/
     planner.py       # construye la lista de objetivos de la noche
     suggest.py       # score unificado 0-100 + Top N + frases "por qué esta noche"
     orbits.py        # familias orbitales + parámetros explicados
+    explain.py       # la única casa de «qué significa este código o esta cifra»
+                     #   (tipos de SN y VSX, clases espectrales, métodos de
+                     #   descubrimiento, magnitudes): dos densidades, short para
+                     #   hooks/tooltips y long para fichas y posts (ADR-058)
+    kinds.py         # los tipos de objetivo (id, etiqueta, glyph, contexto) y
+                     #   las frases de la ficha de cada uno
+    project.py       # proyectos: registro, contexto, carpeta del proyecto y los
+                     #   ficheros que cuelgan de él (project_files)
+    followup.py      # visitas (sesiones) y puntos medidos: el CRUD de lo que
+                     #   cuelga de un proyecto (ADR-045)
     hads.py          # HADS: catálogo híbrido (snapshot+sheet), merge, mat. de sesión
     variables.py     # variables: extremos VSX, HJD (Sol Schlyter), asesor de eventos
     campaign.py      # campañas 1:N ortogonales (CRUD, protocolo, due_campaigns,
@@ -134,6 +149,9 @@ nightscribe/
                       #   límite de CPU, y la decisión sobre sus residuos
     mpc_astrometry.py # generadores de reporte MPC (ADR-062, fase 6): ADES
                       #   PSV y 80 columnas, listón de envío (SNR >= 20)
+    mpc_report.py     # validador y empaquetador del reporte MPC (ADR-022): el
+                      #   mismo juez para lo que genera la app y para lo que
+                      #   pega el observador (80 columnas o ADES PSV)
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame atado por comparada, ensemble con veto MAD,
                       #   puertas que marcan y nunca borran, tiempo a media
@@ -188,6 +206,9 @@ nightscribe/
     stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
                      #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)
     blink.py         # blink de SN: resuelve nombre->coords, pareja alineada PS1-g
+    viz/             # core/viz/sequence_view.py: la secuencia centrada del
+                     #   track & stack (recortes del objeto con un solo
+                     #   estirado, en GIF o montaje PNG; ADR-062, 5.4)
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
                      # + hads_sheet.py: libro HADS de P. Wils (Google Sheets XLSX,
                      #   TTL 12 h, parseo stdlib; ver ADR-034)
@@ -203,6 +224,9 @@ nightscribe/
                       # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
                      #   + fotometría de la comunidad con token (vigilias brillantes)
+                     # + mpc_obs.py: las observaciones publicadas del objeto (MPC
+                     #   Observations API, o NEOCP si no está confirmado) para el
+                     #   chequeo del run contra otras estaciones (TTL 6 h; ADR-062)
     journal.py       # Diario de observación: vista derivada por noche (ADR-036)
     attention.py     # «Necesita tu atención»: qué proyecto te necesita y por qué
                      #   (math local pura, sin red — ADR-038)
@@ -212,8 +236,10 @@ nightscribe/
     satellites.py    # tránsitos de galileanos + sombras sobre Júpiter para el
                      #   sitio del usuario (IAU WGCCRE + calibración Horizons,
                      #   ±10 min etiquetado — ADR-040)
-   viz/               # matplotlib: style, orbit_view, sky_view,
+   viz/               # matplotlib: style, orbit_view, sky_view, night_view,
                       # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
+                      # + lightcurve_view (curva de luz, con las plantillas SN de
+                      #   fondo cuando el proyecto es una supernova)
                       # + evolution_view (evolución SN) y motion_view (movimiento NEO —
                       #   la "prueba de fuego", Track C)
                       # + finder_view (carta de comparación: secuencia fotométrica
@@ -222,20 +248,29 @@ nightscribe/
                       #   y curva plegada por noche — ADR-054)
     gui/               # app, main_window, workers (QThread), wizard, ui_loader,
                        #   ui/ (*.ui Designer);
-                       # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
-                       # (ADR-019/035/036/040) — el **Diario de observación**, el
+                       # TRES pestañas: Tonight, Projects, Campaigns
+                       # (ADR-019/035/036/040; ADR-043 pliega la pestaña
+                       # Observatory en el paso Captura y manda el Sol y el cielo
+                       # al menú Herramientas): el **Diario de observación**, el
                        # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
-                       # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
-                       # widgets/ufe_image_view.py + widgets/histogram_widget.py +
-                       # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
-                       # ufe_measure_tab.py, ADR-044; phase_dialog.py: período
-                       # y fase del proyecto, ADR-054; el panel izquierdo de la
-                       # visita (ufe_visit_panel.ui: navegador de tomas + bloque
-                       # EXOTIC de tránsito + el bloque de serie, ADR-048 rev.)
-                       # vive a la izquierda de la imagen, visible solo con visita)
-                       # viven en
-                       # el menú Herramientas; los chips de eventos del cielo viven en
-                       # la cabecera de Tonight (clic → diálogo)
+                       # **Editor FITS unificado** viven en el menú Herramientas;
+                       # los chips de eventos del cielo viven en la cabecera de
+                       # Tonight (clic → diálogo)
+                       # ADR-044: el editor FITS unificado (ufe_dialog.py +
+                       # ufe_state.py + ufe_host.py + widgets/ufe_image_view.py +
+                       # widgets/histogram_widget.py) con sus pestañas:
+                       # Fotometría (ufe_photometry_tab.py: comparar, medir y la
+                       # serie), Blink (ufe_blink_tab.py), Anotar
+                       # (ufe_annotate_tab.py), Calibración
+                       # (ufe_calibration_tab.py, ADR-061) y Astrometría
+                       # (ufe_trackstack_tab.py: el track & stack, ADR-062), más
+                       # el modo manual del objeto débil
+                       # (ufe_manual_stack_dialog.py, ADR-065); el panel izquierdo
+                       # de la visita (ufe_visit_panel.ui: navegador de tomas +
+                       # bloque EXOTIC de tránsito + el bloque de serie, ADR-048
+                       # rev.) vive a la izquierda de la imagen, visible solo con
+                       # visita; phase_dialog.py: período y fase del proyecto
+                       # (ADR-054)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
                        # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
                        # lenguaje llano + ayudas ⓘ, filas ricas
@@ -255,12 +290,18 @@ nightscribe/
                        #   picker interactivo de comps — ADR-042)
                        # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
                        #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
+                       #   stack_strip: la tira de apilados de las observaciones, ADR-062;
                        #   las filas ricas project_row / campaign_row + sparkline, U2/U5;
                        #   y visits_panel: el gestor de visitas — ADR-045)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta
 docs/                # diseño, arquitectura, fuentes, scoring, órbitas, viz, ADRs
+benchmarks/          # bancos de medida (track & stack, cero punto contra el
+tools/bench/         #   catálogo, inyección/recuperación, combinación, flat):
+                     #   de aquí salen las cifras de los comentarios y los ADR,
+                     #   y no se envían con la app
+website/             # la página de presentación (contenido y capturas)
 installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
 .github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
                      #   PyInstaller, zip portable + instalador Inno, pre-release
@@ -280,13 +321,13 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-052, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-069, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
-**Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
-(UX v3: ADR-019 a ADR-022). El documento maestro con los flujos, las fases y el
-**punto de entrada del próximo trabajo** es `docs/WORKFLOWS.es.md` — léelo antes de
-escribir código nuevo.
+**Flujos y planes**: el flujo centrado en proyectos (UX v3, ADR-019 a ADR-022) está
+implementado; el documento maestro con los flujos y las fases sigue siendo
+`docs/WORKFLOWS.es.md`, y los planes de trabajo por tema viven en `docs/PLANS/`.
+Léelos antes de escribir código nuevo.
 
 ---
 
@@ -296,7 +337,9 @@ escribir código nuevo.
 observatories. Three missions: **plan the night** (NEOs, comets, PCCP candidates,
 supernovae, exoplanet transits), **understand each object** (orbital parameters translated
 into accurate, engaging explanations), and **report it** (bilingual ES/EN social media
-drafts + tweet + ready-to-attach PNG charts).
+drafts + tweet + ready-to-attach PNG charts). And between planning and reporting it also
+**captures and reduces**: it drives CCDciel, and calibrates, stacks and measures
+(astrometry, photometry, periods) in its unified FITS editor.
 
 ### Code rules (mandatory)
 
@@ -332,10 +375,10 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-052, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-069, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
-**Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow
-(UX v3: ADR-019 to ADR-022). The master document with flows, phases and the **entry
-point for the next chunk of work** is `docs/WORKFLOWS.md` — read it before writing
-new code.
+**Flows and plans**: the project-centric flow (UX v3, ADR-019 to ADR-022) is
+implemented; the master document with the flows and the phases is still
+`docs/WORKFLOWS.md`, and the per-topic work plans live in `docs/PLANS/`. Read them
+before writing new code.

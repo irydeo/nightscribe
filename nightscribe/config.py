@@ -142,6 +142,13 @@ DEFAULTS = {
     "astrometry_sweep_pct": 5.0,
     "astrometry_sweep_steps": 25,
     "astrometry_method": "sigma",
+    # The warp's interpolation order (2026-10-07): 1 is the bilinear and the
+    # default, because it makes the stack visibly cleaner at NO cost in depth
+    # (measured on 2025 FG18: orders 1 and 3 tie at magnitude 18.20 against
+    # 18.21 by injection and recovery, while the pixel noise differs by 29 %).
+    # It is a knob for the eye, not for the limit. 3 or 5 give a sharper point
+    # spread and a grainier image.
+    "astrometry_warp_order": 1,
     "astrometry_cutout_margin_px": 64,
     # Extra margin added to the cutout when the ephemeris had to be
     # propagated LOCALLY (Horizons down): two-body and a coarse Earth can

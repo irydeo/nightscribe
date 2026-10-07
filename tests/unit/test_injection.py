@@ -284,9 +284,16 @@ def test_the_injected_flux_comes_back_unbiased(tmp_path):
     assert res["flux"] is not None and res["flux_mf"] is not None
     err = injection.mag_error(res["flux"], got["flux_adu"])
     err_mf = injection.mag_error(res["flux_mf"], got["flux_adu"])
-    # both have to land within a tenth of a magnitude of the truth
+    # both have to land close to the truth, and the MATCHED FILTER gets a wider
+    # allowance since 2026-10-07: the default warp is now the bilinear, which
+    # broadens the point spread by about 3 %, and `recover` measures with a
+    # template of the INJECTED seeing ON PURPOSE (a fixed ruler, so two
+    # treatments are compared with the same one). A 3 % mismatch costs the
+    # filter about 0.12 mag while the aperture does not notice it at all, and
+    # the aperture is what the pipeline publishes: the app measures the seeing
+    # ON the stack (workers._seeing_on_stack) and its template adapts.
     assert abs(err) < 0.10, err
-    assert abs(err_mf) < 0.10, err_mf
+    assert abs(err_mf) < 0.15, err_mf
     # and the completeness table carries both medians
     rows = injection.completeness(paths, [12000.0], w, trials=1,
                                   out_root=tmp_path / "curva")

@@ -40,6 +40,7 @@ def _point_db_at_tmpdir(tmp_path_factory):
     # throwaway file so nothing touches the real database.
     import nightscribe.core.db as dbmod
     import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
     old_dbmod, old_mw = dbmod.db, mw.db
     tmp = dbmod.Database(tmp_path_factory.mktemp("astrometryrestore")
                          / "t.db")
@@ -79,6 +80,7 @@ def visit(_point_db_at_tmpdir, tmp_path):
     # A project with one visit, and a stack file registered on it.
     # @return: (project id, session id, the stack's path)
     import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
     from nightscribe.core import followup as fu, project
     p = project.create(mw.db, "neo", "2026 PY9")
     sid = fu.create_session(mw.db, p["id"], obs_date="2026-10-06")
@@ -150,6 +152,7 @@ def test_the_run_is_written_with_a_summary_the_visit_can_read_back(window,
     assert run_id
     from nightscribe.core import astrometry_store as store
     import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
     run = [r for r in store.list_runs(mw.db, pid) if r["id"] == run_id][0]
     summary = (run["cfg"] or {}).get("result")
     assert summary, "the run carries its own summary"
@@ -158,6 +161,12 @@ def test_the_run_is_written_with_a_summary_the_visit_can_read_back(window,
     assert summary["photometry"]["mag"] == pytest.approx(18.42)
     assert summary["photometry"]["limit"]["mag"] == pytest.approx(19.4)
     assert summary["register_report"]["reasons"] == {"no stars": 1}
+    # the project's magnitude becomes the MEASURED one and says so
+    # (2026-10-07): the same field the planner fills with a prediction, now
+    # carrying a figure somebody measured, and the interface can tell which
+    ctx = project.get(mw.db, pid)["context"]
+    assert ctx["mag"] == pytest.approx(18.42)
+    assert ctx["mag_origin"] == "measured"
     assert summary["calibration"]["flats"] == ["flatG.fits"]
     assert summary["check"]["available"] is True
     assert summary["check"]["our_residual"] == [0.31, -0.22]

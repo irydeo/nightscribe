@@ -88,15 +88,35 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 3. **Apila.** La app resuelve el primer frame, alinea el resto por las
    estrellas y desplaza cada frame para que el objeto caiga siempre en el
    mismo punto. Puedes elegir el método de combinación: **sigma-clipped**
-   (el estándar profesional: casi toda la señal de la media y la limpieza de
-   la mediana), mediana (rápido, para probar), media, suma, o **ponderada
-   (1/σ²)**. La media y la suma dan la misma señal salvo la escala. La
+   (el defecto, y el que hay que usar: medido inyectando fuentes de brillo
+   conocido en una visita real de 207 fotogramas y midiéndolas de vuelta,
+   llega a magnitud **18,23**), mediana, media, suma, o **ponderada (1/σ²)**.
+   La mediana es **0,26 magnitudes menos profunda** (17,97 en los mismos
+   fotogramas) por una razón de estadística pura: la mediana de N medidas es
+   1,25× más ruidosa que su media, y el recorte ya descarta los trazos de las
+   estrellas (aquí tira el 17 % de los píxeles) sin pagar ese precio. La media
+   y la suma dan la misma señal salvo la escala, y conservan los trazos, que
+   es justo para lo que está el recorte. La
    ponderada es el mismo recorte sigma, y después cada toma cuenta según el
    ruido de **su** cielo: en una noche estable sale lo mismo que el
    sigma-clipped (medido: un 0,3 % en 2025 UR y un 2,2 % en 2026 PY9), y es
    lo que salva una noche con nubes finas o Luna, donde una toma con el
    triple de ruido arrastraría la media entera (modelado sobre esas mismas
-   tomas: hasta un 28 %). El apilado final de cada
+   tomas: hasta un 28 %).
+   Dos cosas que parecen profundidad y no lo son. El **remuestreo** (el ajuste
+   «Resampling») sólo cambia el aspecto: el bilineal, que es el defecto, y el
+   cúbico empatan en magnitud 18,20 frente a 18,21 mientras el ruido por píxel
+   difiere un 29 %, así que una imagen más lisa no es una imagen más profunda,
+   y por eso el ruido por píxel de un stack alisado no se usa como medida de
+   alcance. El cúbico y el quíntico quedan para un campo poblado, donde manda
+   la nitidez. Y los fotogramas que el registro descarta se descartan por un
+   motivo que conviene conocer: en esa misma visita los 21 rechazados tenían
+   un seeing mucho peor (8,34 px frente a 5,08), y apilarlos **cuesta 0,11
+   magnitudes** porque ensanchan la PSF del stack. La cabecera de cada stack
+   dice cómo se hizo (`NS_COMB`, el método; `NS_ORDER`, la interpolación;
+   `NS_NUSED`, los fotogramas que entraron; `NS_LEFT`, los que se dejaron
+   fuera), así que un fichero guardado siempre se puede auditar (ADR-068). El
+   apilado final de cada
    observación cubre por defecto el **fotograma completo**, que es lo que
    necesita la fotometría (comparsas alrededor); si vas justo de memoria o
    de tiempo puedes reducirlo a 1024, 512 o 256 px, y el barrido de

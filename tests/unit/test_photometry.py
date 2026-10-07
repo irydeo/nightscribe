@@ -707,6 +707,34 @@ def test_local_sources_empty_or_flat_plates_give_nothing():
     assert phot.local_sources(np.full((50, 50), 800.0)) == []
 
 
+def test_local_sources_pins_the_tie_and_the_dedup_order():
+    # The two rules the finder has to keep, because they are DECISIONS and not
+    # accidents, and because the finder stopped being a Python walk over every
+    # pixel of the cutout on 2026-10-07 (1369 iterations on the 45 px window
+    # the centroid's deblending uses, 4.7 ms, and on noise it found nothing):
+    # it is one pass of shifted comparisons now, and the rewrite is only
+    # correct if these two answers are the same.
+    #
+    #   * a PLATEAU of equal pixels is ONE source, and the upper-left pixel
+    #     speaks for it (otherwise a flat-topped star comes back as several
+    #     sources in the same place);
+    #   * two candidates closer than min_sep are one source, and the one the
+    #     RASTER order visits first wins, even when the other is brighter
+    #     (otherwise which star survives a merge would depend on how the
+    #     candidates happened to be found).
+    rng = np.random.default_rng(3)
+    plate = 1000.0 + rng.normal(0.0, 5.0, (40, 40))
+    plate[20:23, 20:23] = 5000.0            # a 3x3 plateau
+    found = phot.local_sources(plate, k=8.0, min_sep=6, ring=2)
+    assert [(int(x), int(y)) for x, y, _pk in found] == [(20, 20)]
+
+    plate = 1000.0 + rng.normal(0.0, 5.0, (40, 40))
+    plate[20, 20] = 4000.0
+    plate[21, 22] = 5000.0                  # brighter, but later in the raster
+    found = phot.local_sources(plate, k=8.0, min_sep=6, ring=2)
+    assert [(int(x), int(y)) for x, y, _pk in found] == [(20, 20)]
+
+
 def test_gaussian_centroid_locks_the_bump_not_the_bright_neighbour():
     # The contract on structured backgrounds: the centroid stays at the
     # faint bump the observer clicked (within the lattice cell), and
@@ -1415,3 +1443,66 @@ def test_an_unknown_linearity_is_said_out_loud():
     assert "Settings" in warn["en"] and "Ajustes" in warn["es"]
     # with the linearity known there is nothing to say
     assert phot.ceiling_warning({}, {"cam_linearity_adu": 45000.0}) is None
+
+
+def test_the_plate_recipe_never_takes_the_log_of_a_non_positive_flux(
+        monkeypatch):
+    # The belt and braces of the 2026-10-07 crash (the source of it is pinned
+    # in test_photometry_matched). The engine no longer reports ok with a
+    # non-positive flux, but the recipe is what protects a 207-frame run: its
+    # contract is that A MEASUREMENT IS A POSITIVE FLUX, and a target the
+    # engine could not really measure has to come back as unmeasurable with
+    # its reason, never as the logarithm of a negative number.
+    #
+    # The engine here lies on purpose, because that is the input the crash
+    # came from: -845.6 ADU with ok=True, exactly what the real 2025 FG18
+    # visit produced on frame 15.
+    img = _plate(160, 160, [(80.4, 80.3, 9000.0)], noise=5.0)
+
+    def _liar(data, x, y, psf, **kw):
+        out = dict(phot.measure_point(data, x, y, **kw))
+        out.update(ok=True, reason=None, flux=-845.6, snr=-0.97)
+        return out
+
+    monkeypatch.setattr(phot, "measure_matched", _liar)
+    cfg = phot.PlateConfig(target_xy=(80.4, 80.3), entries=[], header={},
+                           wcs=None, fwhm=3.5, matched=True,
+                           radii=(6.0, 10.0, 15.0), require_catalog=False)
+    res = phot.measure_plate(img, cfg)         # must not raise
+    assert res.target["flux"] == -845.6        # what the engine said...
+    assert res.targets[0]["ok"] is False       # ...but not a measurement
+    assert res.targets[0]["inst_t"] is None    # ...and no magnitude
+
+
+def test_a_comparison_with_a_non_positive_flux_is_skipped(monkeypatch):
+    # The same rule on the other side of the zero point: a comparison star
+    # that cannot give a positive flux calibrates nothing, so it is skipped
+    # with its reason like a clipped one, and the logarithm is never reached.
+    img = _plate(160, 160, [(80.4, 80.3, 9000.0), (120.3, 120.2, 9000.0)],
+                 noise=5.0)
+    entry = {"name": "C1", "kind": "comp",
+             "star": {"ra": 1.0, "dec": 2.0, "mag": 15.0, "band": "V",
+                      "bands": [{"label": "V", "value": 15.0, "err": 0.01,
+                                 "derived": False}], "bv": 0.6}}
+
+    class _Wcs:
+        def sky_to_pixel(self, ra, dec):
+            return (120.3, 120.2)
+
+    def _liar(data, x, y, psf, **kw):
+        # only the comparison lies: the target has to be measured for real,
+        # or the recipe stops before reaching the comps at all
+        if abs(x - 120.3) < 1.0 and abs(y - 120.2) < 1.0:
+            out = dict(phot.measure_point(data, x, y, **kw))
+            out.update(ok=True, reason=None, flux=-12.0, snr=-0.5)
+            return out
+        return orig(data, x, y, psf, **kw)
+
+    orig = phot.measure_matched
+    monkeypatch.setattr(phot, "measure_matched", _liar)
+    cfg = phot.PlateConfig(target_xy=(80.4, 80.3), entries=[entry],
+                           header={}, wcs=_Wcs(), fwhm=3.5, matched=True,
+                           radii=(6.0, 10.0, 15.0))
+    res = phot.measure_plate(img, cfg)         # must not raise
+    assert res.used == []
+    assert res.skipped.get("other") == 1

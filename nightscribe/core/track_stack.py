@@ -714,6 +714,30 @@ def sequence_motion_solution(frames, name, site="", lat=None, lon=None):
 # whole point of the region read is that the cutout path never gets near
 # this; the full-frame final stack is where the budget matters.
 MEMORY_BUDGET_BYTES = 2 * 1024 ** 3
+
+# The interpolation order the warp resamples with, as ONE constant so the
+# stack's own header can say it (2026-10-07) and the two cannot drift apart.
+#
+# 1 is the bilinear, and it is the DEFAULT since the 2025 FG18 measurement: it
+# does NOT change the depth (orders 1 and 3 tie at magnitude 18.20 against
+# 18.21 in the injection test, which is the whole point) and it makes the image
+# visibly cleaner (6.58 ADU/px against 8.49), because a bilinear smooths and
+# smoothing lowers the pixel noise WITHOUT adding information. It is a knob for
+# the eye, not for the limit: the depth is decided by the combination and by
+# the frames that go in, and the pixel noise of a smoothed stack is not a
+# measure of how faint it reaches. The observer can ask for the cubic (3) or
+# higher in Settings, at the price of a grainier image and a marginally sharper
+# point spread.
+WARP_ORDER = 1
+WARP_ORDERS = (1, 3, 5)      # what the setting offers, measured ones only
+
+# The order the VELOCITY SWEEP warps with, fixed and deliberately NOT the
+# setting above: the sweep is a measurement (it decides where the object goes)
+# and its thresholds were calibrated with the cubic. An observer's choice about
+# how the final stack looks must not move a measured velocity, which is the
+# same reason the sweep already pins its own combination method to the median
+# whatever the observer chose.
+WARP_ORDER_SWEEP = 3
 # Combination methods, in the order the UI offers them.
 METHODS = ("sum", "mean", "median", "sigma", "weighted")
 # The combine only goes parallel when there is enough work to share: a small
@@ -950,7 +974,7 @@ def _slice_region(preloaded, src_box):
     return sub
 
 
-def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3,
+def _warp_to_box(path, tr, delta, box, shape, loader=None, order=None,
                  preloaded=None):
     # @args: path - the frame, tr - its transform, delta - the object's
     #        offset, box - the output box in reference (x0,y0,x1,y1),
@@ -972,6 +996,9 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3,
     # image (measured: max 257 ADU apart around the object). Everything
     # below is in (row, col); P flips between the two.
     from scipy import ndimage
+    # The order is a knob (see WARP_ORDER): None means "whatever the module
+    # says", so a caller that does not care cannot drift from the default.
+    order = WARP_ORDER if order is None else int(order)
     A_xy, b_xy = _ref_to_native_affine(tr, delta)
     P = np.array([[0.0, 1.0], [1.0, 0.0]])
     A = P @ A_xy @ P
@@ -1004,7 +1031,7 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=3,
 
 
 def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
-                preloaded=None):
+                preloaded=None, order=None):
     # Warps a list of frames onto the box, in PARALLEL, keeping the order.
     # @args: frame_list - list[Frame], offsets - one (dx, dy) per frame (same
     #        order), box/shape - the warp's output box and the native frame,
@@ -1027,7 +1054,7 @@ def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
     results = parallel.map_parallel(
         lambda k: _warp_to_box(
             frame_list[k].path, frame_list[k].transform, offsets[k], box,
-            shape, loader=loader,
+            shape, loader=loader, order=order,
             preloaded=(preloaded[k] if preloaded is not None else None)),
         range(n), workers=workers)
     stack = np.empty((n, out_h, out_w), dtype=np.float32)
@@ -1206,13 +1233,15 @@ def _sigma_clip_keep(data, sigma, iterations):
 
 def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
                 budget_bytes=MEMORY_BUDGET_BYTES, sigma=3.0, iterations=3,
-                track=True):
+                track=True, order=None):
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, method - one of METHODS, box - the output box,
     #        shape - the native frame size, cfg - Config, loader - array
     #        reader, budget_bytes - the RAM budget, track - True freezes the
     #        OBJECT (the stars trail), False freezes the STARS (the object
-    #        trails)
+    #        trails), order - the warp's interpolation order (None = the
+    #        module's default, see WARP_ORDER: a knob for the eye and not for
+    #        the limit, which is what the measurement says)
     # @return: (stack, report)
     # In RAM when the warped frames fit the budget (the cutout path always
     # does); otherwise the output is walked in strips and only the region
@@ -1245,7 +1274,8 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     need = n * out_h * out_w * 4
     if need <= budget_bytes:
         stack, masks = _warp_batch([frames[i] for i in indices], offsets, box,
-                                   shape, loader=loader, cfg=cfg)
+                                   shape, loader=loader, cfg=cfg,
+                                   order=order)
         return combine(stack, method, mask=masks, sigma=sigma,
                        iterations=iterations, weights=weights, cfg=cfg), report
     report.streamed = True
@@ -1264,7 +1294,8 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         py1 = min(out_h, y1 + pad)
         sub_box = (box[0], box[1] + py0, box[2], box[1] + py1)
         strip, masks = _warp_batch([frames[i] for i in indices], offsets,
-                                   sub_box, shape, loader=loader, cfg=cfg)
+                                   sub_box, shape, loader=loader, cfg=cfg,
+                                   order=order)
         combined = combine(strip, method, mask=masks, sigma=sigma,
                            iterations=iterations, weights=weights, cfg=cfg)
         out[y0:y1] = combined[y0 - py0:y1 - py0]
@@ -1272,7 +1303,8 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
 
 
 def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
-                 loader=None, progress=None, cancel=None, track=True):
+                 loader=None, progress=None, cancel=None, track=True,
+                 order=None):
     # @args: frames, groups, q_by_group (one q per group), method, boxes
     #        (one box per group), shape, cfg, loader, progress, cancel,
     #        track - as stack_group (False gives the star stacks)
@@ -1284,7 +1316,7 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
             break
         stack, report = stack_group(frames, group, q_by_group[index], method,
                                     boxes[index], shape, cfg=cfg,
-                                    loader=loader, track=track)
+                                    loader=loader, track=track, order=order)
         if progress is not None:
             progress(index + 1, total, f"observation {index + 1}")
         # one entry PER GROUP even when it is empty, so the caller's index
@@ -1627,7 +1659,8 @@ def _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
     frame_list = [b[0] for b in base]
     offsets = [deltas[k][index] for k in range(len(base))]
     stack, masks = _warp_batch(frame_list, offsets, box, shape, loader=loader,
-                               cfg=cfg, preloaded=preloaded)
+                               cfg=cfg, preloaded=preloaded,
+                               order=WARP_ORDER_SWEEP)
     combined = combine(stack, method, mask=masks, sigma=sigma,
                        iterations=iterations, cfg=cfg)
     score, snr, roundness = _score(combined, (q[0] - box[0], q[1] - box[1]), cfg)

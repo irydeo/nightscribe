@@ -631,3 +631,19 @@ comparisons on the star stack) obeys the rule of **ADR-066**: no comparison and
 no check star enters the zero point if it touches the saturation or the
 linearity, and if the camera profile has no linearity the run says so in its
 notes instead of falling back to the plate's clip in silence.
+
+**Nota (2026-10-07)**: la combinación de fotogramas y lo que decide la
+profundidad del apilado se midió entero y vive en **ADR-068**: la media
+recortada sigma por defecto (la mediana cuesta 0,26 mag), el orden de
+interpolación como mando de aspecto y no de límite, la regla de no apilar un
+fotograma no verificado con su razón medida (el seeing, 0,11 mag), y las cartas
+`NS_COMB`/`NS_ORDER`/`NS_NUSED`/`NS_LEFT` con las que un stack dice cómo se
+hizo.
+
+**Note (2026-10-07)**: the combination of frames and what decides a stack's
+depth were measured whole and live in **ADR-068**: the sigma-clipped mean by
+default (the median costs 0.26 mag), the interpolation order as a knob for the
+look and not for the limit, the rule of not stacking an unverified frame with
+its measured reason (the seeing, 0.11 mag), and the
+`NS_COMB`/`NS_ORDER`/`NS_NUSED`/`NS_LEFT` cards with which a stack says how it
+was made.

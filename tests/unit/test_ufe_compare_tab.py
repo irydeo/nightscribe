@@ -1298,3 +1298,30 @@ def test_the_editor_lands_the_magnitude_on_the_compare_tab(dlg):
     dlg.tab_compare.spn_mag.setValue(0.0)
     assert dlg.set_target_magnitude(17.92) is True
     assert dlg.tab_compare.spn_mag.value() == pytest.approx(17.92)
+
+
+def test_the_magnitude_says_where_it_comes_from(dlg, qapp):
+    # 2026-10-07. The proposal anchors the comparison stars on the target's
+    # magnitude, and a figure MEASURED by a run is not the same thing as the
+    # planner's PREDICTION (an ephemeris, a catalogue, an alert). The same
+    # field in the project carries both over time, so the interface says which
+    # one it is holding, and typing in the field makes it yours.
+    tab = dlg.tab_compare
+    tab.spn_mag.setValue(0.0)
+    assert tab.set_target_magnitude(18.28, "measured") is True
+    assert tab.spn_mag.value() == pytest.approx(18.28)
+    assert tab._mag_origin == "measured"
+    # landing it from the project is NOT the observer typing it
+    assert tab._mag_origin_text() in tab.spn_mag.toolTip()
+    assert tab._mag_origin_text() in tab.primary_subtitle()
+    # and it does not overwrite a figure the plate already had
+    assert tab.set_target_magnitude(12.0, "predicted") is False
+    assert tab._mag_origin == "measured"
+    # the observer touches the field: from here on the figure is theirs
+    tab.spn_mag.setValue(18.5)
+    assert tab._mag_origin == "manual"
+    # a project that never recorded its origin says so instead of guessing
+    tab._set_mag_origin(None)
+    assert tab._mag_origin is None
+    assert tab.spn_mag.toolTip()
+    assert tab._mag_origin_text() == ""

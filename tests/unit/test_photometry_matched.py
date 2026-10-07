@@ -29,6 +29,7 @@ pixels, which is a number the observer can act on.
 """
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -361,3 +362,63 @@ def test_the_plate_says_whether_the_filter_was_actually_used():
     res = _ph.measure_plate(img, _ph.PlateConfig(matched=False, fwhm=3.5,
                                                  **base))
     assert res.ok and res.matched_used is False
+
+
+# --------- the negative flux that killed a real run (2026-10-07) ----------
+
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+
+
+def test_a_negative_matched_flux_comes_back_as_a_failure():
+    # THE REAL CRASH. The filter correlates a PSF with the data, and on noise
+    # that correlation comes out negative as often as positive. It used to be
+    # returned with ok=True, and the callers take -2.5*log10(flux) with a
+    # truthiness guard that a negative number passes: on the real 2025 FG18
+    # visit (frame 15, target T18 at 306,1669) the filter said -845.6 ADU with
+    # snr -0.97, and the whole 207-frame series died with "math domain error"
+    # instead of marking one point as unmeasurable.
+    #
+    # The position below is a fixed one on the real AT2026acka plate where the
+    # filter comes out negative while the APERTURE measures 662 ADU: the two
+    # methods disagree, and that disagreement is exactly the case. Nothing
+    # here is random.
+    from nightscribe.core import fits_io
+    _header, data = fits_io.read_fits(str(FIXTURES / "AT2026acka.fit"))
+    fwhm = 4.5
+    psf = ph.gaussian_psf(fwhm)
+    r_ap, r_in, r_out = ph.aperture_for_fwhm(fwhm)
+    r = ph.measure_matched(data, 403.4, 200.3, psf, r_ap=r_ap,
+                           r_ann_in=r_in, r_ann_out=r_out, fwhm=fwhm)
+    assert r["ok"] is False
+    assert r["flux"] is None
+    assert r["reason"]["es"] and r["reason"]["en"]
+    # the aperture measured the same sky and it does have something to say:
+    # that value is KEPT, because it is a different measurement of the same
+    # star and the observer is entitled to see it
+    assert (r["flux_ap"] or 0.0) > 0.0
+
+
+def test_the_filter_never_says_ok_with_a_non_positive_flux():
+    # The invariant the fix buys, over fresh noise: whatever the noise says,
+    # ok=True means a POSITIVE flux. Before the fix this failed on empty-sky
+    # realisations like these, and every one of those was a log10(negative)
+    # waiting for a caller.
+    rng = np.random.default_rng(4)
+    psf = ph.gaussian_psf(FWHM)
+    r_ap, r_in, r_out = ph.aperture_for_fwhm(FWHM)
+    guarded = 0
+    for _ in range(60):
+        data = _frame_with_star(rng, 0.0, 40.0, 40.0, psf)      # empty sky
+        ap = ph.measure_point(data, 40.0, 40.0, r_ap=r_ap,
+                              r_ann_in=r_in, r_ann_out=r_out, fwhm=FWHM)
+        r = ph.measure_matched(data, 40.0, 40.0, psf, r_ap=r_ap,
+                               r_ann_in=r_in, r_ann_out=r_out, fwhm=FWHM)
+        assert not (r["ok"] and (r.get("flux") or 0.0) <= 0.0)
+        if not r["ok"]:
+            assert r["flux"] is None and r["reason"]
+            if ap["ok"] and (ap.get("flux") or 0.0) > 0.0:
+                # the aperture HAD a measurement and the filter did not: the
+                # exact shape of the crash, and it has to be reachable here or
+                # the test is not testing the guard at all
+                guarded += 1
+    assert guarded > 0, "el camino del flujo negativo no se ha ejercitado"

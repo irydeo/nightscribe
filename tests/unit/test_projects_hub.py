@@ -1759,6 +1759,13 @@ def test_create_project_keeps_variable_and_campaign_context(window):
     assert ctx["variable"]["period_d"] == 227.55
     assert ctx["campaign"]["name"] == "Campaña T CrB"
     assert ctx["project_id"] == 7
+    # WHERE the figure comes from (2026-10-07): the planner's magnitude is a
+    # PREDICTION, and a stack run later overwrites the same field with a
+    # MEASUREMENT. Without this, reading 18.28 could not tell you whether
+    # anybody had measured it, and the proposal anchors the comparison stars
+    # on it.
+    assert ctx["mag"] == 10.1
+    assert ctx["mag_origin"] == "predicted"
 
 
 def test_project_header_shows_campaign_badge(window):

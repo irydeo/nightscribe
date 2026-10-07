@@ -88,15 +88,34 @@ project). No visit, no series: that is the house rule.
    and it is worth seeing that before accepting.
 3. **Stack.** The app solves the first frame, aligns the rest on the stars
    and shifts each frame so the object always lands on the same point. You
-   can pick the combination: **sigma-clipped** (the professional standard:
-   nearly all of the mean's signal with the median's cleanliness), median
-   (fast, for trying), mean, sum, or **weighted (1/sigma^2)**. Mean and sum
-   differ only in scale. Weighted is the same sigma clip, and then each
-   frame counts by the noise of **its own** sky: on a stable night it comes
-   out the same as sigma-clipped (measured: 0.3 % on 2025 UR and 2.2 % on
-   2026 PY9), and it is what saves a night with thin cloud or moon, where a
-   frame with three times the noise would drag the whole mean (modelled on
-   those same frames: up to 28 %). The
+   can pick the combination: **sigma-clipped** (the default, and the one to
+   use: measured by injecting sources of a known brightness into a real
+   207-frame visit and measuring them back, it reaches magnitude **18.23**),
+   median, mean, sum, or **weighted (1/sigma^2)**. The median is **0.26
+   magnitudes shallower** (17.97 on the same frames) for a plain statistical
+   reason: the median of N measurements is 1.25x noisier than their mean, and
+   the clip already rejects the star trails (it discards about 17 % of the
+   pixels here) without paying that. Mean and sum differ only in scale and
+   keep the trails, which is what the clip is for. Weighted is the same sigma
+   clip, and then each frame counts by the noise of **its own** sky: on a
+   stable night it comes out the same as sigma-clipped (measured: 0.3 % on
+   2025 UR and 2.2 % on 2026 PY9), and it is what saves a night with thin
+   cloud or moon, where a frame with three times the noise would drag the
+   whole mean (modelled on those same frames: up to 28 %).
+   Two things that look like depth and are not. The **resampling** (the
+   "Resampling" setting) only changes the look: the bilinear, which is the
+   default, and the cubic tie at magnitude 18.20 against 18.21 while the pixel
+   noise differs by 29 %, so a smoother image is not a deeper one, and that is
+   why the pixel noise of a smoothed stack is not used as a measure of reach.
+   The cubic and the quintic are there for a crowded field, where sharpness
+   rules. And the frames the registration leaves out are left out for a reason
+   worth knowing: on that same visit the 21
+   refused frames had a much worse seeing (8.34 px against 5.08), and
+   stacking them **costs 0.11 magnitudes** because they broaden the stack's
+   point spread. Every stack's header says how it was made (`NS_COMB`, the
+   method; `NS_ORDER`, the interpolation; `NS_NUSED`, the frames that went
+   in; `NS_LEFT`, the ones left out), so a saved file can always be audited
+   (ADR-068). The
    final stack of each observation covers the **whole frame** by default,
    which is what the photometry needs (comparison stars all around); short
    on memory or time you can shrink it to 1024, 512 or 256 px, and the

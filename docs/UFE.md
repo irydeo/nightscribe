@@ -196,7 +196,14 @@ cannot deliver (the query fails, nothing lands on this plate, no usable
 comparison star) keeps the sequence you already had and says why.
 
 * **Target** and **Target mag** pre-fill what the project knows; the
-  approximate magnitude guides the proposal.
+  approximate magnitude guides the proposal, and **where it comes from is
+  said**: the project records whether that figure is a **measurement** (from
+  an earlier stack), a **prediction** from the planner (an ephemeris, a
+  catalog, an alert) or **yours** (you typed it), and the field declares it
+  in its help and in the proposal's own line. It is not a detail: the
+  proposal picks the comparison stars around that figure, and a proposal
+  anchored on a measurement is not the same thing as one anchored on a
+  guess.
 * **Generate field** queries the catalog (Gaia EDR3 or APASS DR9) and
   the VSX variables around the plate centre: the brightest stars come
   out labelled ("show catalog magnitudes" checkbox) and the known

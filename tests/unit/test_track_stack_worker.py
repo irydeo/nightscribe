@@ -301,3 +301,38 @@ def test_photometry_runs_and_keeps_the_plate_shape_for_every_observation(
     assert len(shapes_seen) == 2
     for shape in shapes_seen:
         assert isinstance(shape, tuple) and shape == (64, 64)
+
+
+def test_the_warp_order_is_a_setting_with_the_bilinear_by_default():
+    # 2026-10-07. The interpolation order is a knob for the EYE and not for the
+    # limit, and it is measured: on the 2025 FG18 visit the bilinear and the
+    # cubic tie in depth (magnitude 18.20 against 18.21 by injection and
+    # recovery) while the pixel noise differs by 29 %, because smoothing lowers
+    # the pixel noise without adding information. The bilinear is therefore the
+    # default, and the setting is validated: an order the engine cannot use
+    # falls back to it instead of reaching scipy.
+    from nightscribe.core import track_stack
+    assert track_stack.WARP_ORDER == 1
+    assert track_stack.WARP_ORDER in track_stack.WARP_ORDERS
+    worker = _worker()
+    # no config: the module's default
+    assert worker._warp_order() == track_stack.WARP_ORDER
+    # the observer's choice, when it is one the engine offers
+    worker._cfg = {"astrometry_warp_order": 3}
+    assert worker._warp_order() == 3
+    # and anything else falls back instead of blowing up in scipy
+    for bad in (0, 2, 7, "cubic", None):
+        worker._cfg = {"astrometry_warp_order": bad}
+        assert worker._warp_order() == track_stack.WARP_ORDER
+
+
+def test_the_sweep_keeps_its_own_order_whatever_the_observer_picked():
+    # The sweep is a MEASUREMENT (it decides where the object goes) and its
+    # thresholds were calibrated with the cubic, so the observer's cosmetic
+    # choice must not move a measured velocity. It is the same reason the sweep
+    # already pins its own combination method to the median.
+    from nightscribe.core import track_stack
+    assert track_stack.WARP_ORDER_SWEEP == 3
+    # and it is deliberately independent of the cosmetic default: if the two
+    # ever became the same number by accident, the pinning would be a lie
+    assert track_stack.WARP_ORDER_SWEEP != track_stack.WARP_ORDER

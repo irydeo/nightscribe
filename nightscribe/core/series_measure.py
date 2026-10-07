@@ -535,15 +535,23 @@ def _frame_fwhm(data, res):
     return photometry.estimate_fwhm(data, spots)
 
 
-def _frame_spots(cfg, wcs_ov=None, targets_ov=None):
-    # The targets and the comps on the frame about to be measured: what the
-    # seeing (and the centroid) is measured on.
-    # @args: targets_ov - the targets on THIS frame's grid, as
-    #        ((label, x, y, bv), ...); None means the one in cfg.target_xy
+def _frame_spots(cfg, wcs_ov=None):
+    # The comparison stars of the frame about to be measured: what the
+    # FRAME'S SEEING is measured on.
+    #
+    # The comps and NOT the targets, and that is not a detail: they are shared
+    # by every target of a pass by definition, so the seeing does not depend on
+    # how many objects the pass carries. Measuring it on the targets too broke
+    # the pass parity (a pass of two objects gave a different curve from the
+    # same object measured alone, because the median of a longer list of stars
+    # is a different number), and a saving paid in science is not a saving.
+    #
+    # Without comps there is no shared set and the frame keeps no seeing: the
+    # centroid then estimates it per star, which is what it always did.
+    # @args: cfg - SeriesConfig, wcs_ov - the frame's own WCS when it is being
+    #        measured on its native grid (registration), None otherwise
     # @return: [(x, y), ...]
-    spots = [(float(t[1]), float(t[2])) for t in (targets_ov or ())]
-    if not spots:
-        spots = [cfg.target_xy]
+    spots = []
     w = wcs_ov if wcs_ov is not None else cfg.wcs
     if w is not None:
         for e in cfg.comp_set:
@@ -582,10 +590,20 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         base = apertures[night].get("radii")
     if base is None:
         base = cfg.radii
-    fwhm = None
-    if cfg.seeing_aperture:
-        fwhm = photometry.estimate_fwhm(
-            data, _frame_spots(cfg, wcs_ov, targets_ov))
+    # THE FRAME'S OWN SEEING, measured ONCE for the whole frame.
+    #
+    # It used to be measured only when the aperture had to follow the seeing,
+    # and the centroid then estimated it PER STAR from a single cutout: on the
+    # real 2025 FG18 visit that gave 3.2 to 11.0 px where the session was
+    # 4.64, and it moved the centroid by up to 0.28 px (measured). Every star
+    # of a frame shares one atmosphere, so the recipe takes the frame's value:
+    # one measurement per frame instead of one per star, and a template that
+    # does not depend on how faint the star it is fitting happens to be.
+    #
+    # It is measured on the COMPS (see _frame_spots), which is what makes it
+    # the same number in a pass and in a solo run.
+    spots = _frame_spots(cfg, wcs_ov)
+    fwhm = photometry.estimate_fwhm(data, spots) if spots else None
     radii = base
     seen_scale = None
     if cfg.seeing_aperture and fwhm and fwhm_ref:

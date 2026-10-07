@@ -812,3 +812,21 @@ apertura que usará la noche entera.
 ceilings (ADR-066), and so does its **aperture tuning (T3)**: the check star is
 measured with the same two limits, so a clipped one cannot tune the aperture the
 whole night will use.
+
+**Nota (2026-10-07)**: la receta recibe **el seeing del fotograma**, medido una
+vez sobre las comparsas, y lo comparten todas las estrellas de ese fotograma.
+Antes el centroide lo estimaba estrella a estrella (de 3,2 a 11,0 px donde la
+sesión tenía 4,64, y la posición se movía hasta 0,28 px), y medirlo sobre los
+objetivos además de las comparsas rompía la paridad del pase. Medido en cinco
+conjuntos: 1,7 % de mediana de mejora en la dispersión y entre 1,2 y 1,5× de
+velocidad. Y el desmezclado del centroide, que costaba 3,20 ms por medida,
+cuesta 0,35 ms con el mismo resultado (ADR-067, punto 3).
+
+**Note (2026-10-07)**: the recipe receives **the frame's seeing**, measured once
+on the comparisons, and every star of that frame shares it. The centroid used to
+estimate it star by star (3.2 to 11.0 px where the session had 4.64, moving the
+position by up to 0.28 px), and measuring it on the targets as well as the
+comparisons broke the pass's parity. Measured on five datasets: 1.7 % median
+improvement in the scatter and 1.2 to 1.5× speed. And the centroid's
+deblending, which cost 3.20 ms per measurement, costs 0.35 ms with the same
+result (ADR-067, point 3).

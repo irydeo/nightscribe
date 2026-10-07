@@ -1121,6 +1121,27 @@ class TrackStackWorker(QThread):
             return default
         return self._cfg.get(key, default)
 
+    def _warp_order(self):
+        # The warp's interpolation order, from Settings (2026-10-07).
+        #
+        # The DEFAULT is the bilinear, and that is a measured decision: on the
+        # 2025 FG18 visit, orders 1 and 3 tie in depth (magnitude 18.20 against
+        # 18.21 by injection and recovery) while the pixel noise differs by
+        # 29 % (6.58 against 8.49 ADU/px). A bilinear smooths, and smoothing
+        # lowers the pixel noise WITHOUT adding information: it is a knob for
+        # the eye, not for the limit. The observer who wants the sharpest point
+        # spread (a crowded field) can ask for the cubic, at the price of a
+        # grainier image.
+        # @return: an order the engine can use, never anything else
+        from ..core import track_stack
+        try:
+            value = int(self._cfg_get("astrometry_warp_order",
+                                      track_stack.WARP_ORDER))
+        except (TypeError, ValueError):
+            value = track_stack.WARP_ORDER
+        return value if value in track_stack.WARP_ORDERS \
+            else track_stack.WARP_ORDER
+
     # --------------------------------------------------------- brightness
 
     def _photometry(self, frames, groups, boxes, qs, stacks, points, ref, w0,
@@ -1307,7 +1328,8 @@ class TrackStackWorker(QThread):
             # between the two methods, exactly.
             mag_ap = None
             tgt = getattr(res, "target", None) or {}
-            if tgt.get("flux_ap") and tgt.get("flux"):
+            if (tgt.get("flux_ap") or 0.0) > 0.0 \
+                    and (tgt.get("flux") or 0.0) > 0.0:
                 try:
                     mag_ap = float(res.mag) + 2.5 * math.log10(
                         float(tgt["flux"]) / float(tgt["flux_ap"]))
@@ -1490,7 +1512,8 @@ class TrackStackWorker(QThread):
                 continue
             small, _rep = track_stack.stack_group(
                 frames, group, (cx, cy), self._method, box, shape,
-                cfg=self._cfg, track=False, loader=self._loader)
+                cfg=self._cfg, track=False, loader=self._loader,
+                order=self._warp_order())
             if small is None:
                 continue
             out.append((e, small, cx - box[0], cy - box[1]))
@@ -1747,7 +1770,8 @@ class TrackStackWorker(QThread):
             self.progress.emit("base", 0, 1)
             base_stack, _rep = track_stack.stack_group(
                 frames, (0, len(frames)), q_all, self._method, box_all,
-                shape, cfg=self._cfg, loader=self._loader)
+                shape, cfg=self._cfg, loader=self._loader,
+                order=self._warp_order())
             q_all_box = (q_all[0] - box_all[0], q_all[1] - box_all[1])
             self.progress.emit("detect", 0, 1)
             detection = track_stack.detect(base_stack, q_all_box, self._cfg)
@@ -1849,6 +1873,7 @@ class TrackStackWorker(QThread):
             stacks = track_stack.stack_groups(
                 frames, groups, q_by_group, self._method, boxes, shape,
                 cfg=self._cfg, loader=self._loader,
+                order=self._warp_order(),
                 progress=lambda d, t, _l: self.progress.emit("groups", d, t),
                 cancel=lambda: self._cancel)
             if self._cancel or len(stacks) < len(groups):
@@ -1912,7 +1937,7 @@ class TrackStackWorker(QThread):
                     star_stacks = track_stack.stack_groups(
                         frames, groups, q_by_group, self._method, boxes,
                         shape, cfg=self._cfg, track=False,
-                        loader=self._loader,
+                        loader=self._loader, order=self._warp_order(),
                         progress=lambda d, t, _l: self.progress.emit(
                             "starstack", d, t),
                         cancel=lambda: self._cancel)

@@ -200,7 +200,13 @@ no puede entregar (falla la consulta, no cae nada en esta placa, ninguna
 comparsa válida) mantiene la secuencia que ya tenías y dice por qué.
 
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
-  sabe; la magnitud aproximada sirve de guía a la propuesta.
+  sabe; la magnitud aproximada sirve de guía a la propuesta, y **de dónde
+  sale se dice**: el proyecto guarda si esa cifra es una **medida** (la de
+  un apilado anterior), una **predicción** del planificador (efeméride,
+  catálogo, alerta) o **tuya** (la escribiste tú), y el campo lo declara en
+  su ayuda y en la línea de la propuesta. No es un detalle: la propuesta
+  elige las comparsas alrededor de esa cifra, y una propuesta anclada en una
+  medida y otra anclada en una conjetura no son lo mismo.
 * **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las
   variables VSX alrededor del centro de la placa: las estrellas más
   brillantes aparecen rotuladas (casilla «mostrar magnitudes de

@@ -6559,7 +6559,10 @@ class MainWindow(QMainWindow):
         # setter, and that is not an error.
         setter = getattr(dlg, "set_target_magnitude", None)
         if callable(setter):
-            setter(ctx.get("mag"))
+            # with its origin: "measured" after a run, "predicted" from the
+            # planner, "manual" if the observer set it. The field says which,
+            # because the proposal anchors the comparison stars on this figure
+            setter(ctx.get("mag"), ctx.get("mag_origin"))
 
     def _ufe_sequence_hook(self, pid, state):
         # The editor's sequence changed by the observer: keep it in the
@@ -6578,6 +6581,9 @@ class MainWindow(QMainWindow):
             # sentinel ("no data") is falsy on purpose, so a widget default
             # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
+            # the observer's own figure (the Compare tab's field): neither a
+            # prediction nor a measurement of ours
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
 
     def _visit_open_in_editor(self, pid, path, sid):
@@ -7453,6 +7459,9 @@ class MainWindow(QMainWindow):
             # sentinel ("no data") is falsy on purpose, so a widget default
             # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
+            # the observer's own figure (the Compare tab's field): neither a
+            # prediction nor a measurement of ours
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
 
     def _exotic_write(self, pid, e):
@@ -9353,6 +9362,21 @@ class MainWindow(QMainWindow):
                   "perihelion_date", "transit", "approach", "hads",
                   "variable", "campaign", "project_id", "notes")
                  if target.get(k) is not None}
+        if ctx.get("mag") is not None:
+            # WHERE the figure comes from, said out loud (2026-10-07). The
+            # planner's magnitude is a PREDICTION (an ephemeris, a catalogue,
+            # an alert) and a stack run later overwrites it with a
+            # MEASUREMENT: the same field, two very different things, and the
+            # app uses it to choose the comparison stars. The stack already
+            # says which of the two it carries (NS_MAGSR); the project had no
+            # way to say it, and reading 18.28 could not tell you whether
+            # anybody had measured it.
+            # The name is mag_ORIGIN and not mag_source on purpose: the
+            # points table already has a mag_source that answers a
+            # different question (WHO wrote the figure: "auto" or
+            # "manual"), and two things with the same name is how a
+            # provenance gets lost.
+            ctx["mag_origin"] = "predicted"
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
@@ -10998,6 +11022,7 @@ class MainWindow(QMainWindow):
             # the magnitude lives in the project from now on (the next
             # prefill finds it at the top level)
             ctx_update["mag"] = payload["target_mag"]
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
         # ADR-047: the sequence lands in the OPEN plate's saved state
         # too, merged over whatever it already carries (stretch and
@@ -11528,7 +11553,12 @@ class MainWindow(QMainWindow):
         # magnitude is the run's own summary, so nothing is invented.
         phot = payload.get("photometry") or {}
         if phot.get("mag"):
-            project.update_context(db, pid, {"mag": float(phot["mag"])})
+            project.update_context(db, pid, {
+                "mag": float(phot["mag"]),
+                # and it SAYS so: from here on, the project's figure is a
+                # measurement and the interface can tell the observer which
+                # of the two it is anchoring on
+                "mag_origin": "measured"})
         # The comparison stars the run used are SAVED when the project had
         # none: opening the Photometry tab then finds the same sequence
         # instead of proposing a different one, and the next run starts from

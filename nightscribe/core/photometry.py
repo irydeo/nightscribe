@@ -483,6 +483,31 @@ def sky_sigma(values):
     return sigma if np.isfinite(sigma) and sigma > 0 else None
 
 
+def _matched_fail(ap, reason_es, reason_en, sigma):
+    # The shape EVERY failure of the matched filter comes back with.
+    #
+    # The APERTURE's own numbers are kept (flux_ap): it is a different
+    # measurement of the same star and it may well be fine, and the observer
+    # is entitled to see it. What is None is the filter's own.
+    #
+    # ok is False and the reason travels, because the previous version of
+    # these paths returned ok=True with flux=None, which is the worst of both
+    # worlds: a caller that trusted "ok" then did log10(None) or
+    # log10(negative). Fixed on 2026-10-07 after the real 2025 FG18 visit
+    # (frame 15, target T18 at 306,1669) came back with flux -845.6 ADU and
+    # ok=True, and measure_plate died with "math domain error" instead of
+    # marking one point as unmeasurable.
+    # @args: ap - the aperture measurement of the same star, reason_es/en -
+    #        the plain-language pair, sigma - the sky noise per pixel (None
+    #        when it could not be measured either)
+    # @return: the dict, with ok=False
+    out = dict(ap)
+    out.update(ok=False, reason={"es": reason_es, "en": reason_en},
+               flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
+               n_eff=None, sigma_pp=sigma)
+    return out
+
+
 def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
                     r_ann_out=R_ANN_OUT, sat_adu=None, fwhm=None,
                     centroid_mode="gaussian", sigma_clip=True,
@@ -549,10 +574,8 @@ def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
         ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
         sigma = sky_sigma(sub[ann_mask])
     if sigma is None:
-        out = dict(ap)
-        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
-                   n_eff=None, sigma_pp=None)
-        return out
+        return _matched_fail(ap, "sin ruido de cielo medible",
+                             "no measurable sky noise", None)
     # the PSF placed where the object actually is, inside its pixel
     m = _shift_psf(psf, cx - math.floor(cx), cy - math.floor(cy))
     mh = (m.shape[0] - 1) // 2
@@ -563,21 +586,28 @@ def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
     sx1 = min(sub.shape[1], ix + m.shape[1])
     sy1 = min(sub.shape[0], iy + m.shape[0])
     if sx1 <= sx0 or sy1 <= sy0:
-        out = dict(ap)
-        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
-                   n_eff=None, sigma_pp=sigma)
-        return out
+        return _matched_fail(ap, "sin píxeles utilizables",
+                             "no usable pixels", sigma)
     patch[sy0:sy1, sx0:sx1] = m[sy0 - iy:sy1 - iy, sx0 - ix:sx1 - ix]
     net = sub - sky_pp
     num = float(np.nansum(patch * net))
     gg = float(np.nansum(patch ** 2))
     if gg <= 0:
-        out = dict(ap)
-        out.update(flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
-                   n_eff=None, sigma_pp=sigma)
-        return out
+        return _matched_fail(ap, "sin píxeles utilizables",
+                             "no usable pixels", sigma)
     flux = num / gg
     snr = num / (sigma * math.sqrt(gg))
+    if not math.isfinite(flux) or flux <= 0.0:
+        # THE FILTER CAN COME OUT NEGATIVE, and it is not a rare accident:
+        # the matched filter correlates a PSF with the data, and on noise the
+        # correlation is as often negative as positive. A negative flux is
+        # not a faint measurement, it is the absence of one, and the callers
+        # take -2.5*log10(flux) with a truthiness guard that a negative
+        # number passes. Measured on the real 2025 FG18 visit (frame 15,
+        # target T18 at 306,1669): flux -845.6 ADU, snr -0.97, and the whole
+        # 207-frame run died instead of marking one point.
+        return _matched_fail(ap, "sin señal medible",
+                             "no measurable signal", sigma)
     # the aperture's own SNR with the SAME noise per pixel and the same
     # sky: this is what isolates the weighting (see the docstring)
     n_ap = float(ap.get("n_pix") or 0.0)
@@ -1507,25 +1537,54 @@ def local_sources(data, k=4.0, min_sep=6, ring=4, max_sources=50):
         noise = float(np.nanstd(clean))
     if noise <= 0:
         return []
+    # THE CANDIDATES, IN ONE PASS (2026-10-07). This used to be a Python loop
+    # over every pixel of the cutout (1369 iterations on the 45 px window the
+    # centroid's deblending uses, measured at 4.7 ms) with a slice and a ring
+    # median per local maximum, and on noise it spent all of that to find
+    # nothing. The test is the same one: a pixel that is not lower than any of
+    # its eight neighbours, with the plateau tie left to the upper-left pixel.
+    core = clean[ring:h - ring, ring:w - ring]
+    is_max = np.ones(core.shape, dtype=bool)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            is_max &= core >= clean[ring + dy:h - ring + dy,
+                                    ring + dx:w - ring + dx]
+    is_max &= core != clean[ring:h - ring, ring - 1:w - ring - 1]
+    is_max &= core != clean[ring - 1:h - ring - 1, ring:w - ring]
+    ys, xs = np.nonzero(is_max)
+    if ys.size == 0:
+        return []
+    # the local sky of every candidate at once: the SAME ring as before (the
+    # top and bottom rows and the two side columns), gathered for all of them
+    # and medianed along the second axis
+    offsets = []
+    for dx in range(-ring, ring + 1):
+        offsets.append((-ring, dx))
+        offsets.append((ring, dx))
+    for dy in range(-ring + 1, ring):
+        offsets.append((dy, -ring))
+        offsets.append((dy, ring))
+    yy = ring + ys
+    xx = ring + xs
+    ring_vals = np.stack([clean[yy + dy, xx + dx] for dy, dx in offsets],
+                         axis=1)
+    sig = (core[ys, xs] - np.median(ring_vals, axis=1)) / noise
+    keep = np.nonzero(sig >= k)[0]
+    if keep.size == 0:
+        return []
+    # the min_sep dedup runs in RASTER order, which is the order the old loop
+    # visited the pixels in: the result of a tie must not depend on how the
+    # candidates were found
+    keep = keep[np.lexsort((xs[keep], ys[keep]))]
     out = []
-    for y in range(ring, h - ring):
-        for x in range(ring, w - ring):
-            v = clean[y, x]
-            if v < clean[y - 1:y + 2, x - 1:x + 2].max():
-                continue
-            if v == clean[y, x - 1] or v == clean[y - 1, x]:
-                continue        # plateau tie: the upper-left px speaks
-            loc = np.concatenate([clean[y - ring, x - ring:x + ring + 1],
-                                  clean[y + ring, x - ring:x + ring + 1],
-                                  clean[y - ring + 1:y + ring, x - ring],
-                                  clean[y - ring + 1:y + ring, x + ring]])
-            sig = (v - float(np.median(loc))) / noise
-            if sig < k:
-                continue
-            if any((px - x) ** 2 + (py - y) ** 2 < min_sep ** 2
-                   for px, py, _p, _s in out):
-                continue
-            out.append((float(x), float(y), float(v), float(sig)))
+    for i in keep:
+        y, x = int(ys[i]) + ring, int(xs[i]) + ring
+        if any((px - x) ** 2 + (py - y) ** 2 < min_sep ** 2
+               for px, py, _p, _s in out):
+            continue
+        out.append((float(x), float(y), float(clean[y, x]), float(sig[i])))
     out.sort(key=lambda s: s[3], reverse=True)
     return [(x, y, pk) for x, y, pk, _s in out[:max_sources]]
 
@@ -2216,6 +2275,12 @@ def _check_verdict(entries, used_entries, band, zp, err_total):
     if zp.get("color_used") and zp.get("k") is not None \
             and check["star"].get("bv") is not None:
         zp_check = zp["zp"] + zp["k"] * check["star"]["bv"]
+    if (used.get("flux") or 0.0) <= 0.0:
+        # a magnitude needs a POSITIVE flux: the check star goes through the
+        # same engine as everything else, and an engine that reports ok with
+        # a non-positive flux (the matched filter can, see _matched_fail)
+        # must not reach the logarithm
+        return None
     measured = -2.5 * math.log10(used["flux"]) + zp_check
     delta = measured - catalog
     return {"delta": delta, "ok": abs(delta) <= 2.5 * err_total,
@@ -2336,12 +2401,20 @@ def measure_plate(image, cfg):
         mx, my = target["x"], target["y"]
         if cfg.comp_image is not None:
             mx, my = mx * scale, my * scale
+        # A MEASUREMENT IS A POSITIVE FLUX, whatever the engine says. The
+        # matched filter used to report ok=True with a negative one (see
+        # _matched_fail), and everything below assumes the opposite: the
+        # logarithm of the instrumental magnitude, the CCD error budget, the
+        # zero point. It is decided ONCE, here, so no later line has to
+        # wonder, and a target the engine could not really measure comes back
+        # as "unmeasurable" with its reason instead of as a magnitude of a
+        # negative number.
+        ok = bool(target["ok"]) and (target.get("flux") or 0.0) > 0.0
         measured.append({
             "label": label, "target": target, "col": mx, "row": my,
-            "bv": bv, "ok": bool(target["ok"]),
+            "bv": bv, "ok": ok,
             "reason": target.get("reason"),
-            "inst_t": (-2.5 * math.log10(target["flux"])
-                       if target["ok"] and target.get("flux") else None),
+            "inst_t": (-2.5 * math.log10(target["flux"]) if ok else None),
             # calibrated further down; every key exists from here so a
             # caller writing a curve always reads the same shape
             "zp": None, "mag": None, "err_internal": None,
@@ -2397,7 +2470,10 @@ def measure_plate(image, cfg):
                                   fwhm=fwhm,
                                   robust=cfg.robust_centroid)
         value, derived = band_of(star, band)
-        if not r["ok"]:
+        if not r["ok"] or (r.get("flux") or 0.0) <= 0.0:
+            # a comparison star that cannot give a positive flux cannot
+            # calibrate anything: it is skipped like a clipped one, with its
+            # reason, instead of reaching the logarithm below
             if r.get("saturated"):
                 key = "sat"
             elif r.get("nonlinear"):

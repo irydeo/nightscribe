@@ -1842,3 +1842,58 @@ def test_the_snr_column_says_what_it_is_and_that_the_filter_does_not_touch_it(
     assert "does not change it" in tip
     notes = tab.txt_notes.toPlainText()
     assert "SNR 8.7 against 5.8 on the brightness measurement" in notes
+
+
+def test_the_stack_says_how_it_was_combined(tmp_path, qapp):
+    # 2026-10-07. An afternoon went into telling two stacks of the SAME 207
+    # frames apart, because the saved file did not say which combination had
+    # built it. The method is worth a quarter of a magnitude (measured by
+    # injection on that visit: the sigma-clipped mean reaches 18.23 where the
+    # median reaches 17.97), so it travels in the header, with the number of
+    # frames that really went in and the ones the registration left out.
+    #
+    # This is the same rule the app already applies to a brightness
+    # (NS_MAGSR: a figure never arrives without its origin), applied to the
+    # image itself.
+    from astropy.io import fits
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.core import astrometry, track_stack
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2025 FG18"}
+    host.export_folder = lambda: str(tmp_path)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._run_id = 7
+    frame = track_stack.Frame(path="f.fits",
+                              header={"EXPTIME": 1.0, "FILTER": "Clear",
+                                      "INSTRUME": "TestCam"},
+                              exptime_s=1.0,
+                              date_obs="2026-10-07T22:00:00")
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    report = track_stack.StackReport(method="median", n_frames=186)
+    tab._result = {
+        "method": "median", "n_failed": 21,
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), report)],
+        "points": [(point, None, [])],
+        "groups": [(0, 207)], "mids": [2460965.5], "frames": [frame],
+        "sweep": track_stack.SweepResult(
+            best={"rate": 1.234, "pa": 245.4, "score": 3.0}, grid=[]),
+        "photometry": {"mag": 18.05, "err": 0.12, "band": "G",
+                       "n_comps": 8, "n_frames": 207,
+                       "per_obs": [{"mag": 18.05, "err": 0.12,
+                                    "n_comps": 8, "check": True}]},
+    }
+    tab._show_group(0)
+    written = list(tmp_path.glob("*_obs1_*.fits"))
+    assert len(written) == 1
+    header = fits.getheader(str(written[0]))
+    assert header["NS_COMB"] == "median"
+    assert header["NS_NUSED"] == 186
+    assert header["NS_LEFT"] == 21
+    assert header["NS_ORDER"] == track_stack.WARP_ORDER
+    # the card that would have saved the afternoon: the method is readable
+    # from the file alone
+    assert str(header["NS_COMB"]) in track_stack.METHODS

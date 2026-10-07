@@ -44,7 +44,7 @@ from .widgets.ufe_image_view import (UfeImageView, cross_marker_items,
                                      mark_cross_items)
 from ..viz import palette
 from .widgets.stack_strip import StackStrip
-from ..core import photometry
+from ..core import photometry, track_stack
 from .widgets.collapsible_section import CollapsibleSection
 from .widgets.hero_fit import install_hero_fit, set_hero_text
 from .widgets.kind_glyph import kind_glyph_pixmap
@@ -97,6 +97,7 @@ class UfeTrackStackTab(QWidget):
         self.lbl_plan_line = self._ui.lbl_plan_line
         self.tbl_snr = self._ui.tbl_snr
         self.cmb_method = self._ui.cmb_method
+        self.cmb_warp_order = self._ui.cmb_warp_order
         self.btn_stack = self._ui.btn_stack
         self.prg_stack = self._ui.prg_stack
         self.lbl_status = self._ui.lbl_status
@@ -371,6 +372,28 @@ class UfeTrackStackTab(QWidget):
         _mi = self.cmb_method.findData(
             config.get("astrometry_method", "sigma"))
         self.cmb_method.setCurrentIndex(_mi if _mi >= 0 else 3)
+        # THE RESAMPLING (2026-10-07): the warp's interpolation order, and it
+        # is a knob for the EYE, not for the limit. Measured on the 2025 FG18
+        # visit: orders 1 and 3 tie in depth (magnitude 18.20 against 18.21 by
+        # injection and recovery) while the pixel noise differs by 29 %, so the
+        # bilinear is the default because the image looks cleaner at no cost.
+        self.cmb_warp_order.addItem(self.tr("Bilinear (cleaner)"), 1)
+        self.cmb_warp_order.addItem(self.tr("Cubic (sharper)"), 3)
+        self.cmb_warp_order.addItem(self.tr("Quintic (sharpest)"), 5)
+        _wo = self.cmb_warp_order.findData(
+            config.get("astrometry_warp_order", track_stack.WARP_ORDER))
+        self.cmb_warp_order.setCurrentIndex(_wo if _wo >= 0 else 0)
+        # BOTH choices are PERSISTED (2026-10-07). They used to be read from
+        # the settings and never written back, so a run combined with the
+        # median left no trace: that is exactly how an afternoon went into
+        # telling two stacks of the same frames apart. What the observer picks
+        # is what the next visit starts with.
+        self.cmb_method.currentIndexChanged.connect(
+            lambda _i: config.set("astrometry_method",
+                                  self.cmb_method.currentData() or "sigma"))
+        self.cmb_warp_order.currentIndexChanged.connect(
+            lambda _i: config.set("astrometry_warp_order",
+                                  int(self.cmb_warp_order.currentData() or 1)))
         self.cmb_format.addItem(self.tr("ADES PSV"), "ades")
         self.cmb_format.addItem(self.tr("MPC 80 columns"), "mpc80")
         self._btn_stack_label = self.btn_stack.text()
@@ -1543,6 +1566,34 @@ class UfeTrackStackTab(QWidget):
                        for ch in raw.replace(" ", "")) or "object"
         return f"{slug}_base.fits"
 
+    def _write_provenance_cards(self, header, result, report=None):
+        # HOW THIS IMAGE WAS MADE, written into the file (2026-10-07).
+        #
+        # This was asked for the hard way: an afternoon went into telling two
+        # stacks of the same 207 frames apart, and the saved file did not say
+        # which combination had built it. The method is worth a quarter of a
+        # magnitude (measured on that visit: the sigma-clipped mean reaches
+        # magnitude 18.23 where the median reaches 17.97), so a stack that
+        # does not say how it was combined is a stack nobody can audit a month
+        # later. The rule the app already applies to a brightness (NS_MAGSR: a
+        # figure never arrives without its origin) applies to the image too.
+        # @args: header - the FITS header being built, result - the run's
+        #        payload, report - the stack's own report when the caller has
+        #        it (it carries how many frames were really combined)
+        # @return: None
+        from ..core import track_stack
+        header["NS_COMB"] = (str(result.get("method") or "sigma"),
+                             "how the frames were combined")
+        header["NS_ORDER"] = (int(track_stack.WARP_ORDER),
+                              "interpolation order of the warp")
+        left = result.get("n_failed")
+        if left is not None:
+            header["NS_LEFT"] = (int(left),
+                                 "frames the registration left out")
+        used = getattr(report, "n_frames", None)
+        if used:
+            header["NS_NUSED"] = (int(used), "frames actually combined")
+
     def _save_base_stack(self, result):
         # @args: result - the run's payload
         # @return: the path of the whole-sequence stack, or None when it
@@ -1580,6 +1631,10 @@ class UfeTrackStackTab(QWidget):
             frames = result.get("frames") or []
             hdu.header["NS_NFRAM"] = (int(len(frames)),
                                       "frames in this stack")
+            # the base stack's own provenance: it is the deepest image of the
+            # visit and the one the eye reads, so it has to say how it was
+            # built as well (see _write_provenance_cards)
+            self._write_provenance_cards(hdu.header, result)
             if self._run_id is not None:
                 hdu.header["NS_RUN"] = (int(self._run_id),
                                         "the astrometry run it belongs to")
@@ -2318,13 +2373,19 @@ class UfeTrackStackTab(QWidget):
                 hdu.header["NS_NFRAM"] = (
                     int(groups[index][1] - groups[index][0]),
                     "frames in this stack")
+            # HOW the frames were combined, and how many really went in: a
+            # stack that does not say it cannot be audited (see
+            # _write_provenance_cards)
+            _report = None
+            _stacks = result.get("stacks") or []
+            if index < len(_stacks) and _stacks[index] is not None:
+                _report = _stacks[index][1]
+            self._write_provenance_cards(hdu.header, result, _report)
             # WHICH run this stack came from, so the Photometry tab can write
             # a brightness measured by hand back to the right observation
             if self._run_id is not None:
                 hdu.header["NS_RUN"] = (int(self._run_id),
                                         "the astrometry run it belongs to")
-            # The band's own data, written into the file: the frame's date,
-            # exposure, filter and kit, and the run's motion and brightness,
             # so reopening this stack says the same as the day it was made.
             self._write_frame_meta(hdu.header, result, index)
             self._write_band_cards(hdu.header, result, index)
@@ -2719,6 +2780,13 @@ class UfeTrackStackTab(QWidget):
                 hdu.header["NS_NFRAM"] = (
                     int(groups[index][1] - groups[index][0]),
                     "frames in this stack")
+            # the star stack says the same as its pair (see
+            # _write_provenance_cards): same frames, same combination
+            _report = None
+            _stars = result.get("star_stacks") or []
+            if index < len(_stars) and _stars[index] is not None:
+                _report = _stars[index][1]
+            self._write_provenance_cards(hdu.header, result, _report)
             if self._run_id is not None:
                 hdu.header["NS_RUN"] = (int(self._run_id),
                                         "the astrometry run it belongs to")

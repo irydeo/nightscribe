@@ -30,6 +30,20 @@ bibliotecas estándar del ecosistema. Decisión del autor: **se reabre ADR-004**
    centroide** (numpy y photutils); se acota con tests y se declara aquí para que
    no parezca un accidente. La migración de los módulos viejos queda como plan
    futuro.
+   > **Cerrado el 2026-10-07 (ADR-067)**: ese plan futuro se midió y no se
+   > hace. Contra photutils, la medida individual empata (los dos llegan al
+   > suelo de ruido de la apertura), la serie mejora un 1,8 % de mediana y la
+   > velocidad 1,43×, y el ahorro neto son 250 a 450 líneas (0,5 a 0,8 % de la
+   > app, cero en `series_measure.py`). `photometry.py` y
+   > `series_measure.py` **no se migran**; la convivencia sigue abierta para
+   > capacidades nuevas, con ganancia medida.
+   > **Closed on 2026-10-07 (ADR-067)**: that future plan was measured and is
+   > not done. Against photutils, the single measurement ties (both reach the
+   > aperture's noise floor), the series improves by a median 1.8 % and the
+   > speed by 1.43×, and the net saving is 250 to 450 lines (0.5 to 0.8 % of
+   > the app, zero in `series_measure.py`). `photometry.py` and
+   > `series_measure.py` are **not migrated**; coexistence stays open for new
+   > capabilities, with a measured gain.
 4. **Consecuencias sobre ADR-018**: el lector FITS propio pasa a **legado** para
    lo nuevo; ADR-018 sigue vigente en su decisión de alineación por construcción
    y de no remuestrear los píxeles del usuario.

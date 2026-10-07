@@ -160,7 +160,25 @@
           <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
           <property name="minimumContentsLength"><number>10</number></property>
           <property name="toolTip">
-           <string>How the frames of each group are combined: sum and mean differ only in scale; the median rejects the star trails outright; sigma-clipped keeps almost all of the mean's SNR while rejecting the trails (the default); weighted is the same clip with each frame counting by 1/sigma^2 of its own sky, which is the same on a stable night and what saves a night with thin cloud or moon</string>
+           <string>How the frames of each group are combined, and what it costs. Measured on a real visit (2025 FG18, 207 frames, injecting sources of a known brightness and measuring them back): the sigma-clipped mean (the default) reaches magnitude 18.23; the median reaches 17.97, a quarter of a magnitude less, because a median is 1.25x noisier than a mean; the plain mean is as deep as the clip but keeps the star trails, which are what the clip is for. Weighted is the same clip with each frame counting by 1/sigma^2 of its own sky: it changes nothing on a stable night and it is what saves a night with thin cloud or moon. Sum and mean differ only in scale. Use the median only when something must be rejected outright and the clip cannot.</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_warp">
+        <item>
+         <widget class="QLabel" name="lbl_warp">
+          <property name="text"><string>Resampling:</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="cmb_warp_order">
+          <property name="sizeAdjustPolicy"><enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum></property>
+          <property name="minimumContentsLength"><number>10</number></property>
+          <property name="toolTip">
+           <string>How the frames are resampled onto the output grid. The bilinear (the default) makes the image visibly cleaner at NO cost in depth: measured on a real visit (2025 FG18, 207 frames, injecting sources of a known brightness and measuring them back), the bilinear and the cubic tie at magnitude 18.20 against 18.21, while the pixel noise differs by 29 % (6.58 against 8.49 ADU/px). A smoother image is not a deeper one: the depth is decided by the combination above and by the frames that go in, and the pixel noise of a smoothed stack is not a measure of how faint it reaches. The cubic keeps a marginally sharper point spread and a grainier image: use it if you are chasing detail in a crowded field.</string>
           </property>
          </widget>
         </item>

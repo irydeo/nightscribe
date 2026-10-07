@@ -1163,3 +1163,59 @@ def test_the_aperture_tuning_never_uses_a_star_over_the_ceiling(tmp_path):
                            site_linear=60000.0, site_saturate=65535.0)
     out2 = sm.sweep_aperture(paths, cfg2)
     assert out2, "con el techo por encima de la estrella, el ajuste sí se hace"
+
+
+def test_the_series_survives_an_engine_that_reports_a_negative_flux(
+        tmp_path, monkeypatch):
+    # The crash was HERE. The GUI builds its series with
+    # seeing_aperture=True (see main_window), which is what puts a FWHM in
+    # the plate recipe, and with matched=True (the SeriesConfig default) the
+    # recipe then measures with the filter. A target whose filter flux came
+    # out negative killed the whole 2025 FG18 visit (207 frames) with "math
+    # domain error" on frame 15. The engine cannot produce that any more, and
+    # this pins that the run does not depend on it either: a run that cannot
+    # measure says so and keeps going.
+    paths, wcs, comps = _write_frames(tmp_path, 3, noise=4.0, seed=5)
+
+    def _liar(data, x, y, psf, **kw):
+        out = dict(phot.measure_point(data, x, y, **kw))
+        out.update(ok=True, reason=None, flux=-845.6, snr=-0.97)
+        return out
+
+    monkeypatch.setattr(phot, "measure_matched", _liar)
+    res = sm.measure_series(paths, _config(wcs, comps, matched=True,
+                                           seeing_aperture=True))
+    assert res.status == "complete"
+    assert len(res.points) == 3
+    # every star came back with a flux that is not a measurement: the curve
+    # has no magnitudes, and every point says why
+    assert all(p.mag is None for p in res.points)
+    assert all(p.flags for p in res.points)
+
+
+def test_the_frame_seeing_is_measured_once_and_shared(tmp_path, monkeypatch):
+    # 2026-10-07. The centroid used to estimate the seeing PER STAR, from a
+    # single 19 px cutout: on the real 2025 FG18 visit that gave 3.2 to 11.0 px
+    # where the session was 4.64, and it moved the centroid by up to 0.28 px
+    # (measured). Every star of a frame shares one atmosphere, so the recipe
+    # measures the frame's seeing ONCE and every star of that frame is
+    # centroided with it: one call per frame, not one per star.
+    paths, wcs, comps = _write_frames(tmp_path, 3)
+    calls = []
+    orig = phot.estimate_fwhm
+
+    def _count(data, positions, **kw):
+        calls.append(len(positions))
+        return orig(data, positions, **kw)
+
+    monkeypatch.setattr(phot, "estimate_fwhm", _count)
+    res = sm.measure_series(paths, _config(wcs, comps))
+    assert res.status == "complete"
+    # one measurement per frame (the recipe's), and nothing else: the per-star
+    # estimates inside the centroid are what this test exists to prevent
+    assert len(calls) == 3, calls
+    # and it is the frame's own spots (target + comps), not one star
+    assert all(n > 1 for n in calls), calls
+    # every point still carries the frame's seeing for the report and the
+    # detrend, and it is the SAME number the centroid used
+    assert all(p.fwhm is not None for p in res.points)

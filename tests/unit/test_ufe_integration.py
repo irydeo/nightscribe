@@ -476,6 +476,9 @@ def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
                            "fov_arcmin": 30.0, "target_mag": 11.25})
     assert ctx[0]["mag"] == 11.25          # it lives in the project now
     assert ctx[0]["sequence"]["target_mag"] == 11.25
+    # and it says WHOSE figure it is: the observer's, not a prediction and not
+    # a measurement of ours (2026-10-07)
+    assert ctx[0]["mag_origin"] == "manual"
 
 
 def test_set_object_fills_everything(dlg):

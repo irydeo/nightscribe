@@ -197,6 +197,15 @@ class UfeCompareTab(QWidget):
                                             # code sees the rows directly
         self.edt_target = self._ui.edt_target
         self.spn_mag = self._ui.spn_mag
+        # WHERE the target magnitude comes from (2026-10-07): "measured" by a
+        # run, "predicted" by the planner (an ephemeris, a catalogue, an
+        # alert) or "manual" because the observer typed it. The proposal
+        # anchors the comparison stars on this figure, so the interface has to
+        # be able to say which of the three it is; the stack already says it in
+        # its own header (NS_MAGSR) and the project's context now says it too.
+        self._mag_origin = None
+        self._setting_mag = False
+        self.spn_mag.valueChanged.connect(self._on_mag_edited)
         self.cmb_catalog = self._ui.cmb_catalog
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
@@ -370,9 +379,16 @@ class UfeCompareTab(QWidget):
                 "%1 around the plate centre · no target magnitude yet: the "
                 "proposal starts from a declared guess and says so").replace(
                     "%1", catalog)
-        return self.tr(
+        line = self.tr(
             "%1 around the plate centre · comparisons for a mag %2 target"
         ).replace("%1", catalog).replace("%2", f"{self.spn_mag.value():.1f}")
+        # and WHERE that figure comes from (2026-10-07): a proposal anchored on
+        # a measurement and one anchored on the planner's guess are not the
+        # same thing, and the observer is the one who has to know.
+        what = self._mag_origin_text()
+        if what:
+            line += " · " + self.tr("figure {0}").format(what)
+        return line
 
     def set_active(self, flag, keep_overlays=False):
         # Stage handoff, two distinct concepts (ADR-044 rev): the CLICKS
@@ -1355,8 +1371,10 @@ class UfeCompareTab(QWidget):
         mag = float(self.spn_mag.value())
         return mag if mag > 0.0 else float(compstars.TARGET_MAG_FALLBACK)
 
-    def set_target_magnitude(self, mag):
-        # @args: mag - the object's magnitude, or None when nobody knows it
+    def set_target_magnitude(self, mag, source=None):
+        # @args: mag - the object's magnitude, or None when nobody knows it,
+        #        source - "measured" | "predicted" | "manual" (or None for an
+        #        older project that never recorded it)
         # @return: True when the field took it
         # The host lands it when the editor opens from a project: the
         # magnitude the project knows (or the one the astrometry measured)
@@ -1373,8 +1391,54 @@ class UfeCompareTab(QWidget):
             # the plate's own saved state already landed one: it wins, the
             # same way its saved sequence does
             return False
-        self.spn_mag.setValue(value)
+        # setting it is not the observer typing it: the signals are blocked so
+        # the change does not get stamped as "manual" (the bug this line
+        # exists to avoid)
+        self._setting_mag = True
+        try:
+            self.spn_mag.setValue(value)
+        finally:
+            self._setting_mag = False
+        self._set_mag_origin(source)
         return True
+
+    def _set_mag_origin(self, source):
+        # @args: source - "measured" | "predicted" | "manual" | None
+        # @return: None. The provenance travels with the field, in its tooltip,
+        #          so the observer can ask where the number came from without
+        #          opening anything.
+        self._mag_origin = source if source in ("measured", "predicted",
+                                                "manual") else None
+        self.spn_mag.setToolTip(self._mag_origin_tooltip())
+
+    def _on_mag_edited(self, _value):
+        # The observer touched the field: from here on the figure is theirs,
+        # whatever it was before.
+        # @return: None
+        if self._setting_mag:
+            return
+        self._set_mag_origin("manual")
+
+    def _mag_origin_text(self):
+        # @return: the plain-language name of the figure's origin, or ""
+        if self._mag_origin == "measured":
+            return self.tr("measured by a run")
+        if self._mag_origin == "predicted":
+            return self.tr("the planner's prediction")
+        if self._mag_origin == "manual":
+            return self.tr("yours")
+        return ""
+
+    def _mag_origin_tooltip(self):
+        # @return: the tooltip of the magnitude field, with its origin
+        what = self._mag_origin_text()
+        if not what:
+            return self.tr(
+                "The target's brightness: the proposal chooses the comparison "
+                "stars around it. Its origin is not recorded for this project.")
+        return self.tr(
+            "The target's brightness: the proposal chooses the comparison "
+            "stars around it. This figure is {0}.").format(what)
 
     def _last_proposal_was_same(self):
         # @return: True when the proposal did not change the sequence

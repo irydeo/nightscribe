@@ -616,3 +616,21 @@ def test_manual_reference_replaces_the_ephemeris_and_keeps_the_offset():
     assert offset == (3.0, -4.0)
     # and applying the offset to a group's own ephemeris point is a shift
     assert (150.0 + offset[0], 210.0 + offset[1]) == (153.0, 206.0)
+
+
+def test_the_interpolation_order_reaches_the_warp(tmp_path):
+    # The knob has to be wired end to end (2026-10-07): a stack built at order
+    # 1 and one at order 3 must not be the same image, and a caller that does
+    # not care must get the module's default. Without this, the setting could
+    # be stored, shown and written to the header while the warp ignored it.
+    frames = _sequence(tmp_path, n=4, size=64, rate_px=1.5)
+    box, shape = (8, 8, 40, 40), (64, 64)
+    q = frames[0].object_xy
+    a, _ra = ts.stack_group(frames, (0, len(frames)), q, "sigma", box, shape,
+                            order=1)
+    b, _rb = ts.stack_group(frames, (0, len(frames)), q, "sigma", box, shape,
+                            order=3)
+    assert not np.array_equal(np.nan_to_num(a), np.nan_to_num(b))
+    # and the default is the module's (the bilinear)
+    c, _rc = ts.stack_group(frames, (0, len(frames)), q, "sigma", box, shape)
+    assert np.array_equal(np.nan_to_num(c), np.nan_to_num(a))

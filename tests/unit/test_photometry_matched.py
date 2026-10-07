@@ -325,5 +325,10 @@ def test_the_matched_filter_is_the_app_default():
     assert "best linear estimator" in tip
     assert "1.55 to 1.63" in tip
     assert "RISKS" in tip
-    assert "has NOT been checked with a real comparison catalogue" in tip
+    # and the risks have to carry the measurement that was made, including
+    # the one that goes AGAINST the filter (its flux follows the PSF, and
+    # the aperture's does not)
+    assert "its flux follows the shape of the star" in tip
+    assert "measured against a real catalogue" in tip
+    assert "UNDERESTIMATES the faint stars" in tip
     dlg.deleteLater()

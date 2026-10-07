@@ -142,10 +142,18 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     (`σ_largo² = σ² + L²/12`) con **ventana de 2 FWHM y umbral a 1σ**,
     medidos: con 4 FWHM una estrella redonda reportaba 1,56 px. Medido en
     el apilado real de 139 tomas de 2025 UR: el filtro alcanza **1,55 a
-    1,63×** el SNR de la apertura, y `√(n_ap/n_eff)` predice 1,59×. El
-    reporte **sigue usando la magnitud de la apertura**; el filtro se
-    reporta al lado, y la estela se dice en palabras para acortar la
-    exposición siguiente.
+    1,63×** el SNR de la apertura, y `√(n_ap/n_eff)` predice 1,59×. Contra un
+    **catálogo real** (40 comparsas de Gaia EDR3, mag 13,5 a 19,5) el SNR es
+    **1,57×** y el error del cero punto **0,0119 contra 0,0095 mag**, con la
+    apertura **subestimando** la mitad débil en +0,037 mag y el filtro en
+    +0,007: el filtro gana donde está el objeto débil. Desde el 2026-10-07 es
+    el **método por defecto** (una sola casilla para apagarlo), y su coste
+    medido se dice también: **su flujo sigue a la forma de la PSF**, así que
+    donde la forma cambia por el campo (una visita con dos tandas, un campo
+    con coma) lleva un sesgo de posición que la apertura no tiene (0,2 mag de
+    escalón entre las dos tandas). El reporte **dice qué método midió** y
+    guarda el valor de la apertura al lado; la estela se dice en palabras
+    para acortar la exposición siguiente.
 19. **Diagnóstico de la noche con sus propias estrellas**: la **magnitud
     límite** sale de ajustar `log10(SNR) = a + b·mag` sobre las comparsas
     medidas y resolver para SNR = 5, y el **pendiente es la comprobación**

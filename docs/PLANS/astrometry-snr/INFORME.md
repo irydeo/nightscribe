@@ -18,6 +18,7 @@ explicación de las técnicas a tres niveles está en `docs/SNR.es.md`.
 | **P0** | Recuperar la segunda tanda de una visita | **78 → 139 tomas usables de 140**, y el SNR del apilado **×1,48** |
 | **P1** | Co-adición por 1/σ² | Ganancia 1,003× (2025 UR) y 1,022× (2026 PY9); 28 % en el modelo con nubes |
 | **P2** | Filtro adaptado y estela | **1,55 a 1,63× el SNR de la apertura**; la fórmula predice 1,59 |
+| **P2b** | El filtro contra un **catálogo real** | 1,57× el SNR con 40 comparsas de Gaia; cero punto 0,0119 contra 0,0095 mag; **el filtro es el método por defecto** |
 | **P3** | Diagnóstico de la noche | Pendiente **−0,394** frente al −0,400 de la física |
 | **P4** | Inyección y recuperación | Puerta entre mag ≈19,9 y ≈20,9; posición a **0,14 px**; control sin inyección SNR 0 |
 | **P5** | Pseudo-flat | 12 s por visita de 140 tomas; residual 1,342 % |
@@ -259,12 +260,17 @@ Van escritos porque son la parte útil de un informe:
 - **Barrer el movimiento** en la inyección (varias velocidades por flujo):
   es la palanca natural siguiente del instrumento, y la que diría si el
   barrido de velocidad del pipeline está bien centrado.
-- **La magnitud en la inyección**: necesita las comparsas y su catálogo.
 - **Pintar la rejilla 4×4** sobre la imagen: el dato está (`cells`), el sitio
   natural es el visor.
-- **Usar el filtro adaptado en la magnitud del reporte**: hoy es una segunda
-  opinión. Con 1,6× de SNR medida, la discusión es de calibración (el cero
-  punto también ganaría con el filtro), no de detección.
+- **La PSF del filtro por zona o por comparsa**: el cero punto con catálogo
+  real (P2b) midió que el flujo del filtro sigue a la forma de la PSF, y que
+  donde esa forma cambia por el campo el filtro lleva un sesgo de posición
+  (0,2 mag de escalón entre las dos tandas de una visita) que la apertura no
+  tiene. Cuesta 0,002 mag de error de cero punto, así que es un ajuste de
+  precisión, no una urgencia.
+- **La magnitud en la inyección**: necesita las comparsas y su catálogo; la
+  comprobación con un catálogo real (P2b) la sustituye para el caso que
+  importa, que es la calibración.
 - **La serie sobre un track & stack** (la pieza que quedaba del plan
   anterior): el motor de serie no tiene gancho de imagen pareada.
 - **Volver a correr el caso real** con Horizons: es la comprobación que

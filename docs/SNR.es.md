@@ -49,17 +49,21 @@ que el cero punto salga de la misma aritmética. Medido sobre tus tomas:
 de brillo a bajo SNR **a la mitad**, por un 3 % más de tiempo.
 
 **Qué puedes esperar, y qué no.** Lo bueno: el objeto débil entra donde
-antes no entraba, y la magnitud queda más cerca de la verdad (medido: el
-sesgo baja de +0,54 a +0,23 mag a SNR 9). Los riesgos, dichos claros: **mueve
-la magnitud que publicas**, así que una curva empezada antes mostrará un
-escalón de 0,05 a 0,1 mag (hacia la verdad, no al revés); supone que la
-forma de la estrella es la misma en toda la placa, así que en un campo con
-coma fuerte o con estrellas saturadas puede sesgar distinto que la apertura;
-y **no** se ha comprobado con un catálogo de comparación real, ni en imágenes
-con el anfitrión restado, ni con un objeto estelado. El valor de la apertura
-se guarda al lado del reportado, y la ejecución dice qué método midió: puedes
-comparar siempre. Si quieres volver al camino probado, desmarca la casilla
-en los ajustes avanzados de Fotometría.
+antes no entraba (1,57× el SNR de la apertura, medido también con estrellas
+reales de catálogo), la magnitud queda más cerca de la verdad (el sesgo baja
+de +0,54 a +0,23 mag a SNR 9) y **quita el sesgo de la apertura con las
+estrellas débiles**: contra Gaia, la apertura subestima la mitad débil en
++0,037 mag y el filtro en +0,007. Los riesgos, dichos claros: **mueve la
+magnitud que publicas**, así que una curva empezada antes mostrará un escalón
+de 0,05 a 0,15 mag (hacia la verdad, no al revés); **su flujo sigue a la
+forma de la PSF**, y donde la PSF cambia por el campo (una visita con dos
+tandas, un campo con coma) puede moverse 0,1 mag de estrella a estrella, cosa
+que el cero punto reparte pero no borra del todo (medido: 0,012 mag de error
+de cero punto contra 0,010 de la apertura); y **no** se ha comprobado en
+imágenes con el anfitrión restado, ni con un objeto estelado. El valor de la
+apertura se guarda al lado del reportado, y la ejecución dice qué método
+midió: puedes comparar siempre. Si quieres volver al camino probado, desmarca
+la casilla en los ajustes avanzados de Fotometría.
 
 **4. Te dice si el objeto sale estelado.** Si el objeto se ha movido durante
 la exposición, sale alargado, y la app te lo dice con un número: «el objeto
@@ -175,15 +179,28 @@ tomas de 3 s el suelo de envío del MPC (SNR 20) se alcanza hacia mag 18,5 y
 la puerta de detección se cruza entre 19,9 y 20,9, así que un 1,6× de SNR es
 la diferencia entre poder enviar una observación y no poderla enviar.
 
-**Los límites, medidos y pendientes**: el cero punto se ha comparado con 8
-fuentes inyectadas del mismo flujo (método contra método), **no** con un
-catálogo real; la PSF del filtro es una gaussiana del seeing medido, que en
-este apilado coincide con el perfil empírico pero que en un campo con coma o
-con estrellas saturadas podría no coincidir; el camino de **imagen con
-anfitrión restado** no se ha validado con el filtro (en una prueba recupera
-un 9,6 % menos de flujo que la apertura); y el objeto **estelado** (PSF de
-línea) tampoco. Nada de eso se esconde: el valor de la apertura va al lado
-del reportado y la ejecución dice qué método midió.
+**El cero punto contra un catálogo real** (2026-10-07, 40 comparsas de Gaia
+EDR3 de mag 13,5 a 19,5 sobre el apilado real de 139 tomas): el SNR del
+filtro es **1,57×** el de la apertura y el error del cero punto queda
+**0,0119 contra 0,0095 mag**. Por mitades, el filtro gana en la débil
+(0,063 contra 0,118 mag por estrella) y la apertura en la brillante (0,037
+contra 0,117), y el sesgo contra el catálogo lo explica: la apertura
+**subestima** la mitad débil en +0,037 mag, el filtro en +0,007. La cadena
+entera cuadra con el cielo: el objeto mide 17,94 (apertura) y 18,09 (filtro)
+donde el ephemeris predice 18,25 V.
+
+**El límite que queda, medido**: la PSF del filtro es una gaussiana del
+seeing medido y su flujo sigue a esa forma
+(`2·σ_m²/(σ_m² + σ_g²)`), así que donde la PSF cambia por el campo el filtro
+lleva un sesgo de posición que la apertura no tiene: en esta visita, la
+diferencia apertura menos filtro da un escalón de unos 0,2 mag donde empieza
+la segunda tanda (corr con x +0,75). El ajuste que lo quitaría es medir la
+PSF por zona o por comparsa, y no se ha hecho porque cuesta 0,002 mag de
+error de cero punto. Siguen sin comprobarse el camino de **imagen con
+anfitrión restado** (en una prueba recupera un 9,6 % menos de flujo que la
+apertura) y el objeto **estelado** (PSF de línea). Nada de eso se esconde: el
+valor de la apertura va al lado del reportado y la ejecución dice qué método
+midió.
 
 Con una forma conocida `m` (normalizada, `Σm = 1`) y ruido blanco `σ` por
 píxel, el mejor estimador **lineal** del flujo es
@@ -337,6 +354,7 @@ inyección da SNR 0: el pipeline no fabrica detecciones.
 | Diagnóstico | `core/photometry.py` | `limiting_magnitude`, `quality_grid` |
 | Pseudo-flat | `core/calibration.py` | `pseudo_flat`, `calibrate(pseudo_flat=…)` |
 | Inyección y recuperación | `core/injection.py` | `inject_sequence`, `recover`, `completeness`, `truth_of` |
+| El cero punto contra un catálogo real | `benchmarks/zp_catalog_check.py` | `load_visit`, `pick_comps`, `compare` |
 | Orquestación | `gui/workers.py` | `TrackStackWorker`, `CalibrationWorker` |
 | Lo que ve el observador | `gui/ufe_trackstack_tab.py` | `_register_note`, `_shape_note`, `_diag_note` |
 

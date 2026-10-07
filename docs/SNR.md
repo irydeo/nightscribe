@@ -49,17 +49,21 @@ so the zero point comes from the same arithmetic. Measured on your frames:
 brightness bias at low SNR **halved**, for 3 % more time.
 
 **What you can expect, and what you cannot.** The good: a faint object enters
-where it did not before, and the magnitude lands closer to the truth
-(measured: the bias drops from +0.54 to +0.23 mag at SNR 9). The risks, said
-plainly: it **moves the magnitude that gets published**, so a curve started
-before this will show a step of 0.05 to 0.1 mag (towards the truth, not away
-from it); it assumes the star's shape is the same across the plate, so in a
-field with strong coma or with saturated stars it can bias differently than
-the aperture; and it has **not** been checked with a real comparison
-catalogue, nor on host-subtracted images, nor with a trailed object. The
-aperture's value is kept beside the reported one and the run says which method
-measured, so you can always compare. To go back to the proven path, untick
-the box in the Photometry tab's advanced settings.
+where it did not before (1.57x the aperture's SNR, measured on real catalogue
+stars too), the magnitude lands closer to the truth (the bias drops from
++0.54 to +0.23 mag at SNR 9) and it **removes the aperture's faint-star
+bias**: against Gaia, the aperture underestimates the faint half by 0.037 mag
+and the filter by 0.007. The risks, said plainly: it **moves the magnitude
+that gets published**, so a curve started before this will show a step of
+0.05 to 0.15 mag (towards the truth, not away from it); **its flux follows
+the shape of the PSF**, so where the PSF changes across the field (a visit
+with two runs, a field with coma) it can move by 0.1 mag from star to star,
+which the zero point spreads out but does not erase (measured: 0.012 mag of
+zero-point error against the aperture's 0.010); and it has **not** been
+checked on host-subtracted images, nor with a trailed object. The aperture's
+value is kept beside the reported one and the run says which method measured,
+so you can always compare. To go back to the proven path, untick the box in
+the Photometry tab's advanced settings.
 
 **4. It tells you whether the object came out trailed.** If the object moved
 during the exposure it comes out elongated, and the app says it with a
@@ -175,15 +179,28 @@ frames of 3 s the MPC's submission floor (SNR 20) is reached around mag 18.5
 and the detection gate is crossed between 19.9 and 20.9, so a 1.6x SNR is the
 difference between being able to send an observation and not.
 
-**The limits, measured and pending**: the zero point has been compared with 8
-injected sources of the same flux (method against method), **not** with a real
-catalogue; the filter's PSF is a Gaussian from the measured seeing, which
-agrees with the empirical profile on this stack but might not in a field with
-coma or with saturated stars; the **host-subtracted image** path has not been
-validated with the filter (in one test it recovers 9.6 % less flux than the
-aperture); and neither has a **trailed** object (line PSF). None of that is
-hidden: the aperture's value goes beside the reported one and the run says
-which method measured.
+**The zero point against a real catalogue** (2026-10-07, 40 Gaia EDR3 comps
+from mag 13.5 to 19.5 on the real 139-frame stack): the filter's SNR is
+**1.57x** the aperture's and the zero point's error lands at **0.0119 against
+0.0095 mag**. Split in halves, the filter wins on the faint one (0.063
+against 0.118 mag per star) and the aperture on the bright one (0.037 against
+0.117), and the bias against the catalogue explains it: the aperture
+**underestimates** the faint half by +0.037 mag, the filter by +0.007. The
+whole chain agrees with the sky: the object measures 17.94 (aperture) and
+18.09 (filter) where the ephemeris predicts 18.25 V.
+
+**The limit that is left, measured**: the filter's PSF is a Gaussian from the
+measured seeing and its flux follows that shape
+(`2*sm^2/(sm^2 + sg^2)`), so where the PSF changes across the field the
+filter carries a positional bias the aperture does not have: on this visit
+the aperture-minus-filter difference steps by about 0.2 mag where the second
+run starts contributing (corr with x +0.75). The fix that would remove it is
+measuring the PSF per region or per comp, and it has not been done because it
+costs 0.002 mag of zero-point error. Still unchecked: the
+**host-subtracted image** path (in one test it recovers 9.6 % less flux than
+the aperture) and a **trailed** object (line PSF). None of that is hidden:
+the aperture's value goes beside the reported one and the run says which
+method measured.
 
 With a known shape `m` (normalised, `sum m = 1`) and white noise `sigma` per
 pixel, the best **linear** estimate of the flux is
@@ -336,6 +353,7 @@ detections.
 | Diagnosis | `core/photometry.py` | `limiting_magnitude`, `quality_grid` |
 | Pseudo-flat | `core/calibration.py` | `pseudo_flat`, `calibrate(pseudo_flat=...)` |
 | Injection and recovery | `core/injection.py` | `inject_sequence`, `recover`, `completeness`, `truth_of` |
+| The zero point against a real catalogue | `benchmarks/zp_catalog_check.py` | `load_visit`, `pick_comps`, `compare` |
 | Orchestration | `gui/workers.py` | `TrackStackWorker`, `CalibrationWorker` |
 | What the observer sees | `gui/ufe_trackstack_tab.py` | `_register_note`, `_shape_note`, `_diag_note` |
 

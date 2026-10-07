@@ -312,6 +312,34 @@ salvo un `add_feature_tab`. Los diálogos legacy se mantienen congelados
 mientras el UFE madura; la fase B es la única que toca código legacy, y
 solo para re-exportar (`viz/blink_view.py` mantiene compatibilidad).
 
+**Revisión (2026-10-07, Interfaz 1.9: se cierra el periodo de revisión).** El
+UFE dejó de ser una alternativa y pasó a ser la puerta: los tres diálogos
+clásicos que sobrevivían «por si acaso» se retiran, y con ellos el interruptor
+que elegía entre ellos y el editor.
+
+- Fuera el **diálogo clásico de blink** (`_open_blink_dialog`, sus ayudantes
+  `_dialog_blink_*` y `_blink_*`, su estado, sus timers y `blink_tab.ui`).
+  Estaba ya sin puerta desde el 2026-10-06; ahora tampoco ocupa código.
+- Fuera **`SnAnnotateDialog`** (`gui/sn_annotate_dialog.py`): el anotado de la
+  SN vive en la pestaña Anotar del editor, y el gancho de guardado del UFE ya
+  registra la copia en el proyecto.
+- Fuera la **carta de comparación clásica** (`gui/seqchart_dialog.py`, la rama
+  clásica de `_fu_sequence_dialog`, `_fu_sequence_done` / `_fu_sequence_save`)
+  y su **`SequenceWorker`**: el UFE usa `UfeFieldWorker` / `UfeProposeWorker`, y
+  el gancho del editor ya guarda la secuencia, el PNG/CSV y el
+  `protocol.comp_stars` de la campaña. No se pierde ninguna capacidad.
+- Fuera el interruptor **`ufe_default`** de Ajustes → Desarrollo (que además
+  dejaba la medición y la astrometría solo con un mensaje cuando se apagaba).
+  En esa pestaña queda la barra de iconos del editor, que sí es una preferencia
+  real.
+- **No se toca** lo que el editor reutiliza: `BlinkWorker`,
+  `BlinkExportWorker`, `viz/blink_view.py` (los usan el UFE y el CLI),
+  `core/compstars.py` y el gancho `_ufe_save_hook`.
+
+**Punto de entrada**: `gui/main_window.py` (fuera los caminos clásicos y
+`_use_ufe`), `gui/workers.py` (fuera `SequenceWorker`), `gui/ui/settings_dialog.ui`
+(fuera la fila del interruptor).
+
 ## English
 
 **Context**: three features load and show FITS images with different
@@ -969,3 +997,32 @@ was asked out: it was a second door to the same thing.
   as the classic path nothing in the interface reaches today, with their
   functional test. It is the way back if a door is ever wanted again.
 - The observer's door is the workbench's **Blink** button, which is untouched.
+
+**Revision (2026-10-07, Interfaz 1.9: the review period closes).** The UFE
+stopped being an alternative and became the door: the three classic dialogs
+that survived "just in case" are retired, and with them the switch that chose
+between them and the editor.
+
+- The **classic blink dialog** is gone (`_open_blink_dialog`, its
+  `_dialog_blink_*` and `_blink_*` helpers, its state, its timers and
+  `blink_tab.ui`). It had been doorless since 2026-10-06; now it takes no code
+  either.
+- **`SnAnnotateDialog`** is gone (`gui/sn_annotate_dialog.py`): the SN
+  annotation lives in the editor's Annotate tab, and the UFE's save hook
+  already registers the copy in the project.
+- The **classic comparison chart** is gone (`gui/seqchart_dialog.py`, the
+  classic branch of `_fu_sequence_dialog`, `_fu_sequence_done` /
+  `_fu_sequence_save`) and so is its **`SequenceWorker`**: the UFE uses
+  `UfeFieldWorker` / `UfeProposeWorker`, and the editor's hook already saves the
+  sequence, the PNG/CSV and the campaign's `protocol.comp_stars`. No capability
+  is lost.
+- The **`ufe_default`** switch is gone from Settings -> Development (it also
+  left measuring and astrometry with a bare message when turned off). The
+  editor's icons-only top bar stays there: it is a real preference.
+- **Untouched** is everything the editor reuses: `BlinkWorker`,
+  `BlinkExportWorker`, `viz/blink_view.py` (the UFE and the CLI use them),
+  `core/compstars.py` and the `_ufe_save_hook`.
+
+**Entry point**: `gui/main_window.py` (the classic paths and `_use_ufe` gone),
+`gui/workers.py` (`SequenceWorker` gone), `gui/ui/settings_dialog.ui` (the
+switch's row gone).

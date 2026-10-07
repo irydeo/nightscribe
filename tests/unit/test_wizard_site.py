@@ -136,3 +136,66 @@ def test_resolve_site_refuses_a_short_code(qapp, monkeypatch):
     h.edt_site_mpc.setText("Z4")
     wizard._resolve_site(h)
     assert "three characters" in h.lbl_site_status.text().lower()
+
+
+class _EquipHusk:
+    """Only the widgets _setup_equipment / _apply_equipment reach for."""
+
+    def __init__(self):
+        from PySide6.QtWidgets import QComboBox, QDoubleSpinBox
+        self.spn_aperture = QDoubleSpinBox()
+        self.spn_aperture.setRange(0.0, 100.0)
+        self.spn_pixel_um = QDoubleSpinBox()
+        self.spn_pixel_um.setRange(1.0, 30.0)
+        self.spn_pixel_um.setDecimals(2)
+        self.spn_focal_mm = QDoubleSpinBox()
+        self.spn_focal_mm.setRange(50.0, 20000.0)
+        self.cmb_camera_type = QComboBox()
+        self.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
+        self.cmb_cam_preset = QComboBox()
+
+
+def test_setup_equipment_lists_the_presets(qapp, monkeypatch):
+    # The combo carries "None" first and one entry per preset, and choosing
+    # one writes its datasheet pixel size on the spot (the scale hook reads
+    # that spin, so the step answers in the same breath).
+    from nightscribe.config import config
+    from nightscribe.gui import wizard
+    from nightscribe.core import cameras
+    monkeypatch.setitem(config._data, "cam_preset", "")
+    monkeypatch.setitem(config._data, "pixel_um", 3.76)
+    h = _EquipHusk()
+    wizard._setup_equipment(h)
+    assert h.cmb_cam_preset.count() == len(cameras.PRESETS) + 1
+    assert h.cmb_cam_preset.itemData(0) == ""
+    h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
+    assert h.spn_pixel_um.value() == 5.4
+
+
+def test_apply_equipment_writes_and_fills_a_new_preset(qapp, monkeypatch):
+    # A preset chosen in the visit brings its datasheet profile; one restored
+    # unchanged leaves the profile alone, because the observer may have
+    # measured and tuned it in Settings.
+    from nightscribe.config import config
+    from nightscribe.gui import wizard
+    for key in ("aperture_inches", "pixel_um", "focal_mm", "camera_type",
+                "cam_preset", "cam_full_well_e", "ccd_read_noise"):
+        monkeypatch.setitem(config._data, key, config.get(key))
+    monkeypatch.setitem(config._data, "cam_preset", "")
+    monkeypatch.setitem(config._data, "ccd_read_noise", None)
+    monkeypatch.setitem(config._data, "cam_full_well_e", None)
+    h = _EquipHusk()
+    wizard._setup_equipment(h)
+    h.spn_aperture.setValue(9.0)
+    h.cmb_camera_type.setCurrentText("CMOS")
+    h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
+    wizard._apply_equipment(h)
+    assert config.get("aperture_inches") == 9.0
+    assert config.get("camera_type") == "CMOS"
+    assert config.get("cam_preset") == "kaf8300"
+    assert config.get("ccd_read_noise") == 8.0        # the preset's datasheet
+    assert config.get("cam_full_well_e") == 25500.0
+    # a second visit with the SAME preset leaves the tuned profile alone
+    config.set("ccd_read_noise", 7.5)                 # measured by the observer
+    wizard._apply_equipment(h)
+    assert config.get("ccd_read_noise") == 7.5

@@ -61,8 +61,6 @@ def window(_point_db_at_tmpdir):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     yield w
     config.is_configured = orig_cfg
     w.close()

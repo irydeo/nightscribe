@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QDialog,
                                 QListWidget, QListWidgetItem, QMainWindow,
                                 QMessageBox, QProgressBar, QProgressDialog,
                                 QPushButton, QScrollArea,
-                                QSpinBox, QDoubleSpinBox, QComboBox,
+                                QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
                                 QVBoxLayout, QWidget, QTableWidget,
                                 QTableWidgetItem)
@@ -51,7 +51,7 @@ from .widgets.project_row import ProjectRow
 from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
-from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
+from .workers import (CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
                       SunWorker, TonightWorker)
 
@@ -150,6 +150,19 @@ def _parse_date_obs(text):
         except ValueError:
             continue
     return None
+
+
+# Which Settings spin shows each config key of the camera profile: the map
+# the preset fill walks (core/cameras.profile_from_preset returns config keys,
+# the dialog owns the widgets, and this is the only place that knows both).
+_CAM_PRESET_SPINS = {
+    "pixel_um": "spn_pixel_um",
+    "cam_full_well_e": "spn_cam_full_well",
+    "cam_linearity_adu": "spn_cam_linearity",
+    "ccd_read_noise": "spn_cam_ron",
+    "cam_dark_current_e_s": "spn_cam_dark",
+    "cam_max_exposure_s": "spn_cam_max_exp",
+}
 
 
 def _settings_two_columns(dlg):
@@ -432,11 +445,6 @@ class MainWindow(QMainWindow):
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
-        self._blink_pair = None
-        self._blink_ref8 = None
-        self._blink_obs8 = None
-        self._blink_nudge = [0.0, 0.0]
-        self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
         # Which astrometry run the editor must SHOW when a visit is opened:
@@ -500,12 +508,6 @@ class MainWindow(QMainWindow):
         self._now_timer = QTimer(self)
         self._now_timer.timeout.connect(self._refresh_now_badges)
         self._now_timer.start(5 * 60 * 1000)
-        self._blink_timer = QTimer(self)
-        self._blink_timer.timeout.connect(self._blink_tick)
-        self._blink_render_timer = QTimer(self)
-        self._blink_render_timer.setSingleShot(True)
-        self._blink_render_timer.setInterval(120)
-        self._blink_render_timer.timeout.connect(self._blink_render)
 
     def _build_status_progress(self):
         # One global progress bar, docked to the RIGHT of the status bar (the
@@ -1860,25 +1862,17 @@ class MainWindow(QMainWindow):
 
     def _cam_preset_selected(self, dlg):
         # Fill the datasheet template from the chosen camera preset,
-        # without stomping a value the user set by hand.
+        # without stomping a value the user set by hand. The RULE lives in
+        # core/cameras (shared with the Welcome step); here we only map its
+        # config keys to the spins.
         from ..core import cameras
+        current = {key: getattr(dlg, spin).value()
+                   for key, spin in _CAM_PRESET_SPINS.items()}
         p = cameras.preset(dlg.cmb_cam_preset.currentData())
-        if p is not None:
-            dlg.spn_pixel_um.setValue(float(p["pixel_um"]))
-            if dlg.spn_cam_full_well.value() == 0 and p.get("full_well_e"):
-                dlg.spn_cam_full_well.setValue(float(p["full_well_e"]))
-            if dlg.spn_cam_linearity.value() == 0 and p.get("linearity_adu"):
-                dlg.spn_cam_linearity.setValue(float(p["linearity_adu"]))
-            # the read noise is a datasheet fact, so the preset may fill it
-            # (the GAIN never: it is per unit and per gain setting, and the
-            # preset itself says so)
-            if dlg.spn_cam_ron.value() == 0 and p.get("read_noise_e"):
-                dlg.spn_cam_ron.setValue(float(p["read_noise_e"]))
-            if dlg.spn_cam_dark.value() == 0 and p.get("dark_current_e_s"):
-                dlg.spn_cam_dark.setValue(float(p["dark_current_e_s"]))
-            if dlg.spn_cam_max_exp.value() == 0 and p.get("regime") == "short" \
-                    and p.get("exp_max_s"):
-                dlg.spn_cam_max_exp.setValue(round(float(p["exp_max_s"])))
+        for key, value in cameras.profile_from_preset(p, current).items():
+            spin = _CAM_PRESET_SPINS.get(key)
+            if spin is not None:
+                getattr(dlg, spin).setValue(value)
         self._cam_ref_update(dlg)
 
     def _cam_ref_update(self, dlg):
@@ -2206,8 +2200,6 @@ class MainWindow(QMainWindow):
         # ADR-044 rev (2026-09-24): icons-only top bar in the UFE
         dlg.chk_ufe_bar_icons.setChecked(
             bool(config.get("ufe_bar_icons", True)))
-        dlg.chk_ufe_default.setChecked(bool(config.get("ufe_default",
-                                                       True)))
         # Interfaz 1.4: motion is opt-out, never imposed. The Welcome sky
         # breathes and the view fades in only while this is on.
         dlg.chk_animations.setChecked(bool(config.get("ui_animations", True)))
@@ -2343,8 +2335,8 @@ class MainWindow(QMainWindow):
         config.set("ui_animations", dlg.chk_animations.isChecked())
         if self._welcome is not None:
             self._welcome.refresh_animations()
-        # Development tab (ADR-044): which UI the FITS work opens in
-        config.set("ufe_default", dlg.chk_ufe_default.isChecked())
+        # Development tab (ADR-044): the UFE's top bar, the only switch left
+        # there since the classic dialogs retired (2026-10-07)
         config.set("ufe_bar_icons", dlg.chk_ufe_bar_icons.isChecked())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
@@ -4823,7 +4815,6 @@ class MainWindow(QMainWindow):
             self._step_done(self._next_step_key)
 
 
-
     def _scroll_to_section(self, key):
         # Deep link (Next card Go, dashboard, the ⋯ menu, cadence
         # chips, double-click): land on the part of the project the
@@ -5101,7 +5092,8 @@ class MainWindow(QMainWindow):
         if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
             from ..core import exposure
             scale = exposure.plate_scale(config.get("pixel_um"),
-                                          config.get("focal_mm"))
+                                          config.get("focal_mm"),
+                                          config.get("pixel_binning"))
             t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
             if t_max:
                 body.addWidget(QLabel(
@@ -6613,11 +6605,6 @@ class MainWindow(QMainWindow):
         # object context, and both hooks land on THIS visit (ADR-045:
         # nothing attaches without one).
         # @args: pid - project id, path - the FITS to open, sid - visit id
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to measure from the editor"), 8000)
-            return
         p = project.get(db, pid)
         if not p:
             return
@@ -6662,11 +6649,6 @@ class MainWindow(QMainWindow):
         # editor opens on the visit's first plate (the reference WCS) with
         # the series block armed; a visit with no FITS says so.
         # @args: pid - project id, session_id - the visit
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to measure from the editor"), 8000)
-            return
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
@@ -6700,11 +6682,6 @@ class MainWindow(QMainWindow):
         # showed 1 (reported 2026-10-07).
         self._astrometry_run_pref = (
             (pid, session_id, int(run_id)) if run_id is not None else None)
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to work from the editor"), 8000)
-            return
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
@@ -6749,11 +6726,6 @@ class MainWindow(QMainWindow):
                         "image anymore."), 8000)
             return
         pid = row["project_id"]
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to open this plate"), 8000)
-            return
         p = project.get(db, pid)
         if not p:
             return
@@ -8441,11 +8413,12 @@ class MainWindow(QMainWindow):
                 self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
 
     def _fu_export_annotated(self, pid):
-        # B10: open the preview dialog; the observer picks which of the
-        # registered stacked FITS to annotate (several visits => several
-        # plates), checks the marker, overlays and stretch, and only then
-        # confirms: a copy is written with the SN marked (AIJ ANNOTATE
-        # card) at that moment.
+        # B10: the annotated FITS opens in the unified editor; the observer
+        # picks which of the registered stacked FITS to annotate (several
+        # visits => several plates), checks the marker, overlays and stretch,
+        # and only then confirms: a copy is written with the SN marked (AIJ
+        # ANNOTATE card) at that moment. The editor's Annotate tab is the only
+        # door since the classic dialog retired (2026-10-07).
         from ..core import followup as fu
         p = project.get(db, pid)
         if not p:
@@ -8464,52 +8437,17 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("No stacked images registered"), 5000)
             return
-        ctx = p.get("context") or {}
-        sn_ra = ctx.get("ra_deg")
-        sn_dec = ctx.get("dec_deg")
-        if self._use_ufe():
-            # ADR-044: the annotated FITS inside the editor; the whole
-            # object attaches (marker on its sky position), the other
-            # visits queue as extra plates, and written copies register
-            # like the legacy dialog's did
-            obj = self._ufe_object_from_project(p)
-            dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
-            if not dlg.open_plate(images[-1]["fits_path"]):
-                return
-            dlg.set_object(obj)          # re-apply on the fresh plate
-            dlg.tab_annotate.prefill(
-                notes=self.tr("SN follow-up"),
-                extra_paths=[im["fits_path"] for im in images[:-1]])
+        # the whole object attaches (marker on its sky position), the other
+        # visits queue as extra plates, and written copies register through
+        # the editor's save hook
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
+        if not dlg.open_plate(images[-1]["fits_path"]):
             return
-        # Preview first: the observer chooses the plate, checks the marker,
-        # the overlays and the stretch. The dialog resolves the WCS from
-        # the chosen frame's header (each visit may carry the SN on a
-        # different plate) and writes the copy only on confirm.
-        from .sn_annotate_dialog import SnAnnotateDialog
-        try:
-            dlg = SnAnnotateDialog(
-                self, images, p, p["object_name"],
-                ra_deg=sn_ra, dec_deg=sn_dec,
-                default_notes=self.tr("SN follow-up"))
-        except Exception as err:
-            self.statusBar().showMessage(
-                self.tr("Could not open the FITS for annotation: %1")
-                .replace("%1", str(err)), 8000)
-            return
-        dlg.saved.connect(lambda path: self._fu_annotated_saved(pid, path))
-        dlg.exec()
-
-    def _fu_annotated_saved(self, pid, path):
-        # @args: pid - project id, path - annotated copy just written
-        try:
-            project.add_file(db, pid, path, "fits")
-            self._populate_project_files(pid)
-        except Exception as err:
-            logger.warning("annotated FITS saved but not registered: %s",
-                           err)
-        self.statusBar().showMessage(
-            self.tr("Annotated FITS written to %1")
-            .replace("%1", str(path)), 8000)
+        dlg.set_object(obj)              # re-apply on the fresh plate
+        dlg.tab_annotate.prefill(
+            notes=self.tr("SN follow-up"),
+            extra_paths=[im["fits_path"] for im in images[:-1]])
 
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
@@ -8653,204 +8591,12 @@ class MainWindow(QMainWindow):
         self._load_editor_sequence(dlg, pid, fits_path)
 
     def _fu_sequence_dialog(self, pid):
-        if self._use_ufe():
-            self._fu_sequence_via_ufe(pid)
-            return
-        # Options dialog + launch of the comparison chart (ADR-042). The
-        # heavy work (VizieR, image, render) runs in a SequenceWorker: the
-        # GUI never blocks.
-        p = project.get(db, pid)
-        if not p:
-            return
-        ctx = p.get("context") or {}
-        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
-        if ra is None or dec is None:
-            self.statusBar().showMessage(self.tr(
-                "This project has no coordinates: cannot build the chart"),
-                8000)
-            return
-        camp = None
-        if p.get("campaign_id"):
-            from ..core import campaign as _camp
-            camp = _camp.get(db, p["campaign_id"])
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Comparison chart"))
-        form = QFormLayout(dlg)
-        intro = QLabel(self.tr(
-            "«With what do I compare?» Choose the catalog and NightScribe "
-            "proposes the reference stars over the field image: brighter "
-            "than the target, of similar colour when known, and never a "
-            "known variable."))
-        intro.setWordWrap(True)
-        form.addRow(intro)
-        cmb_cat = QComboBox()
-        cmb_cat.addItem("Gaia EDR3 (G)", "gaia")
-        cmb_cat.addItem("APASS DR9 (V)", "apass")
-        form.addRow(self.tr("Catalog:"), cmb_cat)
-        spn_fov = QSpinBox()
-        spn_fov.setRange(3, 60)
-        spn_fov.setValue(18)
-        spn_fov.setSuffix(" \u2032")
-        form.addRow(self.tr("Field of view:"), spn_fov)
-        spn_comps = QSpinBox()
-        spn_comps.setRange(2, 15)
-        spn_comps.setValue(8)
-        form.addRow(self.tr("Comparison stars:"), spn_comps)
-        mag0 = ctx.get("mag")
-        if mag0 is None:
-            mag0 = (ctx.get("variable") or {}).get("max")
-        spn_mag = QDoubleSpinBox()
-        spn_mag.setRange(-2.0, 25.0)
-        spn_mag.setDecimals(2)
-        spn_mag.setValue(float(mag0) if mag0 is not None else 12.0)
-        spn_mag.setToolTip(self.tr(
-            "Used to propose brighter comparisons; the current best "
-            "estimate comes pre-filled"))
-        form.addRow(self.tr("Target magnitude:"), spn_mag)
-        fits_row = QHBoxLayout()
-        ed_fits = QLineEdit()
-        ed_fits.setPlaceholderText(self.tr(
-            "Optional: your stacked FITS as the background"))
-        fits_row.addWidget(ed_fits)
-
-        def _browse():
-            path, _ = QFileDialog.getOpenFileName(
-                dlg, self.tr("Your FITS image"), "",
-                "FITS (*.fits *.fit *.fts);;" + self.tr("All files (*)"))
-            if path:
-                ed_fits.setText(path)
-
-        btn_browse = QPushButton(self.tr("Browse…"))
-        btn_browse.clicked.connect(_browse)
-        fits_row.addWidget(btn_browse)
-        form.addRow(self.tr("Background:"), fits_row)
-        lbl_fits_hint = QLabel(self.tr(
-            "If your FITS has no astrometry we solve it with "
-            "Astrometry.net (your file is never modified); without it, "
-            "the background is the DSS2 survey image"))
-        lbl_fits_hint.setWordWrap(True)
-        lbl_fits_hint.setStyleSheet("color: #8a90a6; font-size: 12px;")
-        form.addRow(lbl_fits_hint)
-        chk_camp = None
-        if camp is not None:
-            chk_camp = QCheckBox(self.tr(
-                "Also save the sequence to the campaign protocol"))
-            chk_camp.setChecked(True)
-            form.addRow(chk_camp)
-        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        box.button(QDialogButtonBox.Ok).setText(self.tr("Generate"))
-        box.accepted.connect(dlg.accept)
-        box.rejected.connect(dlg.reject)
-        form.addRow(box)
-        if dlg.exec() != QDialog.Accepted:
-            return
-
-        from .workers import SequenceWorker
-        fits_path = ed_fits.text().strip()
-        w = SequenceWorker(p["object_name"], ra, dec,
-                           cmb_cat.currentData(), float(spn_fov.value()),
-                           spn_comps.value(), spn_mag.value(),
-                           Path(fits_path) if fits_path else None,
-                           self._lang())
-        # The build takes seconds (VizieR + image download): a modal busy
-        # dialog says so plainly — the status bar alone reads as "nothing
-        # is happening". No Cancel: a download cannot be aborted halfway,
-        # so the dialog never promises what it cannot keep.
-        wait = QProgressDialog(
-            self.tr("Building the comparison chart…"), "", 0, 0, self)
-        wait.setWindowTitle(self.tr("Comparison chart"))
-        wait.setWindowModality(Qt.WindowModal)
-        wait.setCancelButton(None)
-        wait.setMinimumDuration(0)
-        w.progress.connect(wait.setLabelText)
-        w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
-        save_camp = chk_camp is not None and chk_camp.isChecked()
-        w.finished.connect(
-            lambda out: self._fu_sequence_landed(wait, pid, out, save_camp))
-        self._keep(w)
-        self.statusBar().showMessage(
-            self.tr("Building the comparison chart…"), 0)
-        w.start()
-
-    def _fu_sequence_landed(self, wait, pid, out, save_campaign):
-        # The SequenceWorker finished: the wait dialog is closed and reaped
-        # BEFORE anything else runs — the picker's exec() spins a nested
-        # loop, so any pending dialog would otherwise linger on top of it.
-        # close()+deleteLater(): the reap discipline of e31f394.
-        # @args: wait - the busy QProgressDialog, pid - project id,
-        #        out - worker payload, save_campaign - protocol flag
-        wait.close()
-        wait.deleteLater()
-        self._fu_sequence_done(pid, out, save_campaign)
-
-    def _fu_sequence_done(self, pid, out, save_campaign):
-        # Lands the SequenceWorker result: warnings on the status bar and
-        # the interactive picker dialog (ADR-042 phase 4); files/context
-        # are only written when the user saves from the dialog.
-        self.statusBar().clearMessage()
-        if out.get("status") != "ok":
-            self.statusBar().showMessage(
-                out.get("error") or self.tr("Could not build the chart"),
-                10000)
-            return
-        p = project.get(db, pid)
-        if not p:
-            return
-        notes = []
-        if out.get("vsx_warning"):
-            notes.append(self.tr(
-                "VSX did not answer: field variables are not flagged"))
-        if out.get("fits_error"):
-            notes.append(out["fits_error"])
-        if out.get("target_outside"):
-            notes.append(self.tr(
-                "the target falls outside your image: DSS2 used instead"))
-        if notes:
-            self.statusBar().showMessage(". ".join(notes), 10000)
-        from .seqchart_dialog import SeqChartDialog
-        dlg = SeqChartDialog(
-            self, p["object_name"], out["field"], out["entries"],
-            image=out.get("image"), wcs=out.get("wcs"),
-            img_label=out.get("img_label", ""), lang=self._lang(),
-            default_dir=project.storage_dir(p),
-            on_save=lambda entries, files: self._fu_sequence_save(
-                pid, entries, files, out, save_campaign))
-        dlg.exec()
-
-    def _fu_sequence_save(self, pid, entries, files, out, save_campaign):
-        # Persists the sequence the user confirmed in the picker dialog:
-        # files registered, sequence into the project context (and the
-        # campaign protocol when asked), status line refreshed.
-        # @args: pid - project id, entries - sequence entries, files -
-        #        {"csv", "png"} written by the dialog, out - the worker
-        #        payload (catalog metadata), save_campaign - protocol flag
-        p = project.get(db, pid)
-        if not p:
-            return
-        project.add_file(db, pid, files["csv"], "report")
-        project.add_file(db, pid, files["png"], "chart")
-        project.update_context(db, pid, {"sequence": {
-            "catalog": out["catalog"], "catalog_name": out["catalog_name"],
-            "fov_arcmin": out["fov_arcmin"], "target_mag":
-            out["target_mag"], "entries": entries, "csv": files["csv"],
-            "png": files["png"]}})
-        if save_campaign and p.get("campaign_id"):
-            from ..core import campaign as _camp
-            c = _camp.get(db, p["campaign_id"])
-            if c:
-                prot = c.get("protocol") or {}
-                prot["comp_stars"] = [
-                    f"{e['name']} {e['star']['band']} "
-                    f"{e['star']['mag']:.2f}" for e in entries]
-                _camp.update(db, c["id"], protocol=prot)
-        self.statusBar().showMessage(
-            self.tr("Comparison chart ready"), 8000)
-        p = project.get(db, pid)
-        lbl = self._project_widgets.get("fu_sequence")
-        if lbl is not None and p:
-            lbl.setText(self._fu_sequence_status_text(p))
-        self._populate_project_files(pid)
+        # The comparison chart lives in the unified editor (ADR-044):
+        # the project's newest registered plate when there is one, else
+        # the Compare tab's own survey (DSS2) download. The classic
+        # options dialog, its SequenceWorker and its picker retired on
+        # 2026-10-07, when the UFE became the only door (ADR-044 rev.).
+        self._fu_sequence_via_ufe(pid)
 
     def _fu_export_report(self, pid):
         # Exports the project's photometry to CSV or AAVSO EFF (HJD in-app,
@@ -10021,363 +9767,6 @@ class MainWindow(QMainWindow):
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)
 
-    def _open_blink_dialog(self, sn_name=None, ra=None, dec=None,
-                            fits_path=None):
-        # THE CLASSIC BLINK, WITHOUT A DOOR (2026-10-06). The Tools menu used
-        # to carry "Blink (ad-hoc)…", which with the unified editor on (the
-        # default) opened the editor's own Blink window and, with it off,
-        # this dialog. The entry was redundant with the workbench's Blink
-        # button, so it was removed; this path is kept because the observer
-        # asked for it (it is the way back if a door is ever wanted again)
-        # and because a functional test drives it. Nothing in the interface
-        # reaches it today.
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Blink"))
-        dlg.resize(1100, 640)
-        layout = QVBoxLayout(dlg)
-        blink_w = _load_ui("blink_tab")
-        layout.addWidget(blink_w)
-        if sn_name:
-            blink_w.edt_sn_name.setText(sn_name)
-        if ra is not None and dec is not None:
-            blink_w.chk_manual.setChecked(True)
-            blink_w.edt_ra.setEnabled(True)
-            blink_w.edt_dec.setEnabled(True)
-            blink_w.edt_ra.setText(f"{ra:.5f}")
-            blink_w.edt_dec.setText(f"{dec:+.5f}")
-        if fits_path:
-            blink_w.edt_fits.setText(fits_path)
-        blink_w.btn_browse.clicked.connect(
-            lambda: self._dialog_blink_browse(blink_w))
-        blink_w.btn_prepare.clicked.connect(
-            lambda: self._dialog_blink_prepare(blink_w))
-        blink_w.chk_manual.stateChanged.connect(
-            lambda s: self._dialog_blink_manual(blink_w, s))
-        blink_w.btn_auto_stretch.clicked.connect(
-            lambda: self._dialog_blink_auto_stretch(blink_w))
-        for sld in (blink_w.sld_black, blink_w.sld_white, blink_w.sld_gamma,
-                    blink_w.sld_balance, blink_w.sld_fade, blink_w.sld_marker):
-            sld.valueChanged.connect(
-                lambda: self._dialog_blink_render_soon(blink_w))
-        blink_w.chk_marker.stateChanged.connect(
-            lambda: self._dialog_blink_render_soon(blink_w))
-        blink_w.cmb_zoom.currentIndexChanged.connect(
-            lambda: self._dialog_blink_render(blink_w))
-        blink_w.btn_balance_auto.clicked.connect(
-            lambda: self._dialog_blink_balance_auto(blink_w))
-        blink_w.btn_up.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.0, 0.5))
-        blink_w.btn_down.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.0, -0.5))
-        blink_w.btn_left.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, -0.5, 0.0))
-        blink_w.btn_right.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.5, 0.0))
-        blink_w.btn_gif.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "gif"))
-        blink_w.btn_video.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "video"))
-        blink_w.btn_png.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "png"))
-        self._blink_dialog_widget = blink_w
-        dlg.exec()
-        self._blink_timer.stop()
-        w = getattr(self, "_blink_worker", None)
-        if w is not None and w.isRunning():
-            try:
-                w.progress.disconnect()
-                w.finished.disconnect()
-            except RuntimeError:
-                pass
-            self._blink_worker = None
-
-    # ---- blink dialog helpers ----
-
-    def _dialog_blink_browse(self, b):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("Choose FITS"), "",
-            "FITS (*.fits *.fit *.fts);;All files (*)")
-        if path:
-            b.edt_fits.setText(path)
-
-    def _dialog_blink_manual(self, b, state):
-        b.edt_ra.setEnabled(bool(state))
-        b.edt_dec.setEnabled(bool(state))
-
-    def _dialog_blink_manual_coords(self, b):
-        if not b.chk_manual.isChecked():
-            return None
-        try:
-            ra = float(b.edt_ra.text().strip().replace(",", "."))
-            dec = float(b.edt_dec.text().strip().replace(",", "."))
-        except ValueError:
-            return None
-        if not (0.0 <= ra < 360.0 and -90.0 <= dec <= 90.0):
-            return None
-        return ra, dec
-
-    def _dialog_blink_prepare(self, b):
-        image = b.edt_fits.text().strip()
-        if not image:
-            b.lbl_blink_status.setText(self.tr("Choose a FITS image first."))
-            return
-        name = b.edt_sn_name.text().strip()
-        ra = dec = None
-        if b.chk_manual.isChecked():
-            manual = self._dialog_blink_manual_coords(b)
-            if manual is None:
-                b.lbl_blink_status.setText(
-                    self.tr("Manual coordinates invalid"))
-                return
-            ra, dec = manual
-        elif not name:
-            b.lbl_blink_status.setText(
-                self.tr("Type the supernova name or tick 'Manual coordinates'."))
-            return
-        b.btn_prepare.setEnabled(False)
-        b.lbl_blink_status.setText(self.tr("Reading the FITS image…"))
-        w = BlinkWorker(image, sn_name=name or None, ra=ra, dec=dec)
-        self._blink_worker = w
-        w.progress.connect(lambda msg: b.lbl_blink_status.setText(
-            self._txt(msg)))
-        w.finished.connect(lambda pair, errors: self._dialog_blink_done(
-            b, pair, errors))
-        self._keep(w)
-        w.start()
-
-    def _dialog_blink_done(self, b, pair, errors):
-        b.btn_prepare.setEnabled(True)
-        if errors:
-            b.lbl_blink_status.setText("⚠ " + self._txt(errors))
-            return
-        self._blink_pair = pair
-        self._blink_nudge = [0.0, 0.0]
-        b.lbl_nudge.setText("(0.0, 0.0)")
-        for wgt, val in ((b.sld_black, 10), (b.sld_white, 995),
-                         (b.sld_gamma, 100), (b.sld_balance, 100),
-                         (b.sld_marker, 10), (b.cmb_zoom, 0)):
-            wgt.blockSignals(True)
-            if hasattr(wgt, "setValue"):
-                wgt.setValue(val)
-            else:
-                wgt.setCurrentIndex(val)
-            wgt.blockSignals(False)
-        h, w = pair["obs"].shape
-        b.lbl_blink_status.setText(
-            f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:+.5f}) — "
-            f"{pair['ref_label']} · {w}×{h}px")
-        if pair.get("flipped"):
-            b.lbl_blink_status.setText(
-                b.lbl_blink_status.text() + " · " + self.tr("mirrored"))
-        self._blink_dialog_widget = b
-        self._dialog_blink_render(b)
-        if b.chk_blink_live.isChecked():
-            self._blink_timer.start(b.spn_interval.value())
-
-    def _dialog_blink_auto_stretch(self, b):
-        for sld, val in ((b.sld_black, 10), (b.sld_white, 995),
-                         (b.sld_gamma, 100)):
-            sld.setValue(val)
-        self._dialog_blink_render(b)
-
-    def _dialog_blink_render_soon(self, b):
-        self._blink_dialog_widget = b
-        self._blink_render_timer.start()
-
-    def _dialog_blink_render(self, b):
-        if not self._blink_pair:
-            return
-        import numpy as np
-        from ..viz import blink_view
-        black = b.sld_black.value() / 10.0
-        white = b.sld_white.value() / 10.0
-        gamma = b.sld_gamma.value() / 100.0
-        gain = b.sld_balance.value() / 100.0
-        pair = self._blink_pair
-        ref_f = blink_view.apply_stretch(
-            pair["ref"], *blink_view.auto_limits(pair["ref"], black, white),
-            gamma)
-        obs_f = blink_view.apply_stretch(
-            pair["obs"], *blink_view.auto_limits(pair["obs"], black, white),
-            gamma)
-        ref_f = blink_view.apply_gain(ref_f, gain)
-        self._blink_ref8 = self._blink_shift_ref(blink_view.to_uint8(ref_f))
-        self._blink_obs8 = blink_view.to_uint8(obs_f)
-        zoom = (1, 2, 4)[b.cmb_zoom.currentIndex()]
-        disp_ref, disp_obs, sn_disp = self._blink_display_frames(zoom)
-        if b.chk_blink_live.isChecked():
-            self._blink_pix = (self._blink_pixmap(disp_ref, sn_disp),
-                               self._blink_pixmap(disp_obs, sn_disp))
-            self._blink_show_dlg(b, self._blink_pix[int(self._blink_phase)])
-        else:
-            self._blink_timer.stop()
-            a = b.sld_fade.value() / 100.0
-            mix = ((1.0 - a) * disp_ref + a * disp_obs).astype(np.uint8)
-            self._blink_show_dlg(b, self._blink_pixmap(mix, sn_disp))
-
-    def _blink_show_dlg(self, b, pix):
-        b.lbl_blink.setPixmap(
-            pix.scaled(b.lbl_blink.size(), Qt.KeepAspectRatio,
-                       Qt.SmoothTransformation))
-
-    def _dialog_blink_balance_auto(self, b):
-        if not self._blink_pair:
-            return
-        from ..viz import blink_view
-        black = b.sld_black.value() / 10.0
-        white = b.sld_white.value() / 10.0
-        gamma = b.sld_gamma.value() / 100.0
-        pair = self._blink_pair
-        ref_f = blink_view.apply_stretch(
-            pair["ref"], *blink_view.auto_limits(pair["ref"], black, white),
-            gamma)
-        obs_f = blink_view.apply_stretch(
-            pair["obs"], *blink_view.auto_limits(pair["obs"], black, white),
-            gamma)
-        b.sld_balance.setValue(round(blink_view.auto_gain(ref_f, obs_f) * 100))
-
-    def _dialog_blink_nudge(self, b, dx, dy):
-        if not self._blink_pair:
-            return
-        self._blink_nudge[0] += dx
-        self._blink_nudge[1] += dy
-        b.lbl_nudge.setText(
-            f"({self._blink_nudge[0]:+.1f}, {self._blink_nudge[1]:+.1f})")
-        self._dialog_blink_render(b)
-
-    def _dialog_blink_export(self, b, kind):
-        if not self._blink_pair or self._blink_ref8 is None:
-            return
-        pair = self._blink_pair
-        # A4: per-project folder when opened from a project, flat posts/ otherwise
-        if self._current_project:
-            outdir = project.storage_dir(self._current_project)
-        else:
-            outdir = paths.data_dir() / "posts"
-            outdir.mkdir(parents=True, exist_ok=True)
-        if kind == "gif":
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export GIF"),
-                str(outdir / f"{pair['name']}_blink.gif"), "GIF (*.gif)")
-        elif kind == "video":
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export video"),
-                str(outdir / f"{pair['name']}_blink.mp4"),
-                "MP4 video (*.mp4)")
-        else:
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export PNG"),
-                str(outdir / f"{pair['name']}_before_after.png"),
-                "PNG (*.png)")
-        if not out:
-            return
-        # A4: register the blink export in the project if we came from one
-        if self._current_project:
-            project.add_file(db, self._current_project["id"], out, "chart")
-            self._populate_project_files(self._current_project["id"])
-        effect = "blink" if b.rdo_blink.isChecked() else "fade"
-        sn = pair["sn_xy"] if b.chk_marker.isChecked() else None
-        b.lbl_blink_status.setText(self.tr("Rendering…"))
-        # ADR-046: corner boxes, marker look and the N/E compass follow
-        # the settings (the legacy previews stay as they were)
-        boxes = compass = None
-        if config.get("chart_boxes", False):
-            from ..core import chart_annotate, fits_meta
-            from ..viz import blink_view as _bv
-            boxes = _bv.pair_boxes(
-                pair, fits_meta.read_meta(pair["image_path"]),
-                chart_annotate.site_from_config(config))
-            compass = _bv.pair_compass(pair)
-        w = BlinkExportWorker(
-            kind, self._blink_ref8, self._blink_obs8, sn, out, effect=effect,
-            name=pair["name"], ref_label=pair["ref_label"],
-            lang=self._lang(),
-            observatory=config.get("observatory_name", ""),
-            zoom=(1, 2, 4)[b.cmb_zoom.currentIndex()],
-            marker_scale=b.sld_marker.value() / 10.0,
-            interval_ms=b.spn_interval.value(),
-            boxes=boxes,
-            marker_style=config.get("marker_style", "ring"),
-            compass=compass)
-        w.finished.connect(lambda out, err: b.lbl_blink_status.setText(
-            self.tr("Written to %1").replace("%1", out) if out else
-            self.tr("Export failed: %1").replace("%1", err)))
-        self._keep(w)
-        w.start()
-
-    def _blink_tick(self):
-        if not self._blink_pair or not hasattr(self, "_blink_pix"):
-            self._blink_timer.stop()
-            return
-        self._blink_phase = not self._blink_phase
-        pix = self._blink_pix[int(self._blink_phase)]
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None:
-            self._blink_show_dlg(b, pix)
-
-    def _blink_render(self, *_args):
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None and self._blink_pair:
-            self._dialog_blink_render(b)
-
-    def _blink_shift_ref(self, ref8):
-        dx, dy = self._blink_nudge
-        if dx == 0.0 and dy == 0.0:
-            return ref8
-        import numpy as np
-        from PIL import Image
-        im = Image.fromarray(ref8, mode="L")
-        im = im.transform(im.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy),
-                          fillcolor=0)
-        return np.asarray(im)
-
-    def _blink_display_frames(self, zoom):
-        import numpy as np
-        from ..viz import blink_view
-        disp_ref = np.ascontiguousarray(np.flipud(self._blink_ref8))
-        disp_obs = np.ascontiguousarray(np.flipud(self._blink_obs8))
-        sn = self._blink_pair.get("sn_xy") if self._blink_pair else None
-        if sn is None:
-            return disp_ref, disp_obs, None
-        h = self._blink_obs8.shape[0]
-        sn_disp = (sn[0], h - 1 - sn[1])
-        disp_ref, _sr = blink_view.crop_zoom(disp_ref, sn_disp, zoom)
-        disp_obs, sn_disp = blink_view.crop_zoom(disp_obs, sn_disp, zoom)
-        return (np.ascontiguousarray(disp_ref),
-                np.ascontiguousarray(disp_obs), sn_disp)
-
-    def _blink_pixmap(self, disp8, sn_disp):
-        from PySide6.QtGui import QImage, QPixmap
-        h, w = disp8.shape
-        img = QImage(disp8.data, w, h, w, QImage.Format_Grayscale8).copy()
-        pix = QPixmap.fromImage(img)
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None and b.chk_marker.isChecked() and sn_disp is not None:
-            if 0 <= sn_disp[0] < w and 0 <= sn_disp[1] < h:
-                pix = self._blink_draw_marker(pix, sn_disp)
-        return pix
-
-    def _blink_draw_marker(self, pix, sn):
-        from PySide6.QtCore import QPointF, QRectF
-        from PySide6.QtGui import QColor, QPainter, QPen
-        b = getattr(self, "_blink_dialog_widget", None)
-        scale = (b.sld_marker.value() / 10.0) if b is not None else 1.0
-        x, y = sn
-        r = 0.06 * min(pix.width(), pix.height()) * scale
-        p = QPainter(pix)
-        pen = QPen(QColor("#ffb347"))
-        pen.setWidth(max(2, round(2 * scale)))
-        p.setPen(pen)
-        p.drawEllipse(QPointF(x, y), r, r)
-        p.drawLine(QPointF(x - 1.6 * r, y), QPointF(x - 0.5 * r, y))
-        p.drawLine(QPointF(x + 0.5 * r, y), QPointF(x + 1.6 * r, y))
-        p.drawLine(QPointF(x, y - 1.6 * r), QPointF(x, y - 0.5 * r))
-        p.drawLine(QPointF(x, y + 0.5 * r), QPointF(x, y + 1.6 * r))
-        p.drawText(QRectF(x - 120, y - 2.6 * r, 240, 1.4 * r),
-                   Qt.AlignHCenter | Qt.AlignBottom, self._blink_pair["name"])
-        p.end()
-        return pix
-
     # ---------------- Solar ----------------
 
     _SDO_CHANNELS = ["0193", "0304", "0171", "HMII", "HMIB"]
@@ -10771,12 +10160,6 @@ class MainWindow(QMainWindow):
         # Interfaz 1.0: the workbench is a page of the shell, full screen
         self._ufe_page()
         self.navigate(VIEW_UFE)
-
-    def _use_ufe(self):
-        # @return: True when FITS work opens in the unified editor
-        #          (Settings → Development; the classic dialogs stay
-        #          reachable for the review period, ADR-044)
-        return bool(config.get("ufe_default", True))
 
     def _ufe_object_from_project(self, p):
         # Everything the project knows about the object, for the UFE:

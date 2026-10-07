@@ -14,7 +14,8 @@
 """Offscreen checks for gui/ufe_compare_tab.py: the comparison-sequence
 picker on the shared plate view. Field generation goes through a fake
 UfeFieldWorker (no network); stars come from a synthetic catalog mapped
-through the plate's real WCS. The legacy SeqChartDialog is untouched.
+through the plate's real WCS. The classic picker retired in 2026-10-07
+(ADR-044 rev.), so this tab is the only comparison-sequence picker.
 """
 
 import os

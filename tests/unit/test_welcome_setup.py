@@ -44,8 +44,6 @@ def make_window(monkeypatch):
     def _make(snapshot=None):
         w = MainWindow(snapshot=snapshot)
         w._now_timer.stop()
-        w._blink_timer.stop()
-        w._blink_render_timer.stop()
         windows.append(w)
         return w
 
@@ -127,10 +125,13 @@ def test_cta_needs_a_site(make_window):
 def test_stepper_switches_panels(make_window):
     w = make_window(snapshot=None)
     u = w._welcome.ui
-    w._welcome.show_step("kinds")
+    w._welcome.show_step("equip")
     assert u.setup_stack.currentIndex() == 1
-    w._welcome.show_step("data")
+    assert u.btn_step_equip.isChecked()
+    w._welcome.show_step("kinds")
     assert u.setup_stack.currentIndex() == 2
+    w._welcome.show_step("data")
+    assert u.setup_stack.currentIndex() == 3
     assert u.btn_step_data.isChecked()
 
 
@@ -146,11 +147,56 @@ def test_stepper_marks_the_steps_behind_us(make_window):
     assert u.btn_step_obs.text().startswith("✓")
     assert base in u.btn_step_obs.text()
     assert u.btn_step_obs.property("state") == "done"
+    assert u.btn_step_equip.property("state") == "done"
     assert u.rail_sep1.property("state") == "done"
     assert u.rail_sep2.property("state") == "done"
+    assert u.rail_sep3.property("state") == "done"
     w._welcome.show_step("obs")
     assert u.btn_step_obs.text() == base
     assert u.rail_sep1.property("state") == ""
+
+
+def test_equipment_step_answers_with_the_scale(make_window, monkeypatch):
+    # Interfaz 1.9: the equipment step answers like the night strip does.
+    # The plate scale comes from the pixel size and the focal length on
+    # screen, with a verdict on the sampling (core/exposure).
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "pixel_binning", "1x1")
+    w = make_window(snapshot=None)
+    u = w._welcome.ui
+    u.spn_pixel_um.setValue(3.76)
+    u.spn_focal_mm.setValue(2000.0)                 # 0.39″/px
+    assert "0.39" in u.lbl_scale_value.text()
+    assert "finer" in u.lbl_scale_note.text().lower()
+    u.spn_focal_mm.setValue(500.0)                  # 1.55″/px
+    assert "1.55" in u.lbl_scale_value.text()
+    assert "couple of pixels" in u.lbl_scale_note.text()
+    u.spn_focal_mm.setValue(300.0)                  # 2.58″/px
+    assert "coarse" in u.lbl_scale_note.text().lower()
+
+
+def test_equipment_continue_stores_and_never_blocks(make_window, monkeypatch):
+    # The step never blocks (its defaults are usable) and it writes the same
+    # config keys the Settings dialog owns, so the two screens agree.
+    from nightscribe.config import config
+    # pin the keys this test writes: config is a live singleton and the rest
+    # of the suite reads the real values
+    for key in ("aperture_inches", "pixel_um", "focal_mm", "camera_type",
+                "cam_preset"):
+        monkeypatch.setitem(config._data, key, config.get(key))
+    w = make_window(snapshot=None)
+    ws = w._welcome
+    u = ws.ui
+    u.spn_aperture.setValue(12.0)
+    u.spn_pixel_um.setValue(4.63)
+    u.spn_focal_mm.setValue(1200.0)
+    u.cmb_camera_type.setCurrentText("CMOS")
+    ws._equip_next()
+    assert u.setup_stack.currentIndex() == 2          # landed on targets
+    assert config.get("aperture_inches") == 12.0
+    assert config.get("pixel_um") == 4.63
+    assert config.get("focal_mm") == 1200.0
+    assert config.get("camera_type") == "CMOS"
 
 
 def test_hero_paints_tonight_moon(make_window):
@@ -299,10 +345,10 @@ def test_kinds_continue_refuses_an_empty_set(make_window):
     ws.show_step("kinds")
     ws._set_all(False)
     ws._kinds_next()
-    assert ws.ui.setup_stack.currentIndex() == 1      # still on targets
+    assert ws.ui.setup_stack.currentIndex() == 2      # still on targets
     ws._set_all(True)
     ws._kinds_next()
-    assert ws.ui.setup_stack.currentIndex() == 2
+    assert ws.ui.setup_stack.currentIndex() == 3
 
 
 def test_animations_follow_the_preference(make_window, monkeypatch):
@@ -361,7 +407,7 @@ def test_quiet_link_creates_a_project_when_there_are_projects(make_window):
 
 def test_update_mode_explains_itself(make_window):
     # An update must not tell someone who has been using the app for months
-    # to "set up your observatory in three steps": it says why the app
+    # to "set up your observatory in four steps": it says why the app
     # stopped here, marks what was already configured as done and leaves ONE
     # action, next to the report it closes.
     w = make_window(snapshot=None)

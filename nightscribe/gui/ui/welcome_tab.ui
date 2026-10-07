@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Interfaz 1.4 (ADR-055 amendment): the Welcome view. It hosts the
-  first-run / update wizard as an inline stepper (Observatory -> Targets
-  -> Data) instead of the old modal QWizard, wrapped in a painted night
-  sky.
+  first-run / update wizard as an inline stepper (Observatory -> Equipment
+  -> Targets -> Data) instead of the old modal QWizard, wrapped in a painted
+  night sky.
 
   The structure, texts and tooltips live here (ADR-005). gui/widgets/
   welcome_setup.py wires the signals, swaps skyHero for the real painted
@@ -89,7 +89,7 @@
          </item>
          <item>
           <widget class="QLabel" name="welcomeLead">
-           <property name="text"><string>Three steps, then the app walks you through every project: record, capture, analysis and publishing.</string></property>
+           <property name="text"><string>Four steps, then the app walks you through every project: record, capture, analysis and publishing.</string></property>
            <property name="wordWrap"><bool>true</bool></property>
            <property name="maximumSize"><size><width>660</width><height>16777215</height></size></property>
           </widget>
@@ -175,9 +175,9 @@
       </widget>
      </item>
      <item>
-      <widget class="QToolButton" name="btn_step_kinds">
-       <property name="text"><string>2 · Your targets</string></property>
-       <property name="toolTip"><string>The kinds of object you want to follow</string></property>
+      <widget class="QToolButton" name="btn_step_equip">
+       <property name="text"><string>2 · Your equipment</string></property>
+       <property name="toolTip"><string>Your telescope and camera: they set how much sky falls on each pixel</string></property>
        <property name="checkable"><bool>true</bool></property>
       </widget>
      </item>
@@ -189,8 +189,22 @@
       </widget>
      </item>
      <item>
+      <widget class="QToolButton" name="btn_step_kinds">
+       <property name="text"><string>3 · Your targets</string></property>
+       <property name="toolTip"><string>The kinds of object you want to follow</string></property>
+       <property name="checkable"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="rail_sep3">
+       <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+       <property name="minimumSize"><size><width>24</width><height>2</height></size></property>
+       <property name="maximumSize"><size><width>16777215</width><height>2</height></size></property>
+      </widget>
+     </item>
+     <item>
       <widget class="QToolButton" name="btn_step_data">
-       <property name="text"><string>3 · Your data, safe</string></property>
+       <property name="text"><string>4 · Your data, safe</string></property>
        <property name="toolTip"><string>Your database is copied and the changes are explained</string></property>
        <property name="checkable"><bool>true</bool></property>
       </widget>
@@ -329,6 +343,103 @@
           <widget class="QPushButton" name="btn_obs_next">
            <property name="text"><string>Continue →</string></property>
            <property name="toolTip"><string>Save the site and go to your targets</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QFrame" name="panel_equipment">
+      <layout class="QVBoxLayout" name="equipLayout">
+       <property name="leftMargin"><number>22</number></property>
+       <property name="topMargin"><number>14</number></property>
+       <property name="rightMargin"><number>22</number></property>
+       <property name="bottomMargin"><number>14</number></property>
+       <property name="spacing"><number>6</number></property>
+       <item>
+        <widget class="QLabel" name="lbl_equip_title">
+         <property name="text"><string>Your equipment</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_equip_sub">
+         <property name="text"><string>The telescope and the camera set your plate scale: how much sky falls on each pixel. It decides what fits in the frame, how long you can expose and whether a faint target is worth the trip.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QFormLayout" name="equipForm">
+         <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+         <property name="horizontalSpacing"><number>12</number></property>
+         <property name="verticalSpacing"><number>6</number></property>
+         <item row="0" column="0"><widget class="QLabel" name="lbl_equip_aperture"><property name="text"><string>Aperture (inches):</string></property></widget></item>
+         <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_aperture"><property name="toolTip"><string>Sizes transit targets against the aperture ExoClock asks for, and scales the "why tonight" reasons</string></property><property name="maximum"><double>100.0</double></property></widget></item>
+         <item row="1" column="0"><widget class="QLabel" name="lbl_equip_preset"><property name="text"><string>Camera preset:</string></property></widget></item>
+         <item row="1" column="1"><widget class="QComboBox" name="cmb_cam_preset"><property name="toolTip"><string>Fills the pixel size and the sensor profile (read noise, dark current, full well) from the camera's datasheet. A real measurement always beats a datasheet; you can change any of it later in Settings</string></property></widget></item>
+         <item row="2" column="0"><widget class="QLabel" name="lbl_equip_pixel"><property name="text"><string>Pixel size (µm):</string></property></widget></item>
+         <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_pixel_um"><property name="decimals"><number>2</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>30.0</double></property></widget></item>
+         <item row="3" column="0"><widget class="QLabel" name="lbl_equip_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
+         <item row="3" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property></widget></item>
+         <item row="4" column="0"><widget class="QLabel" name="lbl_equip_camtype"><property name="text"><string>Camera type:</string></property></widget></item>
+         <item row="4" column="1"><widget class="QComboBox" name="cmb_camera_type"><property name="toolTip"><string>CCD, CMOS or DSLR; it goes into the MPC report's instrument type and into the EXOTIC handoff</string></property></widget></item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QFrame" name="scaleStrip" native="true">
+         <property name="maximumSize"><size><width>720</width><height>16777215</height></size></property>
+         <layout class="QHBoxLayout" name="scaleStripLayout">
+          <property name="leftMargin"><number>14</number></property>
+          <property name="topMargin"><number>9</number></property>
+          <property name="rightMargin"><number>14</number></property>
+          <property name="bottomMargin"><number>9</number></property>
+          <property name="spacing"><number>12</number></property>
+          <item>
+           <widget class="QLabel" name="lbl_scale_icon">
+            <property name="text"><string notr="true">⌗</string></property>
+            <property name="alignment"><set>Qt::AlignTop|Qt::AlignHCenter</set></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QVBoxLayout" name="scaleTextLayout">
+            <property name="spacing"><number>1</number></property>
+            <item>
+             <widget class="QLabel" name="lbl_scale_title">
+              <property name="text"><string>YOUR SCALE, NOW</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lbl_scale_value">
+              <property name="text"><string/></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lbl_scale_note">
+              <property name="text"><string/></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="equipBottom">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+        </spacer>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="equipActions">
+         <item>
+          <spacer name="equipActionsSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_equip_next">
+           <property name="text"><string>Continue →</string></property>
+           <property name="toolTip"><string>Save your equipment and go to your targets</string></property>
           </widget>
          </item>
         </layout>

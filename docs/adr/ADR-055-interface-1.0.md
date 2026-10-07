@@ -318,6 +318,36 @@ CCDciel como color con significado. El detalle, los números medidos y el
 criterio de aceptación (las cuatro pestañas caben a 1360x940 y 1360x860,
 Captura incluida con CCDciel conectado) viven en el ADR-041.
 
+**Revisión (2026-10-07, Interfaz 1.9: el equipo, un paso más).** La Bienvenida
+tenía tres pasos (observatorio, objetivos, datos) y le faltaba el que decide la
+escala de la imagen. Ahora son cuatro: **Dónde estás → Tu equipo → Tus
+objetivos → Tus datos**.
+
+- El paso nuevo pide lo mínimo que cambia lo que la app calcula: la apertura (la
+  puerta de tránsitos de ExoClock y las razones del «por qué esta noche»), la
+  pareja píxel y focal (la escala de placa: campo, exposición, recorte de
+  astrometría, escala de la carta), el tipo de cámara (el reporte MPC y el
+  handoff EXOTIC) y un preset que rellena el perfil del sensor. Todo lo demás se
+  afina en Ajustes, y el paso NO bloquea: viene con los valores de la app y se
+  puede seguir.
+- El paso contesta: la tira **«Tu escala, ahora»** calcula los arcsec por píxel
+  con `core/exposure.plate_scale` y dice si el muestreo encaja con el seeing de
+  un sitio típico (`exposure.sampling`), el mismo gancho «la app te responde»
+  que la tira «Tu noche, ahora».
+- El binning entra por fin en la escala (`plate_scale(pixel, focal, binning)`):
+  la clave del config es el píxel del SENSOR, así que un 2x2 da una escala doble
+  y todos sus consumidores (planificador, exposición NEO, pista del solver,
+  EXOTIC, campo de visión) estaban desviados por ese factor.
+- El asistente modal (`wizard.ui`, `maybe_run_wizard`, `_build`, `_page_ok`)
+  desaparece: era el código muerto que la propia Interfaz 1.0 dejó al pasar el
+  asistente a la vista. Los ayudantes que sí se usan (detección, resolución del
+  MPC, kinds, datos y ahora equipo) se quedan en `gui/wizard.py`, compartidos.
+
+**Punto de entrada**: `gui/ui/welcome_tab.ui` (el panel y la tira),
+`gui/widgets/welcome_setup.py` (el gancho), `gui/wizard.py` (los ayudantes),
+`core/exposure.py` (la escala, el binning y el veredicto), `core/cameras.py`
+(el perfil del preset).
+
 ## English
 
 **Context.** The app was born with "Tonight" as the root screen: on open it
@@ -616,3 +646,32 @@ only out of there:
   going to look at them.
 - The calendar is not out of reach: it is still in **Tools → Sky calendar…** and
   in Welcome, which is where the chips led anyway.
+
+**Revision (2026-10-07, Interfaz 1.9: the equipment, one step more).** Welcome
+had three steps (observatory, targets, data) and was missing the one that
+decides the image scale. It has four now: **Where you are -> Your equipment ->
+Your targets -> Your data**.
+
+- The new step asks for the least that changes what the app computes: the
+  aperture (ExoClock's transit gate and the "why tonight" reasons), the
+  pixel/focal pair (the plate scale: field, exposure, astrometry cutout, chart
+  scale), the camera type (the MPC report and the EXOTIC handoff) and a preset
+  that fills the sensor profile. Everything else is refined in Settings, and the
+  step does NOT block: it comes with the app's defaults and can be continued.
+- The step answers back: the **"Your scale, now"** strip computes the
+  arcsec/pixel with `core/exposure.plate_scale` and says whether the sampling
+  fits the seeing of a typical site (`exposure.sampling`), the same "the app
+  answers" hook as the "Your night, now" strip.
+- The binning finally enters the scale (`plate_scale(pixel, focal, binning)`):
+  the config key is the SENSOR's pixel, so a 2x2 doubles the scale and every
+  consumer of it (planner, NEO exposure, solver hint, EXOTIC, field of view)
+  was off by that factor.
+- The modal wizard (`wizard.ui`, `maybe_run_wizard`, `_build`, `_page_ok`) is
+  gone: it was the dead code Interfaz 1.0 itself left behind when the setup
+  moved into the view. The helpers that are used (detection, MPC resolve, kinds,
+  data and now equipment) stay in `gui/wizard.py`, shared.
+
+**Entry point**: `gui/ui/welcome_tab.ui` (the panel and the strip),
+`gui/widgets/welcome_setup.py` (the hook), `gui/wizard.py` (the helpers),
+`core/exposure.py` (the scale, the binning and the verdict), `core/cameras.py`
+(the preset's profile).

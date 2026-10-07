@@ -1257,7 +1257,8 @@ class ObjectPanel(QWidget):
                 + self._txt(explain.short(explain.RATE))))
             from ..config import config
             scale = exposure.plate_scale(config.get("pixel_um"),
-                                         config.get("focal_mm"))
+                                         config.get("focal_mm"),
+                                         config.get("pixel_binning"))
             t_max = exposure.max_exposure_no_trail(rate, scale)
             if t_max:
                 tiles.append((

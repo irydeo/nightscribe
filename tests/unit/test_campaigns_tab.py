@@ -88,8 +88,6 @@ def window(_point_db_at_tmpdir):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     # hermetic object card: the fake loader means no ExploreWorker QThread
     orig_loader = w._proj_panel_loader
     w._proj_panel_loader = (lambda name, fallback_target=None:

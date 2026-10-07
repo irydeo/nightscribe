@@ -14,8 +14,8 @@
 """The UFE's Comparisons section (ADR-044, phase F; rev 2026-09-25): the
 photometric comparison sequence on top of core/compstars (VizieR
 Gaia/APASS + VSX cross-match), with the FinderChart's visual language
-reimplemented as overlays on the shared plate view (the legacy
-SeqChartDialog keeps living untouched).
+reimplemented as overlays on the shared plate view (the only comparison
+picker since the classic one retired, 2026-10-07).
 
 The normal path is ONE click: «Build the sequence…» generates the
 catalog field around the plate centre and proposes the comparisons; the

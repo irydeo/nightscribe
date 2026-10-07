@@ -1217,3 +1217,23 @@ campaigns strip. With the list on screen the side drawer adds nothing: the
 vertical `PROJECTS` tab hides on Home and only appears elsewhere. The
 back/forward arrows grow, and the UFE "Back" button is removed (the general
 stack covers it).
+
+### 7unvicies. Interfaz 1.9: the equipment, one step more, and the classic code retires (2026-10-07, ADR-055 rev. + ADR-044 rev.)
+
+Motivation: Welcome had three steps and was missing the one that decides the
+image scale; and the UFE had been the normal path for months while the three
+classic dialogs and their switch stayed in the code "just in case".
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The equipment step | Welcome goes to four steps (where you are, equipment, targets, data). The new step asks for aperture, pixel, focal length, camera type and a camera preset, and it does NOT block: it comes with the app's defaults | **Done** |
+| The scale answers | The "Your scale, now" strip computes the arcsec/pixel and says whether the sampling fits the seeing of a typical site (`exposure.sampling`), the same hook as "Your night, now" | **Done** |
+| The binning | `plate_scale` applies the config's binning: a 2x2 doubles the scale, and its readers (planner, NEO exposure, ASTAP, EXOTIC, field of view, CLI) stop being off by that factor | **Done** |
+| The cleanup | The classic blink dialog, `SnAnnotateDialog`, the classic chart with its `SequenceWorker` and the `ufe_default` switch are gone: the UFE is the only door. About 2,000 lines fewer | **Done** |
+| The modal wizard | `wizard.ui`, `maybe_run_wizard`, `_build` and `_page_ok` are gone (dead code from Interfaz 1.0); the helpers that are used stay shared in `gui/wizard.py` | **Done** |
+
+**Entry point**: `gui/ui/welcome_tab.ui`, `gui/widgets/welcome_setup.py`,
+`gui/wizard.py`, `core/exposure.py`, `core/cameras.py`; the cleanup in
+`gui/main_window.py`, `gui/workers.py` and `gui/ui/settings_dialog.ui`; tests in
+`test_welcome_setup.py`, `test_wizard_site.py`, `test_exposure.py` and
+`test_ufe_integration.py`.

@@ -663,18 +663,23 @@ QLabel#lbl_data_badge {{
 /* The live "your night, now" panel that sits over the sky. A translucent
    dark panel, not a solid one: the stars must stay visible through it or
    the hero stops being a sky. */
-QFrame#nightStrip {{
+QFrame#nightStrip, QFrame#scaleStrip {{
     background: rgba(9, 13, 24, 0.72);
     border: 1px solid rgba(90, 110, 150, 0.35);
     border-left: 3px solid {C_ACCENT}; border-radius: 10px;
 }}
 QLabel#lbl_night_icon {{ font-size: 22px; color: #cfd9ee; }}
-QLabel#lbl_night_title {{ font-size: 10px; font-weight: 700;
-                          letter-spacing: 1px; color: {C_ACCENT}; }}
+QLabel#lbl_scale_icon {{ font-size: 20px; color: #cfd9ee; }}
+QLabel#lbl_night_title, QLabel#lbl_scale_title {{
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; color: {C_ACCENT};
+}}
 QLabel#lbl_night_window {{ color: #e2e7f2; }}
 QLabel#lbl_night_moon, QLabel#lbl_night_planets {{
     color: #97a0b8; font-size: 12px;
 }}
+QLabel#lbl_scale_value {{ color: #e2e7f2; font-size: 15px; font-weight: 600; }}
+QLabel#lbl_scale_note {{ color: #97a0b8; font-size: 12px; }}
 QPushButton#btn_night_set {{
     background: rgba(106, 176, 255, 0.12); color: {C_ACCENT};
     border: 1px solid rgba(106, 176, 255, 0.45); border-radius: 6px;
@@ -684,36 +689,43 @@ QPushButton#btn_night_set:hover {{ background: rgba(106, 176, 255, 0.22); }}
 
 /* The stepper as a rail: numbered nodes joined by a line that fills as you
    advance (the code flips the [state] property; the colours live here). */
-QToolButton#btn_step_obs, QToolButton#btn_step_kinds,
-QToolButton#btn_step_data {{
+QToolButton#btn_step_obs, QToolButton#btn_step_equip,
+QToolButton#btn_step_kinds, QToolButton#btn_step_data {{
     background: {C_PANEL}; border: 1px solid {C_LINE}; border-radius: 15px;
     padding: 5px 16px; color: {C_TEXT_DIM};
 }}
-QToolButton#btn_step_obs:hover, QToolButton#btn_step_kinds:hover,
+QToolButton#btn_step_obs:hover, QToolButton#btn_step_equip:hover,
+QToolButton#btn_step_kinds:hover,
 QToolButton#btn_step_data:hover {{ background: {C_HOVER}; }}
-QToolButton#btn_step_obs:checked, QToolButton#btn_step_kinds:checked,
+QToolButton#btn_step_obs:checked, QToolButton#btn_step_equip:checked,
+QToolButton#btn_step_kinds:checked,
 QToolButton#btn_step_data:checked {{
     border-color: {C_ACCENT}; color: {C_TEXT}; background: {C_HOVER};
 }}
 QToolButton#btn_step_obs[state="done"],
+QToolButton#btn_step_equip[state="done"],
 QToolButton#btn_step_kinds[state="done"],
 QToolButton#btn_step_data[state="done"] {{
     border-color: {C_GOOD}; color: {C_TEXT};
 }}
-QFrame#rail_sep1, QFrame#rail_sep2 {{
+QFrame#rail_sep1, QFrame#rail_sep2, QFrame#rail_sep3 {{
     background: {C_LINE}; border: none; margin: 0 6px;
 }}
-QFrame#rail_sep1[state="done"], QFrame#rail_sep2[state="done"] {{
+QFrame#rail_sep1[state="done"], QFrame#rail_sep2[state="done"],
+QFrame#rail_sep3[state="done"] {{
     background: {C_GOOD};
 }}
 
-QFrame#panel_obs, QFrame#panel_kinds, QFrame#panel_data {{
+QFrame#panel_obs, QFrame#panel_equipment, QFrame#panel_kinds,
+QFrame#panel_data {{
     background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 12px;
 }}
-QLabel#lbl_obs_title, QLabel#lbl_kinds_title, QLabel#lbl_data_title {{
+QLabel#lbl_obs_title, QLabel#lbl_equip_title, QLabel#lbl_kinds_title,
+QLabel#lbl_data_title {{
     font-size: 16px; font-weight: 700;
 }}
-QLabel#lbl_obs_sub, QLabel#lbl_kinds_sub, QLabel#lbl_data_sub,
+QLabel#lbl_obs_sub, QLabel#lbl_equip_sub, QLabel#lbl_kinds_sub,
+QLabel#lbl_data_sub,
 QLabel#lbl_site_status, QLabel#lbl_site_privacy, QLabel#lbl_kinds_rule,
 QLabel#lbl_data_rule {{ color: {C_TEXT_DIM}; }}
 QLabel#lbl_site_privacy, QLabel#lbl_kinds_rule, QLabel#lbl_data_rule {{

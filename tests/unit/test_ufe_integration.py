@@ -73,9 +73,21 @@ def window(qapp):
     w.close()
 
 
-def test_ufe_default_is_on():
+def test_the_unified_editor_is_the_only_door():
+    # The classic dialogs (blink, annotate, comparison chart) and the switch
+    # that chose between them and the editor retired on 2026-10-07 (ADR-044
+    # rev.): the modules are gone and the config key with them, so nothing
+    # can quietly open them again.
+    import importlib
     from nightscribe.config import DEFAULTS
-    assert DEFAULTS["ufe_default"] is True
+    assert "ufe_default" not in DEFAULTS
+    for mod in ("nightscribe.gui.sn_annotate_dialog",
+                "nightscribe.gui.seqchart_dialog"):
+        try:
+            importlib.import_module(mod)
+        except ModuleNotFoundError:
+            continue
+        raise AssertionError(f"{mod} is back")
 
 
 def test_settings_has_the_development_tab(qapp):
@@ -88,12 +100,12 @@ def test_settings_has_the_development_tab(qapp):
     f.close()
     titles = [d.tabWidget.tabText(i) for i in range(d.tabWidget.count())]
     assert "Development" in titles
-    assert d.chk_ufe_default is not None
-    assert "Image Workbench" in d.lblH_ufe.text()
+    assert d.chk_ufe_bar_icons is not None
+    assert "unified editor" in d.lblH_ufe.text()
     from nightscribe.gui import main_window as mw
     src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert 'chk_ufe_default.setChecked' in src
-    assert 'ufe_default' in src and 'chk_ufe_default.isChecked()' in src
+    assert 'chk_ufe_bar_icons.setChecked' in src
+    assert 'ufe_bar_icons' in src and 'chk_ufe_bar_icons.isChecked()' in src
 
 
 def test_open_plate_and_show_tab(dlg, qapp):
@@ -147,12 +159,12 @@ def test_blink_has_no_ad_hoc_entry_in_the_tools_menu(window, monkeypatch):
     # the unified editor on (the default) that entry opened the editor's own
     # Blink window, which is already its own button in the workbench, so it
     # was redundant. The menu entry, its action and its handler are gone; the
-    # classic dialog stays in the code without a door (the observer's own
-    # choice) and nothing in the interface reaches it.
+    # classic dialog itself retired too (2026-10-07), so the editor is the
+    # only door.
     assert not hasattr(window._menus, "action_blink")
     assert not hasattr(window, "_tools_blink")
-    assert hasattr(window, "_open_blink_dialog")     # kept, unreachable
-    # and the workbench's Blink tool is still the door
+    assert not hasattr(window, "_open_blink_dialog")
+    # and the workbench's Blink tool is the door
     dlg = window._ufe_build()
     assert dlg._tools["blink"].panel is dlg.tab_blink
     dlg.show_tab("blink")
@@ -183,7 +195,6 @@ def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
                         session_id=None: (
                             seen.append((tab, hook_pid, obj, session_id))
                             or _Dlg()))
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     import nightscribe.gui.main_window as _mw
     monkeypatch.setattr(_mw.project, "get",
                         lambda db_, pid: dict(window._current_project))
@@ -202,7 +213,6 @@ def test_routing_sequence_and_annotate(window, monkeypatch):
     monkeypatch.setattr(window, "_fu_sequence_via_ufe",
                         lambda pid: calls.append(("seq", pid)))
     monkeypatch.setattr(mw.project, "get", lambda db_, pid: None)
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     window._fu_sequence_dialog(7)
     assert calls == [("seq", 7)]
 
@@ -453,7 +463,6 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def activateWindow(self):
             pass
     monkeypatch.setattr(window, "_ufe_build", lambda: _Dlg())
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     window._fu_sequence_dialog(3)
     assert seen and seen[0]["mag"] == 11.25
 

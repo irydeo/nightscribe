@@ -11,31 +11,29 @@
 #
 ############################################################
 
-# One wizard whenever a new NightScribe version is installed (ADR-042).
-# First run: the observatory page, then "Your targets" and "Data and
-# compatibility". An update: the two last pages. The app decides nothing
-# on its own: gui/app.py calls maybe_run_wizard() at start and follows the
-# answer (continue, or stop when a first run is cancelled).
+# The setup helpers the Welcome view drives (ADR-055, Interfaz 1.9). The
+# modal QWizard that once used them is gone (2026-10-07): the Welcome view is
+# the only door, and everything here is written against the loaded husk, so it
+# serves the Welcome step directly. The host (gui/app.py) only asks this module
+# whether the setup is due (_wizard_needed) and how to show the version.
 #
 # i18n: the runtime strings below are translated as the "NSWizard" context.
 # lupdate collects them from the QT_TRANSLATE_NOOP marks (the same pattern
 # as core/kinds.py and gui/overview.py). Two quirks to keep: the context in
 # the marks is a string literal (this lupdate silently skips a variable
 # context), and wizard.tr() is never used (lupdate attributes widget.tr()
-# to the variable name, which decouples the strings from the "NSUpdateWizard"
+# to the variable name, which decouples the strings from the "NSWizard"
 # context Qt looks up at runtime, and they silently go untranslated).
 
 import logging
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from PySide6.QtCore import (QT_TRANSLATE_NOOP, QFile, QCoreApplication, Qt,
+from PySide6.QtCore import (QT_TRANSLATE_NOOP, QCoreApplication, Qt,
                             Signal)
-from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
-    QWizard, QVBoxLayout,
+    QVBoxLayout,
 )
 
 from ..config import config
@@ -43,8 +41,6 @@ from ..version import base_version
 from ..core import kinds
 from .theme import (C_ACCENT, C_GOOD, C_TEXT, C_TEXT_DIM, C_WARN, KIND_COLORS,
                     kind_card_style)
-
-UI_DIR = Path(__file__).parent / "ui"
 
 _K = "NSWizard"
 
@@ -67,6 +63,7 @@ S_CODE_MISS = QT_TRANSLATE_NOOP("NSWizard",
     "minorplanetcenter.net, or type the coordinates by hand.")
 S_NEW = QT_TRANSLATE_NOOP("NSWizard", "new")
 S_SOURCE = QT_TRANSLATE_NOOP("NSWizard", "Source: {source}")
+S_CAM_NONE = QT_TRANSLATE_NOOP("NSWizard", "None")
 
 S_VERSION = QT_TRANSLATE_NOOP("NSWizard",
     "Running NightScribe {version}.")
@@ -104,40 +101,6 @@ def tr(text, **values):
     return out
 
 
-def maybe_run_wizard(snapshot=None):
-    # Runs the wizard when it is due (first run, or a newer version than
-    # the one it last ran for) and applies the answer.
-    # @args: snapshot - the pre-migration backup dict from core/backup.py,
-    #          or None when this machine has no database yet
-    # @return: True to continue, False when a first run is cancelled
-    #          (no site yet: the wizard will re-appear on the next start)
-    fresh = not config.is_configured()
-    last = (config.get("app_version") or "").strip()
-    if not fresh and not _wizard_needed(last):
-        return True
-
-    wizard, boxes = _build(fresh, snapshot)
-    result = wizard.exec()
-    finished = result == QWizard.Accepted
-    if finished:
-        # Write the choices back while the widgets are still alive (the
-        # reap below deletes them).
-        if fresh:
-            _apply_site(wizard)
-        _apply_kinds(boxes)
-        _mark_done()
-    # exec() only hides the widget: release it so shiboken does not free
-    # the C++ side out from under Qt (same reaping rule as the tests).
-    wizard.close()
-    wizard.deleteLater()
-    QApplication.processEvents()
-    if not finished:
-        if fresh:
-            return False  # first run with no site: stop, clean exit
-        _mark_done()  # update skipped on purpose: keep the settings on file
-    return True
-
-
 def _wizard_needed(last):
     # The wizard runs when this install is newer than the one it last ran
     # for. Empty or unparseable versions ask again: better an extra look
@@ -151,60 +114,6 @@ def _wizard_needed(last):
     if current is None or stored is None:
         return True
     return current > stored
-
-
-def _build(fresh, snapshot):
-    # Loads wizard.ui, drops the site page on an update, wires the buttons
-    # and the Next gate, and fills the kinds page and the data report.
-    # @args: fresh - first run or update; snapshot - for the data page
-    # @return: (the QWizard, {kind_id: QCheckBox}) in catalogue order
-    file = QFile(str(UI_DIR / "wizard.ui"))
-    file.open(QFile.ReadOnly)
-    wizard = QUiLoader().load(file)
-    file.close()
-
-    if not fresh:
-        # page_site is the first page of wizard.ui
-        wizard.removePage(wizard.pageIds()[0])
-    # currentPage() is None straight after a load; restart() lands the
-    # wizard on the first page that is left
-    wizard.restart()
-
-    wizard.btn_detect.clicked.connect(lambda: _detect(wizard))
-    wizard.btn_resolve.clicked.connect(lambda: _resolve_site(wizard))
-    boxes = _setup_kinds(wizard)
-    _setup_data(wizard, snapshot)
-
-    def _gate(_page_id=None):
-        # The Next button is only usable when the current page is done
-        btn = wizard.button(QWizard.NextButton)
-        if btn is not None:
-            btn.setEnabled(_page_ok(wizard, boxes))
-    wizard.currentIdChanged.connect(_gate)
-    wizard.spn_site_lat.valueChanged.connect(lambda _v: _gate())
-    wizard.spn_site_lon.valueChanged.connect(lambda _v: _gate())
-    for box in boxes.values():
-        box.stateChanged.connect(lambda _state: _gate())
-    _gate()
-    return wizard, boxes
-
-
-def _page_ok(wizard, boxes):
-    # The rule of the current page: the site needs a non-zero coordinate
-    # (the zero pair is "not set"), the kinds page needs one check at
-    # least. The data page never blocks (it holds the Finish button).
-    # @args: wizard - the loaded wizard; boxes - the kinds checkboxes
-    # @return: whether the Next button should be enabled
-    page = wizard.currentPage()
-    if page is None:
-        return True
-    name = page.objectName()
-    if name == "page_site":
-        return (wizard.spn_site_lat.value() != 0.0
-                or wizard.spn_site_lon.value() != 0.0)
-    if name == "page_kinds":
-        return any(box.isChecked() for box in boxes.values())
-    return True
 
 
 def _detect(wizard):
@@ -409,6 +318,41 @@ def _setup_kinds(wizard, card=False):
     return boxes
 
 
+def _setup_equipment(wizard):
+    # Fills the camera preset combo of the equipment step and wires it: a
+    # chosen preset writes its datasheet pixel size on the spot (the scale
+    # hook answers in the same breath), and _apply_equipment stores the rest
+    # of the profile when the step is left. It fills NOTHING at setup: the
+    # widgets already carry what the settings saved (the Welcome's
+    # _fill_from_config), and a preset restored from disk must not overwrite
+    # a pixel the observer typed by hand.
+    # @args: wizard - the loaded Welcome husk
+    from ..core import cameras
+    combo = wizard.cmb_cam_preset
+    combo.blockSignals(True)
+    combo.clear()
+    combo.addItem(tr(S_CAM_NONE), "")
+    for p in cameras.PRESETS:
+        combo.addItem(cameras.label(p), p["key"])
+    idx = combo.findData((config.get("cam_preset") or "").strip())
+    combo.setCurrentIndex(idx if idx >= 0 else 0)
+    combo.blockSignals(False)
+    combo.currentIndexChanged.connect(
+        lambda _i: _equipment_preset_picked(wizard))
+
+
+def _equipment_preset_picked(wizard):
+    # The preset the observer just chose brings its pixel size: the only
+    # profile field the step shows, and the one the scale hook reads. The
+    # rest of the profile rides in _apply_equipment, which fills it only when
+    # the preset really changed.
+    # @args: wizard - the loaded Welcome husk
+    from ..core import cameras
+    p = cameras.preset(wizard.cmb_cam_preset.currentData())
+    if p is not None:
+        wizard.spn_pixel_um.setValue(float(p["pixel_um"]))
+
+
 def _setup_data(wizard, snapshot):
     # Fills the plain-language report: the running version, the backup
     # state and the migration steps. Importing core.db here fires the
@@ -510,6 +454,34 @@ def _apply_site(wizard):
     name = wizard.edt_site_name.text().strip()
     if name:
         config.set("observatory_name", name)
+
+
+def _apply_equipment(wizard):
+    # Writes the equipment step: the aperture (the transit gate and the "why
+    # tonight" reasons read it), the plate-scale pair (pixel and focal), the
+    # camera type (the MPC report and the EXOTIC handoff) and the chosen
+    # preset. A preset that CHANGED in this visit brings its datasheet profile
+    # (read noise, dark, full well, working exposure); one restored unchanged
+    # leaves the profile alone, because the observer may have tuned it in
+    # Settings and choosing the same camera again is no reason to throw that
+    # away.
+    # @args: wizard - the loaded Welcome husk
+    from ..core import cameras
+    config.set("aperture_inches", wizard.spn_aperture.value())
+    config.set("pixel_um", wizard.spn_pixel_um.value())
+    config.set("focal_mm", wizard.spn_focal_mm.value())
+    config.set("camera_type", wizard.cmb_camera_type.currentText())
+    key = (wizard.cmb_cam_preset.currentData() or "").strip()
+    saved = (config.get("cam_preset") or "").strip()
+    config.set("cam_preset", key)
+    if key == saved:
+        return
+    p = cameras.preset(key)
+    if p is None:
+        return
+    for k, value in cameras.profile_from_preset(p, {}).items():
+        if k != "pixel_um":          # the spin above is the truth for it
+            config.set(k, value)
 
 
 def _apply_kinds(boxes):

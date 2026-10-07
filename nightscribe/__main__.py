@@ -315,7 +315,8 @@ def cmd_inject(args):
     nx = int(header.get("NAXIS1", 0))
     ny = int(header.get("NAXIS2", 0))
     scale = exposure.plate_scale(config.get("pixel_um"),
-                                 config.get("focal_mm")) or 2.0
+                                 config.get("focal_mm"),
+                                 config.get("pixel_binning")) or 2.0
     w = WCS(naxis=2)
     w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
     w.wcs.crval = [float(header.get("CRVAL1", 0.0)),

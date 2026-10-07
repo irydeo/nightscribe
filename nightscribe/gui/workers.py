@@ -618,112 +618,6 @@ class SurveyWorker(QThread):
         self.finished.emit(out)
 
 
-class SequenceWorker(QThread):
-    # Gathers the photometric sequence off the GUI thread (ADR-042):
-    # VizieR field, the background (user FITS solved with Astrometry.net
-    # when it lacks WCS, else the DSS2 cutout) and the automatic proposal.
-    # It writes NO files: the SeqChartDialog owns the exports, so the user
-    # can adjust the sequence before anything lands on disk.
-    # The payload is {"status": ok|error, "error", field, entries, image,
-    # wcs, ...}: a Path / Wcs / numpy image plus hundreds of star dicts.
-    # Signal(object) passes it through untouched; Signal(dict) would force
-    # a recursive QVariant conversion at emit — a var<->star reference
-    # cycle in the field once recursed that conversion into a C stack
-    # overflow (SIGSEGV on "Generate").
-    finished = Signal(object)
-    progress = Signal(str)      # stage message for the dialog's status line
-
-    def __init__(self, name, ra_deg, dec_deg, catalog, fov_arcmin,
-                 n_comps, target_mag, fits_path, lang):
-        super().__init__()
-        self._name = name
-        self._ra, self._dec = ra_deg, dec_deg
-        self._catalog = catalog
-        self._fov = fov_arcmin
-        self._n = n_comps
-        self._mag = target_mag
-        self._fits = fits_path
-        self._lang = lang
-
-    def run(self):
-        from ..core import compstars
-        try:
-            field = compstars.load_field(self._catalog, self._ra,
-                                         self._dec, self._fov)
-        except Exception as err:      # never crash the GUI
-            logger.warning("sequence field failed: %s", err)
-            field = None
-        if field is None:
-            self.finished.emit({
-                "status": "error",
-                "error": ("VizieR no respondió; inténtalo de nuevo en "
-                          "unos minutos") if self._lang != "en" else
-                         ("VizieR did not answer; try again in a few "
-                          "minutes")})
-            return
-        try:
-            self._build(field)
-        except Exception as err:      # render/disk problems warn, never
-            logger.exception("sequence worker failed: %s", err)  # crash
-            self.finished.emit({"status": "error", "error": str(err)})
-
-    def _build(self, field):
-        from ..core import blink, compstars
-        from ..core.sources import cutouts
-        from ..viz import blink_view
-        out = {"status": "ok", "field": field, "vsx_warning":
-               field["vsx_warning"]}
-        # img_label tells the truth about the background: the FITS name,
-        # the survey that actually served ("Legacy Survey DR10" / "DSS2
-        # color (CDS)"), or "" when no image could be fetched at all
-        image, wcs, img_label = None, None, ""
-        if self._fits:
-            self.progress.emit(
-                "Leyendo tu FITS…" if self._lang != "en"
-                else "Reading your FITS…")
-            try:
-                img = blink.load_user_image(
-                    self._fits,
-                    progress=lambda m: self.progress.emit(
-                        m["en"] if self._lang == "en" else m["es"]))
-                x, y = img["wcs"].sky_to_pixel(self._ra, self._dec)
-                if 0 <= x < img["wcs"].naxis1 and 0 <= y < img["wcs"].naxis2:
-                    image = blink_view.apply_stretch(
-                        img["data"], *blink_view.auto_limits(img["data"]))
-                    wcs = img["wcs"]
-                    img_label = self._fits.name
-                else:
-                    out["target_outside"] = True
-            except blink.BlinkError as err:
-                out["fits_error"] = err.messages.get(self._lang) or \
-                    err.messages["en"]
-        if wcs is None:
-            self.progress.emit(
-                "Descargando la imagen del campo…" if self._lang != "en"
-                else "Downloading the field image…")
-            image, src = cutouts.reference_cutout(self._ra, self._dec,
-                                                  size=1000,
-                                                  pixscale=self._fov * 60.0
-                                                  / 1000.0)
-            img_label = src or ""
-        self.progress.emit(
-            "Proponiendo la secuencia…" if self._lang != "en"
-            else "Proposing the sequence…")
-        mag = self._mag
-        if mag is None and field["stars"]:
-            mags = sorted(s["mag"] for s in field["stars"])
-            mag = mags[len(mags) // 2]
-        seq = compstars.propose_comps(field["stars"], mag, n=self._n)
-        entries = seq["comps"] + ([seq["check"]] if seq["check"] else [])
-        out.update(entries=entries, image=image, wcs=wcs,
-                   img_label=img_label, target_mag=mag,
-                   catalog=field["catalog"],
-                   catalog_name=field["catalog_name"],
-                   fov_arcmin=field["fov_arcmin"],
-                   n_variables=len(field["variables"]))
-        self.finished.emit(out)
-
-
 class SeriesWorker(QThread):
     # Measures a photometric series off the GUI thread (series plan,
     # phase 5): the same core/series_measure.measure_series the tests and
@@ -1068,8 +962,8 @@ class TrackStackWorker(QThread):
     # the key to a literal self.tr() table, the way TonightWorker's phases
     # do (CONTRIBUTING rule 5). The payload is a dict with numpy stacks
     # inside, so it travels as Signal(object): a Signal(dict) would force
-    # the recursive QVariant conversion that once segfaulted the sequence
-    # worker (see SequenceWorker's comment).
+    # the recursive QVariant conversion that once segfaulted the comparison
+    # chart's sequence worker (a var<->star reference cycle).
 
     progress = Signal(str, int, int)  # (stage key, done, total)
     finished = Signal(object)         # the result dict (below)

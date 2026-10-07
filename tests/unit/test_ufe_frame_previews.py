@@ -202,8 +202,6 @@ def test_the_host_hooks_take_frames_out_and_move_them_aside(qapp, tmp_path,
     config.is_configured = lambda: False
     window = mw.MainWindow()
     window._now_timer.stop()
-    window._blink_timer.stop()
-    window._blink_render_timer.stop()
     try:
         p = project.create(mw.db, "neo", "2025 UR",
                            {"ra_deg": 10.0, "dec_deg": 20.0})

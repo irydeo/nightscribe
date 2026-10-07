@@ -50,6 +50,7 @@ import time
 from pathlib import Path
 
 from ..db import db
+from ..exposure import binning_factor
 from ... import paths
 from .astrometry import WCS_KEYS
 
@@ -317,6 +318,10 @@ def _scale_arcsec(header, config):
     ux = _num(cfg.get("pixel_um"))
     fl = _num(cfg.get("focal_mm"))
     if ux and fl and fl > 0:
+        # the config's pixel is the SENSOR's, so the binning applies here too
+        # (the header's XPIXSZ path above is left alone: some drivers write it
+        # already binned and there is no way to tell)
+        ux = ux * binning_factor(cfg.get("pixel_binning"))
         return (ux / 1000.0) / fl * 206264.806
     return None
 

@@ -74,6 +74,18 @@ drivers, ni slew, ni comunicación en tiempo real (eso sigue siendo del proyecto
 sigue fuera; **exportar ficheros está dentro**. Tests unitarios de cada exportador
 (validación estructural del JSON NINA, líneas del plan CCDciel, columnas CSV).
 
+**Revisión (2026-10-07, la escala de placa y el binning).** `core/exposure.py`
+gana dos cosas que la Interfaz 1.9 hizo visibles:
+
+- `plate_scale(pixel_um, focal_mm, binning=None)` aplica el binning: la clave
+  del config es el píxel del SENSOR, así que un 2x2 da una escala doble. Todos
+  sus lectores (planificador, exposición NEO, pista del solver en `astap.py`,
+  EXOTIC, campo de visión en `overview.py`, CLI) pasan ya el binning del config.
+- `sampling(scale)` da el veredicto de muestreo («fine» / «ok» / «coarse») sobre
+  los bordes 0.5 y 2.0 arcsec/píxel, que es el paso «Tu equipo» de la Bienvenida
+  explicando por qué el número importa. Los bordes son una regla de dedo para el
+  seeing de un sitio típico, y así está comentado en el código.
+
 ## English
 
 **Context**: the project flow (ADR-019) requires carrying the plan to external
@@ -143,3 +155,15 @@ export (`docs/ccdciel_sequence_sample.targets`): **Light + Dark + Bias** steps
 **Consequences**: DESIGN.md updates its "out of scope": telescope control stays out;
 **exporting files is in**. Unit tests per exporter (structural validation of the NINA
 JSON, CCDciel plan lines, CSV columns).
+
+**Revision (2026-10-07, the plate scale and the binning).** `core/exposure.py`
+gains two things Interfaz 1.9 made visible:
+
+- `plate_scale(pixel_um, focal_mm, binning=None)` applies the binning: the
+  config key is the SENSOR's pixel, so a 2x2 doubles the scale. Every reader of
+  it (planner, NEO exposure, the solver hint in `astap.py`, EXOTIC, the field of
+  view in `overview.py`, the CLI) now passes the config's binning.
+- `sampling(scale)` gives the sampling verdict ("fine" / "ok" / "coarse") over
+  the 0.5 and 2.0 arcsec/pixel edges, which is Welcome's "Your equipment" step
+  explaining why the number matters. The edges are a rule of thumb for the
+  seeing of a typical site, and that is how the code comments them.

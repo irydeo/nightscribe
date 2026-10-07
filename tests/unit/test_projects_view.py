@@ -61,8 +61,6 @@ def window(monkeypatch):
         project.create(coredb.db, kind, name, ctx)
     w = MainWindow(snapshot=None)
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     w.resize(1360, 900)
     w.show()
     for _ in range(4):

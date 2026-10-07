@@ -185,10 +185,11 @@ DEFAULTS = {
     "cam_dark_temp_c": None,
     "cam_max_exposure_s": None,     # working max exposure (per gain)
     "cam_regime": "normal",
-    # UFE (ADR-044): open Blink / comparison chart / annotated FITS in the
-    # unified editor by default; the classic dialogs stay reachable for
-    # the review period (Settings → Development)
-    "ufe_default": True,
+    # UFE (ADR-044): the unified editor is the only door to the FITS work
+    # (Blink, comparison chart, annotated FITS). The switch that chose
+    # between it and the classic dialogs retired with them (2026-10-07);
+    # the top bar's look is the only UFE preference left.
+    "ufe_bar_icons": True,
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.

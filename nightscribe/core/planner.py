@@ -404,7 +404,8 @@ def _transit_plate_scale(cfg):
     # incomplete — plate_scale() gives 0.0 without a focal length.
     # @args: cfg - Config instance
     # @return: arcsec/pixel or None
-    ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"))
+    ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"),
+                              cfg.get("pixel_binning"))
     return ps or None
 
 

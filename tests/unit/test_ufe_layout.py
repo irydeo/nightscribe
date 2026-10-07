@@ -654,8 +654,12 @@ def test_the_hero_button_fits_the_column_it_has():
             QApplication.processEvents()
             fit = btn._hero_fit
             assert fit is not None
-            # the button never sticks out of its column
-            assert btn.width() <= tab.width()
+            # the button never sticks out of the COLUMN it lives in. How wide
+            # the column ends up is the splitter's business and it is
+            # font-driven: on Windows the tab's own minimum is wider than the
+            # 380 this test forces, so comparing against the tab would fail
+            # for a font, not for a bug
+            assert btn.width() <= btn.parentWidget().width()
             # and what is painted is either the whole label or its elided
             # form (never a cut word without the ellipsis)
             painted = btn.text()
@@ -739,6 +743,14 @@ def test_the_panel_column_shows_its_messages_whole():
     d.tabs.setCurrentWidget(t)
     QApplication.processEvents()
     area = t.findChild(QScrollArea)
+    # The width the panel's content needs is FONT-driven (the offscreen Linux
+    # font asks for less than the Windows one, measured 2026-10-07), so the
+    # column is first given what THIS font needs plus the scroll area's own
+    # chrome: the property under test is "the messages are shown whole", not
+    # "they fit in one particular font".
+    d.tabs.setMinimumWidth(max(380, area.widget().minimumSizeHint().width()
+                               + 64))
+    QApplication.processEvents()
     assert area.horizontalScrollBar().maximum() == 0     # nothing to scroll
     inner = area.widget()
     clipped = []

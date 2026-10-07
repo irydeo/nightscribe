@@ -17,6 +17,7 @@ them back, a missing frame is skipped, and the calibrated copies are
 deleted outright (they are derived). Never a hard delete of an original."""
 
 import json
+import os
 
 from nightscribe.core import free_space, project as proj_mod
 from nightscribe.core import followup as fu
@@ -55,8 +56,11 @@ def test_move_to_processed_moves_and_follows(tmp_db, tmp_path):
     report = free_space.move_to_processed(tmp_db, run, dest)
     assert report.moved == 3 and not report.errors
     for path in paths:
-        assert not (tmp_path / path.split("/")[-1]).exists()
-        moved = dest / "procesados" / "2025-10-18" / path.split("/")[-1]
+        # the basename with the PLATFORM's separator: splitting on "/" read
+        # the whole path as one name on Windows (the test failed there)
+        name = os.path.basename(path)
+        assert not (tmp_path / name).exists()
+        moved = dest / "procesados" / "2025-10-18" / name
         assert moved.exists()
         row = tmp_db.execute("SELECT path, meta FROM project_files"
                              " WHERE path=?", (str(moved),)).fetchone()
@@ -77,7 +81,7 @@ def test_restore_brings_the_frames_back(tmp_db, tmp_path):
     report = free_space.restore(tmp_db, run)
     assert report.moved == 3 and not report.errors
     for path in paths:
-        assert (tmp_path / path.split("/")[-1]).exists()
+        assert (tmp_path / os.path.basename(path)).exists()
     assert free_space.freeable(tmp_db, run)["n"] == 3
 
 

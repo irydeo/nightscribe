@@ -45,6 +45,14 @@ def _fake_manager(tmp_path, body, name="micromamba"):
     return str(script)
 
 
+# The real manager is a native binary; the fake one is a /bin/sh script, so
+# the tests that RUN it need a POSIX shell. On Windows they are skipped
+# instead of passing for the wrong reason (the script would not run and the
+# run would report a failure the test did not ask for).
+_shell_only = pytest.mark.skipif(
+    os.name == "nt", reason="the fake package manager is a /bin/sh script")
+
+
 # --------------------------------------------------------------- search
 
 def test_find_manager_prefers_the_path(monkeypatch):
@@ -81,9 +89,13 @@ def test_find_on_path(tmp_path, monkeypatch):
 # --------------------------------------------------------------- command
 
 def test_install_plan_is_a_private_environment():
+    # install_plan normalizes the target through Path(), so the separators
+    # come back native: the expectation is built the same way (the test used
+    # to hardcode the POSIX form and failed on Windows)
+    target = str(Path("/home/obs/fo").expanduser())
     plan = fi.install_plan("micromamba", "/usr/bin/micromamba", "/home/obs/fo")
     assert plan["argv"] == ["/usr/bin/micromamba", "create", "-y", "-p",
-                            "/home/obs/fo", "-c", "conda-forge", "findorb"]
+                            target, "-c", "conda-forge", "findorb"]
     # the -p prefix is what keeps it private: a base environment is never
     # touched, and the user can delete the folder to undo it
     assert "-p" in plan["argv"]
@@ -105,6 +117,7 @@ def test_find_fo_searches_the_layouts(tmp_path):
 
 # ------------------------------------------------------------------- run
 
+@_shell_only
 def test_install_runs_the_manager_and_finds_the_binary(tmp_path):
     manager = _fake_manager(tmp_path, (
         "target=''\n"
@@ -123,6 +136,7 @@ def test_install_runs_the_manager_and_finds_the_binary(tmp_path):
     assert seen == ["creating environment", "done"]
 
 
+@_shell_only
 def test_install_reports_a_failure_with_the_manager_words(tmp_path):
     manager = _fake_manager(tmp_path, "echo 'no space left' >&2\nexit 3\n")
     out = fi.install(manager, str(tmp_path / "fo"))
@@ -131,6 +145,7 @@ def test_install_reports_a_failure_with_the_manager_words(tmp_path):
     assert any("no space left" in line for line in out["log"])
 
 
+@_shell_only
 def test_install_can_be_cancelled(tmp_path):
     # A download is minutes long and the window offers Cancel: the process
     # is terminated and the run says it did not finish.

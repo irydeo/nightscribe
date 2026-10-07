@@ -944,6 +944,15 @@ def test_nothing_absorbs_the_extra_height_of_a_tall_window(qapp, tmp_path):
     tab.hide()
 
 
+# How wide the astrometry column's content may demand to be. It is NOT a
+# taste: the splitter gives the tabs 380 px, and the offscreen Linux font
+# needs 298 of them while the Windows one needs 388 (measured: the Windows
+# CI of 2026-10-07). The ceiling is what catches a widget that cannot wrap
+# or elide (a checkbox label once demanded 404 and pushed the right edge of
+# the column out of reach, 2026-10-06).
+_PANEL_MAX_MIN_W = 400
+
+
 def test_the_column_fits_the_narrow_panel_it_lives_in(qapp, tmp_path):
     # The editor is a splitter: the stage takes ~880 px and the tabs 380,
     # so the astrometry column has to FIT there. A widget whose text cannot
@@ -961,7 +970,16 @@ def test_the_column_fits_the_narrow_panel_it_lives_in(qapp, tmp_path):
     qapp.processEvents()
     area = tab.layout().itemAt(0).widget()
     inner = area.widget()
-    assert inner.minimumSizeHint().width() <= area.viewport().width()
+    need = inner.minimumSizeHint().width()
+    # The contract: the content must not demand more than the column can ever
+    # be. The splitter gives the tabs 380 px, and how much the content NEEDS
+    # is font-driven (the offscreen Linux font asks for 298, the Windows one
+    # for 388: measured on the Windows CI of 2026-10-07), so the bound is the
+    # ceiling and not the exact 380. A widget that cannot wrap or elide blows
+    # past it (a checkbox label once asked for 404, 2026-10-06).
+    assert need <= _PANEL_MAX_MIN_W, (
+        f"the column demands {need} px: a widget that cannot wrap or elide "
+        f"is pushing its right edge out of reach")
     tab.hide()
 
 

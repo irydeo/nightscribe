@@ -2016,14 +2016,27 @@ class UfeTrackStackTab(QWidget):
         text = (self.tr("Brightness measured with the matched filter")
                 if phot.get("matched")
                 else self.tr("Brightness measured with the aperture"))
+        # The aperture's value is NOT a second run of the aperture (that
+        # would need its own zero point): it is the aperture's flux with the
+        # SAME zero point, so it is the difference between the two methods.
+        # Said, so the number is not read as something it is not.
         other = phot.get("mag_aperture") if phot.get("matched") else None
         if other is not None:
-            text += self.tr(" (the aperture would give %1)").replace(
-                "%1", f"{float(other):.3f}")
+            text += self.tr(
+                " (the aperture, with the same zero point, would give %1)"
+            ).replace("%1", f"{float(other):.3f}")
             band = phot.get("band")
             if band:
                 text += f" {band}"
-        return text + "."
+        text += "."
+        # The recipe asked for the filter and the plate could not apply it
+        # (no seeing measured on this stack): silence here would leave a run
+        # claiming a method it did not use.
+        if phot.get("matched_requested") and not phot.get("matched"):
+            text += self.tr(
+                " The matched filter was asked for but the seeing could not "
+                "be measured on this stack: the aperture measured.")
+        return text
 
     def _calibration_note(self, cal):
         # @args: cal - the run's calibration summary (or None)
@@ -2081,9 +2094,30 @@ class UfeTrackStackTab(QWidget):
                 ": shorten the exposure or expect a wider PSF."))
         gain = phot.get("snr_gain")
         if gain and float(gain) > 1.05:
-            parts.append(self.tr(
-                "The matched filter would read %1x the aperture's SNR on "
-                "this stack.").replace("%1", f"{float(gain):.2f}"))
+            # The two SNRs of the BRIGHTNESS measurement, and not the
+            # detection's: that one is the astrometry's own aperture and the
+            # filter does not change it, which is exactly what the author
+            # compared (5.41 bit for bit, box on and off) and read as "the
+            # filter does nothing". It does: the magnitude moves, and this
+            # says by how much.
+            pair = ""
+            snr_ap, snr_mf = phot.get("snr_ap"), phot.get("snr_mf")
+            if snr_ap and snr_mf:
+                pair = self.tr(
+                    " (SNR %1 against %2 on the brightness measurement)"
+                ).replace("%1", f"{float(snr_mf):.1f}").replace(
+                    "%2", f"{float(snr_ap):.1f}")
+            if phot.get("matched"):
+                parts.append(self.tr(
+                    "The brightness is measured with the matched filter, "
+                    "which reads %1x the aperture's SNR on this stack%2"
+                ).replace("%1", f"{float(gain):.2f}").replace("%2", pair))
+            else:
+                parts.append(self.tr(
+                    "The matched filter would read %1x the aperture's SNR on "
+                    "this stack%2: its switch is in the Photometry panel, "
+                    "next to the apertures").replace(
+                        "%1", f"{float(gain):.2f}").replace("%2", pair))
         return " ".join(parts)
 
     def _diag_note(self, phot):
@@ -2810,6 +2844,20 @@ class UfeTrackStackTab(QWidget):
                     item.setToolTip(self.tr(
                         "Separation between the stack measurement and the "
                         "per-frame one (the same centroid recipe on both)"))
+                if col == 5:
+                    # The number the observer compares with the floor, and
+                    # the one they compare with the box on and off: it is the
+                    # DETECTION's signal-to-noise, measured with the
+                    # astrometry's own aperture, so the matched filter does
+                    # not change it (it changes the brightness, whose own
+                    # pair of SNRs the run's notes give).
+                    item.setToolTip(self.tr(
+                        "Signal-to-noise of the detection, measured with the "
+                        "astrometry's own aperture: it is what the detection "
+                        "gate, the position's error and the MPC floor use. "
+                        "The matched filter does not change it; the "
+                        "brightness measurement has its own pair, in the "
+                        "notes"))
                 if col == 6:
                     # The magnitude wears its role (core/chart_annotate): the
                     # same colour code as the plate's band and the curve, so

@@ -222,8 +222,12 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
 
 ## 4. Qué significa cada cifra
 
-- **SNR**: cuántas veces supera la señal del objeto al ruido del fondo. Por
-  debajo de 3,5σ la app **no** ejecuta el barrido: barrer sobre ruido y
+- **SNR**: cuántas veces supera la señal del objeto al ruido del fondo,
+  medida con la **apertura propia de la astrometría** (no con la receta de
+  fotometría): es el número que usan la puerta de detección, el error de
+  posición y el suelo de envío, y por eso **el filtro adaptado no lo cambia**
+  (cambia el brillo, que tiene su propio par de SNR y lo dice en las notas).
+  Por debajo de 3,5σ la app **no** ejecuta el barrido: barrer sobre ruido y
   quedarse con el máximo es fabricar un falso positivo. Pero **sí mide el
   brillo** (ADR-062 rev), en la posición de la efeméride, y lo marca en
   **rojo** con su nota: un número marcado vale más que ningún número. La

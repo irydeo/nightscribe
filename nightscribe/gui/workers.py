@@ -1327,7 +1327,13 @@ class TrackStackWorker(QThread):
                             # no check star at all
                             "check_ok": ((res.check or {}).get("ok")
                                          if res.check else None),
-                            "shape": elong, "matched": matched})
+                            "shape": elong, "matched": matched,
+                            # what ACTUALLY measured, which is not what the
+                            # recipe asked for: with no seeing the filter is
+                            # skipped and the aperture measures (see
+                            # PlateResult.matched_used)
+                            "matched_used": bool(getattr(
+                                res, "matched_used", False))})
             if diag_shape is None:
                 diag_shape = stack.shape
             for entry, cres in (res.used or []):
@@ -1380,13 +1386,26 @@ class TrackStackWorker(QThread):
         grid = (photometry.quality_grid(diag_points, diag_shape)
                 if diag_shape else {"ok": False})
         ap_mags = [p["mag_ap"] for p in good if p.get("mag_ap") is not None]
+        # the object's own pair of signal-to-noise values, on the measurement
+        # that produced the magnitude (NOT the detection's: that one is the
+        # astrometry's own aperture and the filter does not change it). The
+        # run says both so the observer can see what the filter bought.
+        snr_ap = [float(p["matched"]["snr_ap"]) for p in good
+                  if p.get("matched") and p["matched"].get("snr_ap")]
+        snr_mf = [float(p["matched"]["snr"]) for p in good
+                  if p.get("matched") and p["matched"].get("snr")]
         return {"mag": float(np.median(mags)),
                 "err": float(np.median([p["err"] for p in good])),
                 "band": band,
-                # which method measured, and what the other one would say
-                "matched": bool((self._recipe or {}).get("matched", True)),
+                # which method measured (the truth, from the plate result),
+                # which one was ASKED for, and what the other would say
+                "matched": any(p.get("matched_used") for p in good),
+                "matched_requested": bool(
+                    (self._recipe or {}).get("matched", True)),
                 "mag_aperture": (float(np.median(ap_mags)) if ap_mags
                                  else None),
+                "snr_ap": (float(np.median(snr_ap)) if snr_ap else None),
+                "snr_mf": (float(np.median(snr_mf)) if snr_mf else None),
                 "trail_px": (float(np.median(trails)) if trails else None),
                 "trail_pa_deg": (float(np.median(pas)) if pas else None),
                 "snr_gain": (float(np.median(gains)) if gains else None),

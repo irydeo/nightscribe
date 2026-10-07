@@ -221,7 +221,12 @@ project). No visit, no series: that is the house rule.
 
 ## 4. What each figure means
 
-- **SNR**: how many times the object's signal beats the background noise.
+- **SNR**: how many times the object's signal beats the background noise,
+  measured with the **astrometry's own aperture** (not with the photometry
+  recipe): it is the number the detection gate, the position's error and the
+  submission floor use, which is why the **matched filter does not change
+  it** (it changes the brightness, which has its own pair of signal-to-noise
+  values, said in the notes).
   Below 3.5σ the app does **not** run the sweep: sweeping over noise and
   keeping the best is how a false positive is made. It still **measures the
   brightness** (ADR-062 rev), at the ephemeris' own position, and marks it

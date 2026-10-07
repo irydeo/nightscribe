@@ -2188,6 +2188,12 @@ class PlateResult:
     sky_mode: str = "median"
     sigma_clip: bool = True
     gain: float = None
+    # WHAT ACTUALLY MEASURED, and not what the recipe asked for: the filter
+    # needs a seeing, and with no FWHM (the comps could not be measured on
+    # this stack) the aperture measures instead. A caller that reported the
+    # recipe's flag said "measured with the matched filter" while the
+    # aperture had done it: the run has to be able to say the truth.
+    matched_used: bool = False
 
 
 def _check_verdict(entries, used_entries, band, zp, err_total):
@@ -2289,7 +2295,7 @@ def measure_plate(image, cfg):
     lin = lin if scale == 1.0 else None
     lin = (lin * stack_scale) if lin is not None else None
     res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
-                      sigma_clip=cfg.sigmaclip)
+                      sigma_clip=cfg.sigmaclip, matched_used=_psf is not None)
     # ---- the targets ------------------------------------------------
     # One target is the historical case; several is the campaign pass, and
     # the whole point is what is NOT repeated: the comparison stars are

@@ -204,6 +204,17 @@ the aperture) and a **trailed** object (line PSF). None of that is hidden:
 the aperture's value goes beside the reported one and the run says which
 method measured.
 
+**And mind WHICH signal-to-noise is being compared**: the one the Astrometry
+tab publishes per observation is the **detection's**, measured with the
+astrometry's own aperture, and it is what the gate, the position's error and
+the MPC submission floor use; the filter **does not change it**, because it
+does not change the position. What the filter moves is the **brightness**,
+and that one has its own pair of signal-to-noise values: the run's note gives
+both (for instance "reads 1.51x the aperture's SNR (SNR 8.7 against 5.8 on
+the brightness measurement)"). Comparing the table's SNR with the box on and
+off and concluding the filter does nothing is comparing the number that by
+design does not change.
+
 With a known shape `m` (normalised, `sum m = 1`) and white noise `sigma` per
 pixel, the best **linear** estimate of the flux is
 

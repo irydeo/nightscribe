@@ -1768,7 +1768,10 @@ def test_the_run_says_which_method_measured_the_brightness(qapp, tmp_path):
     text = tab._method_note({"matched": True, "band": "G",
                              "mag_aperture": 18.243})
     assert "matched filter" in text
-    assert "the aperture would give 18.243" in text
+    # the aperture's value goes WITH its caveat: it is the same zero point on
+    # the aperture's flux, not a second run of the aperture (that one would
+    # need its own zero point, and the run measured only one)
+    assert "the aperture, with the same zero point, would give 18.243" in text
     # with the aperture, the note says so and quotes nothing else
     text = tab._method_note({"matched": False, "band": "G",
                              "mag_aperture": 18.243})
@@ -1777,3 +1780,65 @@ def test_the_run_says_which_method_measured_the_brightness(qapp, tmp_path):
     # a run without the key (an old plate) says nothing rather than guessing
     assert tab._method_note({"mag": 18.2}) == ""
     assert tab._method_note(None) == ""
+    # AND THE CASE THAT MADE THE NOTE LIE: the recipe asked for the filter,
+    # the plate could not apply it (no seeing measured), and the run said
+    # "measured with the matched filter" while the aperture had done it
+    text = tab._method_note({"matched": False, "matched_requested": True,
+                             "band": "G"})
+    assert "with the aperture" in text
+    assert "was asked for but the seeing could not be measured" in text
+
+
+def test_the_shape_note_says_the_filter_state_and_both_signal_to_noise(
+        qapp, tmp_path):
+    # The author compared the SNR in the observations table with the box on
+    # and off, got 5.41 bit for bit, and read it as "the filter does
+    # nothing". That number is the DETECTION's (the astrometry's own
+    # aperture), so it cannot change; what changes is the brightness, and the
+    # note has to say by how much, with the two SNRs of the brightness
+    # measurement.
+    tab, _host = _tab(qapp, tmp_path)
+    base = {"snr_gain": 1.51, "snr_ap": 5.8, "snr_mf": 8.7}
+    text = tab._shape_note(dict(base, matched=True))
+    assert "measured with the matched filter" in text
+    assert "reads 1.51x the aperture's SNR" in text
+    assert "SNR 8.7 against 5.8 on the brightness measurement" in text
+    # with the box off it says what it WOULD read, and where the switch is
+    text = tab._shape_note(dict(base, matched=False))
+    assert "would read 1.51x the aperture's SNR" in text
+    assert "its switch is in the Photometry panel" in text
+    # without the pair the sentence still stands (an old run carries none)
+    text = tab._shape_note({"snr_gain": 1.51, "matched": True})
+    assert "reads 1.51x" in text
+    assert "on the brightness measurement" not in text
+    # and a gain that is not worth saying says nothing at all
+    assert tab._shape_note({"snr_gain": 1.02, "matched": True}) == ""
+
+
+def test_the_snr_column_says_what_it_is_and_that_the_filter_does_not_touch_it(
+        qapp, tmp_path):
+    # The author compared this number with the matched filter on and off, got
+    # 5.41 bit for bit, and read it as "the filter does nothing". It is the
+    # DETECTION's signal-to-noise (the astrometry's own aperture), so it
+    # cannot change: the column has to say what it is and what uses it, and
+    # the notes have to give the pair the filter really moves.
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0,
+                                    snr=5.41, mag=18.48, band="G")
+    tab._result = {
+        "status": "ok", "groups": [(0, 5)], "n_failed": 0,
+        "stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+        "boxes": [(0, 0, 16, 16)], "qs": [(8.0, 8.0)],
+        "mids": [2461000.5], "points": [(sp, None, [])],
+        "photometry": {"mag": 18.48, "err": 0.40, "band": "G",
+                       "matched": True, "matched_requested": True,
+                       "snr_ap": 5.8, "snr_mf": 8.7, "snr_gain": 1.51,
+                       "n_comps": 8, "n_frames": 47, "source": "auto"},
+    }
+    tab._paint_run()
+    tip = tab.tbl_points.item(0, 5).toolTip()
+    assert "detection" in tip
+    assert "does not change it" in tip
+    notes = tab.txt_notes.toPlainText()
+    assert "SNR 8.7 against 5.8 on the brightness measurement" in notes

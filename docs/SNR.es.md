@@ -204,6 +204,16 @@ apertura) y el objeto **estelado** (PSF de línea). Nada de eso se esconde: el
 valor de la apertura va al lado del reportado y la ejecución dice qué método
 midió.
 
+**Y ojo con qué SNR se compara**: el que la pestaña Astrometría publica por
+observación es el de la **detección**, medido con la apertura propia de la
+astrometría, y es el que usan la puerta, el error de posición y el suelo de
+envío del MPC; el filtro **no lo cambia** porque no cambia la posición. Lo
+que el filtro mueve es el **brillo**, y ese tiene su propio par de SNR: la
+nota del run dice los dos (por ejemplo «lee 1,51× el SNR de la apertura
+(SNR 8,7 frente a 5,8 en la medida del brillo)»). Comparar el SNR de la
+tabla con la casilla marcada y sin marcar y concluir que el filtro no hace
+nada es comparar el número que por diseño no cambia.
+
 Con una forma conocida `m` (normalizada, `Σm = 1`) y ruido blanco `σ` por
 píxel, el mejor estimador **lineal** del flujo es
 

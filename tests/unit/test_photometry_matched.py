@@ -334,3 +334,30 @@ def test_the_matched_filter_is_the_app_default():
     assert "measured against a real catalogue" in tip
     assert "UNDERESTIMATES the faint stars" in tip
     dlg.deleteLater()
+
+
+def test_the_plate_says_whether_the_filter_was_actually_used():
+    # The filter needs a seeing. With no FWHM (the comps could not be
+    # measured on this stack) the APERTURE measures, and the caller that
+    # reported the recipe's flag said "measured with the matched filter"
+    # while the aperture had done it: the plate result has to say what
+    # happened, not what was asked for.
+    from nightscribe.core import photometry as _ph
+    rng = np.random.default_rng(23)
+    img, entries, pos = _plate_with_known_flux(rng)
+    radii = _ph.aperture_for_fwhm(3.5)
+    comps = [(img, x, y) for x, y in pos]
+    base = dict(target_xy=(200.0, 200.0), entries=entries, radii=radii,
+                require_catalog=True, comp_images=comps,
+                site_saturate=50000.0)
+    # with the seeing: the filter measures
+    res = _ph.measure_plate(img, _ph.PlateConfig(matched=True, fwhm=3.5,
+                                                 **base))
+    assert res.ok and res.matched_used is True
+    # without it: the aperture does, and the result says so
+    res = _ph.measure_plate(img, _ph.PlateConfig(matched=True, **base))
+    assert res.ok and res.matched_used is False
+    # and with the filter off it is False too (nothing was asked)
+    res = _ph.measure_plate(img, _ph.PlateConfig(matched=False, fwhm=3.5,
+                                                 **base))
+    assert res.ok and res.matched_used is False

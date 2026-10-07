@@ -446,6 +446,29 @@ def test_the_brightness_row_handles_a_recipe_that_sizes_from_the_seeing(
     assert "defaults" in tab.lbl_recipe.text()
 
 
+def test_the_brightness_row_says_which_method_will_measure(qapp, tmp_path):
+    # The filter is the app's default and it MOVES the published magnitude,
+    # so the row that says what the run will do has to say it too: a recipe
+    # read silently is a number nobody can question.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: None
+    base = {"band": "G", "rap": 5.0, "rin": 9.0, "rout": 14.0,
+            "sky": "median", "matched": True}
+    host.photometry_recipe = lambda: dict(base)
+    state = UfeImageState(host)
+    tab = UfeTrackStackTab(state, "en", parent=host)
+    tab._sync_recipe_row()
+    assert "matched filter" in tab.lbl_recipe.text()
+    # with the aperture pinned, the row says the aperture and nothing else
+    base["matched"] = False
+    tab._sync_recipe_row()
+    assert "aperture" in tab.lbl_recipe.text()
+    assert "matched filter" not in tab.lbl_recipe.text()
+
+
 def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):
     # The stars on an object's stack are TRAILS, so a blind solve finds
     # nothing and fails (that is what the observer sees when the stack is

@@ -181,9 +181,10 @@ nunca se modifica.
   El anillo y la línea «Píxel» se dibujan en el centroide medido, no en
   el clic; si el centroide se movió más de 1 px, el panel lo dice.
 * **«Sugerir aperturas»**: el botón vive en la sección Medir, justo
-  bajo las tres aperturas, en el flujo diario (banda, aperturas,
-  sugerir); las demás opciones de receta (cielo, sigma-clip, seeing,
-  término de color, sustracción del anfitrión) se abren en la pequeña
+  bajo las tres aperturas, en el flujo diario (banda, aperturas, centro
+  manual, **filtro adaptado**, sugerir); las demás opciones de receta
+  (cielo, sigma-clip, seeing, término de color, sustracción del
+  anfitrión) se abren en la pequeña
   ventana no modal «Advanced…», que deja seguir midiendo mientras
   está abierta, y el registro de resultados tiene scroll propio para
   los informes largos. Propone los radios desde la curva de crecimiento
@@ -229,6 +230,13 @@ nunca se modifica.
   el objetivo en la imagen diferencia; las comps calibran en la placa
   original. Para SNe en núcleos es la diferencia entre «no medible» y
   «0,03–0,05 mag».
+* **El filtro adaptado merece su frase**: la casilla decide cómo se mide la
+  luz (cada píxel pesado por la forma de la estrella, el objetivo Y las
+  comparsas, para que el cero punto salga de la misma aritmética). Es el
+  método por defecto **por medida**, y sus números y sus riesgos están en su
+  tooltip y en `docs/SNR.es.md`; el encabezado del bloque dice el método
+  aunque el bloque esté cerrado, y **Ajustes → Fotometría** decide con qué
+  empiezan las placas nuevas.
 
 **Fórmula 3: la magnitud diferencial**
 

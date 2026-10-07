@@ -170,9 +170,8 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    desde el 2026-10-07: medido sobre un apilado real de 139 tomas da **1,55 a
    1,63× el SNR de la apertura** y un cero punto **2,6× mejor**, por un 3 %
    más de tiempo. Mueve la magnitud que publicas (0,05 a 0,1 mag, hacia la
-   verdad) y tiene caminos sin comprobar; la casilla de los ajustes avanzados
-   de Fotometría lo apaga y la ejecución dice qué método midió y qué daría el
-   otro.
+   verdad) y tiene caminos sin comprobar; la casilla del panel de Fotometría
+   lo apaga y la ejecución dice qué método midió y qué daría el otro.
 8. **Chequeo.** NightScribe baja las observaciones publicadas del objeto (o
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube

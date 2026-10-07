@@ -698,11 +698,21 @@ class UfeTrackStackTab(QWidget):
             self._sync_plan_line()
             return
         band = recipe.get("band") or self.tr("the comps' own band")
+        # The METHOD is said too, and not only the apertures: it decides how
+        # the light is measured, and a run launched from here has to say it
+        # BEFORE it runs (a recipe read silently is a number nobody can
+        # question). A plate saved before the key existed falls back to the
+        # app's own setting, which is the same fallback the run uses.
+        method = (self.tr("matched filter")
+                  if recipe.get("matched",
+                                config.get("phot_matched", True))
+                  else self.tr("aperture"))
         self.lbl_recipe.setText(self.tr(
-            "Photometry recipe: %1 · apertures %2 · sky %3").replace(
+            "Photometry recipe: %1 · apertures %2 · sky %3 · %4").replace(
                 "%1", str(band)).replace(
                 "%2", self._recipe_radii_text(recipe)).replace(
-                "%3", str(recipe.get("sky") or "median")))
+                "%3", str(recipe.get("sky") or "median")).replace(
+                "%4", method))
         self._fit_label(self.lbl_recipe)
         self._sync_plan_line()
 

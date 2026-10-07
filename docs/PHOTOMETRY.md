@@ -184,7 +184,8 @@ disk is never modified.
   says so.
 * **"Suggest apertures"**: the button lives in the Measure section,
   right under the three apertures, in the daily flow (band, apertures,
-  suggest); the rest of the recipe knobs (sky, sigma-clip, seeing,
+  manual centre, **matched filter**, suggest); the rest of the recipe
+  knobs (sky, sigma-clip, seeing,
   colour term, host subtraction) open in the small non-modal "Advanced…"
   window, which lets measuring continue while it stays open, and the
   result log has its own scrolling for long reports. It proposes the
@@ -231,6 +232,13 @@ disk is never modified.
   on the difference image; the comps calibrate on the original plate.
   For SNe on cores this is the difference between "not measurable" and
   "0.03–0.05 mag".
+* **The matched filter deserves its sentence**: the box decides how the
+  light is measured (every pixel weighed by the star's shape, the target AND
+  the comparisons, so the zero point comes from the same arithmetic). It is
+  the default **by measurement**, and its numbers and its risks are in its
+  tooltip and in `docs/SNR.md`; the block's header says the method even
+  while the block is closed, and **Settings -> Photometry** decides what new
+  plates start with.
 
 **Formula 3: the differential magnitude**
 

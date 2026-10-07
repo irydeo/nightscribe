@@ -63,7 +63,9 @@ zero-point error against the aperture's 0.010); and it has **not** been
 checked on host-subtracted images, nor with a trailed object. The aperture's
 value is kept beside the reported one and the run says which method measured,
 so you can always compare. To go back to the proven path, untick the box in
-the Photometry tab's advanced settings.
+the Photometry tab's panel, next to the apertures (the block's header says the
+method even while it is closed), and Settings -> Photometry decides what NEW
+plates start with.
 
 **4. It tells you whether the object came out trailed.** If the object moved
 during the exposure it comes out elongated, and the app says it with a

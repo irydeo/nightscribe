@@ -242,7 +242,25 @@ class UfeMeasureTab(QWidget):
         # the public attributes the tests and the measure flow pin
         self.chk_sigmaclip = self._advanced.chk_sigmaclip
         self.chk_seeing = self._advanced.chk_seeing
-        self.chk_matched = self._advanced.chk_matched
+        # The switch lives in the PANEL and not inside Advanced… (2026-10-07):
+        # a knob that decides how the light is measured cannot be two clicks
+        # away from the measurement. It was in the advanced window and the
+        # observer looked for it and did not find it. It is the same recipe
+        # field as always, so capture_state, the astrometry run and the series
+        # read it from here and nothing else had to move.
+        self.chk_matched = self._ui.chk_matched
+        # It STARTS at the app's own default (Ajustes -> Photometry), read
+        # here so that `ui_defaults()` and the state reset go back to that
+        # default and not to a value baked into the .ui file
+        self.chk_matched.setChecked(bool(config.get("phot_matched", True)))
+        # And the recipe group's HEADER says the method while the group is
+        # closed: the switch was invisible twice over (inside Advanced… and
+        # inside a closed group), and a method that changes the published
+        # magnitude cannot be a secret. The chip goes when the group opens,
+        # because then the switch itself is there.
+        self.chk_matched.toggled.connect(
+            lambda _c: self._sync_method_notice())
+        self._sync_method_notice()
         self.chk_color = self._advanced.chk_color
         self.chk_subtract = self._advanced.chk_subtract
         self.cmb_sky = self._advanced.cmb_sky
@@ -561,6 +579,18 @@ class UfeMeasureTab(QWidget):
         self._advanced.show()
         self._advanced.raise_()
         self._advanced.activateWindow()
+
+    def _sync_method_notice(self):
+        # @return: None. The recipe group's header carries the method while
+        #          the group is closed, so the observer sees which one will
+        #          measure without opening anything (the chip is the group's
+        #          own way of announcing itself: see CollapsibleSection).
+        sec = self._sections.get("recipe")
+        if sec is None:
+            return
+        sec.setHeaderBadge(self.tr("matched filter")
+                           if self.chk_matched.isChecked()
+                           else self.tr("aperture"))
 
     def _on_group_quick(self, value):
         # the series block's Group frames drives the Advanced… one
@@ -1103,7 +1133,13 @@ class UfeMeasureTab(QWidget):
                          (self.chk_seeing, "seeing"),
                          (self.chk_color, "color"),
                          (self.chk_matched, "matched")):
-            want = bool(st.get(key, False))
+            # A recipe that does not mention a knob does NOT move it: the
+            # fallback is where the widget already is (the .ui's default, or
+            # the app's own setting), so a plate saved before a key existed
+            # inherits the default instead of silently turning it off. With
+            # `False` as the fallback, the key added yesterday (matched)
+            # unticked itself on every old plate.
+            want = bool(st.get(key, chk.isChecked()))
             if chk.isChecked() != want:
                 chk.setChecked(want)
         sky = st.get("sky")

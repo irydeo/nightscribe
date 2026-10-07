@@ -63,7 +63,9 @@ de cero punto contra 0,010 de la apertura); y **no** se ha comprobado en
 imágenes con el anfitrión restado, ni con un objeto estelado. El valor de la
 apertura se guarda al lado del reportado, y la ejecución dice qué método
 midió: puedes comparar siempre. Si quieres volver al camino probado, desmarca
-la casilla en los ajustes avanzados de Fotometría.
+la casilla **«Filtro adaptado»** del panel de Fotometría, junto a las
+aperturas (el encabezado del bloque dice el método aunque esté cerrado), y
+Ajustes → Fotometría decide con qué empiezan las **placas nuevas**.
 
 **4. Te dice si el objeto sale estelado.** Si el objeto se ha movido durante
 la exposición, sale alargado, y la app te lo dice con un número: «el objeto

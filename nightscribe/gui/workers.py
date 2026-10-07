@@ -1250,9 +1250,11 @@ class TrackStackWorker(QThread):
                 centroid_mode=("none" if recipe.get("manual_centre")
                                else "gaussian"),
                 sigmaclip=bool(recipe.get("sigmaclip", True)),
-                # the filter is the DEFAULT (a measured decision): a plate
-                # saved before the key existed measures with it too
-                matched=bool(recipe.get("matched", True)),
+                # the method the recipe carries; and when it carries none
+                # (a plate saved before the key existed) the app's own
+                # setting, so Ajustes decides for those plates too
+                matched=bool(recipe.get(
+                    "matched", self._cfg_get("phot_matched", True))),
                 sky_mode=recipe.get("sky") or "median",
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),

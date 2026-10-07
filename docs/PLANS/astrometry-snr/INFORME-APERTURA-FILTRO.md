@@ -146,8 +146,11 @@ La decisión es del autor y está tomada sobre la medida, no sobre la
 intuición: gana en SNR, en el sesgo a señal baja y en la mitad débil de un
 catálogo real, y cuesta un 3 %. Lo que hay montado:
 
-- casilla **«Filtro adaptado»** en los ajustes avanzados de la pestaña
-  Fotometría, con el porqué medido en su tooltip;
+- casilla **«Filtro adaptado»** en el panel de la pestaña Fotometría, junto
+  a las aperturas y con el porqué medido en su tooltip (el encabezado del
+  bloque dice el método aunque el bloque esté cerrado, y la pestaña
+  Astrometría lo dice antes de lanzar el run); Ajustes → Fotometría decide con
+  qué empiezan las **placas nuevas**;
 - el flag viaja en la **receta**, así que se guarda con la placa y se
   restaura con ella;
 - el **cero punto se mide con el mismo método que el objeto**, siempre: la

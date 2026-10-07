@@ -114,6 +114,14 @@ DEFAULTS = {
     # library has no flat for. Off by default: a real flat always wins, and
     # a pseudo-flat needs the sequence to be dithered.
     "calib_pseudo_flat": False,
+    # The photometry METHOD a new plate starts with: the matched filter
+    # (weigh each pixel by the star's shape) or the plain aperture. It is a
+    # measured decision, not a taste (1.6x the signal-to-noise and no
+    # faint-star bias against a real catalogue), so it starts ON. This key is
+    # only the STARTING point: the recipe saved with a plate always wins, and
+    # the switch the observer touches lives in the Photometry tab, beside the
+    # measurement, with the numbers and the risks in its tooltip.
+    "phot_matched": True,
     # The astrometry's own switch for ADR-061: calibrate the frames as they
     # are read (dark/bias and flat) before stacking them. THREE-STATE on
     # purpose (ADR-061 rev): None means nobody has chosen yet, and then the

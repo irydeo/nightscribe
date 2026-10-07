@@ -2088,6 +2088,8 @@ class MainWindow(QMainWindow):
         dlg.edt_astap_path.setText(config.get("astap_path", ""))
         dlg.chk_solve_save.setChecked(
             bool(config.get("solve_save", True)))
+        dlg.chk_phot_matched.setChecked(
+            bool(config.get("phot_matched", True)))
         dlg.btn_astap_browse.clicked.connect(
             lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
@@ -2271,6 +2273,7 @@ class MainWindow(QMainWindow):
         config.set("astap_path", dlg.edt_astap_path.text().strip())
         config.set("findorb_path", dlg.edt_findorb_path.text().strip())
         config.set("solve_save", dlg.chk_solve_save.isChecked())
+        config.set("phot_matched", dlg.chk_phot_matched.isChecked())
         config.set("exotic_python_path",
                    dlg.edt_exotic_python.text().strip())
         config.set("exotic_install_dir",

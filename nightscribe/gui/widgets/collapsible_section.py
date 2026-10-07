@@ -42,6 +42,7 @@ class CollapsibleSection(QFrame):
         self._title = title
         self._hue = None
         self._notice = None       # (text, level) while a closed group has news
+        self._badge_text = ""     # the PERSISTENT state (see setHeaderBadge)
 
         # the card: the object card's own section skin (one voice, one home)
         self.setObjectName("sectionCard")
@@ -105,6 +106,10 @@ class CollapsibleSection(QFrame):
         # that stays after the group was opened is a mark that lies.
         if self._expanded:
             self.clearNotice()
+        # and the header is repainted for the state it is in: opening hides
+        # the chip, closing brings back whatever the group has to announce
+        # (a persistent badge is not consumed, a notice is)
+        self._apply_notice()
         self.sectionToggled.emit(self._expanded)
 
     # ----------------------------------------------------------- notices
@@ -138,6 +143,9 @@ class CollapsibleSection(QFrame):
         #          colour when the news is a warning (an "info" title would
         #          be the same colour it already has).
         notice = getattr(self, "_notice", None)
+        if not notice and getattr(self, "_badge_text", ""):
+            # no news, but the group has a state to announce
+            notice = (self._badge_text, "info")
         if not notice or self._expanded:
             self._badge.setVisible(False)
             self._badge.setText("")
@@ -165,11 +173,23 @@ class CollapsibleSection(QFrame):
         self._expanded = not collapsed
         self._content.setVisible(self._expanded)
         self._update_arrow()
+        # The chip follows the state whichever way it changed (the signal is
+        # what stays silent: a programmatic close must not fire back). Without
+        # this, a group closed by code kept a chip it should not have, or lost
+        # one it should.
+        self._apply_notice()
 
     # @args: text - the chip label (an empty string hides the chip)
     def setHeaderBadge(self, text):
-        self._badge.setText(text)
-        self._badge.setVisible(bool(text))
+        # @return: None. The group's PERSISTENT state (which method will
+        #          measure, which object the panel is about): unlike the
+        #          notice it is not news, so opening the group does not
+        #          consume it, and it comes back when the group is closed
+        #          again. It is hidden while the content is on screen,
+        #          because then the control itself is what the observer is
+        #          looking at.
+        self._badge_text = str(text or "")
+        self._apply_notice()
 
     # @args: hue - the project's kind hue (a theme.KIND_COLORS value), or
     #        None to go back to the app's accent

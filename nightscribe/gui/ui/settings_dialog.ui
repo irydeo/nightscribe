@@ -199,6 +199,15 @@
          </widget>
         </item>
         <item>
+         <widget class="QGroupBox" name="grp_photmethod">
+          <property name="title"><string>Photometry</string></property>
+          <layout class="QVBoxLayout" name="vbox_photmethod">
+           <item><widget class="QCheckBox" name="chk_phot_matched"><property name="text"><string>Measure with the matched filter by default</string></property><property name="toolTip"><string>What a NEW plate starts with. A plate already measured keeps its own recipe, and the switch itself lives in the Photometry tab, beside the measurement, with the measured numbers and the risks in its tooltip</string></property><property name="checked"><bool>true</bool></property></widget></item>
+           <item><widget class="QLabel" name="lblH_phot_matched"><property name="text"><string>Weighing every pixel by the star's shape reads about 1.6 times the signal-to-noise of a plain circle and does not underestimate the faint stars. Untick it to have new plates go back to the aperture</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
          <widget class="QGroupBox" name="grp_chartann">
           <property name="title"><string>Chart annotations</string></property>
           <layout class="QVBoxLayout" name="vbox_chartann">

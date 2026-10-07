@@ -759,3 +759,38 @@ def test_the_panel_column_shows_its_messages_whole():
     # and the panel's own minimum leaves room in the column
     assert inner.minimumSizeHint().width() <= inner.width()
     d.close()
+
+
+def test_a_closed_group_can_announce_a_state_and_does_not_consume_it():
+    # The method that will measure the brightness is a STATE, not news: the
+    # chip has to come back when the group is closed again, because the
+    # observer has to be able to see it without opening anything (reported
+    # 2026-10-07: the matched filter's switch was inside Advanced… and inside
+    # a closed group, so it was invisible twice over).
+    from nightscribe.gui.widgets.collapsible_section import CollapsibleSection
+    _app()
+    section = CollapsibleSection("The photometry recipe")
+    section.setCollapsed(True)
+    section.setHeaderBadge("matched filter")
+    assert section.headerBadge() == "matched filter"
+    assert section._badge.isVisibleTo(section)
+    # opening hides it (the control itself is on screen), closing brings it
+    # back: a state is not consumed, a notice is
+    section._toggle()
+    assert not section._badge.isVisibleTo(section)
+    section._toggle()
+    assert section.headerBadge() == "matched filter"
+    assert section._badge.isVisibleTo(section)
+    # the news wins while there is news, and opening still consumes it
+    section.setNotice("3")
+    assert section.headerBadge() == "3"
+    section._toggle()
+    assert section.notice() is None
+    section._toggle()
+    assert section.headerBadge() == "matched filter"
+    # and a programmatic close keeps the chip in step with the state
+    section.setCollapsed(True)
+    assert section._badge.isVisibleTo(section)
+    section.setCollapsed(False)
+    assert not section._badge.isVisibleTo(section)
+    section.deleteLater()

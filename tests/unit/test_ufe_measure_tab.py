@@ -2626,3 +2626,64 @@ def test_the_photometry_panel_opens_with_the_button_and_its_guides(dlg):
                     tab.tab_measure._sections["recipe"]):
         assert "border-left: 3px solid" in section.styleSheet()
         assert theme.C_ACCENT in section._btn.styleSheet()
+
+
+def test_the_filter_switch_is_in_the_panel_and_is_the_same_recipe(dlg):
+    # Reported 2026-10-07: the switch lived inside Advanced…, two clicks away
+    # from the measurement, and the observer looked for it and did not find
+    # it. It is in the panel now, next to the manual centre, and it is still
+    # the ONE recipe field: the alias points at the panel widget, so
+    # capture_state, the astrometry run and the series read the same value.
+    tab = dlg.tab_measure
+    assert tab.chk_matched is tab._ui.chk_matched
+    assert tab.chk_matched.isChecked() is True
+    assert tab.capture_state()["matched"] is True
+    # the long explanation (what it is, what it produces, the risks) travels
+    # with it, because it is what makes the switch understandable
+    tip = tab.chk_matched.toolTip()
+    assert "best linear estimator" in tip and "RISKS" in tip
+    # the recipe group's header announces the method while the group is
+    # closed, so the switch is not hidden inside a closed block without a
+    # trace: that was the second half of the complaint
+    sec = tab._sections["recipe"]
+    sec.setCollapsed(True)
+    assert sec.headerBadge() == "matched filter"
+    # and the flag the run reads is the one the observer sees
+    tab.chk_matched.setChecked(False)
+    assert tab.capture_state()["matched"] is False
+    assert sec.headerBadge() == "aperture"
+
+
+def test_a_new_plate_starts_from_the_app_setting(qapp, tmp_path,
+                                                 monkeypatch):
+    # The Ajustes key is only the STARTING point: what a NEW plate begins
+    # with, and what the state reset goes back to. A plate that carries its
+    # own recipe keeps it, which is why this is not a global override.
+    from nightscribe.config import config
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    monkeypatch.setitem(config._data, "phot_matched", False)
+    d = UfeDialog()
+    try:
+        assert d.tab_measure.chk_matched.isChecked() is False
+        assert d.tab_measure.capture_state()["matched"] is False
+        assert d.tab_measure.ui_defaults()["matched"] is False
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
+def test_a_recipe_that_does_not_mention_a_knob_does_not_move_it(dlg):
+    # The fallback used to be False, so the key added on 2026-10-07 (matched)
+    # would have unticked itself on every plate saved before it existed, and
+    # the observer's own choice would have looked like a bug. A recipe that
+    # does not mention a knob leaves the knob where it is.
+    tab = dlg.tab_measure
+    tab.chk_matched.setChecked(True)
+    tab.chk_sigmaclip.setChecked(True)
+    tab.apply_state({"band": "G"})            # an old recipe, no switches
+    assert tab.chk_matched.isChecked() is True
+    assert tab.chk_sigmaclip.isChecked() is True
+    # and when the recipe DOES mention it, the recipe wins
+    tab.apply_state({"band": "G", "matched": False})
+    assert tab.chk_matched.isChecked() is False

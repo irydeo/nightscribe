@@ -169,8 +169,8 @@ project). No visit, no series: that is the house rule.
    1.63x the aperture's SNR** and a zero point **2.6x better**, for 3 % more
    time. It moves the magnitude that gets published (0.05 to 0.1 mag,
    towards the truth) and it has unchecked paths; the box in the Photometry
-   tab's advanced settings turns it off and the run says which method
-   measured and what the other would give.
+   tab's panel turns it off and the run says which method measured and what
+   the other would give.
 8. **Check.** NightScribe downloads the object's published observations (or
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your

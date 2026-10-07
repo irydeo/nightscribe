@@ -313,11 +313,13 @@ def test_the_matched_filter_is_the_app_default():
     # ticked.
     from nightscribe.core import photometry as _ph
     assert _ph.PlateConfig().matched is True
-    # and the recipe that travels to the plate says the same
+    # and the switch that turns it off is in the PANEL, one click away from
+    # the measurement, not inside Advanced…: reported by the author on
+    # 2026-10-07, who looked for it and did not find it there
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     from nightscribe.gui.main_window import _load_ui
-    dlg = _load_ui("ufe_advanced_dialog")
+    dlg = _load_ui("ufe_measure_tab")
     assert dlg.chk_matched.isChecked() is True
     # the tooltip has to say what it is, what it produces AND the risks:
     # a figure or a switch without its meaning is what ADR-058 forbids

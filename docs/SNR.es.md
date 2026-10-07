@@ -297,22 +297,38 @@ añaden luz) se queda con el tren y se sesga lejos de las estrellas, y el
 suavizado (41 px, mucho mayor que la PSF y mucho menor que el viñeteado) se
 lleva lo que quede. Normalizado a mediana uno, es un flat multiplicativo.
 
-No sustituye a un flat de verdad: mide la respuesta del tren **por** la
-forma del cielo, así que el error de flat es mayor. Es el respaldo honesto, y
-la receta dice cuál se usó.
+**Cuando las estrellas no se mueven, el estadístico solo no puede quitarlas**,
+y ese es el caso normal: medido en la visita 2025 FG18 del autor, el campo se
+desplaza **2 px en 207 tomas**. Así que las fuentes se **enmascaran ANTES del
+estadístico** (lo que está a más de 5σ sobre el percentil suavizado, y solo lo
+**extenso** se dilata 12 px: un pico de un píxel es un píxel caliente, no una
+estrella, y dilatar esos enmascaraba el 50 % del fotograma), los píxeles
+enmascarados se tiran y el flat se **interpola** ahí con una convolución
+normalizada (`uniform(x·m) / uniform(m)`, que rellena y suaviza en una sola
+operación). Un píxel caliente se deja **dentro** a propósito, y se restaura
+después del suavizado: está fijo en el sensor, así que la división es lo que
+lo quita.
 
-**Cuando las estrellas no se mueven, no hay pseudo-flat.** Con montura
-sidereal (el caso normal) la misma estrella cae en el mismo píxel toda la
-noche, así que el percentil se la queda y el «flat» divide cada estrella por
-sí misma: un flat que lleva las estrellas es peor que ningún flat. Medido en
-la visita 2025 FG18 del autor, una comparada sobre una estrella brillante
-salía **1,08 mag** desviada. Lo que sí queda de esas tomas es el
-**viñeteado**, que es suave y fijo: la app enmascara las fuentes (lo que está
-a más de 5σ sobre el percentil suavizado, dilatado 12 px) y ajusta una
-superficie de grado 4. Medido contra un master flat real de la misma noche,
-la concordancia es del ~3 % (mediana 0,9963; p5–p95 0,954–1,045) y la
-estructura fina que no corrige (el polvo) vale 0,6 % = 0,007 mag. La receta
-dice `vignette_model` y la nota dice qué es y qué no corrige.
+Medido contra el master flat real de esa misma noche (150 flats): el máximo
+**sin los píxeles calientes** es **1,1136** frente al **1,1102** del real, y
+la desviación sobre el suavizado en los píxeles enmascarados es **2,05 %**
+(antes era 33,83 %, cuando el flat llevaba las estrellas; y el propio master
+real está en 4,58 %, porque lleva el polvo). El relleno es el **1,50 %** de
+los píxeles y el flat entero tarda **18,6 s** para 207 tomas.
+
+**El pedestal hay que quitarlo antes.** Un pseudo-flat se construye de las
+tomas, así que lleva su pedestal (`flat_obs = P + cielo × R`), y la
+normalización no lo quita: la forma sale **comprimida**. Medido en FG18, el
+pedestal es de **827 ADU sobre un cielo de 661** y la compresión es
+`1/(1+p) = 0,44`, o sea que corregía solo el **44 % del viñeteado**. Ahora la
+app lo construye de las tomas **con el mismo dark/bias quitado que la luz**, y
+lo dice cuando no hay ninguno.
+
+No sustituye a un flat de verdad: mide la respuesta del tren **por** la forma
+del cielo, así que el error de flat es mayor (medido: **4,16 % = 0,045 mag**,
+con el pedestal quitado). Es el respaldo honesto, la receta dice cuál se usó, y
+el flat se escribe como producto de la visita para poder **mirarlo**: un flat
+que lleva una estrella no es un flat, y la forma de saberlo es verlo.
 
 ## T7. La calibración, dentro del apilado
 

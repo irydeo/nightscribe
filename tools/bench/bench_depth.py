@@ -213,15 +213,18 @@ def local_noise(data, x, y, r_ap, r_in, r_out):
     return photometry.sky_sigma(ann)
 
 
-def run_stack(name, path, verbose=True, spots=None):
+def run_stack(name, path, verbose=True, spots=None, data=None):
     # @args: spots - the positions to use, or None to look for clean ones in
     #        THIS stack. The comparison between two stacks must pass the SAME
     #        positions: a spot that is clean in one and sits on a source in
     #        the other measures the neighbour and not the pipeline (measured
     #        on the first version of this bench: 17.90 against 18.13 between
     #        two runs of the same test with different spots).
+    # @args: data - the stack ALREADY LOADED (and in the right units: see the
+    #        normalisation in main), or None to read it from `path`
     # @return: the report dict for one stack
-    header, data = fits_io.read_fits(path)
+    if data is None:
+        _h, data = fits_io.read_fits(path)
     data = np.asarray(data, dtype=np.float64)
     r_ap, r_in, r_out = photometry.aperture_for_fwhm(FWHM)
     if spots is None:
@@ -304,15 +307,47 @@ def main():
         if os.path.exists(path):
             loaded.append((name, np.asarray(fits_io.read_fits(path)[1],
                                            dtype=np.float64)))
+    # THE UNITS, checked and not assumed: two stacks have to be in the same
+    # units or the comparison measures the units and not the depth. Learned the
+    # hard way: our saved stack of 2025 FG18 was a MEAN when this bench first
+    # ran (sky 1597.8 ADU against Tycho's 1597.0, so the comparison was
+    # honest) and it has since been rebuilt as a SUM (sky 296,049 ADU, 190.8
+    # times the frame), which would make the same injection 190 times fainter
+    # in ours. A stack that says `NS_COMB = sum` is divided by its own
+    # `NS_NUSED`, which puts it back in the single frame's units: the units the
+    # zero point speaks.
+    for i, (name, data) in enumerate(loaded):
+        try:
+            head = fits_io.read_fits(STACKS[name])[0]
+        except Exception:                                      # noqa: BLE001
+            continue
+        if str(head.get("NS_COMB", "")).strip() == "sum":
+            n_used = head.get("NS_NUSED")
+            if n_used:
+                loaded[i] = (name, data / float(n_used))
+                print(f"  {name}: era una SUMA, dividido por NS_NUSED="
+                      f"{n_used} -> cielo {float(np.median(data / float(n_used))):.1f} ADU")
+    if len(loaded) == 2:
+        skies = [float(np.median(d[np.isfinite(d)])) for _n, d in loaded]
+        if min(skies) > 0 and max(skies) / min(skies) > 1.2:
+            print("AVISO: los dos stacks NO estan en las mismas unidades: "
+                  f"cielos {skies[0]:.0f} y {skies[1]:.0f} ADU "
+                  f"({max(skies) / min(skies):.1f}x). La comparacion mediria "
+                  "las unidades y no la profundidad.")
+        else:
+            print(f"unidades: cielos {skies[0]:.1f} y {skies[1]:.1f} ADU "
+                  f"({max(skies) / min(skies):.2f}x), comparables")
     spots = common_spots(loaded, TRIALS, seed=7)
     print(f"posiciones limpias en los DOS stacks (criterio absoluto): {len(spots)}")
     reports = {}
+    by_name = {n: d for n, d in loaded}
     for name, path in STACKS.items():
         if not os.path.exists(path):
             print(f"  {name}: no existe {path}")
             continue
         print(f"[profundidad] {name} ...")
-        reports[name] = run_stack(name, path, spots=spots)
+        reports[name] = run_stack(name, path, spots=spots,
+                                  data=by_name.get(name))
     if len(reports) == 2:
         a, b = reports["ours"], reports["tycho"]
         print("\n=== comparación ===")

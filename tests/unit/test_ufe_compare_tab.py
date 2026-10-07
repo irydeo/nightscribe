@@ -1295,9 +1295,21 @@ def test_the_project_magnitude_fills_the_field_only_when_it_is_empty(dlg):
 def test_the_editor_lands_the_magnitude_on_the_compare_tab(dlg):
     # The host calls this when the editor opens from a project, so the
     # proposal anchors on the object's real magnitude.
+    #
+    # AND IT CALLS IT WITH THE ORIGIN: this test used to call the facade with
+    # one argument, which is what the facade took, so it pinned the wrong
+    # signature and let the host's two-argument call crash (reported: the
+    # "measure series" button of a visit died with a TypeError). The facade
+    # has to be tested with the arity of the caller, not with its own.
     dlg.tab_compare.spn_mag.setValue(0.0)
-    assert dlg.set_target_magnitude(17.92) is True
+    assert dlg.set_target_magnitude(17.92, "measured") is True
     assert dlg.tab_compare.spn_mag.value() == pytest.approx(17.92)
+    assert dlg.tab_compare._mag_origin == "measured"
+    # and without an origin, which is a project that never recorded one
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    assert dlg.set_target_magnitude(18.30) is True
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(18.30)
+    assert dlg.tab_compare._mag_origin is None
 
 
 def test_the_magnitude_says_where_it_comes_from(dlg, qapp):

@@ -30,8 +30,8 @@ import math
 import re
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QColor, QIcon, QTextCursor
 from PySide6.QtWidgets import (QFrame, QScrollArea, QTableWidgetItem,
                                QVBoxLayout, QWidget)
 
@@ -56,6 +56,29 @@ logger = logging.getLogger("nightscribe.gui.ufe_trackstack_tab")
 # order of the visit's file list cannot put observation 2 in slot 1.
 _OBS_RE = re.compile(r"_obs(\d+)")
 
+# The "Animate / verify" loop's swap interval. 700 ms is the GIF's own
+# duration (core/viz/sequence_view.centered_sequence): the live verification
+# and the exported figure have to read at the same speed, or the two would
+# say different things about the same run.
+_ANIM_INTERVAL_MS = 700
+
+
+def _shift_frame(arr, drow, dcol):
+    # @args: arr - a 2D frame, drow/dcol - the shift in whole pixels
+    #        (positive moves the content down/right)
+    # @return: a copy of arr moved by (drow, dcol), the vacated border filled
+    #          with the frame's own edge
+    # Why not np.roll: it WRAPS, so the opposite edge would be dragged into
+    # the frame right where the object sits and read as a fake source. Edge
+    # replication invents nothing.
+    import numpy as np
+    h, w = arr.shape
+    top, bottom = max(0, drow), max(0, -drow)
+    left, right = max(0, dcol), max(0, -dcol)
+    padded = np.pad(arr, ((top, bottom), (left, right)), mode="edge")
+    r0, c0 = max(0, -drow), max(0, -dcol)
+    return padded[r0:r0 + h, c0:c0 + w]
+
 
 class UfeTrackStackTab(QWidget):
     # @args: state - the shared UfeImageState (the group's stack is loaded
@@ -78,6 +101,12 @@ class UfeTrackStackTab(QWidget):
                                    # column into a real projection, D22)
         self._result = None        # the last run's payload
         self._run_id = None        # its row in astrometry_runs (the Undo)
+        self._anim_on = False      # the "Animate / verify" loop is running
+        self._anim_index = 0       # the observation on screen
+        self._anim_first = 0       # the one every frame is aligned to
+        self._anim_q = []          # the object's pixel in each stack
+        self._anim_headers = []    # each stack's own header (the band reads it)
+        self._anim_timer = None    # the swap timer (built with the UI)
         self._hue = theme.C_ACCENT  # the object's hue (the hero button)
         self._accent = None        # {"hue", "kind", "label"} or None
         self._build_ui()
@@ -154,6 +183,13 @@ class UfeTrackStackTab(QWidget):
         self._thumbs.setVisible(False)
         self.btn_blink = self._ui.btn_blink
         self.btn_blink.clicked.connect(self._on_blink)
+        # The live verification of "The observations" (2026-10-07): the
+        # blink figure EXPORTS the proof, this one PLAYS it in the editor.
+        # Both live in the same row because they answer the same question
+        # (is the object there in every observation?) and they differ only
+        # in whether a file is written.
+        self.btn_animate = self._ui.btn_animate
+        self.btn_animate.toggled.connect(self._on_animate_toggled)
         # the brightness is measured with the recipe the Fotometria tab is
         # holding: one editor in the app, read live, shown before the run
         self.chk_brightness = self._ui.chk_brightness
@@ -286,6 +322,11 @@ class UfeTrackStackTab(QWidget):
         self._sync_manual_dialog(self.chk_manual.isChecked())
         from .widgets.door_menu import build_door
         build_door(self.btn_more, [self.btn_blink, self.btn_undo])
+        # the animation's swap timer: owned by the tab, stopped wherever the
+        # stage is lost (a timer that outlives the view repaints a dead
+        # frame, the trap the Blink tab documents)
+        self._anim_timer = QTimer(self)
+        self._anim_timer.timeout.connect(self._anim_tick)
         # before a run this column is the PLAN: the result arrives whole or
         # not at all, and a check with no run is a paragraph about nothing
         self._show_result_area(False)
@@ -524,6 +565,10 @@ class UfeTrackStackTab(QWidget):
             self._draw_marks()
         else:
             self._manual.setVisible(False)
+            # the animation needs the stage: leaving it stops the loop and
+            # hands the plate back (a timer repainting a hidden view is the
+            # trap the Blink tab already documents)
+            self._anim_stop()
 
     def refresh_context(self):
         # Called by the dialog when the host sets (or clears) the
@@ -541,6 +586,10 @@ class UfeTrackStackTab(QWidget):
             self._worker.cancel()
             self._worker.wait(5000)
         self._worker = None
+        # the animation's timer must not outlive the workbench either: it
+        # holds the tab and the view alive, and a QTimer firing into a
+        # deleted widget is the same shiboken trap as the QThread
+        self._anim_stop()
 
     def _context(self):
         # @return: the visit context {"pid", "session_id", "paths",
@@ -762,41 +811,56 @@ class UfeTrackStackTab(QWidget):
     def _say(self, text):
         # @args: text - the status line's text ("" hides it)
         # @return: None. The messages that belong to no group live under the
-        #          action they belong to (asked for 2026-10-06) and they
-        #          WRAP, up to three lines, so they are read and not guessed
-        #          from a tooltip (asked for: "los mensajes de la derecha se
-        #          cortan"). What the panel must never do again is grow
-        #          without a stop: the paragraph that used to be built here
-        #          measured 204 px of a 380 px column and pushed the groups
-        #          off the screen. Three lines is a ceiling; the whole text is
-        #          in the tooltip and in the window's own line too (U4, via
-        #          set_status_hook). What the run FOUND is not here: it lives
-        #          in its own group, with room and a scroll.
+        #          action they belong to (asked for 2026-10-06) and they are
+        #          read in full: the line is a read-only BOX with its own
+        #          scroll (2026-10-07). A QLabel had no middle ground: either
+        #          it grew without limit (the paragraph that used to be built
+        #          here measured 204 px of a 380 px column) or, capped, it
+        #          clipped its lines with no way to read the rest. The box
+        #          keeps a three-line ceiling and the wheel reaches the end;
+        #          the whole text is also in the tooltip and in the window's
+        #          own line (U4, via set_status_hook). What the run FOUND is
+        #          not here: it lives in its own group, with room and a
+        #          scroll.
         self._status_text = text or ""
         self.lbl_status.setVisible(bool(text))
         self.lbl_status.setToolTip(self._status_text)
-        self.lbl_status.setText(self._status_text)
+        self.lbl_status.setPlainText(self._status_text)
+        # the message reads from its FIRST line: setPlainText leaves the
+        # cursor at the end, and a box that opens scrolled to the bottom
+        # hides the very sentence that says what happened
+        self.lbl_status.moveCursor(QTextCursor.Start)
+        self.lbl_status.verticalScrollBar().setValue(0)
         self._fit_status()
         if self._status_hook is not None and text:
             self._status_hook(str(text),
                               "warn" if str(text).startswith("⚠") else "info")
 
     def _fit_status(self):
-        # @return: None. The line's own height, capped at three lines: the
-        #          sizeHint of a word-wrapped QLabel is computed for a width
-        #          that changes later, so it is asked at the width it has.
+        # @return: None. The box's own height, capped at three lines: the
+        #          text wraps, so its height is asked of the FONT at the
+        #          width the viewport has now (a QPlainTextEdit has no
+        #          heightForWidth, and the document's own size is computed
+        #          for a width that changes later). Past the cap the box
+        #          scrolls instead of clipping, which is the whole point.
+        from PySide6.QtCore import QRect
+        from PySide6.QtGui import QFontMetrics
         label = self.lbl_status
+        fm = QFontMetrics(label.font())
+        line = max(fm.lineSpacing(), 1)
+        cap = line * 3 + 8
+        label.setMaximumHeight(cap)
         if not getattr(self, "_status_text", ""):
             label.setMinimumHeight(0)
             return
-        from PySide6.QtGui import QFontMetrics
-        cap = QFontMetrics(label.font()).height() * 3 + 8
-        label.setMaximumHeight(cap)
-        if label.width() < 50:
+        width = label.viewport().width()
+        if width < 50:
+            label.setMinimumHeight(cap)
             return
-        need = label.heightForWidth(label.width())
-        if need and need > 0:
-            label.setMinimumHeight(min(int(need), cap))
+        rect = fm.boundingRect(QRect(0, 0, width, 10000),
+                               Qt.TextWordWrap, self._status_text)
+        need = rect.height() + 2 * label.frameWidth() + 6
+        label.setMinimumHeight(min(int(need), cap))
 
     def _set_wrapped(self, label, text):
         # @args: label - a QLabel with wordWrap, text - its new text
@@ -853,6 +917,8 @@ class UfeTrackStackTab(QWidget):
             self.spn_nobs.setEnabled(False)
             self.tbl_snr.setRowCount(0)
             self._hide_manual()
+            self._anim_stop()
+            self._sync_animate_button()
             self.lbl_object.setText(self.tr(
                 "Object and frames: open the editor from a visit to arm "
                 "the sequence."))
@@ -868,6 +934,7 @@ class UfeTrackStackTab(QWidget):
             self._n_unreadable = max(0, len(paths) - len(self._frames))
             # a different visit invalidates the last run: its stacks, its
             # check and its report belong to the other sequence
+            self._anim_stop()
             self._base_snr = None
             self._result = None
             self.cmb_group.clear()
@@ -877,6 +944,7 @@ class UfeTrackStackTab(QWidget):
             self._hide_manual()
             self._show_result_area(False)
             self._sync_report_buttons()
+            self._sync_animate_button()
             # a different visit may hold its own saved run: ask again
             self._restore_asked = False
             # and the calibration's automatic default follows THIS visit's
@@ -1011,6 +1079,9 @@ class UfeTrackStackTab(QWidget):
         # over a stack that is being rebuilt is a mark over nothing). The
         # caller that came FROM the mark has already taken what it needs.
         self._hide_manual()
+        # ...and it invalidates the animation: a loop over the previous run's
+        # frames while the new ones are being built is a loop over a lie
+        self._anim_stop()
         self.prg_stack.setVisible(True)
         self.prg_stack.setRange(0, 0)          # busy until a stage counts
         # The hero stops being the action and becomes the way out: same size
@@ -1023,6 +1094,7 @@ class UfeTrackStackTab(QWidget):
         # stale strip next to a fresh run is a lie
         self._thumbs.clear()
         self.btn_blink.setEnabled(False)
+        self._sync_animate_button()
         self._say("")
         self._worker = TrackStackWorker(
             paths, name, self.spn_nobs.value(),
@@ -1138,6 +1210,7 @@ class UfeTrackStackTab(QWidget):
         host = host_of(self)
         undo = getattr(host, "undo_astrometry", None)
         removed = undo(self._run_id) if callable(undo) else None
+        self._anim_stop()
         self._run_id = None
         self._result = None
         self.cmb_group.clear()
@@ -1149,6 +1222,7 @@ class UfeTrackStackTab(QWidget):
         self._hide_manual()
         self._show_result_area(False)
         self._sync_report_buttons()
+        self._sync_animate_button()
         self._say(self.tr("Run undone: %1 observations removed."
                           ).replace("%1", str(removed if removed is not None
                                              else 0)))
@@ -1236,6 +1310,13 @@ class UfeTrackStackTab(QWidget):
             by_group.setdefault(gi, {})[row.get("source") or "stack"] = row
         points, groups, mids, qs = [], [], [], []
         stacks, stack_paths, boxes = [], [], []
+        # The frames of each observation: the run's own PLAN when it saved it
+        # (exact: "Observation 1 (103 frames)"), else what the points say.
+        # The stack point carries n_frames = 0 on purpose (core/astrometry.py:
+        # the count belongs to the frame path), so an old run falls to the
+        # frames point and, without it, to one.
+        plan = [tuple(int(v) for v in g)
+                for g in (summary.get("groups") or []) if len(g) == 2]
         start = 0
         for gi in sorted(by_group):
             entry = by_group[gi]
@@ -1253,9 +1334,15 @@ class UfeTrackStackTab(QWidget):
             if (entry.get("stack") or {}).get("mag_source") == "manual":
                 flags.append("mag_manual")
             points.append((sp, fp, flags))
-            n = int(getattr(sp, "n_frames", 0) or 0) or 1
-            groups.append((start, start + n))
-            start += n
+            if 0 <= gi < len(plan):
+                groups.append(plan[gi])
+            else:
+                n = int(getattr(fp, "n_frames", 0) or 0) if fp is not None \
+                    else 0
+                if not n:
+                    n = int(getattr(sp, "n_frames", 0) or 0) or 1
+                groups.append((start, start + n))
+            start = groups[-1][1]
             mids.append((sp.mjd or 0.0) + 2400000.5)
             # the object's position in the STACK's own pixels: the saved x/y
             # were measured on that very stack, so they need no conversion
@@ -1377,6 +1464,9 @@ class UfeTrackStackTab(QWidget):
         self.txt_notes.setPlainText(text)
         self.cmb_group.setEnabled(False)
         self._sync_report_buttons()
+        # below the gate there are no observation stacks to animate: the
+        # door goes with the evidence, like btn_blink
+        self._sync_animate_button()
         self._say("")
         # The base stack is saved here too: it is the image the manual mark
         # is placed on, and a visit reopened tomorrow must be able to do the
@@ -1435,7 +1525,8 @@ class UfeTrackStackTab(QWidget):
         if scene is not None:
             w, h = state.plate_shape
             for item in cross_marker_items(scene[0], scene[1], float(w),
-                                           float(h), "#ff5555", 10.0):
+                                           float(h), self._mark_color(),
+                                           10.0):
                 view.add_overlay(item)
         if self._manual_armed and self._manual_base is not None \
                 and self._manual.chk_show_cross.isChecked():
@@ -1907,8 +1998,14 @@ class UfeTrackStackTab(QWidget):
             # the whole-sequence stack first: it is the image the manual mark
             # is placed on, and the deepest one of the visit
             base = self._save_base_stack(self._result)
-            for i in range(len(stacks)):
-                self._save_group_stack(i, self._result)
+            written = [self._save_group_stack(i, self._result)
+                       for i in range(len(stacks))]
+            # The paths are KEPT with the result. Without them every look at
+            # an observation wrote its stack AGAIN (one duplicate file row in
+            # the visit per click, plus the whole write on the GUI thread):
+            # measured 2026-10-07, clicking a thumbnail re-registered the same
+            # file. A run knows where it put its stacks.
+            self._result["stack_paths"] = written
             self._base_saved = bool(base)
         # the viewer: one entry per observation, the first one on stage
         self.cmb_group.blockSignals(True)
@@ -1938,6 +2035,7 @@ class UfeTrackStackTab(QWidget):
                   for i in range(len(stacks))]
         self._thumbs.set_stacks([s for s, _rep in stacks], qs_local, labels)
         self.btn_blink.setEnabled(any(s is not None for s, _rep in stacks))
+        self._sync_animate_button()
         self._show_result_area(True)
         if self.cmb_group.count():
             self.cmb_group.setCurrentIndex(0)
@@ -2315,11 +2413,12 @@ class UfeTrackStackTab(QWidget):
     def _group_stack_path(self, index, result):
         # @args: index - the observation, result - the run's payload
         # @return: the file holding this observation's stack, or None when
-        #          it cannot be had. A RESTORED run finds it already on disk
-        #          (written and registered the day of the run); a fresh run
-        #          writes it here.
+        #          it cannot be had. The run KEEPS the paths it wrote (fresh
+        #          or restored), so looking at an observation never writes it
+        #          again: before this, every thumbnail click re-saved the
+        #          stack and registered a duplicate row in the visit.
         paths = result.get("stack_paths") or []
-        if result.get("restored") and index < len(paths) and paths[index]:
+        if 0 <= index < len(paths) and paths[index]:
             return Path(paths[index])
         return self._save_group_stack(index, result)
 
@@ -2463,6 +2562,14 @@ class UfeTrackStackTab(QWidget):
                 stamp = ""
         return f"{slug}_obs{index + 1}{stamp}{'_stars' if stars else ''}.fits"
 
+    def _mark_color(self):
+        # @return: the colour the object's marks must wear, through the ONE
+        #          resolver the editor uses: the object type's own colour (the
+        #          project's accent, the same that tints this tab) or the
+        #          common one, per Settings. Here it is used for the run's
+        #          measured cross and for the annotation the run writes.
+        return theme.mark_color((self._accent or {}).get("hue"))
+
     def _annotate_object(self, path, index, result):
         # @args: path - the stack just written, index - the observation,
         #        result - the run's payload
@@ -2485,7 +2592,8 @@ class UfeTrackStackTab(QWidget):
                 path, path, sn_xy=(float(sp.x), float(sp.y)), scale=scale,
                 obj_name=(self._context() or {}).get("object_name") or "",
                 ra_deg=(float(sp.ra) if sp.ra is not None else None),
-                dec_deg=(float(sp.dec) if sp.dec is not None else None))
+                dec_deg=(float(sp.dec) if sp.dec is not None else None),
+                color=self._mark_color())
         except Exception as err:
             logger.warning("the stack could not be annotated: %s", err)
 
@@ -2873,6 +2981,284 @@ class UfeTrackStackTab(QWidget):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         self._say(self.tr("Blink figure written:") + f" {path.name}")
         return path
+
+    # --------------------------------------------------- the animation
+
+    def _anim_ready(self):
+        # @return: True when there is something to animate. The verification
+        #          needs at least TWO observations: with one there is nothing
+        #          to compare, and a single frame "blinking" against itself
+        #          teaches nobody anything. They must also share ONE shape:
+        #          the view stretches the override frame over the plate in
+        #          the state, so a different size would be silently distorted
+        #          (a run builds them all with the same final field, and this
+        #          is the honest guard for the day one does not).
+        result = self._result or {}
+        stacks = result.get("stacks") or []
+        usable = [s for s, _rep in stacks if s is not None]
+        qs = result.get("qs") or []
+        shapes = {s.shape for s in usable}
+        return len(usable) >= 2 and len(shapes) == 1 \
+            and len(qs) >= len(stacks)
+
+    def _sync_animate_button(self):
+        # @return: None. The door follows its evidence, like btn_blink: no
+        #          run (or a single observation) means no animation, and the
+        #          tooltip already says what it would need.
+        if getattr(self, "btn_animate", None) is None:
+            return
+        self.btn_animate.setEnabled(self._anim_ready())
+
+    def _on_animate_toggled(self, on):
+        # @args: on - the button's new state
+        # @return: None
+        if not on:
+            self._anim_stop()
+            return
+        if not self._anim_ready():
+            self.btn_animate.blockSignals(True)
+            self.btn_animate.setChecked(False)
+            self.btn_animate.blockSignals(False)
+            self._say(self.tr(
+                "Nothing to animate: the verification needs at least two "
+                "observations measured in this visit."))
+            return
+        self._anim_start()
+
+    def _anim_start(self):
+        # @return: None. The tab owns the view's frame while it animates,
+        #          exactly like the Blink tab: the plate in the state is the
+        #          first observation's stack (so the frame's shape, its WCS
+        #          and its measured marks are its own) and every observation
+        #          is painted over it by set_frame_override, ALIGNED on the
+        #          object. So what moves is the star field and the asteroid
+        #          stays put, with the cross and the object mark sitting on
+        #          it: the same reading as the GIF, in the editor, with
+        #          nothing written and no other tab disturbed (no plate is
+        #          reloaded, so no image_loaded storm).
+        result = self._result or {}
+        stacks = result.get("stacks") or []
+        qs = result.get("qs") or []
+        boxes = result.get("boxes") or []
+        self._anim_q = []
+        for i, (stack, _rep) in enumerate(stacks):
+            if stack is None or i >= len(qs) or qs[i] is None:
+                self._anim_q.append(None)
+                continue
+            box = boxes[i] if i < len(boxes) and boxes[i] is not None \
+                else (0, 0, 0, 0)
+            # the object's pixel in THIS stack: the payload's q is in the
+            # reference grid, so the cutout's origin comes off (the same
+            # conversion _write_blink does, and the reason a cutout run
+            # cannot be read with the reference position as it is)
+            self._anim_q.append((float(qs[i][0]) - float(box[0]),
+                                 float(qs[i][1]) - float(box[1])))
+        # the first observation WITH a stack goes on stage FIRST: its file is
+        # what gives the state the plate shape the override frames have to
+        # match (an observation whose stack is missing must not abort a loop
+        # the other two could run)
+        first = next((i for i, (s, _r) in enumerate(stacks)
+                      if s is not None), None)
+        if first is None:
+            self._anim_abort()
+            return
+        state = self._state if self._view is not None else self._stack_state
+        view = self._view if self._view is not None else self._stack_view
+        if state is None or view is None:
+            self._anim_abort()
+            return
+        # THE LEVELS THE OBSERVER APPLIED STAY. Loading the first stack used
+        # to reset the stretch to the auto percentiles, so the verification
+        # started with a different histogram than the plate it was read on;
+        # keep_stretch carries black/white/gamma/invert across the load, and
+        # every frame of the loop is stretched with those same numbers.
+        keep = state.keep_stretch
+        state.keep_stretch = state.has_image
+        try:
+            self._show_group(first)
+        finally:
+            state.keep_stretch = keep
+        if not state.has_image:
+            self._anim_abort()
+            return
+        # The band says what is SHOWN, and what is shown is not the loaded
+        # plate: each observation's own header is read once here (the files
+        # the run wrote, the same source band_facts reads), so the heading
+        # follows the loop without reloading any plate.
+        self._anim_headers = []
+        for path in (result.get("stack_paths") or []):
+            header = None
+            if path:
+                try:
+                    from ..core import fits_io
+                    header = fits_io.read_header(str(path))
+                except Exception as err:
+                    logger.warning("a stack header could not be read (%s): %s",
+                                   path, err)
+            self._anim_headers.append(header)
+        self._anim_first = first
+        self._anim_index = first
+        self._anim_on = True
+        # The cross and the object mark are NOT hidden: the frames are
+        # aligned on the first stack's object, so the marks drawn on that
+        # very plate keep sitting exactly on the asteroid.
+        self._anim_zoom()
+        view.set_frame_override(self._display_frame)
+        view.refresh_frame()
+        self._anim_timer.start(_ANIM_INTERVAL_MS)
+        self._say(self.tr(
+            "Animating %1 observations, centred on the object; the stars "
+            "crawl and the object must not. Click again to stop.").replace(
+                "%1", str(len(stacks))))
+
+    def _anim_abort(self):
+        # @return: None. The animation could not own the stage (no stack on
+        #          disk to show): put the button back without claiming it ran.
+        self._anim_on = False
+        self.btn_animate.blockSignals(True)
+        self.btn_animate.setChecked(False)
+        self.btn_animate.blockSignals(False)
+        self._say(self.tr(
+            "The observation's stack is not on disk: nothing to animate."))
+
+    def _anim_zoom(self):
+        # @return: None. One zoom for the whole loop: the object is centred,
+        #          so what matters is how many pixels around it fill the
+        #          viewport. A factor that shows about 256 px is the window
+        #          the blink figure crops, and the view's own limits clamp
+        #          it (a tiny viewport cannot ask for a 0 factor).
+        view = self._view if self._view is not None else self._stack_view
+        if view is None:
+            return
+        vw = max(1, view.viewport().width())
+        vh = max(1, view.viewport().height())
+        view.fit_to_factor(max(0.5, min(vw, vh) / 256.0))
+        self._anim_center()
+
+    def _anim_center(self):
+        # @return: None. Centres the view on the object of the observation on
+        #          screen. It is called ONCE, when the loop starts (the
+        #          frames are aligned afterwards, so there is nothing to
+        #          recentre). The q is in DATA coordinates (row 0 at the FITS
+        #          bottom) and the scene is screen-oriented, so the flip is
+        #          data_to_scene's and never a hand-rolled one.
+        state = self._state if self._view is not None else self._stack_state
+        view = self._view if self._view is not None else self._stack_view
+        if state is None or view is None:
+            return
+        if not (0 <= self._anim_index < len(self._anim_q)):
+            return
+        q = self._anim_q[self._anim_index]
+        if q is None:
+            return
+        view.centerOn(*state.data_to_scene(q[0], q[1]))
+
+    def band_header(self):
+        # The heading over the plate has to describe what is SHOWN (ADR-046
+        # rev.): while the loop runs, the plate on screen is not the loaded
+        # one but the observation whose turn it is, and its own header (read
+        # once at the start, from the file the run wrote) is what says its
+        # motion, its measured position and its brightness. Outside the
+        # animation it returns None and the band reads the loaded plate, as
+        # always.
+        # @return: the header of the observation on screen, or None
+        if not self._anim_on:
+            return None
+        if 0 <= self._anim_index < len(self._anim_headers):
+            return self._anim_headers[self._anim_index]
+        return None
+
+    def _display_frame(self):
+        # @return: the frame the view paints right now, in SCREEN
+        #          orientation (the same contract the Blink tab's override
+        #          follows), or None. The stretch is the state's OWN black/
+        #          white/gamma/invert, so every observation shares ONE
+        #          range: auto-stretching each frame would make a faint one
+        #          look as bright as a real one, which is exactly the
+        #          illusion this verification exists to break.
+        import numpy as np
+        from ..core import stretch
+        stacks = (self._result or {}).get("stacks") or []
+        if not (0 <= self._anim_index < len(stacks)):
+            return None
+        stack = stacks[self._anim_index][0]
+        if stack is None:
+            return None
+        state = self._state if self._view is not None else self._stack_state
+        if state is None:
+            return None
+        small = stretch.display_downscale(np.asarray(stack, dtype=np.float32),
+                                          stretch.DISPLAY_CAP)
+        small = self._aligned_frame(small, state)
+        img = stretch.apply_stretch(small, state.black, state.white,
+                                    state.gamma)
+        if state.inverted:
+            img = stretch.invert(img)
+        return np.ascontiguousarray(np.flipud(stretch.to_uint8(img)))
+
+    def _aligned_frame(self, small, state):
+        # @args: small - the frame already reduced to the display size,
+        #        state - the image state (for its display scale)
+        # @return: the frame moved so its object lands where the FIRST
+        #          observation's object is.
+        # Each stack follows the object, so the asteroid sits at a different
+        # pixel in each one (its ephemeris position changes through the
+        # night). Aligning them all onto the first stack's pixel is what
+        # makes the asteroid stand still while the stars crawl, and it is
+        # also why the cross and the object mark, drawn on that first plate,
+        # stay on the asteroid instead of drifting.
+        if not (0 <= self._anim_first < len(self._anim_q)) \
+                or not (0 <= self._anim_index < len(self._anim_q)):
+            return small
+        q0 = self._anim_q[self._anim_first]
+        q = self._anim_q[self._anim_index]
+        if q0 is None or q is None:
+            return small
+        scale = max(1, int(getattr(state, "display_scale", 1) or 1))
+        dcol = int(round((q0[0] - q[0]) / scale))
+        drow = int(round((q0[1] - q[1]) / scale))
+        if not dcol and not drow:
+            return small
+        return _shift_frame(small, drow, dcol)
+
+    def _anim_tick(self):
+        # @return: None. The next observation, with its own header for the
+        #          band. No recentring: the frames are already aligned on the
+        #          object, so nothing but the star field moves. An
+        #          observation with no usable stack is skipped rather than
+        #          shown as a blank.
+        stacks = (self._result or {}).get("stacks") or []
+        if not stacks:
+            self._anim_stop()
+            return
+        for _ in range(len(stacks)):
+            self._anim_index = (self._anim_index + 1) % len(stacks)
+            if self._anim_q[self._anim_index] is not None:
+                break
+        view = self._view if self._view is not None else self._stack_view
+        if view is not None:
+            view.refresh_frame()
+
+    def _anim_stop(self):
+        # @return: None. Hands the plate back: the override goes and the
+        #          marks (never hidden) stay where they were, so the tab is
+        #          exactly as it was before the animation. Safe to call when
+        #          nothing is running, and then it touches NOTHING: the view
+        #          belongs to whichever tab is on stage, and a no-op that
+        #          cleared its overlays would wipe another tab's.
+        was_on = self._anim_on
+        if getattr(self, "_anim_timer", None) is not None:
+            self._anim_timer.stop()
+        self._anim_on = False
+        if was_on:
+            view = self._view if self._view is not None else self._stack_view
+            if view is not None:
+                view.set_frame_override(None)
+        if getattr(self, "btn_animate", None) is not None \
+                and self.btn_animate.isChecked():
+            self.btn_animate.blockSignals(True)
+            self.btn_animate.setChecked(False)
+            self.btn_animate.blockSignals(False)
 
     # ------------------------------------------------------ measurement
 

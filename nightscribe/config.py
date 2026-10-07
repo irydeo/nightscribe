@@ -193,7 +193,10 @@ DEFAULTS = {
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.
     "ufe_bar_icons": True,
-    "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
+    # CCD | CMOS | DSLR. Two consumers: the EXOTIC inits.json handoff (its
+    # guide has CMOS entered as "CCD" plus a note) and the MPC report, whose
+    # ADES "mode" is CCD or CMO and whose 80-column column 15 is "C"/"B".
+    "camera_type": "CCD",
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none
     # Chart annotations (ADR-046): the identity stamped in the corner
@@ -204,6 +207,15 @@ DEFAULTS = {
     "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
     "camera_model": "",
     "marker_style": "ring",   # ring | cross (the object marker)
+    # The object's marks in the editor: the full-frame crosshair (the object
+    # mark), the cross the run measured with and the circle with the name.
+    # `annot_visible` is whether that circle shows when a plate opens (the
+    # editor's "A" toggle, live); `marker_color` is the colour of all three:
+    # "kind" = the object type's own colour (theme.KIND_COLORS), "common" =
+    # one colour for every mark (theme.C_OBJECT_MARK). ONE resolver reads it
+    # (theme.mark_color), so the three cannot disagree.
+    "annot_visible": False,
+    "marker_color": "kind",
     "chart_boxes": False,     # metadata corner boxes on the OTHER charts
                               # (the blink GIF/MP4 and the finder chart);
                               # the UFE's plate band is chart_data

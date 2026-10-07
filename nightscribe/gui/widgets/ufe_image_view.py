@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsLineItem,
 
 from ...core import chart_annotate
 from ...viz import palette
+from .. import theme
 from .base_chart import ChartView
 
 logger = logging.getLogger("nightscribe.gui.ufe_image_view")
@@ -190,6 +191,7 @@ class UfeImageView(ChartView):
         # layer, like the ANNOTATE one, so feature tabs never touch it
         self._object_mark_items = []
         self._object_mark_radec = None   # (ra_deg, dec_deg) or None
+        self._object_mark_color = theme.C_OBJECT_MARK   # the mark's colour
         # the object's line, painted OVER the plate (UFE layout v2: it used
         # to be a row of the window under the top bar, 31 px of height for
         # one line of text and a distraction from the picture)
@@ -420,13 +422,15 @@ class UfeImageView(ChartView):
 
     # ------------------------------------------------------ object mark
 
-    def set_object_mark(self, ra_deg, dec_deg):
+    def set_object_mark(self, ra_deg, dec_deg, color=None):
         # The attached project's object: a subtle full-frame cross with a
         # central box (the classic tracker look) where its RA/Dec land on
         # the plate. Needs a WCS; without one (or off-plate) the layer
         # stays empty.
         # @args: ra_deg, dec_deg - object coordinates in degrees, or None
-        #        to drop the mark
+        #        to drop the mark, color - the mark's colour (the object
+        #        type's own, or the common one: the dialog resolves it);
+        #        None keeps the mark's own
         if ra_deg is None or dec_deg is None:
             self._object_mark_radec = None
         else:
@@ -434,6 +438,8 @@ class UfeImageView(ChartView):
                 self._object_mark_radec = (float(ra_deg), float(dec_deg))
             except (TypeError, ValueError):
                 self._object_mark_radec = None
+        if color is not None:
+            self._object_mark_color = str(color)
         self._rebuild_object_mark()
 
     def set_object_mark_visible(self, on):
@@ -452,7 +458,8 @@ class UfeImageView(ChartView):
         if pos is None:
             return
         w, h = self._state.plate_shape
-        for it in cross_marker_items(pos[0], pos[1], w, h, "#ff6378",
+        for it in cross_marker_items(pos[0], pos[1], w, h,
+                                     self._object_mark_color,
                                      w * 0.011, alpha=128, pen_width=1.2):
             it.setZValue(45)
             it.setVisible(self._show_object_mark)

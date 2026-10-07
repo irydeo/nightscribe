@@ -251,3 +251,32 @@ depth by stacking the refused frames (rejected: it costs 0.11 mag); choosing the
 median for its robustness against the trails (rejected: our sigma-clipped mean
 discards 17.5 % of the pixels and keeps the SNR, so the robustness is already
 there and the median only adds noise).
+
+**Revisión (2026-10-07): las unidades de los stacks, comprobadas y no
+supuestas.** Al medir la profundidad del flat (`bench_flat_depth.py`) salió que
+el stack guardado de 2025 FG18 se había reconstruido con `NS_COMB = sum`: su
+cielo es de 296.049 ADU, **190,8 veces** el de una toma, mientras que el de
+Tycho es de 1.597 ADU (una media, 1,0×). Con eso, inyectar los mismos ADU en
+los dos mide las unidades y no la profundidad. En el momento de la comparación
+de este ADR los dos stacks eran medias (1.597,83 contra 1.597,0), así que el
+número que se publicó era honesto; lo que faltaba era la comprobación. El banco
+ahora **normaliza** el stack que dice `sum` (dividiéndolo por su propio
+`NS_NUSED`) y **avisa** si los cielos siguen sin ser comparables (más de 1,2×).
+Re-medida con el fichero actual y normalizada, la ventaja de Tycho sale 1,06×
+(unos 0,06 mag), que cae dentro de la repetibilidad del propio método (este ADR
+ya documenta que elegir las posiciones de otra manera movía el resultado más
+que el efecto).
+
+**Revision (2026-10-07): the units of the stacks, checked and not assumed.**
+While measuring the flat's depth (`bench_flat_depth.py`) it turned out that the
+saved stack of 2025 FG18 had been rebuilt with `NS_COMB = sum`: its sky is
+296,049 ADU, **190.8 times** a single frame, while Tycho's is 1,597 ADU (a
+mean, 1.0x). With that, injecting the same ADU into both measures the units and
+not the depth. When this ADR's comparison was made the two stacks were both
+means (1,597.83 against 1,597.0), so the figure that was published was honest;
+what was missing was the check. The bench now **normalises** a stack that says
+`sum` (dividing it by its own `NS_NUSED`) and **warns** when the skies are
+still not comparable (more than 1.2x). Re-measured with the current file and
+normalised, Tycho's advantage comes out 1.06x (about 0.06 mag), which falls
+inside the method's own repeatability (this ADR already documents that choosing
+the positions differently moved the answer by more than the effect).

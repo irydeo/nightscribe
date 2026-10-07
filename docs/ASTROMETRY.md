@@ -78,8 +78,9 @@ project). No visit, no series: that is the house rule.
    magnitude, because without a flat the object and the comparisons fall in
    different parts of the vignetting and that is **0.087 mag** measured on a
    real visit. The moment you touch it, your choice rules. If you have no flat,
-   the app builds one from the frames themselves (it needs dither and tells
-   you).
+   the app builds one from the frames themselves: it masks the stars out of it
+   and, for the pedestal, it needs a dark/bias (with none it says so, because
+   the flat's shape then comes out compressed).
 2. **Choose how many observations you want.** The MPC prefers several
    measurements spread in time over a single one. You give a number and the
    software splits the sequence into contiguous equal groups. The table

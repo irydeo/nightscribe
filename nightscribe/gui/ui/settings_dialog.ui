@@ -145,7 +145,7 @@
             <item><spacer name="hsp_camtype"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
            </layout>
           </item>
-          <item><widget class="QLabel" name="lblH_camtype"><property name="text"><string>CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item><widget class="QLabel" name="lblH_camtype"><property name="text"><string>CCD, CMOS or DSLR; goes into the EXOTIC inits.json handoff and into the MPC report's instrument type (ADES mode CCD/CMO, 80-column column 15 C/B)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
           <item>
            <layout class="QHBoxLayout" name="row_binning">
             <item><widget class="QLabel" name="lbl_binning"><property name="text"><string>Pixel binning:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -251,6 +251,21 @@
             </layout>
            </item>
            <item><widget class="QLabel" name="lblH_marker_style"><property name="text"><string>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_annot">
+             <item><widget class="QLabel" name="lbl_annot"><property name="text"><string>Object annotation:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_annot_visible"><property name="text"><string>Show the circle with the object's name on the stacks</string></property><property name="toolTip"><string>The circle + name the astrometry run writes on each stack (an AIJ ANNOTATE card). Off, the plate opens with the object's cross only; the "A" button in the editor's top bar toggles it at any time</string></property></widget></item>
+             <item><spacer name="hsp_annot"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="row_mark_color">
+             <item><widget class="QLabel" name="lbl_mark_color"><property name="text"><string>Object marks:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QComboBox" name="cmb_mark_color"/></item>
+             <item><spacer name="hsp_mark_color"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_mark_color"><property name="text"><string>Colour of the object's marks in the editor (the full-frame crosshair, the cross the run measured with and the circle with the name): the object type's own colour (NEO blue, SN red, comet green…), the one the project wears, or one common colour for all of them</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
            <item>
             <layout class="QHBoxLayout" name="row_chart_data">
              <item><widget class="QLabel" name="lbl_chart_data"><property name="text"><string>Plate band:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

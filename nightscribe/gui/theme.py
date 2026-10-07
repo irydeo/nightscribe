@@ -84,6 +84,24 @@ KIND_LABELS = {
     "variable": "VAR",
 }
 
+# The colour of the object's marks in the editor: the full-frame crosshair
+# (the object mark), the cross the run measured with and the circle with the
+# name. One function resolves all three, so they cannot disagree: the object
+# TYPE's own colour by default, or ONE common colour for every mark (the red
+# the app has always used, and the object mark's own).
+C_OBJECT_MARK = "#ff6378"
+
+
+def mark_color(accent, current=C_OBJECT_MARK):
+    # @args: accent - the project's kind hue (a KIND_COLORS value) or None,
+    #        current - the colour the mark wears when the setting asks for
+    #        the common one
+    # @return: the colour the object's marks must wear
+    from ..config import config
+    if str(config.get("marker_color", "kind")) != "kind":
+        return current
+    return accent or current
+
 # Core palette — one warm-black blue family, no pure black.
 C_BG = "#0f121c"        # windows
 C_BASE = "#12141f"      # inputs, tables, cards

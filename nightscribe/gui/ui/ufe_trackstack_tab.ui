@@ -63,11 +63,17 @@
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="lbl_status">
+    <widget class="QPlainTextEdit" name="lbl_status">
      <property name="visible"><bool>false</bool></property>
      <property name="minimumSize"><size><width>0</width><height>34</height></size></property>
-     <property name="text"><string/></property>
-     <property name="wordWrap"><bool>true</bool></property>
+     <property name="maximumSize"><size><width>16777215</width><height>68</height></size></property>
+     <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+     <property name="styleSheet"><string notr="true">background: transparent; border: none;</string></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <property name="readOnly"><bool>true</bool></property>
+     <property name="plainText"><string/></property>
+     <property name="lineWrapMode"><enum>QPlainTextEdit::WidgetWidth</enum></property>
+     <property name="horizontalScrollBarPolicy"><enum>Qt::ScrollBarAlwaysOff</enum></property>
     </widget>
    </item>
    <item>
@@ -255,7 +261,7 @@
          <widget class="QCheckBox" name="chk_calibrate">
           <property name="text"><string>Apply the calibration</string></property>
           <property name="toolTip">
-           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves (needs the sequence to be dithered, and the run says so); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: measured on a real visit, the smooth vignetting alone is worth 0.087 mag of systematic error. When the library has no flat for this filter, a flat is built from the frames themselves, with no star in it, and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
           </property>
          </widget>
         </item>
@@ -367,6 +373,16 @@
        </widget>
       </item>
       <item>
+       <spacer name="hsp_view">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="row_obsactions">
+      <item>
        <widget class="QPushButton" name="btn_blink">
         <property name="enabled"><bool>false</bool></property>
         <property name="text"><string>Blink / montage…</string></property>
@@ -374,6 +390,22 @@
          <string>Writes one figure with every observation's stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</string>
         </property>
        </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_animate">
+        <property name="enabled"><bool>false</bool></property>
+        <property name="checkable"><bool>true</bool></property>
+        <property name="text"><string>Animate / verify</string></property>
+        <property name="toolTip">
+         <string>Plays the observation stacks here, in the main view, centred on the object and with ONE shared stretch: the object must stay put in the middle while the stars crawl, which is what says the detection is real. It writes nothing and asks for no viewer. Click again to stop</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="hsp_obsactions">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        <property name="sizeHint" stdset="0"><size><width>20</width><height>20</height></size></property>
+       </spacer>
       </item>
      </layout>
     </item>

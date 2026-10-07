@@ -976,14 +976,17 @@ class CalibrationWorker(QThread):
     failed = Signal(str)             # an unexpected error, in English
 
     def __init__(self, paths, db, export_dir=None, cfg=None,
-                 pseudo_flat=False):
+                 pseudo_flat=False, flat_path=None):
         super().__init__()
         self._paths = list(paths)
         self._db = db
         # P5: build a flat from the frames themselves for the filters the
         # library has no flat for. It is built ONCE for the whole visit
-        # (it needs every frame) and then applied to each one.
+        # (it needs every frame) and then applied to each one. `flat_path`
+        # is where the flat itself is written, so it can be LOOKED AT: it is
+        # a product of the visit (ADR-069).
         self._pseudo_flat = bool(pseudo_flat)
+        self._flat_path = str(flat_path) if flat_path else None
         self._export = str(export_dir) if export_dir else None
         self._cfg = cfg
         self._cancel = False
@@ -998,6 +1001,7 @@ class CalibrationWorker(QThread):
         reports, written = [], []
         flat = None
         flat_info = None
+        flat_file = None
         try:
             total = len(self._paths)
             if self._export:
@@ -1007,9 +1011,24 @@ class CalibrationWorker(QThread):
                 # change in five minutes), so it is built once here and then
                 # applied to every frame. It needs all the frames at the same
                 # time, which is why it cannot live inside the per-frame loop.
+                # The db goes with it so the pedestal is removed from the
+                # frames before the statistic (ADR-069): without it the flat
+                # comes out compressed.
                 flat, flat_info = calibration.pseudo_flat(
-                    self._paths, cancel=lambda: self._cancel,
+                    self._paths, db=self._db, cfg=self._cfg,
+                    cancel=lambda: self._cancel,
                     progress=lambda d, t: self.progress.emit(0, total))
+                # The flat itself is written as a product of the visit, so
+                # the observer can open it and see that it has no star in it
+                # (ADR-069). A flat nobody can look at is a flat nobody can
+                # check.
+                if flat is not None and self._flat_path:
+                    try:
+                        header = calibration.read_header(self._paths[0])
+                    except Exception:                          # noqa: BLE001
+                        header = None
+                    flat_file = calibration.export_flat(
+                        flat, self._flat_path, info=flat_info, header=header)
             for index, path in enumerate(self._paths, 1):
                 if self._cancel:
                     break
@@ -1034,7 +1053,8 @@ class CalibrationWorker(QThread):
             return
         self.finished.emit({"status": "cancelled" if self._cancel else "ok",
                             "reports": reports, "written": written,
-                            "pseudo_flat": flat_info})
+                            "pseudo_flat": flat_info,
+                            "flat_file": flat_file})
 
 
 class TrackStackWorker(QThread):
@@ -1620,8 +1640,14 @@ class TrackStackWorker(QThread):
         want_pseudo = bool(self._cfg_get("calib_pseudo_flat", False))
         if recipe.flat is None and want_pseudo:
             self.progress.emit("pseudoflat", 0, len(self._paths))
+            # The pedestal goes with it: the pseudo-flat is built from the
+            # frames with the SAME offset removed as the light, or the
+            # division mixes two different things and the flat's shape comes
+            # out compressed (measured on 1 s twilight frames: 44 % of the
+            # correction). See calibration._OffsetSubtractor.
             flat, info = calibration.pseudo_flat(
-                self._paths, cancel=lambda: self._cancel,
+                self._paths, db=db, cfg=self._cfg,
+                cancel=lambda: self._cancel,
                 progress=lambda d, t: self.progress.emit("pseudoflat", d, t))
             self._pseudo_info = info
         return calibration.FrameCalibrator(db, self._cfg, pseudo_flat=flat)

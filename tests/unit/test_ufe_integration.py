@@ -619,8 +619,10 @@ def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
            "entries": [{"name": "A", "kind": "comp",
                         "star": {"ra": 1.0, "dec": 2.0}}]}
     monkeypatch.setattr(mw.project, "get",
-                        lambda db_, pid: {"context": {"sequence": seq}})
-    calls = {"applied": 0, "loaded": []}
+                        lambda db_, pid: {"context": {"sequence": seq,
+                                                      "mag": 17.9,
+                                                      "mag_origin": "measured"}})
+    calls = {"applied": 0, "loaded": [], "mag": []}
 
     class _D:
         def apply_plate_state(self, st):
@@ -629,9 +631,48 @@ def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
         def load_saved_sequence(self, s):
             calls["loaded"].append(s)
 
+        # THE SETTER IS HERE ON PURPOSE, and it takes the two arguments the
+        # host passes. This double used to have no setter at all, so the
+        # getattr returned None, the call was skipped and the host's arity was
+        # never exercised: that is how a facade taking one argument shipped
+        # while the host called it with two (reported: the "measure series"
+        # button of a visit died with a TypeError). A double that exists to
+        # tolerate an old host must not be the reason a new call goes
+        # unchecked.
+        def set_target_magnitude(self, mag, source=None):
+            calls["mag"].append((mag, source))
+            return True
+
     window._load_editor_sequence(_D(), 1, "/x.fits")
     assert calls["applied"] == 1
     assert calls["loaded"] == [seq]
+    # and the magnitude landed WITH its origin: the figure's provenance is
+    # what the Compare tab's proposal and tooltip are built on
+    assert calls["mag"] == [(17.9, "measured")]
+
+
+def test_the_editor_opens_from_a_project_with_a_measured_magnitude(
+        window, dlg, monkeypatch):
+    # REPORTED (2026-10-07): the "measure series" button of a visit died with
+    #   TypeError: UfeDialog.set_target_magnitude() takes 2 positional
+    #   arguments but 3 were given
+    # The host resolves the setter with getattr and calls it with the
+    # magnitude AND its origin, and the dialog's facade only took the
+    # magnitude. Every unit test missed it: the host's call was exercised only
+    # with a double that had no setter at all, so the line never ran. This one
+    # goes through the REAL dialog, which is the whole point of having it.
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "find_file",
+        lambda db_, pid, path: {"meta": {"ufe": {"stretch": {}}}})
+    monkeypatch.setattr(
+        mw.project, "get",
+        lambda db_, pid: {"context": {"mag": 18.28,
+                                      "mag_origin": "measured"}})
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    window._load_editor_sequence(dlg, 1, "/x.fits")     # must not raise
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(18.28)
+    assert dlg.tab_compare._mag_origin == "measured"
 
 
 # ---------------- the workbench is one session at a time (issue) ------

@@ -217,6 +217,47 @@ def test_a7_no_magnitude_leaves_field_blank():
         "\n".join(rows), "Z41")["valid"] is True
 
 
+def test_the_instrument_mode_follows_the_camera_setting():
+    # The report used to declare CCD whatever the observer's camera was
+    # (reported 2026-10-07: "pone CCD y usamos CMOS"). The MPC's own value
+    # lists decide the names: the ADES "mode" is CCD or CMO (the code is
+    # CMO, not "CMOS") and the MPC 1992 column 15 is "C" for CCD and "B"
+    # for CMOS.
+    rows = mpc.to_ades_psv([_point()], "Z41", "2021 EQ3",
+                           {"camera_type": "CMOS"}).splitlines()
+    row = dict(zip(rows[0].split("|"), rows[1].split("|")))
+    assert row["mode"] == "CMO"
+    line = mpc.to_mpc80([_point()], "Z41", "2021 EQ3",
+                        {"camera_type": "CMOS"}).splitlines()[0]
+    assert len(line) == 80
+    assert line[14] == "B"
+    # a CCD says so in both formats
+    rows = mpc.to_ades_psv([_point()], "Z41", "2021 EQ3",
+                           {"camera_type": "CCD"}).splitlines()
+    row = dict(zip(rows[0].split("|"), rows[1].split("|")))
+    assert row["mode"] == "CCD"
+    line = mpc.to_mpc80([_point()], "Z41", "2021 EQ3",
+                        {"camera_type": "CCD"}).splitlines()[0]
+    assert line[14] == "C"
+    # A DSLR carries a CMOS sensor; an unknown type never invents a value
+    # (the old CCD is the honest floor)
+    assert mpc.instrument_mode({"camera_type": "DSLR"}) == ("CMO", "B")
+    assert mpc.instrument_mode(None) == ("CCD", "C")
+    assert mpc.instrument_mode({"camera_type": "nope"}) == ("CCD", "C")
+
+
+def test_the_instrument_mode_still_validates():
+    # The type lands inside the 80-column line and in the ADES row: the
+    # round trip through the validator (the same judge a pasted report
+    # passes) must stay green with either camera.
+    for cfg in ({"camera_type": "CMOS"}, {"camera_type": "CCD"}):
+        text = mpc.to_mpc80([_point()], "Z41", "2021 EQ3", cfg)
+        assert len(text.splitlines()[0]) == 80
+        assert mpc_report.validate(text, "Z41", "2021 EQ3")["valid"] is True
+        ades = mpc.to_ades_psv([_point()], "Z41", "2021 EQ3", cfg)
+        assert mpc_report.validate(ades, "Z41", "2021 EQ3")["valid"] is True
+
+
 def test_a7_dataclass_with_ra_dec_alias():
     # The app's AstrometryPoint names the fields ra/dec; the module accepts
     # both so no caller has to rename anything.

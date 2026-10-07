@@ -247,3 +247,60 @@ real visits (2025 FG18 and 2025 HL5):
    (agreement within ~3 %); the fine structure it does not correct (the dust) is
    worth 0.611 % = 0.007 mag. The result is said for what it is
    (`kind = "vignette_model"`), never as a full flat.
+
+**Revisión (2026-10-07): el pseudo-flat deja de rendirse, y el pedestal se
+quita (ADR-069)**. El punto 3 de arriba describía una rendición, y era
+correcta para el código de entonces: la máscara se calculaba **después** del
+estadístico, así que las estrellas ya estaban dentro y lo único que quedaba era
+devolver un modelo suave, que no es un flat (no corrige el polvo). Ahora la
+máscara se calcula **antes**, los píxeles enmascarados se tiran y el flat se
+interpola ahí (una convolución normalizada), así que un campo estático da un
+flat de resolución completa, con polvo y **sin ninguna estrella**: medido
+contra el master real de esa misma noche (150 flats), el máximo sin píxeles
+calientes pasa de 2,83 a **1,1136** contra el 1,1102 del real, y la desviación
+sobre los píxeles enmascarados de 33,83 % a **2,05 %**.
+
+Y el pseudo-flat lleva el pedestal de las tomas (`flat_obs = P + cielo × R`),
+que la normalización no quita: la forma salía **comprimida** y corregía solo el
+44 % del viñeteado en tomas de 1 s de crepúsculo (pedestal de 827 ADU sobre un
+cielo de 661). Ahora se construye de las tomas **con el offset ya restado**, el
+mismo master que usa la receta; sin master de offset la app lo dice y pide un
+bias. Esto además arregla un fallo que existía: con master de offset, la toma
+llegaba sin pedestal y se dividía por un flat que sí lo llevaba.
+
+El criterio de «¿lleva estrellas?» también cambia: el residuo era una **MAD
+escalada**, robusta por construcción, y un flat con un máximo de 2,83 la movía
+0,01 puntos (0,06 % contra 0,05 %). Ahora se mide la desviación sobre el
+suavizado **en los píxeles que se enmascararon**, que separa limpiamente
+(33,83 % contra 2,05 %). El residuo se conserva como cifra. Y el flat se
+escribe a FITS como producto de la visita, para poder mirarlo en el editor: un
+flat que nadie puede mirar es un flat que nadie puede comprobar.
+
+**Revision (2026-10-07): the pseudo-flat stops giving up, and the pedestal is
+removed (ADR-069)**. Point 3 above described a surrender, and it was right for
+the code of the time: the mask was computed **after** the statistic, so the
+stars were already inside it and the only thing left was to return a smooth
+model, which is not a flat (it does not correct the dust). Now the mask is
+computed **before**, the masked pixels are dropped and the flat is interpolated
+there (a normalised convolution), so a static field gives a full-resolution
+flat, with the dust and with **no star in it**: measured against the real
+master of that same night (150 flats), the maximum without the hot pixels goes
+from 2.83 to **1.1136** against the real flat's 1.1102, and the deviation over
+the masked pixels from 33.83 % to **2.05 %**.
+
+And the pseudo-flat carries the pedestal of the frames
+(`flat_obs = P + sky x R`), which the normalisation does not remove: the shape
+came out **compressed** and it corrected only 44 % of the vignetting on 1 s
+twilight frames (a pedestal of 827 ADU over a sky of 661). It is now built from
+the frames **with the offset already subtracted**, the same master the recipe
+uses; without an offset master the app says so and asks for a bias. This also
+fixes a bug that existed: with an offset master, the light arrived without its
+pedestal and was divided by a flat that still carried one.
+
+The "does it carry stars?" check changes too: the residual was a **scaled
+MAD**, robust by construction, and a flat with a maximum of 2.83 moved it by
+0.01 points (0.06 % against 0.05 %). It now measures the deviation from the
+smoothed flat **at the pixels that were masked**, which separates cleanly
+(33.83 % against 2.05 %). The residual is kept as a figure. And the flat is
+written to FITS as a product of the visit, so it can be looked at in the
+editor: a flat nobody can look at is a flat nobody can check.

@@ -296,22 +296,38 @@ the train and is biased away from the stars, and the smoothing (41 px, much
 larger than the PSF and much smaller than the vignetting) takes out what is
 left. Normalised to a median of one, it is a multiplicative flat.
 
-It does not replace a real flat: it measures the train's response **times**
-the sky's shape, so the flat-field error is larger. It is the honest
-fallback, and the recipe says which one was used.
+**When the stars do not move, the statistic alone cannot remove them**, and
+that is the normal case: measured on the author's own 2025 FG18 visit, the
+field drifts **2 px over 207 frames**. So the sources are **masked BEFORE the
+statistic** (what is more than 5σ above the smoothed percentile, and only what
+is **extended** is dilated 12 px: a single-pixel spike is a hot pixel, not a
+star, and dilating those masked 50 % of the frame), the masked pixels are
+dropped and the flat is **interpolated** there with a normalised convolution
+(`uniform(x·m) / uniform(m)`, which fills and smooths in one operation). A hot
+pixel is left **in** on purpose, and put back after the smoothing: it is fixed
+on the sensor, so the division is what removes it.
 
-**When the stars do not move, there is no pseudo-flat.** With a sidereal
-mount (the normal case) the same star sits on the same pixel all night, so
-the percentile keeps it and the "flat" divides every star by itself: a flat
-that carries the stars is worse than no flat. Measured on the author's own
-2025 FG18 visit, a comparison star on a bright star came out **1.08 mag**
-off. What IS usable from those frames is the **vignetting**, which is smooth
-and fixed: the app masks the sources (what is more than 5σ above the
-smoothed percentile, dilated 12 px) and fits a degree-4 surface. Measured
-against a real master flat of the same night, the agreement is within ~3 %
-(median 0.9963, p5–p95 0.954–1.045) and the fine structure it does not
-correct (the dust) is worth 0.6 % = 0.007 mag. The recipe says
-`vignette_model` and the note says what it is and what it does not correct.
+Measured against the author's own real master flat of that night (150 flats):
+the maximum **without the hot pixels** is **1.1136** against the real flat's
+**1.1102**, and the deviation from the smoothed flat over the masked pixels is
+**2.05 %** (it was 33.83 % before, when the flat carried the stars, and the
+real master itself is at 4.58 %, because it carries the dust). The fill is
+**1.50 %** of the pixels and the whole flat takes **18.6 s** for 207 frames.
+
+**The pedestal has to go first.** A pseudo-flat is built from the lights, so
+it carries their pedestal (`flat_obs = P + sky × R`), and the normalisation
+does not remove it: the shape comes out **compressed**. Measured on FG18, the
+pedestal is **827 ADU over a sky of 661** and the compression is `1/(1+p) =
+0.44`, so it was correcting only **44 % of the vignetting**. The app now
+builds it from the frames **with the same dark/bias removed as the light**,
+and says so when there is none.
+
+It does not replace a real flat: it measures the train's response **times**
+the sky's shape, so the flat-field error is larger (measured: **4.16 % = 0.045
+mag**, with the pedestal removed). It is the honest fallback, the recipe says
+which one was used, and the flat is written as a product of the visit so it can
+be **looked at**: a flat carrying a star is not a flat, and the way to know is
+to see it.
 
 ## T7. The calibration, inside the stacking
 

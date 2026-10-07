@@ -439,6 +439,11 @@ class MainWindow(QMainWindow):
         self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
+        # Which astrometry run the editor must SHOW when a visit is opened:
+        # (project_id, session_id, run_id) when it was opened from the
+        # Analysis tab's list (the observer picked one), None when it was
+        # opened from the visit (the newest run wins, as always).
+        self._astrometry_run_pref = None
         # ADR-043: the CCD block lives inside the open project's Capture
         # step, so this registry dies with the page (and rebirths with it)
         self._obs_widgets = {}
@@ -2166,6 +2171,17 @@ class MainWindow(QMainWindow):
             bool(config.get("chart_data", True)))
         dlg.chk_chart_boxes.setChecked(
             bool(config.get("chart_boxes", False)))
+        # the object's marks in the editor (the crosshair, the run's measured
+        # cross and the circle with the name): whether that circle opens
+        # shown, and the colour of all three
+        dlg.chk_annot_visible.setChecked(
+            bool(config.get("annot_visible", False)))
+        dlg.cmb_mark_color.addItem(
+            self.tr("The object type's colour"), "kind")
+        dlg.cmb_mark_color.addItem(self.tr("One common colour"), "common")
+        _mark = dlg.cmb_mark_color.findData(
+            config.get("marker_color", "kind"))
+        dlg.cmb_mark_color.setCurrentIndex(_mark if _mark >= 0 else 0)
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
         dlg.spn_horizon_margin.setValue(
             float(config.get("horizon_margin_deg", 0)))
@@ -2305,6 +2321,9 @@ class MainWindow(QMainWindow):
                    dlg.cmb_marker_style.currentData() or "ring")
         config.set("chart_data", dlg.chk_chart_data.isChecked())
         config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
+        config.set("annot_visible", dlg.chk_annot_visible.isChecked())
+        config.set("marker_color",
+                   dlg.cmb_mark_color.currentData() or "kind")
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
@@ -6177,7 +6196,10 @@ class MainWindow(QMainWindow):
                 "This run has no visit behind it: open the editor from the "
                 "visit whose frames you want to re-measure."), 8000)
             return
-        self._visit_astrometry(run["project_id"], run["session_id"])
+        # The run the observer PICKED is the one the editor must show, not
+        # the visit's newest (a visit holds many passes)
+        self._visit_astrometry(run["project_id"], run["session_id"],
+                               run_id=run["id"])
 
     def _analysis_astrometry_undo(self, tbl):
         # @args: tbl - the runs table
@@ -6664,11 +6686,20 @@ class MainWindow(QMainWindow):
         # sequence already built (plate state first, project second)
         self._load_editor_sequence(dlg, pid, paths[0])
 
-    def _visit_astrometry(self, pid, session_id):
+    def _visit_astrometry(self, pid, session_id, run_id=None):
         # ADR-062, phase 7 (D15): the visit's frames become a track & stack
         # run. The editor opens on the visit's first plate with the visit
         # armed (the astrometry hook), and the Track & Stack tab on stage.
-        # @args: pid - project id, session_id - the visit
+        # @args: pid - project id, session_id - the visit, run_id - the
+        #        execution the editor must SHOW (the one picked in the
+        #        Analysis tab's list), or None for the newest (the visit's
+        #        own button, whose meaning is "the last pass of this night")
+        # A visit accumulates several passes, and the tab restores the LAST
+        # one unless it is told otherwise: without this, opening the
+        # 2-observation run of a visit whose last pass was 1 observation
+        # showed 1 (reported 2026-10-07).
+        self._astrometry_run_pref = (
+            (pid, session_id, int(run_id)) if run_id is not None else None)
         if not self._use_ufe():
             self.statusBar().showMessage(
                 self.tr("Enable the unified editor in Settings → Development "
@@ -11496,6 +11527,11 @@ class MainWindow(QMainWindow):
             "photometry": _scalar(payload.get("photometry")),
             "register_report": _scalar(payload.get("register_report")),
             "calibration": _scalar(payload.get("calibration")),
+            # The PLAN of the run: which frames went into each observation.
+            # Without it a reopened run can only guess the "N frames" of each
+            # observation from its points, and the stack point carries 0 on
+            # purpose (core/astrometry.py): the combo read "1 frames".
+            "groups": _scalar(payload.get("groups")),
         }
         try:
             return json.loads(json.dumps(summary, ensure_ascii=False))
@@ -11625,16 +11661,50 @@ class MainWindow(QMainWindow):
             return None
         if not runs:
             return None
-        run = runs[-1]                    # oldest first: the newest one wins
+        # The run the editor was TOLD to show wins (the one picked in the
+        # Analysis tab's list); with none, the newest, which is what the
+        # visit's own "Astrometry" button means ("the last pass of the
+        # night").
+        pref = getattr(self, "_astrometry_run_pref", None)
+        run = None
+        if pref and pref[0] == pid and pref[1] == session_id:
+            run = next((r for r in runs if r["id"] == pref[2]), None)
+        if run is None:
+            run = runs[-1]                # oldest first: the newest one wins
         try:
             points = store.points_for_run(db, run["id"])
             files = project.files_for_session(db, session_id)
         except Exception as err:
             logger.warning("the astrometry result could not be read: %s", err)
             return None
-        stacks = [f.get("path") for f in files
-                  if (f.get("kind") == "stack") and f.get("path")
-                  and Path(str(f["path"])).exists()]
+        # The stacks: deduplicated (a visit used to register the same file
+        # once per look) and, when the files say so, only THIS run's. A visit
+        # accumulates the stacks of every pass, and matching them by the
+        # observation number alone showed ANOTHER pass's image (reported
+        # 2026-10-07: a 2-observation run came out with the first stack of a
+        # different run). An old run carries no NS_RUN card, and then the
+        # whole set is offered, as it always was.
+        from ..core import fits_io
+        stacks, seen = [], set()
+        for f in files:
+            path = f.get("path")
+            if f.get("kind") != "stack" or not path:
+                continue
+            path = str(path)
+            if path in seen or not Path(path).exists():
+                continue
+            seen.add(path)
+            stacks.append(path)
+        mine = []
+        for path in stacks:
+            try:
+                header = fits_io.read_header(path)
+            except Exception:
+                continue
+            if header.get("NS_RUN") == run["id"]:
+                mine.append(path)
+        if mine:
+            stacks = mine
         return {"run": run, "points": points, "stacks": stacks}
 
     def _ufe_manual_magnitude(self, run_id, group_index, mag, band=None):

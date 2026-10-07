@@ -108,11 +108,12 @@ def test_chart_annotations_group_on_the_site_tab(qapp):
     names = set(_tab_widgets(dlg, 0))
     for w in ["grp_chartann", "edt_observer", "edt_measurer",
               "edt_telescope", "edt_camera_model", "cmb_marker_style",
-              "chk_chart_boxes"]:
+              "chk_chart_boxes", "chk_annot_visible", "cmb_mark_color"]:
         assert w in names, f"{w} expected on the Site & equipment tab"
     # every field keeps its help-below label (the dialog's layout rule)
     for w in ["lblH_observer", "lblH_measurer", "lblH_teldesc",
-              "lblH_cammodel", "lblH_marker_style", "lblH_chart_boxes"]:
+              "lblH_cammodel", "lblH_marker_style", "lblH_chart_boxes",
+              "lblH_mark_color"]:
         assert w in names, f"{w} expected on the Site & equipment tab"
     dlg.deleteLater()
 

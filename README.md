@@ -41,10 +41,13 @@ Three missions, one loop:
    with the real data of your session.
 
 And the piece that ties them together: every chosen target becomes a
-**project**, a persistent entity with its own folder, that guides you
-through **plan → capture → process → publish** without re-asking you anything
-it already knows (coordinates, window, magnitude, exposure plan). Weeks later,
-the project is still there: follow-up visits, light curve, final outcome.
+**project**, a persistent entity with its own folder, that guides you through
+**Card → Capture → Analysis → Publishing** without re-asking you anything it
+already knows (coordinates, window, magnitude, exposure plan). And the app
+does not stop at the plan: it drives your mount and camera, and it calibrates,
+stacks and measures your own frames (astrometry, photometry, periods) without
+leaving the window. Weeks later, the project is still there: follow-up visits,
+light curve, final outcome.
 
 ## What you can follow
 
@@ -57,10 +60,14 @@ sky as context. This is what you get from each one:
   the still unconfirmed NEOCP candidates, preliminary orbital elements with
   their sigmas, computed from the MPC astrometry. The app knows your camera
   and tells you the maximum trail-free exposure; you export the ephemeris to
-  your planetarium and the sequence to your capture software, measure in your
-  astrometry tool and validate the report before sending it. The motion
-  animation, your frames star-aligned with a marker riding the predicted
-  position, is the smoking gun.
+  your planetarium and the sequence to your capture software, and then the
+  frames are **stacked and measured in the app** (the track & stack: solve the
+  reference, register, stack following the object, detect, sweep the velocity,
+  measure each observation), or you paste the astrometry your own tool
+  produced and the validator reviews it line by line. The MPC report is
+  generated in ADES or 80 columns and checked against the observations other
+  stations have published. The motion animation, your frames star-aligned with
+  a marker riding the object, is the smoking gun.
 - **Comets.** Live observed magnitudes from COBS, perihelion dates and
   activity flags, so you know how each comet is doing tonight, not last
   month.
@@ -80,7 +87,8 @@ sky as context. This is what you get from each one:
   the scientific point of re-observing. The card tells you whether the whole
   transit fits in your night, whether it is detectable with your aperture and
   when to start capturing, with a visual timeline, a pre-flight checklist and
-  a pre-filled export for EXOTIC.
+  the EXOTIC handoff: the app writes the `inits.json`, runs EXOTIC for you and
+  imports its light curve and parameters back into the project.
 - **Close approaches.** ESA NEOCC upcoming flybys: miss distance, estimated
   size and peak magnitude, to catch the week's fast visitor.
 - **HADS stars.** High-amplitude δ Scuti variables: they pulse so fast
@@ -94,7 +102,11 @@ sky as context. This is what you get from each one:
   extremum, your standing vigils (the T CrB eruption, the R CrB fade) checked
   daily against ZTF and the AAVSO community photometry, and the AAVSO
   editorial channel with its alerts and active campaigns. Whenever the star
-  is up tonight.
+  is up tonight. The frames are measured in the app (the photometric series:
+  a calibrated point per frame, the zero point anchored by a comparison star
+  every frame, the ensemble of comparisons with its outlier veto) and the
+  period is searched there too (Lomb-Scargle and PDM, with the false-alarm
+  probability and the folded curve by night).
 - **The Sun and the sky.** The state of the Sun with the latest NASA SDO
   channels and the NOAA indices, transits and shadows of Jupiter's moons
   filtered for your site, and a 60-day sky calendar computed locally: phases,
@@ -106,7 +118,7 @@ sky as context. This is what you get from each one:
 |---|---|
 | **Required** | Linux or Windows · Python 3.11+ (3.12 recommended) *or* the standalone installer (no Python needed) · ~500 MB of disk · an internet connection for the live data (everything else works offline) |
 | **Recommended** | Your **MPC observatory code** (e.g. `Z41`): the first-run wizard resolves your coordinates automatically and it unlocks the site-specific NEO list · your **local horizon file** (TheSkyX `.hrz` or simple `az alt` pairs) · your telescope aperture and camera pixel/focal length |
-| **Optional** | **CCDciel** running locally, if you want the app to drive the mount and camera (the first observatory integration; NINA and others are planned) · four free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, TNS bot, AAVSO token); see *Optional integrations* |
+| **Optional** | **CCDciel** running locally, if you want the app to drive the mount and camera (the first observatory integration; NINA and others are planned) · four free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, TNS bot, AAVSO token) · two optional external tools, **Find_Orb** (the check against other observers) and **EXOTIC** (the transit reduction); see *Optional integrations* |
 
 No account, no registration, no telemetry: NightScribe runs on your computer
 and talks only to the public data services listed below.
@@ -151,11 +163,15 @@ What using NightScribe actually feels like, in five scenes:
    for Cartes du Ciel and the sequence for your capture software; or, with
    CCDciel connected, you send the plan and start the run without leaving the
    app.
-4. **Processing.** You measure the stack in Tycho Tracker, the standard
-   astrometry tool, which already writes the MPC file. You **paste** the lines
-   into the project and NightScribe validates them one by one (format, your
-   MPC code, designation) before they leave: if a field slipped, you find out
-   here and not in the MPC's reply. The report stays filed with the session.
+4. **Analysis.** Back home you open the visit in the editor. The app solves
+   the reference frame, registers the sequence and **stacks it following the
+   object**; it looks for the dot, sweeps the velocity, measures every
+   observation twice (on its stack and per frame) and checks the result
+   against what the other stations have published. The MPC report comes out
+   in ADES or 80 columns with the middle-of-exposure instants and the
+   propagated uncertainties, ready to send. (You can also measure in Tycho
+   Tracker or another tool and **paste** the lines: NightScribe validates them
+   one by one before they leave.)
 5. **The weeks after.** The journal remembers that night by itself. The
    supernova you confirmed keeps its own light curve, and the dashboard nudges
    you when three nights have passed without a revisit. If you feel like
@@ -216,15 +232,20 @@ The flow that turns a moving dot into a reported observation:
   position (Horizons interpolated to the minute, not the stale plan), and
   **Astrometric Goto** adds a plate-solve-and-correct cycle that absorbs
   ephemeris error: the reliable route to NEOCPs with large uncertainties.
-- Process in your usual astrometry tool (Tycho Tracker or another) and
-  **paste the astrometry** into the project: NightScribe validates every line
-  (80-column or ADES PSV, your MPC code, the designation) and leaves the
-  **MPC report** packaged and filed. You send the email; the file is ready
-  and checked.
-- The **motion animation** is the smoking gun: your frames star-aligned, a
-  marker riding the *predicted* position with the predicted rate and PA and
-  the ephemeris source in the caption. If a dot stays under the marker while
-  the stars drift, that is your object.
+- The frames come home and the app does the astrometry: it solves the
+  reference frame, registers the sequence, stacks it following the object,
+  finds the dot, sweeps the velocity and measures every observation twice (on
+  its stack and per frame), flagging any disagreement. The result is checked
+  against the observations other stations have published and the **MPC
+  report** is generated in ADES PSV or 80 columns, with your camera's
+  instrument type, ready to send.
+- You can also measure in your usual tool (Tycho Tracker or another) and
+  **paste the astrometry** into the visit: NightScribe validates every line
+  (80-column or ADES PSV, your MPC code, the designation) before it leaves.
+- The **motion animation** is the smoking gun, now played in the editor: the
+  observation stacks centred on the object, the stars crawling while the
+  asteroid stands still. If it stands still in every panel, the detection is
+  solid.
 
 ### Confirm and follow supernovae
 
@@ -321,16 +342,66 @@ From the **Tools** menu:
 
 ### Drive your observatory (CCDciel)
 
-The fourth tab talks to your local **CCDciel** over JSON-RPC, only while
-CCDciel is actually running: status at a glance (version, CCD temperature,
-tracking, slewing), **Point telescope** (quick slew to a moving target's
-freshly computed position), **Astrometric Goto** (slew, capture, plate-solve
-and correction) and **live capture** (stage the project's saved plan and start
-the run).
+The **Capture** step of each project talks to your local **CCDciel** over
+JSON-RPC, only while CCDciel is actually running: status at a glance (version,
+CCD temperature, tracking, slewing), **Point telescope** (quick slew to a
+moving target's freshly computed position), **Astrometric Goto** (slew,
+capture, plate-solve and correction) and **live capture** (stage the project's
+saved plan and start the run).
 
 CCDciel is the first direct observatory integration; NINA and others are on
 the roadmap. Meanwhile, file-based sequence export already covers NINA (JSON),
 CCDciel itself and generic CSV.
+
+### Reduce and measure in the app (the editor)
+
+Everything the night produced opens in one workbench, the **unified FITS
+editor**: the plate with its histogram and stretch, a band that says what the
+plate itself knows (position, magnitude, date, exposure, kit, station, scale)
+and, hanging from each visit, the frames that came home. The work happens in
+tabs, and every figure it shows is explained where it appears.
+
+- **Photometry.** The comparison stars are proposed next to the target (never
+  the brightest of the field: they saturate), and the plate is measured with a
+  calibrated recipe (aperture or matched filter, sky, colour term, the
+  catalogue the zero point stands on). On a whole sequence the **series**
+  engine measures one point per frame, with the zero point anchored by a
+  comparison every frame, the ensemble of comparisons vetoing an outlier, the
+  optimum aperture per night and an honest multi-night detrend; the light
+  curve is drawn from it, and it exports as CSV or AAVSO EFF, or straight to
+  ExoClock.
+- **Period and phase.** Lomb-Scargle (with a floating mean) and PDM, the
+  spectral window, the false-alarm probability by bootstrap, how many cycles
+  the data really cover, and the folded curve night by night: a period is
+  claimed with its evidence, not as a bare number.
+- **Calibration.** A library of masters (dark/bias and flat) indexed by
+  camera, gain, temperature, exposure and filter, and a declarative recipe:
+  the flat is normalised, a dark already carries the bias, and a dark without
+  an exact exposure match is not scaled. When the library has no flat for the
+  filter, one is built from the dithered frames themselves and the run says
+  so. A star that touches the saturation or the linearity does not enter the
+  zero point.
+- **Astrometry (track & stack).** The sequence becomes MPC observations: the
+  reference frame is solved, the frames are registered (small rotation
+  included), the sequence is stacked **following the object** so its light is
+  concentrated while the stars trail, the dot is detected and the velocity
+  swept; each observation is stacked on its own and measured twice (on its
+  stack and per frame, the disagreement flagged). The result is checked
+  against the observations other stations published (Find_Orb, leave-one-out)
+  and the report is generated in ADES PSV or 80 columns, with the
+  middle-of-exposure instants, the propagated uncertainties and your camera's
+  instrument type. Below the detection gate there is a **manual mode** (mark
+  the object by eye on the whole-sequence stack) and the **animation** plays
+  the observations in the editor to see the asteroid stand still while the
+  stars crawl.
+- **Blink and annotate.** Your FITS blinked against a PanSTARRS DR1 g
+  reference requested with the exact geometry of your image (animated GIF,
+  H.264 MP4, before/after PNG), and an AIJ-compatible annotated copy of the
+  plate with the object's position written into the header.
+
+The external tools keep their place: what the app produces is standard FITS,
+ADES and AAVSO files, so Tycho Tracker, AstroImageJ, EXOTIC or your own
+scripts pick up exactly where it leaves off.
 
 ### Remember everything: journal and attention
 
@@ -409,6 +480,8 @@ service. If a source is down, the rest of the app never breaks; check
 | SIMBAD (CDS) | Transients and host galaxies (Harvard mirror as fallback) | 7 d | No |
 | TNS | Fresh transient positions, days before SIMBAD ingests them | 6 h | No (only for discovery images) |
 | NASA Exoplanet Archive | Planet period, radius, mass, host star | 7 d | No |
+| VizieR (CDS) | Star fields for the comparison sequences and the astrometric references (Gaia EDR3, APASS DR9, VSX) | 30 d | No |
+| MPC Observations API | What other stations have published about the object, for the check before sending | 6 h | No |
 | ALeRCE / ZTF | Reference light-curve context | 30 d | No |
 
 **Sun and environment:**
@@ -429,9 +502,12 @@ service. If a source is down, the rest of the app never breaks; check
 **Computed locally, no network at all:** Sun, Moon and planet positions
 (Schlyter's algorithms, arcminute precision), minor-body propagation (Kepler
 from the SBDB elements), transit instants, heliocentric Julian dates, the
-whole 60-day sky calendar and Jupiter's moon events. Images are credited
-(NASA/SDO, PanSTARRS, DSS); external websites (SolarMonitor, ETD, NEOfixer,
-TNS…) open in your browser, never embedded.
+whole 60-day sky calendar and Jupiter's moon events. And the **reduction
+itself**: the registration, the stack, the astrometric and photometric
+measurement, the series, the period search and the light curve are arithmetic
+on your own pixels, with no service involved. Images are credited (NASA/SDO,
+PanSTARRS, DSS); external websites (SolarMonitor, ETD, NEOfixer, TNS…) open in
+your browser, never embedded.
 
 ## Optional integrations
 
@@ -446,6 +522,8 @@ you so. Configure them in **Tools → Settings → Integrations**.
 | **TNS bot credentials** | Discovery images shown inside the app (respecting each survey's licence) |
 | **AAVSO API token** | Community photometry for the bright-star vigils |
 | **AAVSO observer code** | Filled into the photometry exports and the EXOTIC handoff |
+| **Find_Orb** (external binary) | The check of your astrometric measurement against the observations other stations published, before the MPC report. Without it the check is not available, and the app says so instead of pretending |
+| **EXOTIC** (external Python 3.10 or older) | The transit reduction: the app writes the handoff, runs EXOTIC for you and imports its light curve and parameters into the project. Without it the handoff is still yours to run by hand |
 
 ## Your data stays with you
 
@@ -462,13 +540,15 @@ Honesty section, so you know where the edges are:
 
 - **Not a planetarium.** It does not replace Stellarium or Cartes du Ciel: it
   exports ephemerides *to* them.
-- **It does not reduce your raw frames.** Calibration, stacking and
-  astrometric and photometric measurement happen in your usual tools
-  (Tycho Tracker, AstroImageJ, EXOTIC…). NightScribe prepares the night,
-  validates and archives the results, and writes the story.
-- **The MPC report is validated and filed; you send the email.** Astrometry
-  tools already generate it; NightScribe is the safety net that reviews it
-  before it leaves.
+- **It reduces, and it also lets you reduce elsewhere.** The app calibrates,
+  stacks and measures astrometry and photometry itself (see *Reduce and
+  measure in the app*), and what it produces is standard FITS, ADES and AAVSO
+  files, so the tools you already trust (Tycho Tracker, AstroImageJ…) keep
+  working on its output. **EXOTIC** stays external: the app orchestrates it,
+  it does not reimplement it.
+- **The MPC report is generated and validated; you send the email.** The app
+  writes it from its own measurements, or reviews the one you paste, and
+  checks it against the other stations before it leaves.
 - **Export formats**: the CCDciel sequence format is validated against a real
   CCDciel export, and the TheSkyX and Cartes du Ciel ephemerides against real
   imports; the NINA and generic-CSV sequence exports are starting points to
@@ -476,7 +556,7 @@ Honesty section, so you know where the edges are:
 - **Planning-grade sky events**: eclipses are *probable eclipses*, labelled as
   such, and Galilean moon events carry their ±10 min label.
 - **Status: alpha.** It is the daily driver of a real observatory (MPC Z41)
-  with a 1,300+ automated test suite, but expect sharp edges; and please
+  with a 3,000+ automated test suite, but expect sharp edges; and please
   report them.
 
 ## Quickstart and CLI
@@ -499,8 +579,10 @@ details):
 | `post <object>` | bilingual drafts + tweet (`--png` adds the charts) |
 | `solar` | Sun state (`--png` renders the panel) |
 | `blink <name> <fits>` | supernova blink vs PanSTARRS (`--video`, `--post`, `--zoom`, `--efecto blink/fade`…) |
+| `sequence <object>` | photometric sequence + finder chart (`--mag`, `--fov`, `--comps`, `--catalog gaia/apass`, `--fits` as background) |
 | `history` | the observing journal in the terminal |
 | `project …` | minimal project management: `list`, `create`, `advance`, `show`, `close`, `reopen`, `files` |
+| `inject <folder>` | injection and recovery: synthetic sources of a known brightness are added to a copy of your frames and measured back, to say how deep the pipeline really reaches |
 
 See [INSTALL.md](INSTALL.md) for full per-OS instructions, the pip package and
 the standalone installer, and [CONTRIBUTING.md](CONTRIBUTING.md) to hack on

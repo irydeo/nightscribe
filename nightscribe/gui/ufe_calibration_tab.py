@@ -87,6 +87,12 @@ class UfeCalibrationTab(QWidget):
         self.chk_pseudo_flat.toggled.connect(self._on_pseudo_flat)
         self.btn_calibrate.clicked.connect(self._on_calibrate)
         self._btn_label = self.btn_calibrate.text()
+        # ADR-069: the flat is written as a product of the visit and can be
+        # opened in the editor's own viewer, because the observer's criterion
+        # for "this is a flat" is looking at it and seeing no star in it.
+        self.btn_flat = self._ui.btn_flat
+        self.btn_flat.clicked.connect(self._on_see_flat)
+        self._flat_file = None
 
     def _on_pseudo_flat(self, on):
         # @args: on - the new state of the policy switch
@@ -331,25 +337,34 @@ class UfeCalibrationTab(QWidget):
                 "No visit with frames: open the editor from a visit."))
             return
         export_dir = None
+        flat_path = None
+        from .. import paths as paths_mod
+        folder = None
+        getter = getattr(host_of(self), "export_folder", None)
+        if callable(getter):
+            try:
+                folder = getter()
+            except Exception:
+                folder = None
+        base = Path(folder or paths_mod.data_dir())
         if self.chk_export.isChecked():
-            from .. import paths as paths_mod
-            folder = None
-            getter = getattr(host_of(self), "export_folder", None)
-            if callable(getter):
-                try:
-                    folder = getter()
-                except Exception:
-                    folder = None
-            export_dir = Path(folder or paths_mod.data_dir()) / "calibrados"
+            export_dir = base / "calibrados"
+        # The flat is a product of the visit like any other, and the whole
+        # point of writing it is being able to LOOK at it (ADR-069).
+        if self.chk_pseudo_flat.isChecked():
+            flat_path = str(base / "pseudo_flat.fits")
         from ..core.db import db
         from .workers import CalibrationWorker
         self.prg_calib.setVisible(True)
         self.prg_calib.setRange(0, len(paths))
         self.prg_calib.setValue(0)
         self.btn_calibrate.setText(self.tr("Cancel"))
+        self.btn_flat.setEnabled(False)
+        self._flat_file = None
         self._worker = CalibrationWorker(
             paths, db, export_dir, config,
-            pseudo_flat=self.chk_pseudo_flat.isChecked())
+            pseudo_flat=self.chk_pseudo_flat.isChecked(),
+            flat_path=flat_path)
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -417,6 +432,42 @@ class UfeCalibrationTab(QWidget):
                 "Pseudo-flat built from %1 frames (median %2 ADU).").replace(
                     "%1", str(info.get("n_frames"))).replace(
                     "%2", f"{float(info['median_adu']):.0f}")
+            # P5 rev (ADR-069): what the flat is made of, so the observer can
+            # judge it instead of trusting it. The stars are masked before the
+            # statistic and their pixels are filled from the sky around them;
+            # the two numbers that say whether that worked are how much was
+            # filled and how far the flat still deviates over those pixels.
+            parts = []
+            if info.get("n_sources") is not None:
+                parts.append(self.tr("%1 sources masked").replace(
+                    "%1", str(info["n_sources"])))
+            if info.get("filled_pct") is not None:
+                parts.append(self.tr("%1 % of the pixels filled").replace(
+                    "%1", f"{float(info['filled_pct']):.2f}"))
+            if info.get("hot_px"):
+                parts.append(self.tr(
+                    "%1 hot pixels kept in the flat (the division removes "
+                    "them)").replace("%1", str(info["hot_px"])))
+            if info.get("verify_pct") is not None:
+                parts.append(self.tr(
+                    "deviation over the masked ones: %1 %").replace(
+                        "%1", f"{float(info['verify_pct']):.2f}"))
+            if parts:
+                note += " " + "; ".join(parts) + "."
+            # The pedestal is not a detail: without a dark/bias the flat is
+            # built from frames that carry it, its shape comes out compressed
+            # and it corrects only part of the vignetting (measured: 44 % on
+            # 1 s twilight frames). It is said, not hidden.
+            off = info.get("offset") or {}
+            if off.get("n_applied"):
+                note += " " + self.tr(
+                    "Built with the offset removed (%1).").replace(
+                        "%1", ", ".join(off.get("applied") or []))
+            elif off.get("n_missing"):
+                note += " " + self.tr(
+                    "No dark/bias master: the pedestal stays in the flat, so "
+                    "its shape is compressed and only part of the vignetting "
+                    "is corrected. Index a bias for this camera.")
             if info.get("note"):
                 if info.get("kind") == "vignette_model":
                     # the smooth model is not a caveat, it is what was
@@ -426,3 +477,33 @@ class UfeCalibrationTab(QWidget):
                 else:
                     note += " " + self.tr("Warning:") + " " + info["note"]
             self._say(note)
+        # The flat is registered to the visit like any other product and the
+        # door to look at it is opened (ADR-069).
+        flat_file = payload.get("flat_file")
+        self._flat_file = str(flat_file) if flat_file else None
+        self.btn_flat.setEnabled(bool(self._flat_file))
+        if self._flat_file:
+            notify = getattr(host_of(self), "notify_saved", None)
+            if callable(notify):
+                try:
+                    notify([self._flat_file], "fits")
+                except Exception as err:                       # noqa: BLE001
+                    logger.warning("flat register failed: %s", err)
+
+    def _on_see_flat(self):
+        # @return: None. Opens the flat in the editor's own viewer. The
+        # observer's criterion for "this is a flat" is looking at it and
+        # seeing that no star is in it, and that is not something a note can
+        # replace.
+        path = self._flat_file
+        if not path:
+            self._say(self.tr(
+                "No flat has been built for this visit yet: run the "
+                "calibration with the pseudo-flat box checked."))
+            return
+        opener = getattr(host_of(self), "open_plate", None)
+        if callable(opener):
+            opener(str(path))
+        else:
+            self._say(self.tr("The flat is at %1").replace(
+                "%1", str(path)))

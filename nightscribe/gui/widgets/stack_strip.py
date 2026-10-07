@@ -92,14 +92,21 @@ class StackStrip(QWidget):
         finite = flat[np.isfinite(flat)]
         lo, hi = ((float(finite.min()), float(finite.max()))
                   if finite.size else (0.0, 1.0))
-        for (stack, center, label), crop in zip(items, crops):
-            self._row.addWidget(self._panel(crop, lo, hi, label))
+        for index, ((stack, center, label), crop) in enumerate(
+                zip(items, crops)):
+            self._row.addWidget(self._panel(crop, lo, hi, label, index))
         self._row.addStretch(1)
 
-    def _panel(self, crop, lo, hi, label):
+    def _panel(self, crop, lo, hi, label, index):
         # @args: crop - the already cropped panel (numpy), lo/hi - the
-        #        shared display range, label - the caption or None
+        #        shared display range, label - the caption or None,
+        #        index - the observation's index in the run
         # @return: the QFrame with the thumbnail and its caption
+        # The index is PASSED IN, never counted here: _panel() runs before
+        # addWidget(), so `self._row.count() - 1` gave the first panel -1
+        # (its click was dropped) and every other one the PREVIOUS index
+        # (clicking a stack loaded its neighbour). Measured 2026-10-07: the
+        # first thumbnail did nothing and the second loaded observation 1.
         disp = stretch.to_uint8(stretch.apply_stretch(crop, lo, hi, 0.7))
         disp = np.ascontiguousarray(disp)
         img = QImage(disp.data, THUMB_PX, THUMB_PX, THUMB_PX,
@@ -108,7 +115,6 @@ class StackStrip(QWidget):
         col = QVBoxLayout(box)
         col.setContentsMargins(0, 0, 0, 0)
         col.setSpacing(2)
-        index = self._row.count() - 1
         thumb = _Thumb(index, self.picked.emit, box)
         thumb.setPixmap(QPixmap.fromImage(img))
         thumb.setFixedSize(THUMB_PX, THUMB_PX)

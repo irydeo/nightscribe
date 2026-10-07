@@ -647,3 +647,82 @@ look and not for the limit, the rule of not stacking an unverified frame with
 its measured reason (the seeing, 0.11 mag), and the
 `NS_COMB`/`NS_ORDER`/`NS_NUSED`/`NS_LEFT` cards with which a stack says how it
 was made.
+
+**Nota (2026-10-07): la verificación se puede jugar sin exportar nada.** El punto 7
+montaba la secuencia centrada en un GIF o un montaje PNG, que hay que escribir y
+abrir fuera. La pestaña Track & Stack gana **«Animar o verificar»**: la misma
+secuencia, con el mismo estirado compartido, pero reproducida **en la vista
+principal del editor**, un apilado por observación. Cada frame se **alinea sobre
+el píxel del asteroide de la primera observación**, así que lo que se mueve es el
+campo de estrellas y el asteroide (con la cruz medida y la marca del proyecto
+encima) se queda quieto; no se recarga ninguna placa, así que ninguna otra
+pestaña se resetea. Los **niveles de histograma aplicados se conservan** al
+arrancar y los comparten todas las observaciones, y la **banda superior sigue a
+la observación en pantalla**: cada stack trae su propio header y la pestaña se lo
+da al editor, de modo que el movimiento, la posición medida y la magnitud que se
+leen son los de la observación que se está viendo. La pestaña posee el frame
+mientras dura (el mismo `set_frame_override` que la pestaña Blink) y lo suelta al
+salir de la pestaña. El GIF sigue existiendo para publicar; esto es para decidir
+si se publica. Además, el clic en una miniatura de «The observations» carga de
+verdad su observación (el índice del panel se pasaba mal y la primera miniatura
+no hacía nada) y el run **guarda las rutas de sus apilados**, así que mirarlos no
+los reescribe ni los vuelve a registrar en la visita.
+
+**Nota (2026-10-07): el tipo de instrumento del reporte sale de la cámara.** El
+punto 10 escribía `CCD` fijo en el campo ADES `mode` (y dejaba en blanco la
+columna 15 del formato de 80 columnas), así que un observador con sCMOS enviaba
+un dato falso sobre su propio detector. Ahora manda el ajuste **Camera type**:
+ADES `mode` vale `CCD` o `CMO` (el código del MPC para CMOS es `CMO`, no
+`CMOS`) y la columna 15 vale `C` o `B` (la tabla de códigos del propio MPC).
+
+**Note (2026-10-07): the verification can be played without exporting anything.**
+Item 7 built the centred sequence into a GIF or a still montage, which has to be
+written and opened outside. The Track & Stack tab gains **"Animate / verify"**:
+the same sequence, with the same shared stretch, but played **in the editor's
+main view**, one stack per observation. Every frame is **aligned on the pixel of
+the first observation's object**, so what moves is the star field and the
+asteroid (with the measured cross and the project mark on top of it) stays put;
+no plate is reloaded, so no other tab is reset. The **applied histogram levels
+are kept** when the loop starts and every observation shares them, and the
+**top band follows the observation on screen**: each stack brings its own header
+and the tab hands it to the editor, so the motion, the measured position and the
+brightness read are those of the observation being shown. The tab owns the frame
+while it runs (the same `set_frame_override` the Blink tab uses) and hands it
+back when the stage is left. The GIF still exists for publishing; this is for
+deciding whether to publish. Also, clicking a thumbnail in "The observations"
+really loads its observation now (the panel's index was passed wrong and the
+first thumbnail did nothing) and the run **keeps the paths of its stacks**, so
+looking at them never rewrites or re-registers them.
+
+**Note (2026-10-07): the report's instrument type comes from the camera.**
+Item 10 wrote a hardcoded `CCD` in the ADES `mode` cell (and left column 15 of
+the 80-column format blank), so an sCMOS observer submitted a false datum about
+their own detector. The **Camera type** setting is the source now: ADES `mode`
+is `CCD` or `CMO` (the MPC's code for CMOS is `CMO`, not `CMOS`) and column 15
+is `C` or `B` (the MPC's own code table).
+
+**Nota (2026-10-07): reabrir una visita muestra LA ejecución que abriste, y sus
+apilados.** Una visita acumula varias pasadas (el 2025 FG18 del autor tenía 17), y el
+botón «Open in the editor» de la lista de ejecuciones abría la visita, no la pasada: la
+pestaña restauraba siempre la **última** ejecución de esa noche. Abrir la de 2
+observaciones cuando la última era de 1 traía 1. Ahora el id elegido viaja en la apertura
+y manda sobre «la última» (el botón «Astrometry» de la ventana de la visita sigue
+significando la última pasada). Además, los apilados se emparejan con **su** ejecución
+por la tarjeta `NS_RUN` (una visita registra los de todas las pasadas, y casarlos sólo por
+el número de observación mostraba la imagen de otra pasada) y no se ofrecen dos veces, y
+el **plan de la ejecución** (qué frames fueron a cada observación) viaja en su resumen,
+así que un run reabierto dice «Observation 1 (103 frames)» y no el 0 del punto del stack
+leído como «1 frames».
+
+**Note (2026-10-07): reopening a visit shows THE run you opened, and its stacks.**
+A visit accumulates passes (the author's 2025 FG18 had 17), and the Analysis list's
+"Open in the editor" opened the visit, not the pass: the tab always restored the
+**last** run of that night. Opening the 2-observation one when the last was a
+1-observation pass brought 1. The picked id now travels with the open and wins over
+"the last" (the visit window's "Astrometry" button still means the last pass). Also,
+the stacks are matched to **their** run through the `NS_RUN` card (a visit registers
+the stacks of every pass, and matching them by observation number alone showed another
+pass's image) and are not offered twice, and the **run's plan** (which frames went into
+each observation) travels in its summary, so a reopened run says "Observation 1 (103
+frames)" instead of the stack point's 0 read as "1 frames".
+

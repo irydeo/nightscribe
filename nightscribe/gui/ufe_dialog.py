@@ -206,6 +206,9 @@ class UfeDialog(QWidget):
         # The observer's own toggles survive while the dialog stays open.
         from ..config import config
         self.btn_boxes.setChecked(bool(config.get("chart_data", True)))
+        # the object's annotation opens the way Settings says (the "A" toggle
+        # is the session's choice from there on)
+        self.btn_annot.setChecked(bool(config.get("annot_visible", False)))
         self._apply_bar_style()
         super().showEvent(event)
 
@@ -522,6 +525,13 @@ class UfeDialog(QWidget):
         self.btn_annot = self._ui.btn_annot
         self.btn_annot.toggled.connect(
             lambda checked: self.view.set_annotations_visible(checked))
+        # The object's annotation (the circle + name the run writes on the
+        # stacks) opens HIDDEN unless Settings says otherwise: the editor's
+        # job is the cross, and the "A" toggle brings the annotation back at
+        # any time. Set here as well as at every show so a plate loaded
+        # before the first show already opens the way the observer chose.
+        from ..config import config as _cfg
+        self.btn_annot.setChecked(bool(_cfg.get("annot_visible", False)))
         # ADR-046 rev.: what the plate's band says about the plate
         # (position, magnitude, date, exposure, kit, station, scale, field).
         # The object's name is the heading and stays. The configured
@@ -1087,6 +1097,23 @@ class UfeDialog(QWidget):
         # kind's colour is the app's grammar for "this object")
         if hasattr(self, "frames_list"):
             self.frames_list.set_accent((self._project_accent or {}).get("hue"))
+        # The object's marks wear the kind's colour too (or the common one,
+        # per Settings). The badge arrives AFTER set_object, so the mark has
+        # to be told again here, or it would keep the colour it opened with.
+        obj = self._object or {}
+        self.view.set_object_mark(obj.get("ra"), obj.get("dec"),
+                                  self._object_mark_color())
+
+    def _object_mark_color(self):
+        # @return: the colour the editor's object marks must wear: the object
+        #          type's own colour (the project's accent) or the common
+        #          one, per Settings. ONE resolver for the three marks (this
+        #          crosshair, the run's measured cross and the circle with
+        #          the name), so they cannot disagree.
+        # The accent is only there once the project's badge has arrived, and
+        # set_object runs before it: hence the getattr.
+        accent = (getattr(self, "_project_accent", None) or {}).get("hue")
+        return theme.mark_color(accent)
 
     def project_accent(self):
         # @return: {"hue", "kind", "label"} of the project this window is
@@ -1180,14 +1207,24 @@ class UfeDialog(QWidget):
                 self.state.toggle_flip(axis)
         self.tab_photometry.apply_state(st)
 
-    def set_target_magnitude(self, mag):
-        # @args: mag - the object's magnitude, or None when nobody knows it
+    def set_target_magnitude(self, mag, source=None):
+        # @args: mag - the object's magnitude, or None when nobody knows it,
+        #        source - "measured" | "predicted" | "manual" (or None for a
+        #        project that never recorded it)
         # @return: True when the field took it
         # The project knows the object's magnitude (from the planner, or
         # from the astrometry that measured it), and the sequence proposal
         # anchors on it. Landing it here is what keeps the Compare tab's
         # field from showing a default nobody chose.
-        return bool(self.tab_compare.set_target_magnitude(mag))
+        #
+        # The SECOND argument is not decoration: the figure's origin travels
+        # with it, and the interface says which one it is holding. This
+        # facade forgot to forward it when it grew one, so the host's call
+        # (two arguments) hit a one-argument method and the editor could not
+        # be opened from a project at all. The test that pinned this method
+        # called it with ONE argument, and the test of the host's call used a
+        # double with no setter at all: between the two, nobody checked.
+        return bool(self.tab_compare.set_target_magnitude(mag, source))
 
     def load_saved_sequence(self, seq):
         # ADR-047/048: when the open plate carries no sequence of its own,
@@ -2182,7 +2219,7 @@ class UfeDialog(QWidget):
         # view (re)places it on every plate load and solve by itself
         obj_dict = self._object or {}
         ra, dec = obj_dict.get("ra"), obj_dict.get("dec")
-        self.view.set_object_mark(ra, dec)
+        self.view.set_object_mark(ra, dec, self._object_mark_color())
         self.btn_mark.setEnabled(
             self.view._object_mark_radec is not None)
         if not self._object:
@@ -2225,6 +2262,26 @@ class UfeDialog(QWidget):
                 pass
         return None
 
+    def _band_header(self):
+        # @return: the header the band must describe. Normally the loaded
+        #          plate's own; but the astrometry tab can be PLAYING its
+        #          observations (its "Animate / verify" loop), and there the
+        #          plate on screen is a different stack each step whose header
+        #          is not the loaded one. The tab is asked first, so the
+        #          heading follows the loop (motion, measured position and
+        #          brightness of the observation being shown).
+        tab_ts = getattr(self, "tab_trackstack", None)
+        ask = getattr(tab_ts, "band_header", None)
+        if callable(ask):
+            try:
+                header = ask()
+            except Exception as err:
+                logger.warning("band header hook failed: %s", err)
+                header = None
+            if header:
+                return header
+        return self.state.header or {}
+
     def _chart_band(self):
         # The view's band provider (ADR-046 rev.): assembles what the plate
         # says about itself from the live state, following
@@ -2248,7 +2305,7 @@ class UfeDialog(QWidget):
             name = self.tab_compare.edt_target.text().strip()
         if not name and self.state.path:
             name = Path(self.state.path).stem
-        header = self.state.header or {}
+        header = self._band_header()
         meta = fits_meta.meta_from_header(header)
         if header.get("NS_NFRAM") is not None:
             # a stack is "N × T s": how many frames it combines
@@ -2317,7 +2374,7 @@ class UfeDialog(QWidget):
             point = None
             ask = getattr(tab, "series_point_for", None)
             if callable(ask):
-                meta_ = fits_meta.meta_from_header(self.state.header or {})
+                meta_ = fits_meta.meta_from_header(header)
                 point = ask(self.state.path, meta_.get("mjd"),
                             meta_.get("exptime_s"))
             if point is not None:
@@ -2346,8 +2403,7 @@ class UfeDialog(QWidget):
             measured_pos=facts.get("measured_pos"),
             predicted_mag=facts.get("predicted"),
             detection=facts.get("detection"),
-            equipment=chart_annotate.equipment_from_header(
-                self.state.header or {}, config),
+            equipment=chart_annotate.equipment_from_header(header, config),
             site=chart_annotate.site_from_config(config))
 
     def set_status(self, text, level="info"):

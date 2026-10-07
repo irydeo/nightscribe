@@ -92,6 +92,20 @@ _BAND_MAP = {
 _ADES_FIELDS = ("objid", "mode", "stn", "obsTime", "ra", "dec",
                 "rmsRA", "rmsDec", "mag", "band", "astCat", "ref", "subFmt")
 
+# The instrument type the report declares (2026-10-07). The MPC keeps its own
+# lists of allowed values and an unlisted one makes the whole batch be
+# rejected, so the names are the MPC's and not ours:
+# * ADES "mode": "CCD" or "CMO" (Complementary Metal Oxide Semiconductor).
+#   The code is CMO, NOT "CMOS": the long word is the description in the
+#   MPC's table, not the value.
+# * MPC 1992 (80 columns), column 15: "C" for CCD, "B" for CMOS.
+# A DSLR carries a CMOS sensor, so it reports as CMO / "B". The app's
+# Settings ("Camera type") is the single source: before this the report
+# hardcoded CCD and an sCMOS observer submitted a lie about their own
+# detector.
+_ADES_MODE = {"CCD": "CCD", "CMOS": "CMO", "DSLR": "CMO"}
+_MPC80_MODE = {"CCD": "C", "CMOS": "B", "DSLR": "B"}
+
 
 def _point_get(point, key, default=None):
     # @args: point - dict or object, key - field name, default - fallback
@@ -333,6 +347,16 @@ def _cfg_get(cfg, key, default):
     return default
 
 
+def instrument_mode(cfg):
+    # @args: cfg - Config object, dict or None
+    # @return: (ades_mode, mpc80_code) for the configured camera type: the
+    #          ADES "mode" value and the MPC 1992 column-15 code. An unknown
+    #          type falls back to CCD/"C", which is what the report always
+    #          wrote before the setting existed.
+    raw = str(_cfg_get(cfg, "camera_type", "CCD") or "CCD").strip().upper()
+    return (_ADES_MODE.get(raw, "CCD"), _MPC80_MODE.get(raw, "C"))
+
+
 def _iso_time(mjd):
     # @args: mjd - UTC Modified Julian Date (T_mid)
     # @return: "YYYY-MM-DDTHH:MM:SS.ssssss" ISO 8601, UTC, no trailing Z
@@ -353,12 +377,15 @@ def _iso_time(mjd):
 
 def to_mpc80(points, obs_code, designation, cfg=None):
     # @args: points - measured observations, obs_code - MPC station code,
-    #        designation - the object, cfg - Config (unused here, kept for
-    #        a uniform signature)
+    #        designation - the object, cfg - Config (the camera type)
     # @return: the 80-column block, one line per observation
     # Field positions are the ones core.mpc_report documents (_DESIG, _DATE,
     # _RA, _DEC, _MAG, _BAND, _STATION); a missing magnitude leaves the field
-    # blank instead of writing a zero that would read as a measurement.
+    # blank instead of writing a zero that would read as a measurement. The
+    # instrument type goes in column 15 (index 14): the MPC's own code table
+    # says "C" for CCD and "B" for CMOS, and leaving it blank said nothing
+    # about the detector.
+    _mode, mode_char = instrument_mode(cfg)
     packed, _note = pack_designation(designation, None)
     lines = []
     for point in points:
@@ -377,7 +404,7 @@ def to_mpc80(points, obs_code, designation, cfg=None):
             band_s = f"{band_code(band):<2}"
         line = (
             f"{packed[:5]:<5}"          # 0-4   packed designation
-            f"{'':<10}"                 # 5-14  notes (blank)
+            f"{'':<9}{mode_char}"       # 5-14  notes (blank) + type (15)
             f"{date:<17}"               # 15-31 packed date (T_mid)
             f"{ra_s:<12}"               # 32-43 RA
             f"{dec_s:<12}"              # 44-55 Dec
@@ -393,12 +420,16 @@ def to_mpc80(points, obs_code, designation, cfg=None):
 
 def to_ades_psv(points, obs_code, designation, cfg=None):
     # @args: points - measured observations, obs_code - MPC station code,
-    #        designation - the object id, cfg - Config (astCat comes from it)
+    #        designation - the object id, cfg - Config (astCat and camera
+    #        type come from it)
     # @return: the ADES PSV block, header + one row per observation
     # ADES carries what 80 columns cannot: the rmsRA/rmsDec and the
     # astrometric catalogue. Empty cells mark what was not measured; the
     # format itself makes those columns optional, so honesty costs nothing.
+    # The "mode" cell is the instrument type and comes from the camera
+    # setting (CCD / CMO), never hardcoded: see instrument_mode.
     astcat = _cfg_get(cfg, "astrometry_astcat", "Gaia2")
+    mode, _code = instrument_mode(cfg)
     lines = ["|".join(_ADES_FIELDS)]
     for point in points:
         ra, dec = _ra_dec(point)
@@ -413,7 +444,7 @@ def to_ades_psv(points, obs_code, designation, cfg=None):
         band_s = band_code(band) if mag is not None else ""
         row = [
             str(designation),
-            "CCD",
+            mode,
             str(obs_code).upper(),
             _iso_time(mjd),
             f"{ra:.6f}",

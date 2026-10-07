@@ -69,7 +69,7 @@
     <widget class="QCheckBox" name="chk_pseudo_flat">
      <property name="text"><string>Build a flat from the frames when the library has none</string></property>
      <property name="toolTip">
-      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It needs the sequence to be dithered: without dithering the stars survive the percentile and the app says so. This is the calibration's own policy and this tab is its single home: every pipeline that applies the calibration reads this same switch, the stack included</string>
+      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. Where they do NOT move (a static field: measured, 2 px over a whole visit) the app MASKS them, drops the masked pixels and interpolates the flat there, so no star can end up in it; a hot pixel is left in on purpose, so the division removes it. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It is built from the frames with the SAME dark/bias removed as the light: without one the pedestal compresses its shape (measured: 44 % of the correction on 1 s twilight frames) and the app says so. This is the calibration's own policy and this tab is its single home: every pipeline that applies the calibration reads this same switch, the stack included</string>
      </property>
     </widget>
    </item>
@@ -95,6 +95,15 @@
      <item>
       <widget class="QProgressBar" name="prg_calib">
        <property name="visible"><bool>false</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_flat">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>See the flat</string></property>
+       <property name="toolTip">
+        <string>Opens the flat that was built from the frames in the editor's own viewer, so it can be looked at: a flat carrying a star is not a flat, and the way to know is to see it. The figures it was built with (how many sources were masked, how much was filled, how many hot pixels were kept, and how far it still deviates over the masked pixels) are in the note above and in the FITS header</string>
+       </property>
       </widget>
      </item>
     </layout>

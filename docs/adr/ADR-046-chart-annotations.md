@@ -88,6 +88,19 @@ marcadores al instante: se aplica en la siguiente interacción o reapertura
 es la de la placa fuente cuando el llamador la conoce (UFE) y la del frame
 de trabajo en los caminos legacy/CLI.
 
+**Revisión (2026-10-07): las marcas del objeto son opcionales y llevan el color del tipo.**
+El círculo con el nombre que el run de astrometría escribe en cada apilado (tarjeta
+`ANNOTATE`) ya no sale por defecto: el editor abre la placa sólo con la cruz del objeto y
+el botón «A» de la barra superior lo devuelve cuando se quiere (`annot_visible`, por
+defecto apagado, es el valor de partida en cada apertura). El color de las tres marcas del
+objeto en el editor (la cruceta a todo el campo, la cruz que mide el run y ese círculo)
+lo decide `marker_color`: el propio del tipo de objeto (`theme.KIND_COLORS`, el mismo que
+tiñe la pestaña y el proyecto) por defecto, o **un color común** para las tres
+(`theme.C_OBJECT_MARK`, el rojo de la marca del objeto). Un solo resolutor
+(`theme.mark_color`) lo reparte, así que las tres no pueden discrepar; y en el caso del
+círculo el color viaja en la tarjeta, que es el modelo AIJ, así que el fichero dice lo
+mismo que se ve.
+
 ## English
 
 **Context.** The charts the observatory publishes carried only the object
@@ -362,3 +375,16 @@ is now symmetric both ways:
 - **Card-name rule**: eight characters or fewer. The app's own FITS reader
   (`core/fits_io.py`, ADR-018) does not understand `HIERARCH`, so a longer card is
   written by astropy and lost by the reader: the band would say there is no datum.
+
+**Revision (2026-10-07): the object's marks are optional and carry the kind colour.**
+The circle with the name that the astrometry run writes on every stack (the `ANNOTATE`
+card) no longer shows by default: the editor opens the plate with the object's cross
+only, and the top bar's "A" button brings it back when wanted (`annot_visible`, off by
+default, is the starting value at every show). The colour of the editor's three object
+marks (the full-frame crosshair, the cross the run measured with and that circle) is
+decided by `marker_color`: the object type's own (`theme.KIND_COLORS`, the one that
+tints the tab and the project) by default, or **one common colour** for all three
+(`theme.C_OBJECT_MARK`, the object mark's red). A single resolver
+(`theme.mark_color`) hands it out, so the three cannot disagree; and for the circle the
+colour travels in the card, which is the AIJ model, so the file says the same as what is
+seen.

@@ -761,6 +761,25 @@ def test_the_panel_column_shows_its_messages_whole():
     d.close()
 
 
+def test_the_band_header_follows_the_animation():
+    # The heading must describe the plate ON SCREEN; while the astrometry tab
+    # plays its observations ("Animate / verify") the plate on screen is not
+    # the loaded one, so the dialog asks the tab first and falls back to the
+    # loaded plate's own header when there is no animation.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    _app()
+    d = UfeDialog()
+    d.show()
+    _settle(d)
+    t = d.tab_trackstack
+    assert d._band_header() == (d.state.header or {})
+    t.band_header = lambda: {"NS_NFRAM": 3}
+    assert d._band_header() == {"NS_NFRAM": 3}
+    t.band_header = lambda: None
+    assert d._band_header() == (d.state.header or {})
+    d.close()
+
+
 def test_a_closed_group_can_announce_a_state_and_does_not_consume_it():
     # The method that will measure the brightness is a STATE, not news: the
     # chip has to come back when the group is closed again, because the

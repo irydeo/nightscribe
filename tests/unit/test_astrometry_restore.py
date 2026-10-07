@@ -75,6 +75,56 @@ def window(_point_db_at_tmpdir, qapp):
     w.close()
 
 
+@pytest.fixture(autouse=True)
+def _no_run_pref(window):
+    # The run the editor was told to show is a preference on the window: a
+    # test that sets it must not leak it into the next one.
+    window._astrometry_run_pref = None
+    yield
+    window._astrometry_run_pref = None
+
+
+def _write_stack(path, run_id=None, pixels=16):
+    # @args: path - where, run_id - the NS_RUN card (None leaves it out, as
+    #        an old run's file has it), pixels - the image side
+    # @return: the path as a string, with a readable 2D image
+    import numpy as np
+    from astropy.io import fits
+    hdu = fits.PrimaryHDU(np.zeros((pixels, pixels), dtype=np.float32))
+    if run_id is not None:
+        hdu.header["NS_RUN"] = int(run_id)
+        hdu.header["NS_STACK"] = ("object", "the stars are trails")
+    hdu.writeto(str(path), overwrite=True)
+    return str(path)
+
+
+def _payload2(mag=18.0):
+    # @return: the worker's dict for a run with TWO observations (the second
+    #          group measured from the next four frames)
+    import numpy as np
+    from nightscribe.core import astrometry
+
+    def _pt(x, mjd, gi, source, n):
+        return astrometry.AstrometryPoint(
+            ra=30.0, dec=10.0, rms_ra=0.2, rms_dec=0.2, x=x, y=x, snr=12.0,
+            mag=mag, band="G", mjd=mjd, n_frames=n, group_index=gi,
+            source=source)
+
+    return {
+        "status": "ok", "method": "sigma", "n_obs": 2, "n_failed": 0,
+        "groups": [(0, 4), (4, 8)],
+        "points": [(_pt(8.0, 61000.5, 0, "stack", 0),
+                    _pt(8.5, 61000.5, 0, "frames", 4), []),
+                   (_pt(9.0, 61000.6, 1, "stack", 0),
+                    _pt(9.5, 61000.6, 1, "frames", 4), [])],
+        "stacks": [(np.zeros((8, 8), dtype=np.float32), None),
+                   (np.zeros((8, 8), dtype=np.float32), None)],
+        "boxes": [(0, 0, 8, 8), (0, 0, 8, 8)],
+        "qs": [(8.0, 8.0), (9.0, 9.0)], "mids": [2461000.5, 2461000.6],
+        "frames": [],
+    }
+
+
 @pytest.fixture
 def visit(_point_db_at_tmpdir, tmp_path):
     # A project with one visit, and a stack file registered on it.
@@ -130,6 +180,9 @@ def _payload(mag=18.42):
         "stacks": [(np.zeros((8, 8), dtype=np.float32), None)],
         "star_stacks": [(np.zeros((8, 8), dtype=np.float32), None)],
         "boxes": [(0, 0, 8, 8)], "qs": [(8.0, 8.0)], "mids": [2461000.5],
+        # the plan: which frames went into each observation (the combo says
+        # it when the run is reopened)
+        "groups": [(0, 4)],
         "w0": None, "frames": [],
         # the whole-sequence stack and what the manual mark needs to use it
         # on a run that is reopened
@@ -181,6 +234,8 @@ def test_the_run_is_written_with_a_summary_the_visit_can_read_back(window,
     assert summary["ephem_band"] == "V"
     assert summary["ephem_mag_source"] == "horizons"
     assert summary["ephem_source"] == "horizons"
+    # the plan of the run: which frames went into each observation
+    assert summary["groups"] == [[0, 4]]
     # JSON in, JSON out: a numpy bool would have come back as the string
     # "True", which is truthy for the wrong reason
     import json
@@ -196,6 +251,58 @@ def test_the_visit_hands_back_its_last_run_with_points_and_stacks(window,
     assert data["stacks"] == [path]
     assert {p["source"] for p in data["points"]} == {"stack", "frames"}
     assert all(p["ra"] == pytest.approx(30.0) for p in data["points"])
+
+
+def test_the_editor_shows_the_run_that_was_picked(window, visit):
+    # A visit accumulates passes, and the editor used to show the newest of
+    # them whatever you had opened: picking the 2-observation run of a visit
+    # whose last pass had 1 brought 1 (reported 2026-10-07).
+    pid, sid, _path = visit
+    one = window._ufe_astrometry_persist(pid, sid, _payload())
+    two = window._ufe_astrometry_persist(pid, sid, _payload2())
+    # the visit's own button picks nothing: the newest wins, as always
+    assert window._ufe_astrometry_result(pid, sid)["run"]["id"] == two
+    # the run picked in the Analysis tab's list is the one shown
+    window._astrometry_run_pref = (pid, sid, one)
+    data = window._ufe_astrometry_result(pid, sid)
+    assert data["run"]["id"] == one
+    assert len({p["group_index"] for p in data["points"]}) == 1
+    window._astrometry_run_pref = (pid, sid, two)
+    data = window._ufe_astrometry_result(pid, sid)
+    assert data["run"]["id"] == two
+    assert len({p["group_index"] for p in data["points"]}) == 2
+    # a preference for ANOTHER visit is ignored: it cannot hijack this one
+    window._astrometry_run_pref = (pid, 9999, one)
+    assert window._ufe_astrometry_result(pid, sid)["run"]["id"] == two
+
+
+def test_the_stacks_of_other_passes_are_not_offered(window, visit, tmp_path):
+    # The visit registers the stacks of EVERY pass, and the restore matched
+    # them by the observation number alone: a 2-observation run came out
+    # with another pass's first image. The files say which run they belong
+    # to (NS_RUN), so only its own are offered.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    pid, sid, path = visit
+    other = _write_stack(tmp_path / "2026PY9_obs1_other.fits")
+    project.add_file(mw.db, pid, other, "stack", session_id=sid)
+    run_id = window._ufe_astrometry_persist(pid, sid, _payload())
+    _write_stack(path, run_id=run_id)
+    data = window._ufe_astrometry_result(pid, sid)
+    assert data["stacks"] == [path]
+
+
+def test_the_stacks_are_not_offered_twice(window, visit):
+    # A visit used to register the same stack once per look: the same path
+    # must not come back twice (the strip would show it twice).
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    pid, sid, path = visit
+    project.add_file(mw.db, pid, path, "stack", session_id=sid)
+    project.add_file(mw.db, pid, path, "stack", session_id=sid)
+    window._ufe_astrometry_persist(pid, sid, _payload())
+    data = window._ufe_astrometry_result(pid, sid)
+    assert data["stacks"] == [path]
 
 
 def test_an_undone_run_is_not_handed_back(window, visit):
@@ -262,6 +369,9 @@ def test_the_host_and_the_tab_agree_on_the_saved_run(window, visit, tmp_path,
     assert tab._result is not None and tab._result.get("restored")
     assert tab._result["box_all"] == (10, 20, 42, 52)
     assert tab._result["ephem_mag"] == pytest.approx(22.21)
+    # the plan of the run comes back too: "Observation 1 (4 frames)", not the
+    # stack point's 0 read as "1 frames"
+    assert tab._result["groups"] == [(0, 4)]
     assert tab.tbl_points.rowCount() == 1
     assert tab._result["stacks"][0][0] is not None      # read from the file
     assert tab.btn_undo.isEnabled()

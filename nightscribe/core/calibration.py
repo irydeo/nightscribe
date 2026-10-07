@@ -46,6 +46,7 @@ in float32.
 import datetime
 import json
 import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -495,6 +496,24 @@ def _as_float32(data):
 
 
 # ------------------------------------------------------- the pseudo-flat (P5)
+#
+# Revised 2026-10-07 (ADR-069). Two things changed, and both were measured
+# against the author's own real master flat of the same night (150 flats of
+# 2025-03-31, `tools/bench/bench_flat.py`):
+#
+# 1. THE MASK COMES BEFORE THE STATISTIC. The old version computed the
+#    percentile first and went looking for stars afterwards, so the stars
+#    were already inside it and the only thing left was to give up. On a
+#    STATIC field (measured on 2025 FG18: 2 px of drift in 207 frames, 17 to
+#    33 stars matched) the percentile cannot remove them at all: the flat
+#    came out with a maximum of 2.83 against the real flat's 1.11, and a
+#    comparison star sitting on a bright star went 1.08 mag off.
+# 2. THE PEDESTAL IS REMOVED. A pseudo-flat is built from the lights, so it
+#    carries their pedestal: flat_obs = P + sky * R. The normalisation does
+#    not remove it and the SHAPE comes out COMPRESSED. Measured: P = 827 ADU
+#    (56 % of the level) and the compression is 1/(1+p) = 0.44, so the flat
+#    was correcting only 44 % of the vignetting. With the pedestal removed,
+#    the agreement with the real flat goes from 15.6 % to 4.16 %.
 
 # The percentile the pseudo-flat takes over the frames. 33 % and not 50 %
 # because the sky and the stars only ADD light: a low percentile is
@@ -511,33 +530,47 @@ PSEUDO_FLAT_WINDOW = 41
 # work) and each one is O(1) per pixel, so the whole flat is seconds and not
 # minutes: a 41-px MEDIAN filter on 2048x2048 would be the minutes.
 PSEUDO_FLAT_PASSES = 3
-# Above this percentage of local residual, the flat still carries the stars:
-# the frames were not dithered, so the percentile did not average them away.
-# Measured on the synthetic case of the tests: a dithered set lands under
-# 1 %, a static set well above 5 %.
+# How much small-scale structure survived the smoothing, as a scaled MAD, in
+# per cent. KEPT AS A FIGURE, NOT AS THE CHECK: a scaled MAD is robust by
+# construction, the stars cover 0.3 % of the pixels, and a flat carrying them
+# (a maximum of 2.83) moves it by nothing at all (measured: 0.06 % with the
+# stars, 0.05 % without them). The check is PSEUDO_FLAT_VERIFY_PCT.
 PSEUDO_FLAT_RESIDUAL_PCT = 2.0
 # Rows per chunk when reading the frames: the percentile needs every frame at
-# the same time, so the pass is done in bands. 64 rows x 139 frames x 2048
-# px x 4 B = 73 MB, which is a working set and not a problem.
+# the same time, so the pass is done in bands. 64 rows x 207 frames x 2048
+# px x 4 B = 108 MB, which is a working set and not a problem.
 _PSEUDO_FLAT_ROWS = 64
-# ---- the star mask and the smooth model -------------------------------
-# When the frames are NOT dithered the flat carries the stars, and a flat
-# that carries the stars is worse than no flat: every star is divided by
-# itself. Measured on the author's own 2025 FG18 visit (sidereal tracking,
-# the stars do not move): a comparison star sitting on a bright star came
-# out 1.08 mag off, and the whole zero point was scrap.
-#
-# What IS still usable from those frames is the VIGNETTING, which is smooth
-# and fixed: a low-order surface fitted to the percentile where there are no
-# stars. Measured against the author's own real flat of the same night (a
-# master of 20 flats): the model agrees with it to within 3 % in the middle
-# of the field (p5-p95 of the ratio: 0.95-1.05), and the fine structure it
-# does not correct (the dust) is worth 0.6 % = 0.007 mag. The vignetting
-# itself is 13-22 % across the field, so correcting it is what matters.
-PSEUDO_FLAT_MASK_SIGMA = 5.0     # above the smoothed percentile by this many
-                                 # sigma = a source that does not move
-PSEUDO_FLAT_MASK_DILATE = 12     # px around it: the halo, the spikes, the
-                                 # bloom of a bright star
+
+# ---- the mask, the fill and the hot pixels (P5 rev) ---------------------
+# Above this many robust sigmas over the SMOOTHED percentile is a source that
+# does not move. It is the only detector that can see the FAINT stars: the
+# pixel noise is 117 ADU on a sky of 1552 (7.5 %), so a star worth 1 % of the
+# sky is at S/N 0.13 in one frame and only exists in the combination.
+PSEUDO_FLAT_MASK_SIGMA = 5.0
+# px around it: the halo, the spikes, the bloom of a bright star.
+PSEUDO_FLAT_MASK_DILATE = 12
+# What is not bigger than this is a HOT PIXEL and not a star: it is FIXED, so
+# it belongs in the flat (the division removes it) and it must NOT be
+# dilated. Measured on FG18: 10,150 isolated spikes, 0.242 % of the frame, up
+# to 9,232 ADU on a sky of 1,488. Dilating them masked 50 % of the frame.
+PSEUDO_FLAT_HOT_MAX_PX = 2
+# The check that replaced the MAD: how far the FINAL flat deviates from its
+# own smoothed version AT THE PIXELS THAT WERE MASKED, which is where a star
+# was and therefore where a bump cannot exist. Measured: 33.83 % on the flat
+# that carried the stars, 2.11 % on the masked one, and 4.58 % on the real
+# master (it carries the dust, which is not masked and is a dip, not a bump).
+PSEUDO_FLAT_VERIFY_PCT = 8.0
+# Above this fraction of filled pixels there is not enough sky left to model
+# anything, and the smooth vignetting model is what is left (see below).
+PSEUDO_FLAT_MAX_FILLED_PCT = 30.0
+# ---- the smooth vignetting model, the LAST resort -----------------------
+# A flat that carries the stars is worse than no flat: every star is divided
+# by itself. When the sky coverage is not enough to build a clean flat, what
+# IS still usable from those frames is the VIGNETTING, which is smooth and
+# fixed: a low-order surface fitted to the percentile where there are no
+# stars. Measured against the author's real flat: it agrees to within 3 %
+# (p5-p95 0.95-1.05) and the fine structure it does not correct (the dust) is
+# worth 0.6 % = 0.007 mag. The vignetting itself is 13-22 %.
 PSEUDO_FLAT_MODEL_ORDER = 4      # the total degree of the fitted surface
 _PSEUDO_FLAT_FIT_STRIDE = 8      # fit on every 8th pixel: the vignetting is
                                  # smooth, and 2048x2048 rows would be a
@@ -585,40 +618,178 @@ def _vignetting_model(raw, star_mask, order=PSEUDO_FLAT_MODEL_ORDER):
     return (model / norm).astype(np.float32), None
 
 
+def _star_mask(raw, ref, sigma=None, dilate=None):
+    # @args: raw - the per-pixel percentile over the frames, ref - its own
+    #        smoothed version, sigma - significance, dilate - px of halo
+    # @return: (mask, hot, stats): mask = the EXTENDED sources, dilated;
+    #          hot = the isolated spikes, NOT dilated
+    # WHAT IS WELL ABOVE THE SMOOTHED PERCENTILE IS A SOURCE THAT DOES NOT
+    # MOVE. It is the only detector that can see the faint ones: a star worth
+    # 1 % of the sky is at S/N 0.13 in a single frame (117 ADU of noise on a
+    # sky of 1552) and only exists in the combination.
+    #
+    # The split between EXTENDED and ISOLATED is what makes the mask usable:
+    # a star is extended (its core plus its halo) and a hot pixel is one
+    # pixel, fixed on the sensor. Measured on FG18: 10,150 isolated against 99
+    # extended, and dilating the isolated ones masked 50 % of the frame.
+    from scipy import ndimage
+    sigma = PSEUDO_FLAT_MASK_SIGMA if sigma is None else float(sigma)
+    dilate = PSEUDO_FLAT_MASK_DILATE if dilate is None else int(dilate)
+    diff = raw - ref
+    noise = float(outliers.scaled_mad(diff.ravel()))
+    flag = diff > sigma * max(noise, 1e-6)
+    lab, nl = ndimage.label(flag)
+    sizes = np.bincount(lab.ravel())[1:] if nl else np.array([])
+    big = np.zeros_like(flag)
+    hot = np.zeros_like(flag)
+    if nl:
+        big = np.isin(lab, np.nonzero(sizes > PSEUDO_FLAT_HOT_MAX_PX)[0] + 1)
+        hot = np.isin(lab, np.nonzero(sizes <= PSEUDO_FLAT_HOT_MAX_PX)[0] + 1)
+    mask = ndimage.binary_dilation(big, iterations=dilate) if dilate else big
+    stats = {"n_sources": int(nl), "n_hot": int(hot.sum()),
+             "n_masked": int(mask.sum()), "noise": noise}
+    return mask, hot, stats
+
+
+def _fill_masked(x, mask, window, passes):
+    # THE FILL AND THE SMOOTHING ARE THE SAME OPERATION: a normalised
+    # convolution, uniform(x * m) / uniform(m), which is a box filter that
+    # ignores what is missing and interpolates it from the sky around it. It
+    # is what makes a full-resolution flat WITH dust possible on a static
+    # field, where the pixels under a star hold no data in any frame.
+    #
+    # The price, said and not hidden: a dust mote sitting UNDER a star cannot
+    # be recovered, and the fraction filled is reported.
+    # @return: (filled float32, filled_pct)
+    from scipy import ndimage
+    valid = np.isfinite(x) & ~mask
+    y = np.where(valid, x, 0.0).astype(np.float32)
+    v = valid.astype(np.float32)
+    filled = float(100.0 * (1.0 - v.mean()))
+    for _ in range(max(1, int(passes))):
+        num = ndimage.uniform_filter(y, size=int(window), mode="nearest")
+        den = ndimage.uniform_filter(v, size=int(window), mode="nearest")
+        ok = den > 1e-6
+        y = np.where(ok, num / np.where(ok, den, 1.0), 0.0).astype(np.float32)
+        v = ok.astype(np.float32)
+    return y, filled
+
+
+class _OffsetSubtractor:
+    # A loader that removes the offset (dark or bias) as the frames are read,
+    # so the pseudo-flat is built from frames with the SAME pedestal as the
+    # light. Without it the division mixes two different things and the flat
+    # comes out COMPRESSED: measured on 1 s twilight frames of FG18, the
+    # pedestal is 827 ADU over a sky of 661 (56 % of the level) and the
+    # correction drops to 44 % of what it should be.
+    #
+    # The recipe is resolved from EACH frame's own header and cached by the
+    # key the recipe itself uses, so a visit is one query and not two hundred.
+
+    def __init__(self, db, cfg=None):
+        self._db = db
+        self._tol = (cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
+                     if cfg is not None else _DEFAULT_TEMP_TOL_C)
+        self._cache = {}
+        self.applied = set()          # the master names that were used
+        self.seen_paths = set()       # frames, not calls: the loader is asked
+        self.missing_paths = set()    # once PER BAND, so counting calls said
+                                      # 6,624 missing for a 207-frame visit
+
+    def __call__(self, path, box=None):
+        data, header = read_image(path, box)
+        out = _as_float32(data)
+        self.seen_paths.add(path)
+        try:
+            meta = meta_from_header(header)
+            temp = meta.get("temp_c")
+            key = (meta.get("camera"), meta.get("gain"),
+                   meta.get("exptime_s"), meta.get("filter"),
+                   (None if temp is None
+                    else int(round(float(temp) / max(self._tol, 1e-6)))))
+            recipe = self._cache.get(key)
+            if recipe is None:
+                recipe = resolve_recipe(self._db, meta, tol_c=self._tol)
+                self._cache[key] = recipe
+        except Exception as err:                  # never break the flat
+            logger.warning("pseudo-flat: the offset could not be resolved "
+                           "for %s (%s)", path, err)
+            self.missing_paths.add(path)
+            return out
+        if recipe.offset is None:
+            self.missing_paths.add(path)
+            return out
+        try:
+            off = _as_float32(read_image(recipe.offset.path, box))
+        except Exception as err:
+            logger.warning("pseudo-flat: the offset master could not be read "
+                           "(%s)", err)
+            self.missing_paths.add(path)
+            return out
+        if off.shape != out.shape:
+            self.missing_paths.add(path)
+            return out
+        self.applied.add(Path(recipe.offset.path).name)
+        return out - off
+
+    def summary(self):
+        # @return: how the pedestal was treated, for the flat's own report.
+        #          The counts are FRAMES and not calls, which is what the
+        #          observer reads.
+        return {"applied": sorted(self.applied),
+                "n_applied": len(self.seen_paths - self.missing_paths),
+                "n_missing": len(self.missing_paths)}
+
+
 def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
-                progress=None, cancel=None):
-    # @args: paths - the light frames of the visit, window/passes/order -
-    #        the recipe's knobs (defaults above), loader - callable(path,
-    #        box) -> array, progress - callable(done, total), cancel -
-    #        callable() -> True to stop
+                progress=None, cancel=None, db=None, cfg=None,
+                mask_sigma=None, mask_dilate=None):
+    # @args: paths - the light frames of the visit, window/passes/order - the
+    #        recipe's knobs (defaults above), loader - callable(path, box) ->
+    #        array, progress - callable(done, total), cancel - callable() ->
+    #        True to stop, db - Database (with it the pedestal is removed from
+    #        the frames first, see _OffsetSubtractor), cfg - Config (for the
+    #        temperature tolerance), mask_sigma/mask_dilate - the source
+    #        mask's knobs (defaults above; the tests use them to turn the mask
+    #        off and prove it is what keeps the stars out)
     # @return: (flat float32, info dict) or (None, info) when it cannot be
     #          built
     # A FLAT MADE FROM THE FRAMES THEMSELVES, for the observer who has none
     # (which is most of them: ADR-061 could only warn "no flat for this
     # filter" and leave the dust and the vignetting in).
     #
-    # The physics is the dither. The optical train's dust and the sensor's
-    # vignetting are FIXED on the frame, so they survive any statistic taken
-    # over frames; the stars MOVE from frame to frame, so a low percentile
-    # over the set removes them, and the smoothing takes out what is left of
-    # their bumps. What comes out is a multiplicative map of the train,
-    # normalised to a median of one, which is exactly what a flat is.
+    # The physics is that the train's dust and the sensor's vignetting are
+    # FIXED on the frame, so they survive any statistic taken over the frames,
+    # while the stars MOVE. When they do NOT move (measured on FG18: 2 px of
+    # drift over 207 frames, 17 to 33 stars matched) the statistic alone
+    # cannot remove them, so the sources are MASKED, the masked pixels are
+    # dropped, and the flat is INTERPOLATED there from the sky around them.
+    # What comes out is a multiplicative map of the train, normalised to a
+    # median of one, with no star in it: measured against the author's own
+    # real flat, the maximum agrees to 0.3 % (1.1137 against 1.1102) where
+    # the version without the mask gave 2.83.
     #
-    # It is NOT a substitute for a real flat: a true flat measures the
-    # train's response and this one measures the train's response times the
-    # sky's shape, so the flat-field error is larger. It is the honest
-    # fallback, and the recipe line says which one was used.
+    # It is NOT a substitute for a real flat: a true flat measures the train's
+    # response and this one measures that response times the sky's shape, so
+    # the flat-field error is larger (measured: 4.16 % = 0.045 mag with the
+    # pedestal removed). It is the honest fallback, and the recipe line says
+    # which one was used.
     window = int(PSEUDO_FLAT_WINDOW if window is None else window)
     passes = int(PSEUDO_FLAT_PASSES if passes is None else passes)
     order = float(PSEUDO_FLAT_ORDER if order is None else order)
-    loader = loader or read_image
+    subtractor = _OffsetSubtractor(db, cfg) if db is not None else None
+    load = subtractor if subtractor is not None else (loader or read_image)
     paths = list(paths or [])
     info = {"n_frames": len(paths), "window": window, "passes": passes,
             "order": order, "median_adu": None, "residual_pct": None,
-            "kind": "pseudo_flat", "model_range": None, "note": ""}
+            "kind": "pseudo_flat", "model_range": None, "note": "",
+            "mask_pct": None, "filled_pct": None, "hot_px": None,
+            "n_sources": None, "verify_pct": None, "offset": None,
+            "seconds": None}
     if not paths:
         info["note"] = "no frames to build a flat from"
         return None, info
+    t0 = time.time()
     from scipy import ndimage
     try:
         header = read_header(paths[0])
@@ -639,21 +810,20 @@ def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
         band = np.empty((total, y1 - y0, nx), dtype=np.float32)
         for k, path in enumerate(paths):
             try:
-                data = loader(path, (0, y0, nx, y1))
+                data = load(path, (0, y0, nx, y1))
             except Exception as err:
                 logger.warning("pseudo-flat: %s could not be read (%s)",
                                path, err)
                 band[k] = np.nan
                 continue
             band[k] = _as_float32(data)
-        # The order statistic over the FRAMES, per pixel: the stars move,
-        # the train does not. It is taken with a PARTITION and not with
+        # The order statistic over the FRAMES, per pixel: the stars move, the
+        # train does not. It is taken with a PARTITION and not with
         # np.percentile: the percentile sorts (or interpolates) the whole
         # band, and the answer wanted here is one element of the ordered
         # list, which partition gives in O(n) instead of O(n log n).
         # Measured on the real 2025 UR visit (140 frames of 2048x2048): 197 s
-        # with the percentile, 12 s with the partition, and the same flat
-        # (median 4461 ADU against 4460, residual 1.342 % against 1.341 %).
+        # with the percentile, 12 s with the partition, and the same flat.
         #
         # The low order is also what makes a NaN frame harmless: a partition
         # puts the NaNs at the end of the ordering, and the 33rd percentile
@@ -668,56 +838,94 @@ def pseudo_flat(paths, window=None, passes=None, order=None, loader=None,
         info["note"] = "no frame could be read"
         return None, info
     raw = np.nan_to_num(raw, nan=float(np.nanmedian(raw)))
-    # the smoothing: `passes` box filters, which is the cheap Gaussian
+    if subtractor is not None:
+        info["offset"] = subtractor.summary()
+    # The smoothed percentile: the reference the mask is measured against, and
+    # the smoothing the flat used to have.
     smooth = raw
     for _ in range(max(1, passes)):
         smooth = ndimage.uniform_filter(smooth, size=window, mode="nearest")
-    norm = float(np.median(smooth))
-    if not np.isfinite(norm) or norm <= 0:
+    norm0 = float(np.median(smooth))
+    if not np.isfinite(norm0) or norm0 <= 0:
         info["note"] = "the flat has a non-positive median"
         return None, info
-    flat = (smooth / norm).astype(np.float32)
-    info["median_adu"] = norm
-    # How much small-scale structure survived the smoothing: the stars, if
-    # the frames were not dithered. It is measured on the flat itself, so
-    # the warning does not depend on anybody remembering to say whether the
-    # sequence was dithered.
-    inner = raw[window:-window, window:-window] if ny > 3 * window \
-        else raw
+    # How much small-scale structure survived the smoothing, as a FIGURE and
+    # not as the check: a scaled MAD is robust, so a flat carrying the stars
+    # (a maximum of 2.83) moves it by nothing at all (measured: 0.06 % with
+    # the stars, 0.05 % without them). The check is verify_pct, below.
+    inner = raw[window:-window, window:-window] if ny > 3 * window else raw
     ref = smooth[window:-window, window:-window] if ny > 3 * window else smooth
     if inner.size and ref.size:
         ratio = (inner / np.maximum(ref, 1e-6)) - 1.0
-        info["residual_pct"] = float(
-            100.0 * outliers.scaled_mad(ratio.ravel()))
-    # THE STAR MASK: what is well above the SMOOTHED percentile (the train's
-    # own response, stars averaged away) is a source that does not move. The
-    # noise is the MAD of the difference itself, which the stars (a small
-    # fraction of the pixels) cannot inflate.
-    diff = raw - smooth
-    noise = float(outliers.scaled_mad(diff.ravel()))
-    star_mask = diff > PSEUDO_FLAT_MASK_SIGMA * max(noise, 1e-6)
-    info["mask_pct"] = float(100.0 * star_mask.mean())
-    if info["residual_pct"] is not None \
-            and info["residual_pct"] > PSEUDO_FLAT_RESIDUAL_PCT:
-        # The frames are not dithered: the stars are in the flat, and a flat
-        # that carries the stars is worse than no flat (each star divided by
-        # itself). What IS usable is the VIGNETTING, which is smooth: a
-        # low-order surface fitted to the percentile where there are no
-        # stars. The model is said for what it is: it does not correct the
-        # dust.
-        model, why = _vignetting_model(raw, star_mask)
+        info["residual_pct"] = float(100.0 * outliers.scaled_mad(
+            ratio.ravel()))
+    # THE MASK, BEFORE ANYTHING ELSE IS DECIDED: the stars never enter the
+    # flat, and the hot pixels stay in it.
+    mask, hot, mstats = _star_mask(raw, smooth, sigma=mask_sigma,
+                                   dilate=mask_dilate)
+    info["mask_pct"] = float(100.0 * mask.mean())
+    info["hot_px"] = int(hot.sum())
+    info["n_sources"] = int(mstats["n_sources"])
+    # THE FILL, which is also the smoothing.
+    flat_raw, filled = _fill_masked(raw, mask, window, passes)
+    info["filled_pct"] = filled
+    # THE HOT PIXELS GO BACK AFTER THE SMOOTHING. They are FIXED, so they are
+    # part of the train's response and the division removes them; but the box
+    # filter would dilute a single pixel 1681 times and the division would
+    # then leave it exactly where it was (measured: 1484 ADU in the smoothed
+    # flat against 1744 in the statistic, over a sky of 1488).
+    if hot.any():
+        flat_raw = np.where(hot, raw, flat_raw)
+    norm = float(np.median(flat_raw))
+    if not np.isfinite(norm) or norm <= 0:
+        info["note"] = "the flat has a non-positive median"
+        return None, info
+    flat = (flat_raw / norm).astype(np.float32)
+    info["median_adu"] = norm
+    info["seconds"] = time.time() - t0
+    # The flat's own range, and the one figure that says whether a STAR got in:
+    # its maximum OUTSIDE the hot pixels. The hot pixels are deliberately kept
+    # in the flat (the division removes them) and on a 1 s twilight frame they
+    # reach 6.2 times the sky, so the raw maximum says nothing by itself: the
+    # measured FG18 flat goes to 6.22 with them and to 1.11 without, against a
+    # real flat's 1.11.
+    info["flat_min"] = float(flat.min())
+    info["flat_max"] = float(flat.max())
+    info["flat_max_no_hot"] = float(flat[~hot].max()) if hot.any() \
+        else float(flat.max())
+    # THE CHECK: how far the flat deviates from its own smoothed version AT
+    # THE PIXELS THAT WERE MASKED, which is where a star was and therefore
+    # where a bump cannot exist. Measured: 33.83 % on the flat that carried
+    # the stars, 2.11 % on this one, and 4.58 % on the real master (which
+    # carries the dust, and the dust is not masked and is a dip).
+    if mask.any():
+        ref2 = flat
+        for _ in range(max(1, passes)):
+            ref2 = ndimage.uniform_filter(ref2, size=window, mode="nearest")
+        dev = np.abs((flat / np.maximum(ref2, 1e-6)) - 1.0)[mask]
+        info["verify_pct"] = float(100.0 * np.percentile(dev, 99))
+    if filled > PSEUDO_FLAT_MAX_FILLED_PCT:
+        # Not enough sky left to build a flat: what IS usable is the
+        # VIGNETTING, which is smooth, so a low-order surface is fitted where
+        # there are no sources. It does not correct the dust and it says so.
+        model, why = _vignetting_model(raw, mask)
         if model is None:
-            info["note"] = ("the frames were not dithered, so a flat from "
-                            "them would carry the stars, and " + why)
+            info["note"] = ("the sources cover almost the whole frame, so a "
+                            "flat from it would be all interpolation: " + why)
             return None, info
         info["kind"] = "vignette_model"
         info["median_adu"] = float(np.median(raw))
         info["model_range"] = (float(model.min()), float(model.max()))
-        info["note"] = ("a smooth model of the vignetting (the frames were "
-                        "not dithered, so a flat from them would carry the "
-                        "stars): it matches a real flat to within ~3 % and "
-                        "does not correct the dust")
+        info["note"] = ("a smooth model of the vignetting (the sources cover "
+                        f"{filled:.0f} % of the frame, so a flat from it "
+                        "would be all interpolation): it does not correct "
+                        "the dust")
         return model, info
+    if info["verify_pct"] is not None \
+            and info["verify_pct"] > PSEUDO_FLAT_VERIFY_PCT:
+        info["note"] = ("the flat still deviates "
+                        f"{info['verify_pct']:.1f} % over the sources that "
+                        "were masked: it may still carry them")
     return flat, info
 
 
@@ -906,5 +1114,62 @@ def export_calibrated(data, header, out_path, report=None):
                                     f"(norm {report.flat_norm:.3g})"
         for note in report.warnings:
             hdu.header["HISTORY"] = f"warning: {note}"
+    hdu.writeto(str(out_path), overwrite=True)
+    return str(out_path)
+
+
+def export_flat(flat, out_path, info=None, header=None):
+    # @args: flat - the flat (normalised, float32), out_path - where to write,
+    #        info - the pseudo_flat info dict (its figures go into the header),
+    #        header - an optional header to carry over (the first frame's)
+    # @return: the path written
+    # THE FLAT IS A PRODUCT OF THE VISIT, and it is written so it can be
+    # LOOKED AT. The observer's own criterion for "this is a flat and not a
+    # map of the stars" is to see it, and a figure in a note is not the same
+    # thing. It is also what makes it auditable, and what lets it be taken to
+    # another tool (PixInsight included) to be compared or refined.
+    #
+    # The cards are short, because a FITS keyword is 8 characters, and each
+    # one carries a figure the flat was built with.
+    from astropy.io import fits
+    hdu = fits.PrimaryHDU(np.asarray(flat, dtype=np.float32))
+    for key in ("INSTRUME", "TELESCOP", "FILTER", "GAIN", "EXPTIME",
+                "CCD-TEMP", "DATE-OBS", "OBJECT", "SITELAT", "SITELONG"):
+        if header and key in header:
+            try:
+                hdu.header[key] = header[key]
+            except (ValueError, TypeError):
+                continue
+    hdu.header["IMAGETYP"] = "FLAT"
+    hdu.header["HISTORY"] = "NightScribe pseudo-flat (ADR-069)"
+
+    def _round(value):
+        # @return: the figure rounded for a FITS card, or None when there is
+        #          nothing to say (a missing figure is not a zero)
+        return None if value is None else round(float(value), 3)
+
+    if info:
+        for key, value in (("NS_FLAT", info.get("kind")),
+                           ("NS_NFRA", info.get("n_frames")),
+                           ("NS_MASK", _round(info.get("mask_pct"))),
+                           ("NS_FILL", _round(info.get("filled_pct"))),
+                           ("NS_HOT", info.get("hot_px")),
+                           ("NS_VERIF", _round(info.get("verify_pct"))),
+                           ("NS_RESID", _round(info.get("residual_pct")))):
+            if value is None:
+                continue
+            try:
+                hdu.header[key] = value
+            except (ValueError, TypeError):
+                continue
+        off = info.get("offset") or {}
+        if off.get("n_applied"):
+            hdu.header["HISTORY"] = ("offset removed: "
+                                     + ", ".join(off.get("applied") or []))
+        elif off.get("n_missing"):
+            hdu.header["HISTORY"] = ("no dark/bias: the pedestal stays in "
+                                     "the flat and compresses its shape")
+        if info.get("note"):
+            hdu.header["HISTORY"] = "note: " + str(info["note"])
     hdu.writeto(str(out_path), overwrite=True)
     return str(out_path)

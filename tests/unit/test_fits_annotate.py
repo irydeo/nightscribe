@@ -250,6 +250,25 @@ def test_read_annotations_roundtrip(tmp_path):
                      "color": "orange", "label": "SN test"}]
 
 
+def test_the_annotation_colour_can_be_chosen(tmp_path):
+    # The colour is the LAST field of the ANNOTATE card. The app writes its
+    # own (orange) unless a caller asks for another, and the reader hands
+    # back whatever was written (a name or a "#rrggbb").
+    src = tmp_path / "src.fits"
+    _make_fits(src)
+    out = tmp_path / "out.fits"
+    fits_annotate.write_annotated_fits(
+        src, out, sn_xy=(10.0, 10.0), obj_name="2026 QX", color="#4484ef")
+    assert fits_io.read_header(out)["ANNOTATE"] == \
+        "10.00,10.00,30,1,0,1,1,#4484ef"
+    assert fits_annotate.read_annotations(out)[0]["color"] == "#4484ef"
+    # no colour asked for keeps the app's own
+    out2 = tmp_path / "out2.fits"
+    fits_annotate.write_annotated_fits(
+        src, out2, sn_xy=(10.0, 10.0), obj_name="2026 QX")
+    assert fits_io.read_header(out2)["ANNOTATE"].endswith(",orange")
+
+
 def test_read_annotations_plain_and_broken(tmp_path):
     src = tmp_path / "plain.fits"
     _make_fits(src)

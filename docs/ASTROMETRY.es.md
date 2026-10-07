@@ -78,7 +78,9 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    magnitud, porque sin flat el objeto y las comparsas caen en zonas distintas
    del viñeteado y eso vale **0,087 mag** medidos en una visita real. En cuanto
    la tocas, tu elección manda. Si no tienes flat, la app construye uno de las
-   propias tomas (necesita dither y te avisa).
+   propias tomas: le enmascara las estrellas y, para el pedestal, necesita un
+   dark/bias (sin él te avisa, porque entonces la forma del flat sale
+   comprimida).
 2. **Elige cuántas observaciones quieres.** El MPC prefiere varias medidas
    repartidas en el tiempo antes que una sola. Dices un número y el
    software reparte la secuencia en grupos contiguos iguales. La tabla

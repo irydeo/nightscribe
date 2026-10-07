@@ -311,6 +311,33 @@ def test_the_strip_shows_every_observation_and_picks_one(qapp, tmp_path):
     assert tab._thumbs._row.count() == 0
 
 
+def test_each_thumbnail_carries_its_own_index(qapp, tmp_path):
+    # The panel's index is PASSED IN, never counted at paint time: _panel()
+    # runs before addWidget(), so counting gave the first thumbnail -1 (its
+    # click was silently dropped by _show_group) and every other one the
+    # PREVIOUS observation. Reported 2026-10-07: "clicking an image should
+    # load it" and it did not. This pins the number the thumb really holds.
+    from nightscribe.gui.widgets.stack_strip import _Thumb
+    tab, _host = _tab(qapp, tmp_path)
+    shown = []
+    tab._show_group = lambda index: shown.append(index)
+    stacks = [np.full((16, 16), float(v), dtype=np.float32)
+              for v in (10.0, 20.0, 30.0)]
+    tab._thumbs.set_stacks(stacks, [(8.0, 8.0)] * 3,
+                           ["Obs. 1", "Obs. 2", "Obs. 3"])
+    panels = [tab._thumbs._row.itemAt(i).widget()
+              for i in range(tab._thumbs._row.count())
+              if tab._thumbs._row.itemAt(i).widget() is not None]
+    thumbs = [p.findChild(_Thumb) for p in panels]
+    assert [t._index for t in thumbs] == [0, 1, 2]
+    # and the click goes through the strip's signal to the right stack
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    QTest.mouseClick(thumbs[0], Qt.LeftButton)
+    assert shown == [0]
+    tab._thumbs.clear()
+
+
 def test_the_blink_figure_is_written(qapp, tmp_path):
     # The figure lands in the project's folder with a name that says what
     # it is, and every panel shares one stretch.
@@ -331,6 +358,204 @@ def test_the_blink_figure_is_written(qapp, tmp_path):
     assert path.name.endswith("_observations.png")
     assert "2026QX" in path.name
     assert saved and saved[0][1] == "sequence"
+
+
+def _anim_tab(qapp, tmp_path, n=2):
+    # @args: qapp/tmp_path - the offscreen app and its folder, n - how many
+    #        observations the fake run carries
+    # @return: (tab, host, view) with a fake run whose stacks are REAL files
+    #          on disk (the animation loads the first one into the state, so
+    #          the plate shape the override frames must match is a real one).
+    #          The object sits at a DIFFERENT pixel in each stack, as it does
+    #          in a real run (the stack follows the object and its ephemeris
+    #          position changes), and each file carries its own NS_* cards so
+    #          the band has something to follow.
+    import numpy as np
+    from astropy.io import fits
+    from nightscribe.core import astrometry
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    tab, host = _tab(qapp, tmp_path)
+    host.export_folder = lambda: str(tmp_path)
+    state = tab._state
+    view = UfeImageView(state)
+    tab._view = view
+    stacks, paths, qs, boxes, points = [], [], [], [], []
+    for i in range(n):
+        arr = np.zeros((48, 48), dtype=np.float32)
+        col, row = 10 + 30 * i, 18
+        arr[row, col] = 100.0 * (i + 1)
+        path = tmp_path / f"2026QX_obs{i + 1}.fits"
+        hdu = fits.PrimaryHDU(arr)
+        hdu.header["NS_STACK"] = ("object", "the stars are trails")
+        hdu.header["NS_RUN"] = 1
+        hdu.header["NS_NFRAM"] = 2 + i          # the band follows this
+        hdu.header["NS_MAG"] = 18.0 + i * 0.1
+        hdu.header["NS_MAGB"] = "G"
+        hdu.writeto(str(path), overwrite=True)
+        stacks.append((arr, None))
+        paths.append(str(path))
+        qs.append((float(col), float(row)))
+        boxes.append((0, 0, 48, 48))
+        points.append((astrometry.AstrometryPoint(
+            ra=30.0, dec=10.0, x=float(col), y=float(row), snr=12.0,
+            mag=18.0 + i * 0.1, band="G", group_index=i), None, []))
+    tab._result = {"status": "ok", "stacks": stacks, "stack_paths": paths,
+                   "qs": qs, "boxes": boxes,
+                   "groups": [(0, 2), (2, 4)],
+                   "mids": [2461000.5, 2461000.6], "points": points}
+    tab._sync_animate_button()
+    return tab, host, view
+
+
+def test_the_animation_needs_two_observations(qapp, tmp_path):
+    # One observation has nothing to compare: a single frame blinking against
+    # itself teaches nobody anything, so the door stays shut (and says why
+    # when it is asked anyway).
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+                   "qs": [(8.0, 8.0)], "boxes": [(0, 0, 16, 16)]}
+    tab._sync_animate_button()
+    assert tab.btn_animate.isEnabled() is False
+    tab._on_animate_toggled(True)          # forced, as a stray click would
+    assert tab.btn_animate.isChecked() is False
+    assert tab._anim_on is False
+    assert "Nothing to animate" in tab._status_text
+
+
+def test_the_animation_keeps_the_object_still_while_the_stars_move(
+        qapp, tmp_path):
+    # The verification, in the editor: the tab owns the view's frame (like
+    # the Blink tab) and every observation is drawn ALIGNED on the object, so
+    # the asteroid stands still and what moves is the star field. Nothing is
+    # written, no plate is reloaded (no other tab is disturbed) and no
+    # external viewer is opened.
+    tab, _host, view = _anim_tab(qapp, tmp_path, n=2)
+    # the view is centred ONCE, on the object of the first observation; the
+    # loop itself never recentres (the frames are already aligned)
+    calls = []
+    orig_center = view.centerOn
+    view.centerOn = lambda *pt: (calls.append(pt), orig_center(*pt))[1]
+    tab.btn_animate.setChecked(True)       # the real gesture
+    assert tab._anim_on is True
+    assert view._frame_override is not None
+    n0 = len(calls)
+    # the frame the view paints has the plate's own shape (the override is
+    # stretched over it): a mismatch would silently distort the image
+    frame0 = tab._display_frame()
+    assert frame0 is not None and frame0.shape == (48, 48)
+    # one tick moves to the next observation: the object's peak is at the
+    # SAME pixel in both frames, even though the two stacks hold it 30 px
+    # apart (that is the whole point of the alignment)
+    tab._anim_tick()
+    assert tab._anim_index == 1
+    frame1 = tab._display_frame()
+    assert np.unravel_index(np.argmax(frame0), frame0.shape) == \
+        np.unravel_index(np.argmax(frame1), frame1.shape)
+    assert len(calls) == n0                # no recentring per tick
+    # stopping hands the plate back and puts the button back
+    tab._anim_stop()
+    assert tab._anim_on is False
+    assert view._frame_override is None
+    assert tab.btn_animate.isChecked() is False
+
+
+def test_the_animation_keeps_the_histogram_levels(qapp, tmp_path):
+    # Reported 2026-10-07: starting the animation reloaded the first stack
+    # and reset the stretch to the auto percentiles, so the levels the
+    # observer had applied were lost. keep_stretch carries them across the
+    # load, and every frame shares them.
+    tab, _host, _view = _anim_tab(qapp, tmp_path, n=2)
+    state = tab._state
+    tab._show_group(0)
+    state.set_stretch(black=5.0, white=40.0, gamma=0.7)
+    tab.btn_animate.setChecked(True)
+    assert state.black == 5.0 and state.white == 40.0
+    assert abs(state.gamma - 0.7) < 1e-6
+    tab._anim_stop()
+
+
+def test_the_animation_keeps_the_annotation_on_the_object(qapp, tmp_path):
+    # The cross and the object mark must stay where the object is (reported
+    # 2026-10-07: "mantén la anotación en dónde está el objeto, no la
+    # muevas"). The frames are aligned on the first stack's object, so the
+    # marks drawn on that very plate keep sitting on the asteroid: the
+    # animation must not hide them nor clear them after drawing.
+    tab, _host, view = _anim_tab(qapp, tmp_path, n=2)
+    events = []
+    hidden = []
+    orig_mark = view.set_object_mark_visible
+    view.set_object_mark_visible = lambda on: (
+        hidden.append(bool(on)), orig_mark(on))[1]
+    orig_clear = view.clear_overlays
+    view.clear_overlays = lambda: events.append("clear")
+    orig_add = view.add_overlay
+    view.add_overlay = lambda it: (events.append("add"), orig_add(it))[1]
+    tab.btn_animate.setChecked(True)
+    assert hidden == []                    # the object mark is never hidden
+    assert "add" in events                 # the measured cross was drawn
+    assert events[-1] == "add"             # and nothing cleared it afterwards
+    tab._anim_stop()
+
+
+def test_the_band_follows_the_observation_on_screen(qapp, tmp_path):
+    # The heading must describe what is SHOWN: while the loop runs the plate
+    # on screen is not the loaded one, so each observation brings its own
+    # header (its frames, its measured brightness) and the band cannot keep
+    # saying the first one.
+    tab, _host, _view = _anim_tab(qapp, tmp_path, n=2)
+    assert tab.band_header() is None            # not animating: the plate
+    tab.btn_animate.setChecked(True)
+    assert tab.band_header()["NS_NFRAM"] == 2
+    assert tab.band_facts(tab.band_header())["measured"]["mag"] == 18.0
+    tab._anim_tick()
+    assert tab.band_header()["NS_NFRAM"] == 3
+    assert abs(tab.band_facts(tab.band_header())["measured"]["mag"]
+               - 18.1) < 1e-6
+    tab._anim_stop()
+    assert tab.band_header() is None
+
+
+def test_leaving_the_tab_stops_the_animation(qapp, tmp_path):
+    # A timer repainting a view nobody is looking at is the trap the Blink
+    # tab already documents: leaving the stage stops the loop and hands the
+    # frame back.
+    tab, _host, view = _anim_tab(qapp, tmp_path, n=2)
+    tab.btn_animate.setChecked(True)
+    tab.set_active(False)
+    assert tab._anim_on is False
+    assert view._frame_override is None
+    assert tab.btn_animate.isChecked() is False
+
+
+def test_a_fresh_run_keeps_its_stack_paths(qapp, tmp_path):
+    # Looking at an observation must not write it again: the run stores the
+    # paths it wrote, so the strip, the viewer and the animation reuse them
+    # (before, every look re-saved the stack and registered a duplicate row
+    # in the visit: measured 2026-10-07).
+    from nightscribe.core import astrometry, track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.export_folder = lambda: str(tmp_path)
+    saved = []
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=24.0, y=24.0,
+                                    snr=15.2, mag=18.0, band="G")
+    tab._result = {
+        "status": "ok", "groups": [(0, 2), (2, 4)], "n_failed": 0,
+        "stacks": [(np.zeros((48, 48), dtype=np.float32), None),
+                   (np.ones((48, 48), dtype=np.float32), None)],
+        "boxes": [(0, 0, 48, 48), (0, 0, 48, 48)],
+        "qs": [(24.0, 24.0), (24.0, 24.0)], "mids": [2461000.5, 2461000.6],
+        "points": [(sp, None, []), (sp, None, [])],
+        "detection": track_stack.DetectionReport(detected=True, snr=15.2),
+    }
+    tab._paint_run()
+    written = tab._result.get("stack_paths") or []
+    assert len(written) == 2 and all(written)
+    assert tab.btn_animate.isEnabled()
+    before = list(saved)
+    tab._show_group(0)
+    tab._show_group(1)
+    assert saved == before                  # nothing written again
 
 
 def test_the_run_paints_the_strip_the_magnitude_and_the_brightness(qapp,
@@ -814,6 +1039,31 @@ def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
     assert tab.txt_notes.height() <= tab.txt_notes.maximumHeight()
 
 
+def test_the_status_line_under_the_stack_button_scrolls(qapp, tmp_path):
+    # Reported 2026-10-07: the message under the Stack button was a wrapped
+    # LABEL capped at three lines, so a long one (a failure, a cancel, the
+    # report's news) was CUT with no way to read the rest. It is a read-only
+    # box now: same three-line ceiling, but the wheel reaches the end.
+    from PySide6.QtWidgets import QPlainTextEdit
+    tab, _host = _tab(qapp, tmp_path)
+    # a real top-level window: a widget whose parent is never shown does not
+    # lay out (the box would never wrap, and the scrollbar would be a lie)
+    tab.setParent(None)
+    tab.resize(420, 900)
+    tab.show()
+    qapp.processEvents()
+    assert isinstance(tab.lbl_status, QPlainTextEdit)
+    assert tab.lbl_status.isReadOnly()
+    tab._say("⚠ " + "a very long message about the run " * 20)
+    qapp.processEvents()
+    box = tab.lbl_status
+    assert box.maximumHeight() <= 90          # the ceiling still holds
+    assert box.verticalScrollBar().maximum() > 0   # and the rest is reachable
+    # the whole text is still the record (the tooltip and _status_text)
+    assert box.toolTip() == tab._status_text
+    tab.close()
+
+
 def test_the_star_stack_is_saved_next_to_the_object_stack(qapp, tmp_path):
     # C3: when the run kept the star stack (the observer asked for it to
     # measure by hand in the Photometry tab), the tab writes it as its own
@@ -868,6 +1118,64 @@ def test_the_star_stack_is_saved_next_to_the_object_stack(qapp, tmp_path):
     assert header["CRVAL1"] == pytest.approx(30.0)
     assert any(p.endswith("_stars.fits") and kind == "stack"
                for paths, kind in saved for p in paths)
+
+
+def test_the_object_marks_take_the_kind_colour(qapp, tmp_path, monkeypatch):
+    # The editor's object marks (the full-frame crosshair of the object, the
+    # cross the run measured with and the circle with the name) wear the
+    # object TYPE's own colour by default; Settings can put ONE common colour
+    # on all three. The colour travels in the annotation's card too, so
+    # reopening the stack says the same.
+    from astropy.wcs import WCS
+    from PySide6.QtWidgets import QGraphicsLineItem, QWidget
+    from nightscribe.config import config
+    from nightscribe.core import astrometry, fits_annotate
+    from nightscribe.gui import theme
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+    from nightscribe.gui.ufe_trackstack_tab import UfeTrackStackTab
+    host = QWidget()
+    host.astrometry_context = lambda: {"pid": 1, "session_id": 2,
+                                       "paths": [], "object_name": "2026 QX"}
+    host.export_folder = lambda: str(tmp_path)
+    host.project_accent = lambda: {"hue": "#4484ef", "kind": "neo",
+                                   "label": "NEO"}
+    state = UfeImageState(host)
+    view = UfeImageView(state)
+    tab = UfeTrackStackTab(state, "en", view=view, parent=host)
+    tab.refresh_accent()                 # the accent arrives with the badge
+
+    def cross_colours():
+        return {it.pen().color().name()
+                for it in view._items_registered
+                if isinstance(it, QGraphicsLineItem)}
+
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.crpix = [8.5, 8.5]
+    w.wcs.cd = [[-1e-4, 0.0], [0.0, 1e-4]]
+    w.pixel_shape = (16, 16)
+    point = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"stacks": [(np.zeros((16, 16), dtype=np.float32), None)],
+                   "points": [(point, None, [])], "groups": [(0, 5)],
+                   "mids": [2460965.5], "wcs_by_group": [w]}
+    tab._show_group(0)
+    path = tmp_path / "2026QX_obs1_20251017T000000.fits"
+    assert path.exists()
+    # the circle with the name carries the kind's colour, in the file
+    assert fits_annotate.read_annotations(str(path))[0]["color"] == "#4484ef"
+    # and so does the cross the run measured with (the view's own crosshair
+    # belongs to the dialog and is tested in test_ufe_dialog)
+    assert "#4484ef" in cross_colours()
+    # Settings can put ONE common colour on all three
+    monkeypatch.setitem(config._data, "marker_color", "common")
+    assert theme.mark_color("#4484ef") == theme.C_OBJECT_MARK
+    tab._show_group(0)
+    assert fits_annotate.read_annotations(str(path))[0]["color"] == \
+        theme.C_OBJECT_MARK
+    assert theme.C_OBJECT_MARK in cross_colours()
+    assert "#4484ef" not in cross_colours()
 
 
 def test_the_band_reads_the_motion_and_brightness_of_a_stack(qapp, tmp_path):
@@ -1144,7 +1452,11 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     assert tab.chk_calibrate.text()
     assert tab.chk_calibrate.isChecked() is False
     assert "0.087" in tab.chk_calibrate.toolTip()      # the why, measured
-    assert "dithered" in tab.chk_calibrate.toolTip()
+    # ADR-069: it no longer needs dither (the stars are masked, so a static
+    # field works); what it does need is a dark/bias, or the pedestal
+    # compresses the flat, and the tooltip says so.
+    assert "dark/bias" in tab.chk_calibrate.toolTip()
+    assert "no star in it" in tab.chk_calibrate.toolTip()
 
 
 def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(

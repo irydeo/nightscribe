@@ -458,6 +458,42 @@ def test_the_band_toggle_default_comes_from_config(dlg, monkeypatch):
     assert dlg.view.show_data
 
 
+def test_the_object_annotation_toggle_default_comes_from_config(dlg,
+                                                                monkeypatch):
+    # The circle + name the run writes on the stacks opens HIDDEN by default
+    # (the editor's job is the cross) and Settings sets that default; the
+    # "A" button is the session's choice from there on.
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "annot_visible", False)
+    dlg.hide()
+    dlg.show()                          # showEvent re-reads the default
+    assert not dlg.btn_annot.isChecked()
+    assert dlg.view._show_annotations is False
+    monkeypatch.setitem(config._data, "annot_visible", True)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_annot.isChecked()
+    assert dlg.view._show_annotations is True
+
+
+def test_the_object_mark_takes_the_kind_colour(dlg, monkeypatch):
+    # The full-frame crosshair of the object wears the object TYPE's colour
+    # (Settings), and the badge arrives AFTER set_object, so the mark has to
+    # be told again there: this pins that it is.
+    from nightscribe.config import config
+    from nightscribe.gui import theme
+    dlg.set_object({"name": "2026 QX", "ra": 30.0, "dec": 10.0})
+    assert dlg.view._object_mark_color == theme.C_OBJECT_MARK
+    dlg.set_project_badge({"kind": "neo", "kind_color": "#4484ef",
+                           "kind_label": "NEO"})
+    assert dlg.view._object_mark_color == "#4484ef"
+    # "one common colour" puts the same red on every mark
+    monkeypatch.setitem(config._data, "marker_color", "common")
+    dlg.set_project_badge({"kind": "neo", "kind_color": "#4484ef",
+                           "kind_label": "NEO"})
+    assert dlg.view._object_mark_color == theme.C_OBJECT_MARK
+
+
 # ------------------------------------- top-bar style (ADR-044 rev, 2026-09-24)
 
 

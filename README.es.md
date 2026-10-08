@@ -142,11 +142,12 @@ y solo habla con los servicios públicos de datos listados más abajo.
 2. **El asistente solo pide una cosa: tu observatorio.** Escribe tu código MPC
    y tus coordenadas se rellenan desde la lista del MPC; o introduce nombre,
    latitud, longitud y altitud a mano.
-3. La pestaña **Esta noche** calcula tu noche por sí sola: descarga las listas
+3. La vista **Esta noche** (desde **+ NUEVO PROYECTO** en la cabecera) calcula tu noche
+   por sí sola: descarga las listas
    de objetivos, las filtra por tu sitio y tu equipo, y lo ordena todo.
 4. **Haz clic en cualquier objetivo** y verás su ficha completa explicada.
    ¿Te gusta lo que ves? Un botón: **Crear proyecto**.
-5. Cuando tengas un minuto, abre **Herramientas → Configuración**: fichero de
+5. Cuando tengas un minuto, abre **Herramientas → Configuración…**: fichero de
    horizonte, magnitud límite, escala de placa de la cámara, valores de sesión.
    Todo trae valores por defecto sensatos; nada más es obligatorio.
 
@@ -154,7 +155,8 @@ y solo habla con los servicios públicos de datos listados más abajo.
 
 Cómo se siente usar NightScribe, en cinco escenas:
 
-1. **Al final de la tarde.** Abres la app. Esta noche ya está calculada: una
+1. **Al final de la tarde.** Abres la app y el panel de noche te recibe; un
+   clic en **+ NUEVO PROYECTO** y la noche ya está calculada: una
    lista de filas amplias, el mejor objetivo primero. Un chip en la cabecera
    avisa de que la Luna está al 87 %; otro anuncia un tránsito de sombra en
    Júpiter a las 23:12. La primera fila es un NEO sin confirmar con *«inicio
@@ -182,12 +184,12 @@ Cómo se siente usar NightScribe, en cinco escenas:
    supernova que confirmaste mantiene su propia curva de luz, y el panel te
    avisa cuando han pasado tres noches sin revisitarla. Si te apetece
    contarla, el borrador bilingüe ya está escrito con los datos reales de la
-   sesión. Una tarde aparece un chip en Esta noche: *«R CrB está cayendo: tu
+   sesión. Una tarde aparece un chip en la vista Esta noche: *«R CrB está cayendo: tu
    vigilia»*.
 
 ## Qué puedes hacer: en detalle
 
-### Planificar la noche (pestaña Esta noche)
+### Planificar la noche (la vista Esta noche)
 
 Una única respuesta ordenada a *«¿qué puedo hacer esta noche?»*, con los ocho
 tipos de objetivos de la sección anterior mezclados en un mismo ranking.
@@ -278,7 +280,7 @@ El flujo que convierte un puntito en movimiento en una observación reportada:
   Ib/c, SLSN, kilonova), la app calcula un análisis de campaña indicativo con
   veredicto, una **animación de la evolución** muestra el decaimiento, una
   copia FITS anotada porta los metadatos, y un recordatorio de cadencia
-  («3 noches desde tu última visita») aparece en Esta noche cuando toca
+  («3 noches desde tu última visita») aparece en la vista Esta noche cuando toca
   volver.
 - Contexto de referencia bajo demanda: los puntos ZTF vía ALeRCE aparecen como
   puntos grises de referencia bajo los tuyos, nunca mezclados con tus
@@ -322,9 +324,9 @@ Pensado para que *cualquiera se atreva* a capturar su primer tránsito:
   científico, protocolo (cadencia, filtros, estrellas de comparación), URLs
   de reporte y datos. Una campaña, muchos proyectos asociados (borrar la
   campaña los libera, nunca los borra). Un miembro *toca* cuando su última
-  sesión tiene `cadence_nights` noches y aterriza en Esta noche
+  sesión tiene `cadence_nights` noches y aterriza en la vista Esta noche
   automáticamente; también aterriza cuando se detecta un **evento** o se
-  acerca un **extremo** predicho. La pestaña Campañas es la sala de guerra:
+  acerca un **extremo** predicho. La vista Campañas es la sala de guerra:
   «Está pasando ahora» con ⚡ eventos, ⏳ extremos por llegar y 👁 vigilias,
   tarjetas de salud por campaña (miembros × cadencia × eventos), y frases
   completas en lenguaje llano.
@@ -615,6 +617,11 @@ sistema operativo, el paquete pip y el instalador autónomo, y
 [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para colaborar.
 
 ## Documentación
+
+**La [guía de usuario](docs/user/README.es.md)**
+([English](docs/user/README.md)) recorre el ciclo completo, del primer
+arranque al reporte MPC, en capítulos cortos con el «por qué» de cada
+opción. También viaja dentro de la app (**Ayuda → Documentación técnica**).
 
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
 decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.

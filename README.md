@@ -136,11 +136,12 @@ and talks only to the public data services listed below.
 2. **The wizard asks for one thing: your observatory.** Type your MPC code and
    your coordinates are filled in from the MPC list; or enter name, latitude,
    longitude and altitude by hand.
-3. The **Tonight** tab computes your night on its own: it downloads the target
-   lists, filters them by your site and gear, and ranks everything.
+3. The **Tonight** view (from **+ NEW PROJECT** in the header) computes your
+   night on its own: it downloads the target lists, filters them by your site
+   and gear, and ranks everything.
 4. **Click any target** and you get its full explained card. Like what you
    see? One button: **Create project**.
-5. When you have a minute, open **Tools → Settings**: horizon file, limiting
+5. When you have a minute, open **Tools → Settings…**: horizon file, limiting
    magnitude, camera plate scale, session defaults. Everything has a sensible
    default; nothing else is mandatory.
 
@@ -148,7 +149,7 @@ and talks only to the public data services listed below.
 
 What using NightScribe actually feels like, in five scenes:
 
-1. **Late afternoon.** You open the app. Tonight is already computed: a list
+1. **Late afternoon.** You open the app and the night panel greets you; one click on **+ NEW PROJECT** and the night is already computed: a list
    of wide rows, best target first. A chip in the header warns you the Moon is
    87 % lit; another announces a shadow transit on Jupiter at 23:12. The top
    row is an unconfirmed NEO with *"safe start until 23:41; 2.5 h over your
@@ -176,12 +177,12 @@ What using NightScribe actually feels like, in five scenes:
    supernova you confirmed keeps its own light curve, and the dashboard nudges
    you when three nights have passed without a revisit. If you feel like
    telling it, the bilingual draft is already written with the real session
-   data. One evening a chip appears in Tonight: *"R CrB is fading: your
+   data. One evening a chip appears in the Tonight view: *"R CrB is fading: your
    vigil"*.
 
 ## What you can do: in detail
 
-### Plan the night (Tonight tab)
+### Plan the night (the Tonight view)
 
 One ranked answer to *"what can I do tonight?"*, with the eight kinds of
 targets from the previous section mixed into a single ranking.
@@ -264,7 +265,7 @@ The flow that turns a moving dot into a reported observation:
   kilonova), the app computes an indicative campaign analysis and verdict, an
   **evolution animation** shows the fade, an annotated FITS copy carries the
   metadata, and a cadence reminder ("3 nights since your last visit") surfaces
-  in Tonight when it's time to go back.
+  in the Tonight view when it's time to go back.
 - Reference context on request: ZTF points via ALeRCE appear as grey reference
   points under yours, never mixed with your own measurements.
 - Export your photometry as **CSV** or **AAVSO EFF** (the AAVSO's extended
@@ -301,9 +302,9 @@ Designed so that *anyone dares* to capture their first transit:
   goal, protocol (cadence, filters, comparison stars), report and data URLs.
   One campaign, many attached projects (deleting the campaign frees them,
   never deletes them). A member is *due* when its last session is
-  `cadence_nights` old and lands in Tonight automatically; it also lands when
+  `cadence_nights` old and lands in the Tonight view automatically; it also lands when
   an **event** is detected or a predicted **extremum** is imminent. The
-  Campaigns tab is the war room: "Happening now" with ⚡ events, ⏳ upcoming
+  Campaigns view is the war room: "Happening now" with ⚡ events, ⏳ upcoming
   extrema and 👁 vigils, per-campaign health cards (members × cadence ×
   events), and full sentences in plain language.
 - **Vigils**: your standing watch list, *T CrB eruption watch*, *R CrB fade
@@ -589,6 +590,11 @@ the standalone installer, and [CONTRIBUTING.md](CONTRIBUTING.md) to hack on
 it.
 
 ## Documentation
+
+**The [user guide](docs/user/README.md)** ([español](docs/user/README.es.md))
+walks the whole cycle, from the first run to the MPC report, in short
+chapters with the "why" of each option. It also ships inside the app
+(**Help → Technical Documentation**).
 
 Design, architecture, data sources, scoring, workflows and every decision
 (ADRs) live in [`docs/`](docs/), in Spanish and English.

@@ -2682,8 +2682,17 @@ class MainWindow(QMainWindow):
                 self.tr("Documentation not found at %1").replace("%1", root),
                 10000)
             return
-        name = "WORKFLOWS.es.md" if self._lang() == "es" else "WORKFLOWS.md"
-        start = root / name if (root / name).exists() else None
+        # The user guide (docs/user/) is the door for the observer; the
+        # WORKFLOWS master doc stays as the fallback when the guide is not
+        # shipped (a dev checkout without docs/user, a trimmed package).
+        lang = self._lang()
+        candidates = [
+            root / "user" / ("README.es.md" if lang == "es" else "README.md"),
+            root / "user" / ("README.md" if lang == "es" else "README.es.md"),
+            root / ("WORKFLOWS.es.md" if lang == "es" else "WORKFLOWS.md"),
+            root / ("WORKFLOWS.md" if lang == "es" else "WORKFLOWS.es.md"),
+        ]
+        start = next((c for c in candidates if c.exists()), None)
         open_browser(root, self, start=start)
 
     # ---------------- Tonight: suggestion grid ----------------

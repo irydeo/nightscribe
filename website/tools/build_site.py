@@ -987,6 +987,19 @@ def write_assets(out):
     shutil.copyfile(TOOLS / "site.js", assets / "main.js")
     for name in ("appicon.svg", "welcome_sky.svg"):
         shutil.copyfile(ASSETS_SRC / name, assets / name)
+    # The captures live in assets/screens (prepared by tools/prepare_screens.py
+    # and committed with the site). They are copied into the output because CI
+    # builds into a folder of its own: without this the pages would reference
+    # images that the deployed artifact does not carry (they 404). A local
+    # build writes them over themselves, which is skipped.
+    screens = SITE / "assets" / "screens"
+    if screens.is_dir():
+        target_dir = assets / "screens"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for shot in sorted(screens.glob("*.webp")):
+            target = target_dir / shot.name
+            if shot.resolve() != target.resolve():
+                shutil.copyfile(shot, target)
 
 
 # -------------------------------------------------------------------- build

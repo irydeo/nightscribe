@@ -97,6 +97,26 @@ img { max-width: 100%; }
 .bar-end .ghost:hover, .bar-end .lang:hover {
   color: var(--text); border-color: var(--edge); text-decoration: none;
 }
+/* The phone's menu: hidden on a desktop, where the links row is right there.
+   It is a native <details>, so it works with no JavaScript at all. */
+.bar-menu { display: none; }
+.bar-menu > summary {
+  list-style: none; cursor: pointer; color: var(--text); font-size: 17px;
+  line-height: 1; border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 11px 6px;
+}
+.bar-menu > summary::-webkit-details-marker { display: none; }
+.bar-menu[open] > summary { border-color: var(--accent); color: var(--accent); }
+.bar-menu > nav {
+  position: absolute; right: 20px; top: calc(var(--bar-h) - 4px); z-index: 40;
+  background: var(--panel); border: 1px solid var(--edge); border-radius: 12px;
+  padding: 8px; display: flex; flex-direction: column; gap: 2px;
+  min-width: 230px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5);
+}
+.bar-menu > nav a {
+  color: var(--text); font-size: 14px; padding: 8px 10px; border-radius: 8px;
+}
+.bar-menu > nav a:hover { background: var(--base); text-decoration: none; }
 
 /* -------------------------------------------------------------- the hero */
 
@@ -417,6 +437,7 @@ img { max-width: 100%; }
   .toc-link { white-space: nowrap; background: var(--base); }
   .paper { padding: 24px 20px 30px; }
   .bar-nav { display: none; }
+  .bar-menu { display: block; position: relative; }
   /* the fold says it can be opened, and the reader can see it is closed */
   .side-fold > summary::after { content: " ▸"; color: var(--accent); }
   .side-fold[open] > summary::after { content: " ▾"; }
@@ -424,8 +445,13 @@ img { max-width: 100%; }
 
 @media (max-width: 420px) {
   /* the mark, the guide's link and the language did not fit together: the
-     name steps aside and the icon keeps the identity */
+     name and the guide's own pill step aside (the brand goes home, and the
+     guide's pages have the contents one line below) */
   .wordmark { display: none; }
+  .bar-end .guide { display: none; }
+  /* the hero's wordmark was cut at 320 (38 px with 6 px of letter spacing
+     needs ~350): it comes down instead of overflowing its own box */
+  .hero-title { font-size: 30px; letter-spacing: 3px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

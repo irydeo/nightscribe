@@ -80,10 +80,21 @@ frame.addEventListener("load", function () {{
                     " (" + Math.round(r.right) + ")");
         }}
       }}
+      // a heading that cannot fit its own box is cut, and the boxes alone do
+      // not say so (the hero's wordmark was, at 320)
+      var cut = [];
+      var heads = doc.querySelectorAll("h1, h2, h3");
+      for (var j = 0; j < heads.length; j++) {{
+        if (heads[j].scrollWidth > heads[j].clientWidth + 1) {{
+          cut.push(heads[j].tagName.toLowerCase() + " (" +
+                   heads[j].scrollWidth + ">" + heads[j].clientWidth + ")");
+        }}
+      }}
       document.getElementById("nsresult").textContent =
         "RESULT {page} {width} " + sw + " " +
-        (over ? "OVERFLOW" : "ok") +
-        (wide.length ? " :: " + wide.slice(0, 6).join(", ") : "");
+        (over ? "OVERFLOW" : (cut.length ? "CUT" : "ok")) +
+        (wide.length ? " :: " + wide.slice(0, 6).join(", ") : "") +
+        (cut.length ? " :: " + cut.slice(0, 4).join(", ") : "");
     }} catch (e) {{
       document.getElementById("nsresult").textContent =
         "RESULT {page} {width} ? ERROR " + e;

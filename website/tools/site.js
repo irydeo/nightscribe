@@ -10,7 +10,8 @@
  *   2. the top bar marks the section you are reading (the landing only: it
  *      is the page with a menu);
  *   3. a screenshot opens larger, with an explicit way to close it;
- *   4. on a phone the guide's contents fold away.
+ *   4. on a phone the guide's contents fold away and the landing's sections
+ *      live in a menu (the links row does not fit a small screen).
  *
  * Each block is independent on purpose: the viewer used to sit after the
  * menu's block, and on the guide's pages (no menu) that block returned early
@@ -93,7 +94,18 @@
       });
   }
 
-  /* ---- 4. a screenshot opens larger ----------------------------------- */
+  /* ---- 4. the phone's menu closes when a section is picked ------------ */
+
+  // It is a native <details>, so nothing else would close it after a jump.
+  Array.prototype.forEach.call(
+    document.querySelectorAll(".bar-menu nav a"), function (link) {
+      link.addEventListener("click", function () {
+        var menu = link.closest("details");
+        if (menu) { menu.removeAttribute("open"); }
+      });
+    });
+
+  /* ---- 5. a screenshot opens larger ----------------------------------- */
 
   var zooms = document.querySelectorAll(".shot .zoom");
   if (zooms.length) {

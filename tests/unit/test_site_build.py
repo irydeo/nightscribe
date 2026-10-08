@@ -234,6 +234,12 @@ def test_the_top_bar_shows_the_curated_sections():
         assert nav.count("<a ") == len(gen.NAV_MAIN[lang]) + 1, lang
         for anchor in re.findall(r'href="#([^"]+)"', nav):
             assert f'id="{anchor}"' in page, (lang, anchor)
+        # the phone's menu carries the same links (the row is hidden there)
+        menu = page[page.index('<details class="bar-menu">'):]
+        menu = menu[:menu.index("</details>")]
+        assert menu.count("<a ") == nav.count("<a "), (lang, "phone menu")
+        for href in re.findall(r'href="([^"]+)"', nav):
+            assert f'href="{href}"' in menu, (lang, href)
 
 
 def test_every_screenshot_opens_larger_and_can_be_closed():
@@ -274,12 +280,15 @@ def test_the_pages_fit_a_phone():
     assert re.search(r"\.code\s*\{[^}]*overflow-x:\s*auto", css)
 
 
-def test_the_footer_offers_to_report_a_bug():
-    # The way to say "this is wrong" is one click away, in both languages and
-    # on every page (the footer is shared).
+def test_the_bar_and_the_footer_offer_to_report_a_bug():
+    # The way to say "this is wrong" is one click away, at the top and at the
+    # bottom, in both languages and on every page.
     for page in (SITE / "index.html", SITE / "index.es.html",
                  SITE / "docs" / "06-photometry.es.html"):
         html = page.read_text(encoding="utf-8")
+        bar = html[html.index('<div class="bar-end">'):]
+        bar = bar[:bar.index("</div>")]
+        assert "github.com/irydeo/nightscribe/issues" in bar, page.name
         foot = html[html.index('<footer class="foot">'):]
         assert "github.com/irydeo/nightscribe/issues" in foot, page.name
 

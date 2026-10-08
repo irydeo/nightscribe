@@ -61,9 +61,17 @@ python3 website/tools/check_mobile.py --shots /tmp/mobile
 The widths are the real ones (320, 360, 390, 430) and they are tested through
 an **iframe**, because headless Chrome refuses to lay out a viewport narrower
 than 500 px: the iframe is the viewport. It exits non-zero when a page
-overflows and leaves a screenshot of each combination, which is what a person
-actually looks at. The unit suite carries the cheap half (the three CSS rules
-that make it true), so the regression is caught without a browser.
+overflows or when a heading does not fit its own box (the landing's wordmark
+was cut at 320, and boxes alone do not say so) and leaves a screenshot of each
+combination, which is what a person actually looks at. The unit suite carries
+the cheap half (the CSS rules that make it true), so the regression is caught
+without a browser.
+
+Two things live only on a small screen and are therefore invisible on a
+desktop: the guide's contents **fold away** (a native `<details>`, closed by
+the script) and the landing's sections move into a **menu** (the links row
+does not fit), with the same links. Both work with no JavaScript: the script
+only closes them when the reader picks something.
 
 ## Publish it
 

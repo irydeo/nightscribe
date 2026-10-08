@@ -263,7 +263,7 @@ CHROME = {
                                           "reduced by EXOTIC, a light curve "
                                           "and a measurement. Click any of "
                                           "them to see it larger.",
-           "report": "Report a bug",
+           "report": "Report a bug", "sections": "Sections",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -280,7 +280,7 @@ CHROME = {
                        "& stack, la fotometría, un tránsito reducido por "
                        "EXOTIC, una curva de luz y una medida. Pincha "
                        "cualquiera para verla más grande.",
-           "report": "Informar de un fallo",
+           "report": "Informar de un fallo", "sections": "Secciones",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -670,8 +670,19 @@ def _shell(*, lang, title, description, root, body, page_class, switcher,
     # duplicate that made the bar crowded. On the guide's own pages there is
     # no menu, and the pill is the way back to its index.
     guide_pill = "" if nav else (
-        f'<a class="ghost" href="{root}docs/index{_suffix(lang)}.html">'
+        f'<a class="ghost guide" href="{root}docs/index{_suffix(lang)}.html">'
         f'{chrome["guide"]}</a>')
+    # The phone's menu: the sections live in a native <details> because a
+    # small screen cannot hold the links row (it is hidden there). The guide's
+    # pages have no sections to list, so they have no menu.
+    bar_menu = ""
+    if nav:
+        bar_menu = (
+            f'<details class="bar-menu">'
+            f'<summary aria-label="{chrome["sections"]}" '
+            f'title="{chrome["sections"]}">☰</summary>'
+            f'<nav>' + "".join(f'<a href="{href}">{label}</a>'
+                               for href, label in nav) + '</nav></details>')
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -692,7 +703,9 @@ def _shell(*, lang, title, description, root, body, page_class, switcher,
     <nav class="bar-nav">{bar_nav}</nav>
     <div class="bar-end">
       {guide_pill}
+      <a class="ghost report" href="{REPO_URL}/issues" rel="noopener">{chrome["report"]}</a>
       <a class="lang" href="{switcher}">{LANG_LABEL[_other(lang)]}</a>
+      {bar_menu}
     </div>
   </div>
 </header>

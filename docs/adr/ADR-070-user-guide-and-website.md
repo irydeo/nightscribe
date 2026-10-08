@@ -83,12 +83,17 @@ bloque de código sin scroll propio). Ahora la rejilla de la guía usa
 `minmax(0, 1fr)`, las cuatro rejillas `minmax(min(100%, X), 1fr)`, los bloques
 de código llevan su propio scroll en cualquier sitio, el índice se pliega en
 móvil (un `<details>` nativo) y el nombre de la marca cede por debajo de 420 px.
-`website/tools/check_mobile.py` repite la medición y falla si una página
-desborda; la suite vigila las reglas del CSS que lo hacen verdad.
+El menú de secciones, que la fila de enlaces no cabe en un móvil, pasa a un
+`<details>` con el mismo contenido (sin JavaScript queda abierto; con él se
+cierra al elegir una sección). `website/tools/check_mobile.py` repite la
+medición y falla si una página desborda o si un titular no cabe en su caja
+(el de la portada se cortaba a 320); la suite vigila las reglas del CSS que lo
+hacen verdad.
 
-**Revisión (2026-10-08, el reporte de fallos).** El pie de la web (todas las
-páginas) enlaza la página de incidencias del repositorio, en el idioma de la
-página, y el README lleva la misma línea en su sección de documentación.
+**Revisión (2026-10-08, el reporte de fallos).** El enlace a la página de
+incidencias del repositorio está **arriba y abajo**: en la barra, junto al
+idioma, y en el pie de todas las páginas, en el idioma de la página; el README
+lleva la misma línea en su sección de documentación.
 
 ## English
 
@@ -168,9 +173,14 @@ and the landing **754** (a code block without its own scroll). The guide's grid
 now uses `minmax(0, 1fr)`, the four grids `minmax(min(100%, X), 1fr)`, the code
 blocks carry their own scroll wherever they are, the contents fold away on a
 phone (a native `<details>`) and the brand's name steps aside below 420 px.
-`website/tools/check_mobile.py` repeats the measurement and fails when a page
-overflows; the suite watches the CSS rules that make it true.
+The sections menu, which the links row cannot hold on a phone, becomes a
+`<details>` with the same content (open with no JavaScript; the script closes
+it when a section is picked). `website/tools/check_mobile.py` repeats the
+measurement and fails when a page overflows or when a heading does not fit its
+own box (the landing's was cut at 320); the suite watches the CSS rules that
+make it true.
 
-**Revision (2026-10-08, reporting a bug).** The site's footer (every page)
-links the repository's issue tracker, in the page's language, and the README
+**Revision (2026-10-08, reporting a bug).** The link to the repository's issue
+tracker sits **at the top and at the bottom**: in the bar, next to the
+language, and in the footer of every page, in the page's language; the README
 carries the same line in its documentation section.

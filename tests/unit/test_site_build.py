@@ -236,6 +236,28 @@ def test_the_top_bar_shows_the_curated_sections():
             assert f'id="{anchor}"' in page, (lang, anchor)
 
 
+def test_every_screenshot_opens_larger_and_can_be_closed():
+    # The captures open in the site's own viewer and the way out is explicit.
+    # Two things have to hold, and both broke once: the image sits inside a
+    # link (which is what makes it work even without JavaScript) and the
+    # script carries the viewer. The menu's block used to return early on the
+    # guide's pages (they have no menu), which left the viewer unmounted and
+    # turned a click into "open the raw file, no way back".
+    js = (SITE / "assets" / "main.js").read_text(encoding="utf-8")
+    assert 'box.id = "lightbox"' in js
+    assert 'class="close"' in js and 'addEventListener("click", close)' in js
+    assert '"Escape"' in js
+    figures = 0
+    for page in SITE.rglob("*.html"):
+        html = page.read_text(encoding="utf-8")
+        for figure in re.findall(r'<figure class="shot">.*?</figure>', html,
+                                 re.S):
+            figures += 1
+            assert re.search(r'<a class="zoom" href="[^"]+">\s*<img ', figure), \
+                f"{page.name}: {figure[:90]}"
+    assert figures, "the site shows no screenshots"
+
+
 def test_the_landing_and_the_guide_are_the_readme_and_the_chapters():
     # The point of the whole thing: the prose is not written twice. The
     # landing's definition is the README's own opening and the guide's pages

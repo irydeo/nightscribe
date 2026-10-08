@@ -280,15 +280,25 @@ img { max-width: 100%; }
   border: 1px solid var(--edge); border-radius: 10px;
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6);
 }
-#lightbox p {
+#lightbox p.cap {
   color: #dfe6f5; font-size: 14px; line-height: 1.5; margin: 14px 0 0;
   max-width: 92ch; text-align: center;
 }
-#lightbox .close {
-  position: absolute; top: 10px; right: 18px; font-size: 28px; line-height: 1;
-  color: var(--dim); background: none; border: 0; cursor: pointer;
+#lightbox p.hint {
+  color: var(--dim); font-size: 12.5px; margin: 8px 0 0; text-align: center;
 }
-#lightbox .close:hover { color: var(--text); }
+/* A button, not a glyph lost in a corner: closing a full-screen image has to
+   be obvious, and on a phone there is no Escape key. */
+#lightbox .close {
+  position: absolute; top: 14px; right: 18px; width: 42px; height: 42px;
+  display: grid; place-items: center; font-size: 19px; line-height: 1;
+  color: var(--text); background: rgba(23, 26, 38, 0.92);
+  border: 1px solid var(--edge); border-radius: 50%; cursor: pointer;
+}
+#lightbox .close:hover, #lightbox .close:focus-visible {
+  background: var(--hover); border-color: var(--accent); color: #ffffff;
+  outline: none;
+}
 
 /* ---------------------------------------------------------------- guide */
 

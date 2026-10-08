@@ -107,7 +107,20 @@ def test_an_object_that_barely_rises_is_called_out(ribbon):
     ribbon.grab()
 
 
-def test_a_polar_site_without_astronomical_night(ribbon):
+def test_a_polar_site_without_astronomical_night(ribbon, monkeypatch):
+    # The band says so when the Sun never drops 18 degrees at the site. That
+    # is a SEASON, not a place: at 78 N there is no astronomical night in the
+    # summer and there IS one from early October on, so a test that read
+    # tonight's sky passed until the season turned and failed on 2026-10-08
+    # (on every platform that day: the date, not the font). The date is
+    # pinned to the summer solstice, when the site has no night: the
+    # behaviour under test is the band's, not the calendar's.
+    import datetime as dt
+    from nightscribe.core import night_brief as nb
+    real = nb.brief
+    monkeypatch.setattr(
+        nb, "brief",
+        lambda lat, lon, when=None: real(lat, lon, dt.date(2026, 6, 21)))
     ribbon.set_site(78.0, 15.0)
     assert not ribbon.has_night()
     assert "18" in ribbon.caption()     # the "never drops 18 degrees" line

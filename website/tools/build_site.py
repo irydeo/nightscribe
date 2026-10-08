@@ -135,44 +135,96 @@ NAV_MAIN = {
 # there, so a capture that is still missing leaves the page whole (and the run
 # says which ones are pending).
 SHOTS = {
-    # name: (English caption, Spanish caption)
-    "welcome": ("The Welcome screen: your observatory, your equipment, your "
-                "targets, your data",
-                "La pantalla de bienvenida: tu observatorio, tu equipo, tus "
-                "objetivos, tus datos"),
-    "tonight": ("Tonight: the targets ranked for your site and your gear",
-                "Esta noche: los objetivos ordenados para tu sitio y tu "
-                "equipo"),
-    "projects": ("A project, from the object card to publishing",
-                 "Un proyecto, de la ficha del objeto a la publicación"),
-    "project": ("The object card: what it is, how it moves, when to catch it",
-                "La ficha del objeto: qué es, cómo se mueve, cuándo cazarlo"),
-    "campaigns": ("Campaigns and vigils: what is due, what is happening",
-                  "Campañas y vigilias: lo que toca y lo que está pasando"),
-    "capture": ("Capture: the plan, the exposures and CCDciel",
-                "Captura: el plan, las exposiciones y CCDciel"),
-    "photometry": ("Photometry: the comparison sequence and its recipe",
-                   "Fotometría: la secuencia de comparación y su receta"),
-    "measure": ("Measuring on the plate, with the manual centre when the "
-                "object is faint",
-                "Midiendo en la placa, con el centro manual cuando el objeto "
-                "es débil"),
-    "curve": ("The light curve of the series, point by point",
-              "La curva de luz de la serie, punto a punto"),
-    "transit": ("An exoplanet transit, reduced and fitted",
-                "Un tránsito de exoplaneta, reducido y ajustado"),
-    "astrometry": ("The track & stack: the asteroid stands still while the "
-                   "stars crawl",
-                   "El track & stack: el asteroide se queda quieto mientras "
-                   "las estrellas se mueven"),
-    "posts": ("Publishing: the bilingual draft and the charts",
-              "Publicación: el borrador bilingüe y los gráficos"),
-    "settings": ("Settings: every section, with a sensible default",
-                 "Ajustes: cada sección, con un valor por defecto sensato"),
+    # name: (English caption, Spanish caption). Each one says what the screen
+    # is FOR, in a sentence or two: a caption that only names the tab teaches
+    # nothing.
+    "welcome": ("The first screen, in four steps: where you observe from, "
+                "your telescope and camera, what you want to follow and the "
+                "report on your data. The hero answers back with your own "
+                "night (darkness window, Moon and planets) as you type.",
+                "La primera pantalla, en cuatro pasos: desde dónde observas, "
+                "tu telescopio y tu cámara, qué quieres seguir y el informe "
+                "de tus datos. El héroe responde con tu propia noche (ventana "
+                "de oscuridad, Luna y planetas) según escribes."),
+    "tonight": ("Tonight: everything you can do, ranked 0 to 100 for your "
+                "site, your horizon and your gear, each row with the reason "
+                "behind its score in one line.",
+                "Esta noche: todo lo que puedes hacer, ordenado de 0 a 100 "
+                "para tu sitio, tu horizonte y tu equipo, con el motivo de "
+                "cada fila en una línea."),
+    "projects": ("A project is one object with its whole life in one place: "
+                 "the explained card, the capture plan, the analysis and the "
+                 "publishing, with its own folder.",
+                 "Un proyecto es un objeto con toda su vida en un sitio: la "
+                 "ficha explicada, el plan de captura, el análisis y la "
+                 "publicación, con su propia carpeta."),
+    "project": ("The object card: what it is in plain words (here a type-Ia "
+                "supernova), how bright it is, when it is above your horizon "
+                "and how long the window lasts.",
+                "La ficha del objeto: qué es en palabras llanas (aquí una "
+                "supernova de tipo Ia), cuánto brilla, cuándo está sobre tu "
+                "horizonte y cuánto dura la ventana."),
+    "campaigns": ("Campaigns and vigils: what is due by cadence, what is "
+                  "happening right now and what is on watch, all in the "
+                  "language of the observing night.",
+                  "Campañas y vigilias: lo que toca por cadencia, lo que está "
+                  "pasando ahora mismo y lo que está en vigilancia, en el "
+                  "lenguaje de la noche de observación."),
+    "capture": ("Capture: the plan of the session, the exposure the object "
+                "allows and CCDciel, so the mount and the camera can be "
+                "driven without leaving the app.",
+                "Captura: el plan de la sesión, la exposición que permite el "
+                "objeto y CCDciel, para manejar la montura y la cámara sin "
+                "salir de la app."),
+    "photometry": ("Photometry in the editor: the plate with the comparison "
+                   "stars proposed next to the target (never the brightest of "
+                   "the field: they saturate) and the recipe that will "
+                   "measure it.",
+                   "Fotometría en el editor: la placa con las estrellas de "
+                   "comparación propuestas junto al objetivo (nunca las más "
+                   "brillantes del campo: saturan) y la receta que la medirá."),
+    "measure": ("Measuring on the plate: with a faint object the centre can "
+                "be placed by hand, and the measurement then says exactly "
+                "what it did and how much it trusts it.",
+                "Midiendo en la placa: con un objeto débil el centro se puede "
+                "colocar a mano, y la medida dice exactamente qué hizo y "
+                "cuánto se fía de sí misma."),
+    "curve": ("The light curve of the series: one calibrated point per "
+              "frame, with the ensemble of comparison stars holding the zero "
+              "point night after night.",
+              "La curva de luz de la serie: un punto calibrado por fotograma, "
+              "con el conjunto de estrellas de comparación sosteniendo el "
+              "punto cero noche tras noche."),
+    "transit": ("An exoplanet transit reduced by EXOTIC from inside the app: "
+                "the mid-transit instant, the planet-to-star radius ratio "
+                "and the folded light curve with its residuals.",
+                "Un tránsito de exoplaneta reducido por EXOTIC desde la "
+                "propia app: el instante del tránsito, la relación de radios "
+                "y la curva plegada con sus residuos."),
+    "astrometry": ("The track & stack: the frames are stacked following the "
+                   "asteroid, so its light concentrates while the stars "
+                   "leave a trail; the run measures every observation and "
+                   "prepares the MPC report.",
+                   "El track & stack: los fotogramas se apilan siguiendo al "
+                   "asteroide, así que su luz se concentra mientras las "
+                   "estrellas dejan traza; el run mide cada observación y "
+                   "prepara el reporte MPC."),
+    "posts": ("Publishing: the bilingual draft and the charts of the night, "
+              "written with the real data of the session.",
+              "Publicación: el borrador bilingüe y los gráficos de la noche, "
+              "escritos con los datos reales de la sesión."),
+    "settings": ("Settings: every section, what it decides and when to touch "
+                 "it. Everything has a sensible default.",
+                 "Ajustes: cada sección, qué decide y cuándo tocarla. Todo "
+                 "tiene un valor por defecto sensato."),
 }
 
-# The three the landing's strip shows, in order.
-LANDING_SHOTS = ("project", "astrometry", "photometry")
+# The six the landing's strip shows, in order: the application's face (a
+# project), the two things that surprise people (the track & stack and the
+# photometry) and the three the observer asked to see there (the transit with
+# its EXOTIC reduction, the light curve and the measurement).
+LANDING_SHOTS = ("project", "astrometry", "photometry", "transit", "curve",
+                 "measure")
 
 # The captures of each guide chapter, by the chapter's stem.
 CHAPTER_SHOTS = {
@@ -204,9 +256,13 @@ CHROME = {
            "read": "Read the guide", "chapters": "The guide, chapter by "
                                                  "chapter",
            "what": "What it is", "more": "See it in the guide",
-           "app": "The app", "app_lead": "Screenshots of the running program, "
-                                          "with real observations: not "
-                                          "mockups.",
+           "app": "The app", "app_lead": "Six screens of the running "
+                                          "program, with real observations: "
+                                          "the object card, the track & "
+                                          "stack, the photometry, a transit "
+                                          "reduced by EXOTIC, a light curve "
+                                          "and a measurement. Click any of "
+                                          "them to see it larger.",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -218,8 +274,11 @@ CHROME = {
            "chapters": "La guía, capítulo a capítulo",
            "what": "Qué es", "more": "Verlo en la guía",
            "app": "La aplicación",
-           "app_lead": "Capturas del programa en marcha, con observaciones "
-                       "reales: no son maquetas.",
+           "app_lead": "Seis pantallas del programa en marcha, con "
+                       "observaciones reales: la ficha del objeto, el track "
+                       "& stack, la fotometría, un tránsito reducido por "
+                       "EXOTIC, una curva de luz y una medida. Pincha "
+                       "cualquiera para verla más grande.",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -696,9 +755,13 @@ def _figure(name, lang, root=""):
     if not image.is_file():
         return ""
     caption = SHOTS.get(name, ("", ""))[0 if lang == "en" else 1]
+    # The image sits inside a link, so the larger view works even with
+    # JavaScript off (the browser opens the file); the site's script turns
+    # that click into its own overlay instead (site.js).
     return (f'<figure class="shot">'
+            f'<a class="zoom" href="{root}assets/screens/{name}.webp">'
             f'<img src="{root}assets/screens/{name}.webp" '
-            f'alt="{html.escape(caption)}" loading="lazy">'
+            f'alt="{html.escape(caption)}" loading="lazy"></a>'
             f'<figcaption>{html.escape(caption)}</figcaption></figure>')
 
 

@@ -74,4 +74,39 @@
     function (section) {
       if (seen[section.id]) { observer.observe(section); }
     });
+
+  /* ---- 3. the screenshots open larger --------------------------------- */
+
+  var zooms = document.querySelectorAll(".shot .zoom");
+  if (!zooms.length) { return; }
+
+  var box = document.createElement("div");
+  box.id = "lightbox";
+  box.innerHTML = '<button class="close" aria-label="Close">×</button>' +
+    '<img alt=""><p></p>';
+  document.body.appendChild(box);
+  var big = box.querySelector("img");
+  var caption = box.querySelector("p");
+
+  function close() {
+    box.classList.remove("on");
+    big.removeAttribute("src");     // the file is not kept in memory
+  }
+
+  Array.prototype.forEach.call(zooms, function (link) {
+    link.addEventListener("click", function (event) {
+      if (event.metaKey || event.ctrlKey || event.shiftKey) { return; }
+      event.preventDefault();
+      var figure = link.closest("figure");
+      var text = figure ? figure.querySelector("figcaption") : null;
+      big.src = link.getAttribute("href");
+      big.alt = text ? text.textContent : "";
+      caption.textContent = text ? text.textContent : "";
+      box.classList.add("on");
+    });
+  });
+  box.addEventListener("click", close);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && box.classList.contains("on")) { close(); }
+  });
 }());

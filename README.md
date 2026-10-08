@@ -110,7 +110,9 @@ and talks only to the public data services listed below.
 
 ## Your first five minutes
 
-1. **Install** (details in [INSTALL.md](INSTALL.md)):
+1. **Install** (details in [INSTALL.md](INSTALL.md); on Windows there is a
+   [standalone installer](https://github.com/irydeo/nightscribe/releases),
+   no Python needed):
 
    ```bash
    python3 -m venv --system-site-packages .venv
@@ -520,31 +522,6 @@ sequences, reports, charts, posts) under a root you choose and can change
 later. No accounts, no cloud, no telemetry. Uninstall and delete the folder:
 nothing remains anywhere else.
 
-## What NightScribe is *not* (yet)
-
-Honesty section, so you know where the edges are:
-
-- **Not a planetarium.** It does not replace Stellarium or Cartes du Ciel: it
-  exports ephemerides *to* them.
-- **It reduces, and it also lets you reduce elsewhere.** The app calibrates,
-  stacks and measures astrometry and photometry itself (see *Reduce and
-  measure in the app*), and what it produces is standard FITS, ADES and AAVSO
-  files, so the tools you already trust (Tycho Tracker, AstroImageJ…) keep
-  working on its output. **EXOTIC** stays external: the app orchestrates it,
-  it does not reimplement it.
-- **The MPC report is generated and validated; you send the email.** The app
-  writes it from its own measurements, or reviews the one you paste, and
-  checks it against the other stations before it leaves.
-- **Export formats**: the CCDciel sequence format is validated against a real
-  CCDciel export, and the TheSkyX and Cartes du Ciel ephemerides against real
-  imports; the NINA and generic-CSV sequence exports are starting points to
-  validate against your own versions.
-- **Planning-grade sky events**: eclipses are *probable eclipses*, labelled as
-  such, and Galilean moon events carry their ±10 min label.
-- **Status: alpha.** It is the daily driver of a real observatory (MPC Z41)
-  with a 3,000+ automated test suite, but expect sharp edges; and please
-  report them.
-
 ## Quickstart and CLI
 
 ```bash
@@ -587,5 +564,6 @@ Design, architecture, data sources, scoring, workflows and every decision
 
 ## Licence
 
-GPL v3. (c) 2026 Francisco José Calvo Fernández
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE).
+(c) 2026 Francisco José Calvo Fernández
 ([Irydeo Observatory](https://www.irydeo.com), MPC Z41).

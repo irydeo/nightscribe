@@ -113,7 +113,9 @@ y solo habla con los servicios públicos de datos listados más abajo.
 
 ## Tus primeros cinco minutos
 
-1. **Instala** (detalles en [INSTALL.es.md](INSTALL.es.md)):
+1. **Instala** (detalles en [INSTALL.es.md](INSTALL.es.md); en Windows hay un
+   [instalador autónomo](https://github.com/irydeo/nightscribe/releases), sin
+   necesidad de Python):
 
    ```bash
    python3 -m venv --system-site-packages .venv
@@ -543,32 +545,6 @@ contenedora** (planes, secuencias, informes, gráficos, posts) bajo una raíz
 que eliges tú y puedes cambiar más adelante. Sin cuentas, sin nube, sin
 telemetría. Desinstala y borra la carpeta: no queda nada en ningún otro sitio.
 
-## Qué NO es NightScribe (aún)
-
-Sección de honestidad, para que sepas dónde están los bordes:
-
-- **No es un planetario.** No sustituye a Stellarium o Cartes du Ciel: exporta
-  efemérides *hacia* ellos.
-- **Reduce, y además te deja reducir fuera.** La app calibra, apila y mide
-  astrometría y fotometría ella misma (ver *Reducir y medir en la app*), y lo
-  que produce son ficheros FITS, ADES y AAVSO estándar, así que las
-  herramientas en las que ya confías (Tycho Tracker, AstroImageJ…) siguen
-  funcionando sobre su salida. **EXOTIC** sigue siendo externo: la app lo
-  orquesta, no lo reimplementa.
-- **El informe MPC se genera y se valida; el correo lo envías tú.** La app lo
-  escribe desde sus propias medidas, o revisa el que pegues, y lo contrasta
-  con las demás estaciones antes de que salga.
-- **Formatos de exportación**: el formato de secuencias CCDciel está validado
-  contra una exportación real de CCDciel, y las efemérides TheSkyX y Cartes du
-  Ciel contra importaciones reales; las secuencias NINA y CSV genérico son
-  puntos de partida pendientes de validar contra tus versiones.
-- **Eventos del cielo de calidad planificación**: los eclipses son *eclipses
-  probables*, etiquetados como tales, y los fenómenos de los galileanos llevan
-  su etiqueta ±10 min.
-- **Estado: alpha.** Es la herramienta diaria de un observatorio real
-  (MPC Z41) con una suite de más de 3.000 tests automatizados, pero espera
-  algún borde afilado; y por favor, repórtalo.
-
 ## Inicio rápido y CLI
 
 ```bash
@@ -612,5 +588,6 @@ decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.
 
 ## Licencia
 
-GPL v3. (c) 2026 Francisco José Calvo Fernández
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE).
+(c) 2026 Francisco José Calvo Fernández
 ([Observatorio Irydeo](https://www.irydeo.com), MPC Z41).

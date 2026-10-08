@@ -62,14 +62,20 @@ img { max-width: 100%; }
   backdrop-filter: blur(10px);
 }
 .bar-in {
-  max-width: var(--max); margin: 0 auto; height: var(--bar-h);
+  max-width: var(--max); margin: 0 auto; min-height: var(--bar-h);
   padding: 0 20px; display: flex; align-items: center; gap: 18px;
 }
 .brand { display: flex; align-items: center; gap: 9px; color: var(--text); }
 .brand:hover { text-decoration: none; }
 .wordmark { font-weight: 800; letter-spacing: 2.5px; font-size: 15px; }
 .wordmark b, .hero-title b { color: var(--accent); }
-.bar-nav { display: flex; gap: 16px; overflow-x: auto; flex: 1; }
+/* The navigation NEVER scrolls: the entries are the curated main sections,
+   and if a screen is too narrow for them the menu wraps instead (a scrollbar
+   in the header is what the redesign removed). */
+.bar-nav {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; flex: 1;
+  align-content: center;
+}
 .bar-nav a {
   color: var(--dim); font-size: 13px; white-space: nowrap;
   padding: 4px 0; border-bottom: 2px solid transparent;
@@ -185,15 +191,16 @@ img { max-width: 100%; }
 
 /* the target kinds: the app's own chips and colours */
 .kinds {
-  display: grid; gap: 14px;
+  display: grid; gap: 14px; margin-top: 24px;
   grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
 }
 .kind {
   background: var(--base); border: 1px solid var(--line);
   border-top: 3px solid var(--kind); border-radius: var(--radius);
   padding: 16px 18px 14px; display: flex; flex-direction: column;
+  gap: 9px;
 }
-.kind p { margin: 0 0 8px; color: #ccd3e4; font-size: 14.5px; }
+.kind p { margin: 0; color: #ccd3e4; font-size: 14.5px; }
 .kind .kind-src { color: var(--dim); font-size: 12.5px; margin-top: auto; }
 .kind .more { font-size: 13px; font-weight: 600; }
 .chip {

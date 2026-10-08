@@ -217,6 +217,24 @@ def test_the_landing_shows_the_kinds_with_the_app_colours():
     assert es.count('class="kind"') == len(gen.kinds_catalogue("es"))
 
 
+def test_the_top_bar_shows_the_curated_sections():
+    # The bar is CURATED on purpose: with every heading it needed a scroll,
+    # and a scrollbar in the header is the one thing the landing must not
+    # have. Each title it shows has to exist in the README (and reach the
+    # page), or a rewording would drop an entry without anybody noticing.
+    gen = _generator()
+    for lang, suffix in (("en", ""), ("es", ".es")):
+        readme = (ROOT / f"README{suffix}.md").read_text(encoding="utf-8")
+        for title in gen.NAV_MAIN[lang]:
+            assert f"## {title}" in readme, (lang, title)
+        page = (SITE / f"index{suffix}.html").read_text(encoding="utf-8")
+        nav = page[page.index('<nav class="bar-nav">'):]
+        nav = nav[:nav.index("</nav>")]
+        assert nav.count("<a ") == len(gen.NAV_MAIN[lang]) + 1, lang
+        for anchor in re.findall(r'href="#([^"]+)"', nav):
+            assert f'id="{anchor}"' in page, (lang, anchor)
+
+
 def test_the_landing_and_the_guide_are_the_readme_and_the_chapters():
     # The point of the whole thing: the prose is not written twice. The
     # landing's definition is the README's own opening and the guide's pages

@@ -60,6 +60,7 @@ ASSETS_SRC = ROOT / "nightscribe" / "assets"
 
 REPO_URL = "https://github.com/irydeo/nightscribe"
 SITE_URL = "https://irydeo.github.io/nightscribe"
+LICENSE_URL = f"{REPO_URL}/blob/main/LICENSE"
 LANGS = ("en", "es")
 LANG_LABEL = {"en": "EN", "es": "ES"}
 
@@ -94,16 +95,14 @@ NAV_SHORT = {
            "Where the data comes from": "Data sources",
            "Optional integrations": "Integrations",
            "Your data stays with you": "Your data",
-           "What NightScribe is *not* (yet)": "What it is not",
            "Quickstart and CLI": "Quickstart & CLI"},
     "es": {"¿Qué es NightScribe?": "Qué es",
            "Tus primeros cinco minutos": "Primeros cinco minutos",
-           "Una noche entera (y las semanas después)": "Una noche entera",
+           "Una noche completa (y las semanas siguientes)": "Una noche completa",
            "Qué puedes hacer: en detalle": "En detalle",
            "De dónde salen los datos": "Fuentes de datos",
            "Integraciones opcionales": "Integraciones",
            "Tus datos se quedan contigo": "Tus datos",
-           "Qué NO es NightScribe (todavía)": "Qué no es",
            "Arranque rápido y CLI": "Arranque y CLI"},
 }
 
@@ -117,6 +116,21 @@ README_KIND_ORDER = ("neo", "comet", "pccp", "sn", "transit", "alert",
 # the "in detail" chapter becomes an accordion.
 KINDS_SECTION = ("What you can follow", "Qué puedes seguir")
 DETAIL_SECTION = ("What you can do: in detail", "Qué puedes hacer: en detalle")
+
+# The sections the top bar shows. It is a CURATED list, not every heading:
+# fourteen entries need a scroll, and a scrollbar in the header is the one
+# thing a landing must not have, while a navigation that lists everything
+# guides nobody. Each title has to exist in the README: the site's test says
+# so, so a rewording fails there instead of losing an entry in silence.
+NAV_MAIN = {
+    "en": ("What is NightScribe?", "What you can follow", "What you need",
+           "Your first five minutes", "A whole night (and the weeks after)",
+           "Where the data comes from"),
+    "es": ("¿Qué es NightScribe?", "Qué puedes seguir", "Qué necesitas",
+           "Tus primeros cinco minutos",
+           "Una noche completa (y las semanas siguientes)",
+           "De dónde salen los datos"),
+}
 
 # The hero's "at a glance" facts: the same promises the README makes a screen
 # below, in four words each.
@@ -136,7 +150,8 @@ CHROME = {
                                                  "chapter",
            "what": "What it is", "more": "See it in the guide",
            "on_github": "GitHub",
-           "licence": "GPL v3 · Francisco José Calvo Fernández, "
+           "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
+                      "Francisco José Calvo Fernández, "
                       "Observatorio Irydeo (MPC Z41)"},
     "es": {"guide": "Guía de usuario", "contents": "Índice",
            "next": "Siguiente", "prev": "Anterior",
@@ -145,7 +160,8 @@ CHROME = {
            "chapters": "La guía, capítulo a capítulo",
            "what": "Qué es", "more": "Verlo en la guía",
            "on_github": "GitHub",
-           "licence": "GPL v3 · Francisco José Calvo Fernández, "
+           "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
+                      "Francisco José Calvo Fernández, "
                       "Observatorio Irydeo (MPC Z41)"},
 }
 
@@ -681,14 +697,19 @@ def build_landing(lang):
     sections = []
     for sec in _sections(body):
         if sec["text"] in KINDS_SECTION:
-            sec["html"] = _kinds_cards(lang)
+            # the section's own introduction stays (the cards replace the
+            # bullets, not the paragraph that says what the list is)
+            cut = sec["html"].find("<ul>")
+            lead = sec["html"][:cut] if cut >= 0 else ""
+            sec["html"] = lead + _kinds_cards(lang)
         if sec["text"] in DETAIL_SECTION:
             sec["html"] = _accordion(sec["html"])
         sections.append(sec)
-    # the bar shows the README's own sections and the guide block the page
-    # adds at the end (the chapter index)
-    nav = [(f'#{s["id"]}', _nav_label(s, lang)) for s in sections] + [
-        ("#guide", chrome["guide"])]
+    # the bar shows the curated sections and the guide block the page adds
+    wanted = NAV_MAIN[lang]
+    nav = [(f'#{s["id"]}', _nav_label(s, lang)) for s in sections
+           if s["text"] in wanted]
+    nav.append(("#guide", chrome["guide"]))
 
     glance = "".join(f'<span class="glance">{html.escape(g)}</span>'
                      for g in GLANCE[lang])
@@ -706,7 +727,7 @@ def build_landing(lang):
     <p class="hero-tag">{html.escape(tagline)}</p>
     <p class="hero-what">{html.escape(definition)}</p>
     <p class="hero-cta">
-      <a class="btn primary" href="{REPO_URL}#install">{chrome["download"]}</a>
+      <a class="btn primary" href="{REPO_URL}/releases">{chrome["download"]}</a>
       <a class="btn" href="{REPO_URL}" rel="noopener">{chrome["github"]}</a>
       <a class="btn ghost" href="docs/index{_suffix(lang)}.html">{chrome["read"]}</a>
     </p>

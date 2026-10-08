@@ -157,7 +157,7 @@ No key is required: every optional integration degrades gracefully.
 - **Windows: SmartScreen warns about the standalone exe** → *More info → Run
   anyway* (the installer is built from this same source tree).
 - **A source fails** (e.g. NEOfixer down) → the app keeps working with the rest;
-  check the *Data sources* menu for per-source status.
+  check *Help → About NightScribe* for the list of sources.
 - **CCDciel actions greyed out** → control is only available while CCDciel is
   running; check host/port under *Settings → Integrations*.
 - **Translations missing after editing** → run

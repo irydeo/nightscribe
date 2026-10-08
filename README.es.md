@@ -460,8 +460,8 @@ supernova, rastro de movimiento del NEO. Copias, pegas, listo.
 Cada fuente externa, qué te aporta, con qué frescura, y si necesita clave.
 Toda la red pasa por una **caché SQLite con TTL por fuente** (la columna
 «refresco»): las consultas repetidas son instantáneas y gratuitas para el
-servicio. Si una fuente cae, el resto de la app nunca se rompe; consulta
-**Ayuda → Fuentes de datos** para ver el estado en vivo de cada una.
+servicio. Si una fuente cae, el resto de la app nunca se rompe; las fuentes
+están listadas en **Ayuda → Acerca de NightScribe**.
 
 **Fuentes de planificación (alimentan Esta noche):**
 

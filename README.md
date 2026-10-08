@@ -438,8 +438,8 @@ Copy, paste, done.
 Every external source, what it gives you, how fresh it is, and whether it
 needs a key. All network access goes through an **SQLite cache with per-source
 TTLs** (the refresh column): repeat queries are instant and free for the
-service. If a source is down, the rest of the app never breaks; check
-**Help → Data sources** for the live status of each one.
+service. If a source is down, the rest of the app never breaks; the sources
+are listed under **Help → About NightScribe**.
 
 **Planning sources (feed Tonight):**
 

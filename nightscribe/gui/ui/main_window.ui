@@ -135,10 +135,10 @@
      <property name="title"><string>Help</string></property>
      <addaction name="action_welcome"/>
      <addaction name="action_guide_web"/>
-     <addaction name="separator_help"/>
-     <addaction name="action_about"/>
-     <addaction name="action_sources"/>
+     <addaction name="separator"/>
      <addaction name="action_log"/>
+     <addaction name="separator"/>
+     <addaction name="action_about"/>
     </widget>
     <addaction name="menu_file"/>
     <addaction name="menu_tools"/>
@@ -167,9 +167,6 @@
    </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>
-  </action>
-  <action name="action_sources">
-   <property name="text"><string>Data sources</string></property>
   </action>
   <action name="action_welcome">
     <property name="text"><string>Welcome / setup guide</string></property>

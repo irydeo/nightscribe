@@ -1498,7 +1498,6 @@ class MainWindow(QMainWindow):
         self._menus.action_quit.triggered.connect(self.close)
         self._menus.action_settings.triggered.connect(self.on_open_settings)
         self._menus.action_about.triggered.connect(self.on_about)
-        self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_guide_web.triggered.connect(self.on_guide_web)
         self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_welcome.triggered.connect(
@@ -2666,7 +2665,10 @@ class MainWindow(QMainWindow):
     def _about_html(self):
         # @return: the About text as rich HTML. The project URL is the one
         #          thing that leaves the app from here, so it is a real link
-        #          (the report of a bug starts at the same page).
+        #          (the report of a bug starts at the same page). The data
+        #          sources live here too: they were a Help entry of their own
+        #          (a static list, no live status) and one informational box
+        #          is enough (2026-10-08).
         return (
             f"<b>NightScribe</b> {full_version()}<br><br>"
             + self.tr("Plan your night, understand every object, "
@@ -2674,15 +2676,12 @@ class MainWindow(QMainWindow):
             + "<br><br>(c) 2026 Francisco José Calvo Fernández<br>"
             "GPL v3 · Irydeo Observatory (MPC Z41)<br><br>"
             '<a href="https://github.com/irydeo/nightscribe">'
-            "github.com/irydeo/nightscribe</a>")
-
-    def on_sources(self):
-        QMessageBox.information(
-            self, self.tr("Data sources"),
-            self.tr("NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · "
-                    "COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA "
-                    "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
-                    "Legacy Survey · CDS hips2fits"))
+            "github.com/irydeo/nightscribe</a>"
+            + "<br><br><b>" + self.tr("Data sources") + "</b><br>"
+            + self.tr("NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · "
+                      "COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA "
+                      "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
+                      "Legacy Survey · CDS hips2fits"))
 
     def on_open_log(self):
         # Help > Open the log: the file the app writes while it runs, so a

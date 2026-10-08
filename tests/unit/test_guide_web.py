@@ -102,18 +102,23 @@ def test_the_welcome_guide_button_opens_the_web_guide(window, monkeypatch):
     assert opened == ["https://example.test/g/index.html"]
 
 
-def test_the_help_menu_has_no_technical_documentation(window):
-    # The general in-app door is gone (ADR-053 revision): the guide is the
-    # published website, and the in-app browser only opens one concrete
-    # document (the UFE series "?"). The entry and the method that opened it
-    # go together.
-    assert not hasattr(window._menus, "action_docs")
-    assert not hasattr(window, "on_docs")
+def test_the_help_menu_keeps_only_its_doors(window):
+    # The general in-app doc door and the Data sources entry are gone
+    # (ADR-053 revisions): the guide is the published website and the sources
+    # live in About. Each entry went with the method that served it.
+    for name in ("action_docs", "action_sources"):
+        assert not hasattr(window._menus, name), name
+    for name in ("on_docs", "on_sources"):
+        assert not hasattr(window, name), name
+    # About is the LAST entry of the menu
+    assert window._menus.menu_help.actions()[-1] is window._menus.action_about
 
 
-def test_about_carries_the_project_url(window):
+def test_about_carries_the_project_url_and_the_sources(window):
     # The About box is where somebody checks the exact build before reporting
-    # an issue, so the project URL lives there, as a real link.
+    # an issue: the project URL is a real link, and the data sources (which
+    # used to be a menu entry of their own) are listed here too.
     html = window._about_html()
     assert '<a href="https://github.com/irydeo/nightscribe">' in html
     assert "GPL v3" in html
+    assert "NEOfixer" in html

@@ -320,6 +320,12 @@ class UfeMeasureTab(QWidget):
         # its observation (see _sync_manual_button).
         self.btn_manual_mag = self._ui.btn_manual_mag
         self.btn_manual_mag.clicked.connect(self._on_manual_magnitude)
+        # ADR-072: the one-time gain measurement, for an observer who only
+        # has single images (a single image cannot measure the gain, and the
+        # header can lie). It lives with the result, where the gain line is
+        # what tells the observer that it is missing.
+        self.btn_measure_gain = self._ui.btn_measure_gain
+        self.btn_measure_gain.clicked.connect(self._on_measure_gain)
         self.btn_reset_more = self._ui.btn_reset_more
         self._door(self.btn_export_more, (self.btn_csv, self.btn_eff))
         self._door(self.btn_reset_more, (self.btn_reset_state,
@@ -1381,45 +1387,139 @@ class UfeMeasureTab(QWidget):
             logger.warning("the pair %s could not be read: %s", partner, err)
             return None
 
-    def _gain_estimate(self):
-        # @return: the gain measured on the visit's own frames, or None
+    def _gain_measurement(self):
+        # @return: (estimate, header) measured on the visit's own frames, or
+        #          (None, None)
         # The same measurement the series engine makes (core/gain.py): two
         # frames of the same exposure say the conversion gain of the data
         # in hand. It costs two frame reads, so it is cached per visit and
         # only attempted when Ajustes carries no gain (the observer's
-        # decision always wins, see core/gain.resolve).
+        # decision always wins, see core/gain.resolve). The header travels
+        # with it because it is the header of the FRAMES (with their GAIN
+        # card), not the stack's, and that is the key the store wants.
+        from ..core import fits_io
         from ..core import gain as gain_mod
         ctx = self._series_context() or {}
         sid = ctx.get("session_id")
         paths = ctx.get("paths") or []
         if sid is None or not paths:
-            return None
+            return None, None
         cache = getattr(self, "_gain_est", None)
         if cache is None:
             cache = self._gain_est = {}
         if sid not in cache:
+            header = None
+            for path in paths[:3]:
+                try:
+                    header = fits_io.read_header(path)
+                    break
+                except Exception as err:            # never fatal
+                    logger.warning("gain header failed: %s", err)
             try:
-                cache[sid] = gain_mod.estimate_from_paths(
+                estimate = gain_mod.estimate_from_paths(
                     paths, level_max=config.get("ccd_saturate"))
             except Exception as err:            # never fatal
                 logger.warning("gain estimate failed: %s", err)
-                cache[sid] = None
+                estimate = None
+            cache[sid] = (estimate, header)
         return cache[sid]
 
     def _resolve_gain(self):
         # @return: the resolved working gain {"gain", "ron", "source", ...}
-        # The same chain the series walks (2026-10-08): Ajustes -> the
-        # gain measured on the visit's frames -> the header. The header is
-        # the LAST word and not the first, because it can carry the
-        # camera's gain SETTING or a placeholder (measured on the author's
-        # own frames: GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU).
+        # The same chain the series walks (2026-10-08, ADR-072): Ajustes ->
+        # the gain measured on the visit's frames -> the gain remembered for
+        # this camera -> the header. The header is the LAST word and not the
+        # first, because it can carry the camera's gain SETTING or a
+        # placeholder (measured on the author's own frames: GAIN = 5,
+        # EGAIN = 1.0, real gain 0.11 e-/ADU).
         from ..core import gain as gain_mod
-        estimate = None if config.get("ccd_gain") is not None \
-            else self._gain_estimate()
-        return gain_mod.resolve(
+        from ..core import gain_store
+        from ..core.db import db
+        estimate, frames_header = (None, None) \
+            if config.get("ccd_gain") is not None else self._gain_measurement()
+        remembered = None
+        if config.get("ccd_gain") is None:
+            try:
+                remembered = gain_store.recall(db, self._state.header)
+            except Exception as err:            # never fatal
+                logger.warning("gain recall failed: %s", err)
+        resolved = gain_mod.resolve(
             settings_gain=config.get("ccd_gain"),
             settings_ron=config.get("ccd_read_noise"),
-            header=self._state.header, estimate=estimate)
+            header=self._state.header, estimate=estimate,
+            remembered=remembered)
+        if resolved.get("source") == "remembered" and remembered is not None:
+            resolved["remembered"] = remembered
+        # a fresh measurement is worth remembering for the next plate, keyed
+        # by the frames' own camera and setting (not the stack's)
+        if resolved.get("source") == "frames" and frames_header is not None:
+            try:
+                gain_store.remember(db, frames_header, resolved)
+            except Exception as err:            # never fatal
+                logger.warning("gain remember failed: %s", err)
+        return resolved
+
+    def _on_measure_gain(self):
+        # ADR-072: the one-time action for an observer who only has single
+        # images. Point at a folder with two frames of the same exposure,
+        # measure the conversion gain and remember it for this camera; the
+        # next plate reuses it instead of trusting the header.
+        from ..core import fits_io
+        from ..core import gain as gain_mod
+        from ..core import gain_store
+        from ..core.db import db
+        start = str(Path(self._state.path).parent) if self._state.path else ""
+        folder = QFileDialog.getExistingDirectory(
+            self, self.tr("Measure my gain"), start)
+        if not folder:
+            return
+        paths = sorted(str(p) for p in Path(folder).iterdir()
+                       if p.suffix.lower() in (".fit", ".fits", ".fts"))
+        if len(paths) < 2:
+            self._say(self.tr("That folder has fewer than two FITS frames: "
+                              "the gain needs a pair of the same exposure."))
+            return
+        try:
+            estimate = gain_mod.estimate_from_paths(paths)
+        except Exception as err:                # never fatal
+            logger.warning("gain estimate failed: %s", err)
+            estimate = None
+        gain = (estimate or {}).get("gain")
+        if gain is None:
+            notes = (estimate or {}).get("notes") or []
+            said = notes[-1].get(self._lang) if notes else None
+            self._say(said or self.tr(
+                "The gain could not be measured there: it needs two frames "
+                "of the same exposure with a usable sky."))
+            return
+        try:
+            header = fits_io.read_header(paths[0])
+        except Exception as err:                # never fatal
+            logger.warning("gain header failed: %s", err)
+            header = None
+        if header is not None:
+            try:
+                gain_store.remember(db, header, estimate)
+            except Exception as err:            # never fatal
+                logger.warning("gain remember failed: %s", err)
+        parts = [self.tr("Gain {0} e-/ADU")
+                 .format("{:.4g}".format(float(gain)))]
+        ron = estimate.get("ron")
+        if ron is not None:
+            parts.append(self.tr("read noise {0} e-")
+                         .format("{:.3g}".format(float(ron))))
+        if estimate.get("n_kept"):
+            parts.append(self.tr("{0} sky boxes")
+                         .format(int(estimate["n_kept"])))
+        self._say("")
+        QMessageBox.information(
+            self, self.tr("Measure my gain"),
+            self.tr("Measured on your own frames: {0}. It is remembered for "
+                    "this camera, so a single image reuses it."
+                    ).format(" · ".join(parts)))
+        # the live measurement re-resolves the gain, so its line follows
+        if self._last is not None:
+            self._remeasure()
 
     def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
@@ -1505,6 +1605,7 @@ class UfeMeasureTab(QWidget):
             "match": self._field_match(res.col, res.row),
             "sky_mode": res.sky_mode, "sigma_clip": res.sigma_clip,
             "gain_source": res.gain_source,
+            "gain_remembered": gain_report.get("remembered"),
         }
         self._fill_panel(res.band, len(entries), len(res.used),
                          res.skipped, res.derived, res.gain)
@@ -2423,6 +2524,7 @@ class UfeMeasureTab(QWidget):
         self._last = None
         self._diff = None
         self._pair_obs = None
+        self._sub_report = None
         self._last_suggestions = []
         self.chart_series.set_data([])
         self.chart_series.set_outliers([])
@@ -3277,6 +3379,12 @@ class UfeMeasureTab(QWidget):
             if src:
                 notes.append(self.tr("Gain {0} e-/ADU ({1})")
                              .format("{:.3g}".format(float(gain)), src))
+            rec = last.get("gain_remembered")
+            if rec:
+                from ..core import gain_store
+                said = gain_store.summary(rec, self._lang)
+                if said:
+                    notes.append(said.get(self._lang) or said["en"])
         if last["scint"] is not None:
             notes.append(self.tr(
                 "Scintillation included ({0:.3f} mag)")
@@ -3481,9 +3589,16 @@ class UfeMeasureTab(QWidget):
         # the seeing lives on the plate scale; the registration gate wants it
         # on the work frame the difference is built in
         fwhm = (self._last or {}).get("fwhm")
+        logger.info("build difference: obs=%s ref=%s flipped=%s comps=%d "
+                    "fwhm=%s", obs.shape, ref.shape, pair.get("flipped"),
+                    len(comp_xy), fwhm)
         result = host_subtract.subtract(
             obs, ref, comp_xy,
             fwhm_px=(fwhm / fx if fwhm else None))
+        logger.info("build difference: scale=%s rms=%s trusted=%s used=%d",
+                    result["transform"].get("scale"),
+                    result["transform"].get("rms_px"), result["trusted"],
+                    result["used"])
         self._sub_report = result
         return result["diff"]
 
@@ -3491,20 +3606,37 @@ class UfeMeasureTab(QWidget):
         # The difference image as the view's frame (screen orientation).
         # Its sky sits at ~0, so the plate's black/white would show a
         # black screen: the difference gets its own auto percentiles
-        # (gamma and invert stay shared). The survey's masked pixels arrive
-        # as NaN and to_uint8 would paint them black: they are shown at the
-        # difference's own sky instead, so the holes are not black dots.
+        # (gamma and invert stay shared). A pixel the survey never had
+        # (a mask, or an edge the warp could not fill) arrives as NaN and
+        # to_uint8 would paint it black: it is shown as the OBSERVATION
+        # there (the un-subtracted star), never as a black dot nor as fake
+        # sky, because filling it with the difference's median turns a
+        # masked bright star into a black hole.
         if self._diff is None:
             return None
         data = self._diff
         finite = np.isfinite(data)
         if not finite.all():
-            sky = float(np.median(data[finite])) if finite.any() else 0.0
-            data = np.where(finite, data, sky)
-        black, white = stretch.auto_limits(data)
-        img = stretch.apply_stretch(data, black, white,
-                                    self._state.gamma)
-        if self._state.inverted:
+            obs = self._pair_obs
+            if obs is not None and obs.shape == data.shape:
+                data = np.where(finite, data, obs)
+            else:
+                sky = (float(np.median(data[finite])) if finite.any()
+                       else 0.0)
+                data = np.where(finite, data, sky)
+        # The observer's own black/white (the histogram strip) drive the
+        # difference too, so the SN can be brought up the same way it is on
+        # the plate. The difference's sky sits at the plate's level
+        # (obs - gain*ref), so the observer's window usually applies; when it
+        # misses (a subtraction that leaves a different pedestal) the
+        # difference falls back to its own percentiles rather than clipping.
+        st = self._state
+        black, white = float(st.black), float(st.white)
+        med = float(np.nanmedian(data))
+        if not (black < med < white):
+            black, white = stretch.auto_limits(data)
+        img = stretch.apply_stretch(data, black, white, st.gamma)
+        if st.inverted:
             img = stretch.invert(img)
         return np.ascontiguousarray(np.flipud(stretch.to_uint8(img)))
 

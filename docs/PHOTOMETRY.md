@@ -227,12 +227,16 @@ disk is never modified.
 * **Where the gain comes from** (2026-10-08): the CCD equation hangs
   entirely on the gain (e-/ADU), so the app resolves it in one fixed
   order: Settings, then the **measurement on your own frames** (two frames
-  of the same exposure tell it), and only then the header. The measurement
-  beats the header because the card can carry the camera's **setting**
-  (`GAIN`, a small number that is not e-/ADU) or a placeholder
-  (`EGAIN = 1.0`): with one of those the error comes out several times
-  shorter than it is, and the check star cannot warn because its semaphore
-  is measured with that same error. The panel says which way the gain
+  of the same exposure tell it), then the one **remembered** for your camera
+  and setting, and only then the header. The measurement beats the header
+  because the card can carry the camera's **setting** (`GAIN`, a small
+  number that is not e-/ADU) or a placeholder (`EGAIN = 1.0`): with one of
+  those the error comes out several times shorter than it is, and the check
+  star cannot warn because its semaphore is measured with that same error.
+  The **remembered** gain solves the single-image case: on an SN you usually
+  bring one stack, and one image cannot measure the gain, so the app measures
+  it when it can (the visit's frames, or the **"Measure my gain…"** action)
+  and remembers it per camera and setting. The panel says which way the gain
   came; the measured case and its figures are in ADR-072.
 * **The check star as a traffic light**: when the sequence has one, it
   is measured and compared with its catalog value; beyond 2.5σ_total

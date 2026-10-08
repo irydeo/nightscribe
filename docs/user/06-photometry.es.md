@@ -44,14 +44,32 @@ secuencia. La receta de medida tiene tres decisiones que conviene entender:
 **La ganancia y tu error.** La barra de error de una medida sale de la
 ecuación CCD, que cuelga de la **ganancia** de tu cámara (e-/ADU). La app la
 resuelve en un orden fijo: lo que pongas en **Ajustes**, después la **medida
-en tus propias tomas** (dos tomas de la misma exposición la dicen) y solo
-entonces la cabecera del FITS. La medida gana a la cabecera porque la tarjeta
-puede traer el **ajuste** de la cámara o un valor de relleno, y con uno de esos
-el error sale más corto de lo que es. El panel dice de dónde salió la ganancia.
+en tus propias tomas** (dos tomas de la misma exposición la dicen), después la
+**recordada** para tu cámara y tu ajuste, y solo entonces la cabecera del FITS.
+La medida gana a la cabecera porque la tarjeta puede traer el **ajuste** de la
+cámara o un valor de relleno, y con uno de esos el error sale más corto de lo
+que es. En una SN sueles traer **una sola imagen**, y una imagen no puede medir
+la ganancia: la app la mide cuando puede (los frames de tu visita) y la
+**recuerda**, así que a partir de ahí una placa suelta la reutiliza. Si nunca
+tienes un par, el botón **«Medir ganancia…»** mide tu cámara con dos tomas que
+le indiques y la guarda. El panel dice de dónde salió la ganancia.
 
 **Avanzado…** abre el resto de la receta (modelo de cielo, sigma-clip,
 término de color, sustracción de galaxia anfitriona). Cada placa guarda su
 propia receta: cambiarla en una no toca las demás.
+
+**Sustracción de la galaxia anfitriona.** Para una supernova en el núcleo de
+su galaxia, marca **Restar galaxia anfitriona (referencia PS1)**: la app
+descarga el recorte del survey del campo, lo alinea con tu placa por las
+estrellas que comparten, lo ensancha hasta que su perfil de estrella coincide
+con el tuyo y lo resta, de modo que se va la luz de la galaxia y queda la
+supernova. Ese igualado es lo que hace desaparecer las estrellas; la app lo
+mide en tus propias estrellas y siempre elige la opción que menos deja. No es
+perfecto (el survey es otro telescopio y otra noche), así que pueden quedar
+unos anillos tenues alrededor de las estrellas más brillantes, y una estrella
+que tu cámara saturó no se puede restar. La medida lee entonces el objetivo
+sobre la imagen diferencia; las comparsas siguen calibrando sobre tu placa
+original.
 
 **Guardar…** registra el punto calibrado en el proyecto (caerá en la curva de
 luz y en el resumen de campaña). **Exportar** da el CSV de los puntos y el

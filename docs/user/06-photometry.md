@@ -44,14 +44,31 @@ The measurement recipe has three decisions worth understanding:
 **The gain and your error.** A measurement's error bar comes from the CCD
 equation, which hangs on your camera's **gain** (e-/ADU). The app resolves it
 in one fixed order: what you set in **Settings**, then the **measurement on
-your own frames** (two frames of the same exposure tell it), and only then the
-FITS header. The measurement beats the header because the card can carry the
-camera's **setting** or a placeholder, and with one of those the error comes
-out shorter than it is. The panel says where the gain came from.
+your own frames** (two frames of the same exposure tell it), then the one
+**remembered** for your camera and setting, and only then the FITS header. The
+measurement beats the header because the card can carry the camera's
+**setting** or a placeholder, and with one of those the error comes out shorter
+than it is. On an SN you usually bring **a single image**, and one image cannot
+measure the gain: the app measures it when it can (your visit's frames) and
+**remembers** it, so a later single plate reuses it. If you never have a pair,
+the **"Measure gain…"** button measures your camera on two frames you point it
+at and stores it. The panel says where the gain came from.
 
 **Advanced…** opens the rest of the recipe (sky model, sigma-clip, colour
 term, host-galaxy subtraction). Each plate keeps its own recipe: changing it
 on one does not touch the others.
+
+**Host-galaxy subtraction.** For a supernova sitting on its galaxy's core,
+tick **Subtract host galaxy (PS1 reference)**: the app fetches the survey's
+cutout of the field, lines it up with your plate on the stars they share,
+broadens it until its star profile matches yours, and subtracts it, so the
+galaxy's own light goes and the supernova is left. The match is what makes
+the stars vanish; the app measures it from your own stars and always picks
+the option that leaves the least behind. It is not perfect (the survey is
+another telescope and another night), so a few faint rings may remain
+around the brightest stars, and a star your camera saturated cannot be
+subtracted at all. The measurement then reads the target on the difference
+image; the comparison stars keep calibrating on your original plate.
 
 **Save…** registers the calibrated point in the project (it lands on the
 light curve and the campaign summary). **Export** gives the CSV of the

@@ -55,7 +55,7 @@ def test_migration_v3_to_current_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -111,7 +111,7 @@ def test_migration_v9_moves_session_images_into_the_registry(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     row = db.execute(
         "SELECT path, kind, session_id, meta FROM project_files"
         " WHERE project_id=1").fetchone()
@@ -146,7 +146,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> current
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
 
 
 # ---------------- sessions CRUD ----------------
@@ -300,7 +300,7 @@ def test_migration_v10_adds_the_pin_column(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(project_sessions)").fetchall()}
     assert "pinned" in cols
@@ -333,7 +333,7 @@ def test_migration_v10_gains_the_plate_link(tmp_path):
     db.close()
 
     db = Database(str(f))           # replays the v11 migration
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(photometry_points)").fetchall()}
     assert "file_id" in cols

@@ -133,6 +133,9 @@ class SeriesConfig:
     gain_source: str = None         # "settings" | "frames" | "header": where
                                     # the resolved gain came from, so the
                                     # plate can say it (2026-10-08)
+    db: object = None               # the Database, so the run can recall the
+                                    # gain remembered for this camera and
+                                    # remember the one it measures (ADR-072)
     site_flat: float = 0.007
     site_saturate: float = None
     site_lon: float = None
@@ -1397,6 +1400,7 @@ def _resolve_gain(cfg, paths):
     # @args: cfg - the SeriesConfig, paths - the series in observing order
     # @return: (cfg with the resolved site gain/ron, the report dict)
     from . import gain as gain_mod
+    from . import gain_store
     header = None
     for path in list(paths)[:3]:
         try:
@@ -1412,9 +1416,18 @@ def _resolve_gain(cfg, paths):
         except Exception as err:                     # never fatal
             logger.warning("gain estimate failed: %s", err)
             estimate = None
+    # WHAT THE APP REMEMBERED for this camera (ADR-072): a supernova
+    # observer usually hands in ONE image, and one image cannot measure the
+    # gain; a measurement made on another night beats the header too.
+    remembered = None
+    if cfg.site_gain is None and cfg.db is not None and header is not None:
+        try:
+            remembered = gain_store.recall(cfg.db, header)
+        except Exception as err:                     # never fatal
+            logger.warning("gain recall failed: %s", err)
     resolved = gain_mod.resolve(
         settings_gain=cfg.site_gain, settings_ron=cfg.site_ron,
-        header=header, estimate=estimate)
+        header=header, estimate=estimate, remembered=remembered)
     if resolved.get("gain") is not None:
         resolved["used"] = resolved["gain"]
     report = dict(resolved)
@@ -1422,6 +1435,12 @@ def _resolve_gain(cfg, paths):
         report["n_boxes"] = estimate.get("n_boxes")
         report["n_kept"] = estimate.get("n_kept")
         report["pair"] = estimate.get("pair")
+    if report.get("source") == "frames" and cfg.db is not None \
+            and header is not None:
+        try:
+            gain_store.remember(cfg.db, header, report)
+        except Exception as err:                     # never fatal
+            logger.warning("gain remember failed: %s", err)
     g = resolved.get("gain")
     r = resolved.get("ron")
     if g is not None:

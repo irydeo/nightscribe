@@ -201,14 +201,27 @@ The pieces, in impact-per-effort order:
 * **H2. Sky on a galactic core**, two levels:
   (a) a plane fitted to the annulus pixels (after 2.5σ sigma-clipping)
   evaluated at the star's position, instead of the flat median;
-  (b) **host subtraction**: take the aligned pair from
-  `core/blink.prepare_pair`, scale the reference by the flux ratio of
-  the comps present in both images (the comps must vanish in the
-  difference; their mean residual is the scaling criterion), subtract,
-  and measure the SN on the difference image. The PS1-g reference is not
-  calibrated to the user's filter: the comp fit absorbs that, and the
-  docs must say so. Tests: synthetic gradient galaxy + known-flux SN;
-  the post-subtraction measurement recovers the flux to 1 %.
+  (b) **host subtraction**: take the pair from
+  `core/blink.prepare_pair`, **register the reference onto the frame's
+  pixel grid as a similarity** (scale + rotation + translation) on the
+  stars the two share (`core/register`: the WCS alone is not enough,
+  because the SIP terms are ignored and, above all, the cutout's scale
+  differs from the real one by a fraction of a percent, leaving a dipole
+  at every star), **exclude the survey's masked
+  pixels** (they arrive as NaN: filled so the resampling can cross them,
+  then excluded again from the difference), **match the PSF**
+  (`core/difference`, ADR-073: the observation is broader than the survey,
+  so the reference is broadened with the difference Gaussian or with a
+  regularized optimal kernel of the Alard-Lupton kind, and the one that
+  leaves the least residual on the stars wins), scale the reference by the
+  flux ratio of the comps present in both images (the comps must vanish
+  in the difference; their mean residual is the scaling criterion),
+  subtract, and measure the SN on the difference image. The PS1-g
+  reference is not calibrated to the user's filter: the comp fit absorbs
+  that, and the docs must say so. When the registration is not reliable
+  the subtraction still runs and the panel warns. Tests: a shifted
+  synthetic pair + a NaN hole; the registration lowers the residual, the
+  hole is not painted and the measurement recovers the target's flux.
 * **H3. FWHM-based aperture**: FWHM measured from bright unsaturated
   comps (second-order moments after sky subtraction); `r_ap = k·FWHM`
   with k ∈ [1.2, 1.6], default 1.35; the annulus scales in proportion.
@@ -219,7 +232,8 @@ The pieces, in impact-per-effort order:
   warning. Test: a star at 95 % of the ceiling is flagged and not
   measured.
 * **H5. Honest total error**: CCD equation (gain/RON resolved in the
-  order of ADR-072: Settings → measurement on the frames → header) +
+  order of ADR-072: Settings → measurement on the frames → **remembered** →
+  header) +
   scintillation (Young 1967:
   `σ ∝ D^(−2/3) · X^1.75 · t^(−1/2) · e^(−h/8 km)`; site parameters in
   Settings with sensible defaults) + covariance of the ZP+colour fit +

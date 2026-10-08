@@ -200,15 +200,27 @@ Las piezas, en orden de impacto por esfuerzo:
 * **H2. Cielo en núcleo galáctico**, dos niveles:
   (a) plano ajustado a los píxeles del anillo (tras sigma-clip 2,5σ)
   evaluado en la posición de la estrella, en lugar de la mediana plana;
-  (b) **sustracción de huésped**: tomar el par alineado de
-  `core/blink.prepare_pair`, escalar la referencia por el cociente de
-  flujos de las comps presentes en ambas imágenes (las comps deben
-  anularse en la diferencia; su residuo medio es el criterio de escala),
-  restar, y medir la SN sobre la imagen diferencia. La referencia PS1-g
-  no está calibrada al filtro del usuario: el ajuste por comps absorbe
-  eso, y la doc debe decirlo. Tests: galaxia sintética con gradiente +
-  SN de flujo conocido; la medida tras sustracción recupera el flujo al
-  1 %.
+  (b) **sustracción de huésped**: tomar el par de
+  `core/blink.prepare_pair`, **registrar la referencia sobre la rejilla
+  del frame como semejanza** (escala + rotación + traslación) con las
+  estrellas que comparten (`core/register`: el WCS solo no basta, porque
+  los términos SIP se ignoran y, sobre todo, la escala del cutout difiere
+  de la real en una fracción de por ciento, dejando un dipolo en cada
+  estrella), **excluir los píxeles enmascarados
+  del survey** (llegan como NaN: se rellenan para poder remuestrear y se
+  vuelven a enmascarar en la diferencia), **igualar la PSF**
+  (`core/difference`, ADR-073: la observación es más ancha que el survey,
+  así que la referencia se ensancha con la gaussiana diferencia o con un
+  kernel óptimo regularizado tipo Alard-Lupton, y gana el que menos residuo
+  deja en las estrellas), escalar la referencia por el
+  cociente de flujos de las comps presentes en ambas imágenes (las comps
+  deben anularse en la diferencia; su residuo medio es el criterio de
+  escala), restar, y medir la SN sobre la imagen diferencia. La
+  referencia PS1-g no está calibrada al filtro del usuario: el ajuste por
+  comps absorbe eso, y la doc debe decirlo. Si el registro no es fiable
+  se resta igualmente y el panel lo avisa. Tests: par sintético
+  desplazado + hueco NaN; el registro baja el residuo, el hueco no se
+  pinta y la medida recupera el flujo del objetivo.
 * **H3. Apertura por FWHM**: FWHM medido de las comps brillantes no
   saturadas (momentos de segundo orden tras restar el cielo);
   `r_ap = k·FWHM` con k ∈ [1.2, 1.6] elegido por defecto 1.35; el anillo
@@ -218,7 +230,8 @@ Las piezas, en orden de impacto por esfuerzo:
   ajustes `ccd_saturate`; fallback al estimador actual con aviso. Test:
   una estrella al 95 % del techo se marca y no se mide.
 * **H5. Error total honesto**: ecuación CCD (ganancia/RON resueltos en el
-  orden de ADR-072: Ajustes → medida en los frames → cabecera) + centelleo
+  orden de ADR-072: Ajustes → medida en los frames → **recordada** → cabecera)
+  + centelleo
   (Young 1967:
   `σ ∝ D^(−2/3) · X^1.75 · t^(−1/2) · e^(−h/8 km)`; parámetros del sitio
   en Ajustes con defaults razonables) + covarianza del ajuste ZP+color +

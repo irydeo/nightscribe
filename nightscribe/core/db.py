@@ -563,6 +563,30 @@ def _migrate(conn):
             conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
                          " mag_source TEXT DEFAULT 'auto'")
         conn.execute("PRAGMA user_version = 18")
+    if v < 19:
+        # ADR-072 rev: the gain the app measured on the observer's own
+        # frames, remembered per camera and gain setting. A supernova
+        # observer usually hands in ONE image, and one image cannot measure
+        # the conversion gain (it needs a pair at the same exposure), so the
+        # app measures it whenever it can and keeps it here, keyed by the
+        # camera's own name and its setting, so a single plate reuses it
+        # instead of trusting a header card that may be a placeholder.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS gains (
+            id             INTEGER PRIMARY KEY,
+            camera         TEXT NOT NULL,
+            gain_setting   REAL,
+            binning        INTEGER,
+            gain_e_per_adu REAL NOT NULL,
+            ron_e          REAL,
+            source         TEXT DEFAULT 'frames',
+            measured_at    TEXT,
+            n_boxes        INTEGER,
+            n_kept         INTEGER,
+            UNIQUE(camera, gain_setting, binning)
+        );
+        """)
+        conn.execute("PRAGMA user_version = 19")
     conn.commit()
 
 
@@ -637,6 +661,10 @@ MIGRATION_NOTES = {
         "Astrometry: the magnitude the run measured is kept beside the one "
         "the report uses, so a brightness measured by hand can replace it "
         "without losing what the machine said."),
+    19: QT_TRANSLATE_NOOP("NSMigrations",
+        "The gain of your camera, measured on your own frames, is remembered "
+        "per camera and setting, so a single image can reuse it instead of "
+        "trusting the FITS header."),
 }
 
 

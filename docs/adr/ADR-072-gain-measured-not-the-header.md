@@ -60,6 +60,35 @@ serie ya hace), que se saltan si el observador fijó la ganancia. Tests: la
 prioridad de las palabras clave, la medida que gana a una cabecera que discrepa,
 la nota cuando coinciden y cuando no, y la cadena en la pestaña y en la serie.
 
+**Revisión (2026-10-08, la ganancia se recuerda).** En una supernova el
+observador suele entregar **una sola imagen**, y una imagen no puede medir la
+ganancia: la transferencia de fotones necesita un par de la misma exposición. La
+solución no es estimarla de una imagen (depende de que el cielo domine y de
+conocer el número de tomas del apilado), sino **medirla cuando se pueda y
+recordarla**:
+
+1. **Un almacén** (`core/gain_store.py`, migración 19 de la BD): tabla `gains`
+   con la clave `(INSTRUME, GAIN, XBINNING)` y el valor medido, la fuente, la
+   fecha y la calidad del ajuste. `remember` guarda o actualiza; `recall`
+   devuelve la mejor entrada para la placa. Si la placa no dice su ajuste (un
+   apilado no lleva `GAIN`), usa la última medida de esa cámara y lo marca
+   (`matched=False`).
+2. **La cascada gana un escalón**: Ajustes → frames (fresca) → **recordada** →
+   cabecera. La recordada es una medida real y también gana a la cabecera.
+3. **Todos los caminos recuerdan**: la pestaña Medir, la serie y el track & stack
+   piden `recall` antes de resolver y guardan con `remember` cuando la fuente ha
+   sido `frames`. Así el almacén se llena solo cada vez que la app lee un par.
+4. **«Medir mi ganancia…»** (pestaña Medir): la acción de una vez para el que
+   solo tiene imágenes. Apunta a una carpeta con dos tomas de la misma
+   exposición, mide, enseña `g ± err` + ruido de lectura + cajas y lo guarda.
+
+**Consecuencias de la revisión**: el caso de una sola imagen se resuelve en
+cuanto el observador tenga un par (las tomas de su visita, o la acción de una
+vez); a partir de ahí, cualquier placa suelta usa la recordada sin tocar la
+cabecera. La acción cuesta dos lecturas de frame una vez; la recordada, ninguna.
+Tests: el almacén (alta, actualización, coincidencia exacta y de respaldo), la
+cascada (la recordada gana a la cabecera), la acción y la pestaña.
+
 ## English
 
 **Context**: the CCD equation, which is what turns a measurement's noise into an
@@ -117,3 +146,31 @@ frame reads per visit or run (nothing against the hundreds the series is about t
 make), which are skipped when the observer set the gain. Tests: the keyword
 priority, the measurement beating a header that disagrees, the note when they
 agree and when they do not, and the chain in the tab and in the series.
+
+**Revision (2026-10-08, the gain is remembered).** On a supernova the observer
+usually hands in **a single image**, and one image cannot measure the gain: the
+photon transfer needs a pair at the same exposure. The answer is not to estimate
+it from one image (that depends on the sky dominating and on knowing the stack's
+frame count), but to **measure it when possible and remember it**:
+
+1. **A store** (`core/gain_store.py`, database migration 19): a `gains` table
+   keyed by `(INSTRUME, GAIN, XBINNING)` with the measured value, the source, the
+   date and the fit's quality. `remember` stores or updates; `recall` returns the
+   best entry for the plate. When the plate does not say its setting (a stack
+   carries no `GAIN`), it uses that camera's latest measurement and flags it
+   (`matched=False`).
+2. **The chain gains a rung**: Settings → frames (fresh) → **remembered** →
+   header. The remembered one is a real measurement and beats the header too.
+3. **Every path remembers**: the Measure tab, the series and the track & stack
+   call `recall` before resolving and store with `remember` when the source was
+   `frames`. The store fills itself every time the app reads a pair.
+4. **"Measure my gain…"** (Measure tab): the one-time action for whoever only has
+   images. Point at a folder with two frames of the same exposure, measure, show
+   `g ± err` + read noise + boxes and store it.
+
+**Consequences of the revision**: the single-image case is solved as soon as the
+observer has a pair (their visit's frames, or the one-time action); from then on
+any single plate uses the remembered one without touching the header. The action
+costs two frame reads once; the remembered gain, none. Tests: the store (insert,
+update, exact and fallback match), the chain (the remembered gain beats the
+header), the action and the tab.

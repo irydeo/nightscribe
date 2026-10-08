@@ -352,11 +352,13 @@ def _disagreement_note(head_gain, est_gain):
 
 
 def resolve(settings_gain=None, settings_ron=None, header=None,
-            points=None, estimate=None):
+            points=None, estimate=None, remembered=None):
     # The priority chain of the working gain, resolved one number at a
     # time: what the observer set in Ajustes wins (it is a decision), then
     # WHAT THE FRAMES THEMSELVES SAY (a measurement of the data in hand),
-    # and only then what the frame header carries.
+    # then WHAT THE APP REMEMBERED for this camera (a measurement made on
+    # another night, core/gain_store.py), and only then what the frame
+    # header carries.
     #
     # THE MEASUREMENT BEATS THE HEADER (revision, 2026-10-08). The header
     # used to win, on the reasoning that it is "a fact of the camera". It
@@ -369,19 +371,26 @@ def resolve(settings_gain=None, settings_ron=None, header=None,
     # never told. When the header and the measurement disagree, the note
     # says so.
     #
+    # THE REMEMBERED GAIN (revision, 2026-10-08, ADR-072): a supernova
+    # observer usually hands in ONE image, and one image cannot measure the
+    # gain. A gain the app measured before, on this same camera and
+    # setting, is a real measurement and beats the header too; it sits
+    # just under the fresh measurement of the frames in hand.
+    #
     # When the gain comes from the frames, the read noise of the same fit
-    # rides along with it. If none of the three exists the answer is
+    # rides along with it. If none of the four exists the answer is
     # "there is no gain", and the caller says so instead of guessing.
     # @args: settings_gain/settings_ron - the Ajustes values (e-/ADU, e-),
     #        header - the header of the reference frame, points - boxes
     #        from frame_boxes (fitted here), estimate - an already computed
-    #        gain block
+    #        gain block, remembered - a gain_store block for this camera
     # @return: {"gain", "ron", "source", "gain_err", "ron_err", "notes"}
     out = {"gain": None, "ron": None, "source": None, "gain_err": None,
            "ron_err": None, "notes": []}
     if estimate is None and points is not None:
         estimate = fit_pair(points)
     est_gain = estimate.get("gain") if estimate else None
+    rem_gain = (remembered or {}).get("gain")
     head = header_numbers(header) if header is not None else {}
     if settings_gain is not None:
         out["gain"], out["source"] = float(settings_gain), "settings"
@@ -392,6 +401,8 @@ def resolve(settings_gain=None, settings_ron=None, header=None,
         if head.get("gain") is not None \
                 and not gains_agree(float(head["gain"]), float(est_gain)):
             out["notes"].append(_disagreement_note(head["gain"], est_gain))
+    elif rem_gain is not None:
+        out["gain"], out["source"] = float(rem_gain), "remembered"
     elif head.get("gain") is not None:
         out["gain"], out["source"] = float(head["gain"]), "header"
     if settings_ron is not None:
@@ -399,6 +410,9 @@ def resolve(settings_gain=None, settings_ron=None, header=None,
     elif out["source"] == "frames" and estimate.get("ron") is not None:
         out["ron"] = estimate.get("ron")
         out["ron_err"] = estimate.get("ron_err")
+    elif out["source"] == "remembered" and (remembered or {}).get("ron") \
+            is not None:
+        out["ron"] = remembered.get("ron")
     elif head.get("ron") is not None:
         out["ron"] = float(head["ron"])
     return out
@@ -410,9 +424,11 @@ def source_label(source, lang="es"):
     # @args: source - "settings" | "header" | "frames" | None, lang - ui
     # @return: the label
     es = {"settings": "de Ajustes", "header": "de la cabecera del FITS",
-          "frames": "medida en tus propias tomas"}
+          "frames": "medida en tus propias tomas",
+          "remembered": "recordada de tu cámara"}
     en = {"settings": "from settings", "header": "from the FITS header",
-          "frames": "measured on your own frames"}
+          "frames": "measured on your own frames",
+          "remembered": "remembered from your camera"}
     table = es if (lang or "es") != "en" else en
     return table.get(source, "")
 

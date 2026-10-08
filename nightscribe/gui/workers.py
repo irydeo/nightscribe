@@ -1119,12 +1119,14 @@ class TrackStackWorker(QThread):
         from ..core import astrometry as astrometry_mod
         from ..core import compstars, photometry
         from ..core import gain as gain_mod
+        from ..core import gain_store
         from ..core import wcs as wcs_mod
-        # THE WORKING GAIN (2026-10-08): Ajustes -> measured on the visit's
-        # frames -> header. The header can carry the camera's gain SETTING
-        # or a placeholder (measured on the author's own QHY42Pro frames:
-        # GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU), so it is the last
-        # word and not the first: see core/gain.resolve.
+        from ..core.db import db as _db
+        # THE WORKING GAIN (2026-10-08, ADR-072): Ajustes -> measured on the
+        # visit's frames -> remembered for this camera -> header. The header
+        # can carry the camera's gain SETTING or a placeholder (measured on
+        # the author's own QHY42Pro frames: GAIN = 5, EGAIN = 1.0, real gain
+        # 0.11 e-/ADU), so it is the last word and not the first.
         estimate = None
         if self._cfg_get("ccd_gain", None) is None and frames:
             try:
@@ -1132,10 +1134,21 @@ class TrackStackWorker(QThread):
                     frames, level_max=self._cfg_get("ccd_saturate", None))
             except Exception as err:            # never fatal
                 logger.warning("gain estimate failed: %s", err)
+        remembered = None
+        if self._cfg_get("ccd_gain", None) is None:
+            try:
+                remembered = gain_store.recall(_db, ref.header)
+            except Exception as err:            # never fatal
+                logger.warning("gain recall failed: %s", err)
         gain_report = gain_mod.resolve(
             settings_gain=self._cfg_get("ccd_gain", None),
             settings_ron=self._cfg_get("ccd_read_noise", None),
-            header=ref.header, estimate=estimate)
+            header=ref.header, estimate=estimate, remembered=remembered)
+        if gain_report.get("source") == "frames":
+            try:
+                gain_store.remember(_db, ref.header, gain_report)
+            except Exception as err:            # never fatal
+                logger.warning("gain remember failed: %s", err)
         recipe = dict(self._recipe or {})
         entries = list(self._comps)
         source = "project" if entries else "auto"

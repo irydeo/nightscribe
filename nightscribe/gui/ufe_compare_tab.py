@@ -14,8 +14,8 @@
 """The UFE's Comparisons section (ADR-044, phase F; rev 2026-09-25): the
 photometric comparison sequence on top of core/compstars (VizieR
 Gaia/APASS + VSX cross-match), with the FinderChart's visual language
-reimplemented as overlays on the shared plate view (the legacy
-SeqChartDialog keeps living untouched).
+reimplemented as overlays on the shared plate view (the only comparison
+picker since the classic one retired, 2026-10-07).
 
 The normal path is ONE click: «Build the sequence…» generates the
 catalog field around the plate centre and proposes the comparisons; the
@@ -43,10 +43,14 @@ from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
 
 from ..core import compstars, photometry
 from ..core.sources import vizier
+from ..config import config
 from ..viz import palette
+from . import theme
 from .ufe_manual_dialog import UfeManualDialog
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
+from .ufe_host import host_of
+from .widgets.collapsible_section import CollapsibleSection
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -193,6 +197,15 @@ class UfeCompareTab(QWidget):
                                             # code sees the rows directly
         self.edt_target = self._ui.edt_target
         self.spn_mag = self._ui.spn_mag
+        # WHERE the target magnitude comes from (2026-10-07): "measured" by a
+        # run, "predicted" by the planner (an ephemeris, a catalogue, an
+        # alert) or "manual" because the observer typed it. The proposal
+        # anchors the comparison stars on this figure, so the interface has to
+        # be able to say which of the three it is; the stack already says it in
+        # its own header (NS_MAGSR) and the project's context now says it too.
+        self._mag_origin = None
+        self._setting_mag = False
+        self.spn_mag.valueChanged.connect(self._on_mag_edited)
         self.cmb_catalog = self._ui.cmb_catalog
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
@@ -203,6 +216,17 @@ class UfeCompareTab(QWidget):
         self.btn_dss.clicked.connect(self._on_load_survey)
         self.lbl_status = self._ui.lbl_status
         self._status_hook = None     # the window's single status line (U4)
+        # ADR-038 rev: the knobs of the sequence live in ONE block, closed
+        # on entry, and the panel's hero button is the way in. The container
+        # comes from the Designer file; the block only decides whether it is
+        # shown, and the status line stays OUTSIDE it (it is the news of the
+        # action, not a knob).
+        self._sections = {
+            "seq": self._wrap_section(
+                "sec_seq_content", self.tr("The comparison sequence"),
+                "photometry_seq_open"),
+        }
+        self.refresh_accent()
 
         # the manual tweak: its controls are translatable, so they live
         # in their own window (ui/ufe_manual_dialog.ui). The toggle
@@ -296,6 +320,75 @@ class UfeCompareTab(QWidget):
         return self._manual.isVisible()
 
     # ------------------------------------------------------- activation
+
+    # -------------------------------------------------------- the block
+
+    def _wrap_section(self, name, title, key, open_by_default=False):
+        # @args: name - the .ui container's objectName, title - the block's
+        #        title in plain language, key - the settings key that
+        #        remembers whether it stays open, open_by_default - the state
+        #        before the observer chooses
+        # @return: the CollapsibleSection
+        # Same mechanism as the astrometry tab's: the container comes out of
+        # the column and into the block, so the Designer file keeps owning
+        # the structure and the block only decides whether it is shown.
+        content = getattr(self._ui, name)
+        section = CollapsibleSection(title, self)
+        self.layout().replaceWidget(content, section)
+        content.setParent(None)
+        section.contentLayout().addWidget(content)
+        content.setVisible(True)
+        section.setCollapsed(
+            not bool(config.get(key, 1 if open_by_default else 0)))
+        section.sectionToggled.connect(
+            lambda opened, k=key: config.set(k, 1 if opened else 0))
+        return section
+
+    def refresh_accent(self):
+        # @return: None. The block wears the object's hue on its spine, like
+        #          every other block of the panel (the list grammar: the hue
+        #          carries the meaning).
+        ask = getattr(host_of(self), "project_accent", None)
+        hue = None
+        if callable(ask):
+            try:
+                hue = (ask() or {}).get("hue")
+            except Exception as err:
+                logger.warning("the project accent could not be read: %s", err)
+        for section in getattr(self, "_sections", {}).values():
+            section.setAccent(hue or theme.C_ACCENT)
+
+    def primary_subtitle(self):
+        # @return: the line under the panel's hero button: what building the
+        #          sequence will do with what there is, or what is missing.
+        #          Built from the SAME widgets the block shows, so the two
+        #          cannot disagree.
+        if self._entries:
+            return self.tr(
+                "%1 comparison stars in the sequence, saved in the project"
+            ).replace("%1", str(len(self._entries)))
+        if self._state.wcs is None and self._field is None:
+            return self.tr(
+                "No plate yet: open a frame, or load the field from the "
+                "survey in the block below.")
+        catalog = self.cmb_catalog.currentText() or "Gaia"
+        if self.spn_mag.value() == self.spn_mag.minimum():
+            # the "No data" sentinel: the proposal starts from a declared
+            # guess and says so, instead of using a number nobody chose
+            return self.tr(
+                "%1 around the plate centre · no target magnitude yet: the "
+                "proposal starts from a declared guess and says so").replace(
+                    "%1", catalog)
+        line = self.tr(
+            "%1 around the plate centre · comparisons for a mag %2 target"
+        ).replace("%1", catalog).replace("%2", f"{self.spn_mag.value():.1f}")
+        # and WHERE that figure comes from (2026-10-07): a proposal anchored on
+        # a measurement and one anchored on the planner's guess are not the
+        # same thing, and the observer is the one who has to know.
+        what = self._mag_origin_text()
+        if what:
+            line += " · " + self.tr("figure {0}").format(what)
+        return line
 
     def set_active(self, flag, keep_overlays=False):
         # Stage handoff, two distinct concepts (ADR-044 rev): the CLICKS
@@ -430,7 +523,7 @@ class UfeCompareTab(QWidget):
             or self.cmb_catalog.currentText(),
             "center": list(field.get("center") or ()),
             "fov_arcmin": float(field.get("fov_arcmin") or 0.0),
-            "target_mag": float(self.spn_mag.value()),
+            "target_mag": float(self.spn_mag.value()) or None,
             "entries": [
                 {
                     "name": e["name"],
@@ -672,7 +765,7 @@ class UfeCompareTab(QWidget):
             self._say(self.tr(
                 "The plate has no WCS: solving it to build the comparison "
                 "field…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_generate(),
@@ -1070,9 +1163,9 @@ class UfeCompareTab(QWidget):
             return None
         from ..config import config
         from ..core import compstars, photometry
-        sat = photometry.saturation_ceiling(
-            state.header, {"ccd_saturate": config.get("ccd_saturate")})
-        lin = photometry.linearity_ceiling(config)
+        # the two ceilings from their one home (ADR-066): a candidate that
+        # reaches either one is never proposed as a comparison star
+        sat, lin = photometry.star_ceilings(state.header, config)
         gain = config.get("ccd_gain")
         ron = config.get("ccd_read_noise")
         # the Compare tab owns no aperture spins (the Measure tab does), so
@@ -1152,7 +1245,7 @@ class UfeCompareTab(QWidget):
         # @return: None
         try:
             seq = compstars.propose_comps(
-                self._stars, self.spn_mag.value(), validator=validator,
+                self._stars, self._proposal_mag(), validator=validator,
                 margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         except Exception as err:
             logger.exception("sequence proposal failed: %s", err)
@@ -1170,7 +1263,7 @@ class UfeCompareTab(QWidget):
         # @return: None
         from .workers import UfeProposeWorker
         self._propose_worker = UfeProposeWorker(
-            self._stars, self.spn_mag.value(), validator,
+            self._stars, self._proposal_mag(), validator,
             margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         self._propose_worker.progress.connect(self._on_propose_stage)
         self._propose_worker.finished.connect(self._on_proposed)
@@ -1223,6 +1316,10 @@ class UfeCompareTab(QWidget):
                          + ([seq["check"]] if seq["check"] else []))
         self._redraw_entries()
         self._reload_table()
+        # the group is closed by default (2026-10-06): the news (how many
+        # stars came back) rides its header, so the observer knows what is
+        # inside without opening it
+        self._sections["seq"].setNotice(str(len(self._entries)))
         text = self.tr("Proposed {0} comparisons (tweak by clicking "
                        "stars).").format(len(self._entries))
         rejected = seq.get("rejected") or []
@@ -1254,8 +1351,94 @@ class UfeCompareTab(QWidget):
         self._build_backup = []
         if self._last_proposal_was_same():
             text += " " + self.tr("The sequence is the same as before.")
+        if float(self.spn_mag.value()) <= 0.0:
+            # The sequence is a first guess, and the observer must know WHY:
+            # nobody knows the magnitude, so a declared constant anchored it.
+            text += " " + self.tr(
+                "The target's magnitude is not known, so the proposal "
+                "started from %1: set it, or let the astrometry measure "
+                "it.").replace("%1", f"{compstars.TARGET_MAG_FALLBACK:.1f}")
         self._say(text)
         self._commit()
+
+    def _proposal_mag(self):
+        # @return: the magnitude the proposal anchors on, in mag
+        # The field shows "No data" until somebody knows it (the project,
+        # or the astrometry that measured the object). The proposal still
+        # has to start somewhere, so it starts from a DECLARED constant and
+        # _apply_proposal says so: a silent default is how a 12.00 nobody
+        # chose ended up stored as if it were data.
+        mag = float(self.spn_mag.value())
+        return mag if mag > 0.0 else float(compstars.TARGET_MAG_FALLBACK)
+
+    def set_target_magnitude(self, mag, source=None):
+        # @args: mag - the object's magnitude, or None when nobody knows it,
+        #        source - "measured" | "predicted" | "manual" (or None for an
+        #        older project that never recorded it)
+        # @return: True when the field took it
+        # The host lands it when the editor opens from a project: the
+        # magnitude the project knows (or the one the astrometry measured)
+        # is what the proposal should anchor on, not the widget's default.
+        if mag is None:
+            return False
+        try:
+            value = float(mag)
+        except (TypeError, ValueError):
+            return False
+        if value <= 0.0:
+            return False
+        if float(self.spn_mag.value()) > 0.0:
+            # the plate's own saved state already landed one: it wins, the
+            # same way its saved sequence does
+            return False
+        # setting it is not the observer typing it: the signals are blocked so
+        # the change does not get stamped as "manual" (the bug this line
+        # exists to avoid)
+        self._setting_mag = True
+        try:
+            self.spn_mag.setValue(value)
+        finally:
+            self._setting_mag = False
+        self._set_mag_origin(source)
+        return True
+
+    def _set_mag_origin(self, source):
+        # @args: source - "measured" | "predicted" | "manual" | None
+        # @return: None. The provenance travels with the field, in its tooltip,
+        #          so the observer can ask where the number came from without
+        #          opening anything.
+        self._mag_origin = source if source in ("measured", "predicted",
+                                                "manual") else None
+        self.spn_mag.setToolTip(self._mag_origin_tooltip())
+
+    def _on_mag_edited(self, _value):
+        # The observer touched the field: from here on the figure is theirs,
+        # whatever it was before.
+        # @return: None
+        if self._setting_mag:
+            return
+        self._set_mag_origin("manual")
+
+    def _mag_origin_text(self):
+        # @return: the plain-language name of the figure's origin, or ""
+        if self._mag_origin == "measured":
+            return self.tr("measured by a run")
+        if self._mag_origin == "predicted":
+            return self.tr("the planner's prediction")
+        if self._mag_origin == "manual":
+            return self.tr("yours")
+        return ""
+
+    def _mag_origin_tooltip(self):
+        # @return: the tooltip of the magnitude field, with its origin
+        what = self._mag_origin_text()
+        if not what:
+            return self.tr(
+                "The target's brightness: the proposal chooses the comparison "
+                "stars around it. Its origin is not recorded for this project.")
+        return self.tr(
+            "The target's brightness: the proposal chooses the comparison "
+            "stars around it. This figure is {0}.").format(what)
 
     def _last_proposal_was_same(self):
         # @return: True when the proposal did not change the sequence
@@ -1410,7 +1593,7 @@ class UfeCompareTab(QWidget):
     def _notify_saved(self, paths, payload=None):
         # Files written while a host watches (a project) get registered
         # there; with no host this is a no-op.
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify(paths, "sequence", payload or {})
@@ -1425,7 +1608,7 @@ class UfeCompareTab(QWidget):
         if st is None:
             st = {"catalog": "manual", "catalog_name": "Manual",
                   "fov_arcmin": 0.0,
-                  "target_mag": float(self.spn_mag.value())}
+                  "target_mag": float(self.spn_mag.value()) or None}
         if not st.get("entries"):
             st = dict(st)
             st["entries"] = [
@@ -1441,7 +1624,7 @@ class UfeCompareTab(QWidget):
         # the host, so the project keeps it and reopening does not mean
         # rebuilding the comparison stars every time.
         # @args: force - persist even when empty (an explicit clear)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_sequence", None)
         if callable(notify):
             notify(self._sequence_payload(), force)

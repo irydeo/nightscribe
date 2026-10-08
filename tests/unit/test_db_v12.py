@@ -77,7 +77,7 @@ def _columns(db, table):
 def test_upgrade_from_v11_adds_the_series_schema(tmp_path):
     f = _v11_database(tmp_path / "v11.db")
     db = Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     cols = _columns(db, "photometry_points")
     assert {"mag_raw", "flags", "run_id"} <= cols
     tables = {r[0] for r in db.execute(
@@ -94,7 +94,7 @@ def test_upgrade_from_v11_adds_the_series_schema(tmp_path):
 
 def test_fresh_database_has_v13(tmp_path):
     db = Database(str(tmp_path / "fresh.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert {"mag_raw", "flags", "run_id", "err_internal"} <= _columns(
         db, "photometry_points")
     db.close()
@@ -104,7 +104,7 @@ def test_reopen_is_idempotent(tmp_path):
     f = tmp_path / "t.db"
     Database(str(f)).close()
     db = Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
     assert {"mag_raw", "flags", "run_id"} <= _columns(db,
                                                       "photometry_points")
     db.close()

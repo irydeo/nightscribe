@@ -1,0 +1,667 @@
+{
+ "object": "2025UR",
+ "horizons": "2025 UR",
+ "mpec": "https://minorplanetcenter.net/mpec/K25/K25U52.html",
+ "exptime_s": 3,
+ "filter": "Clear",
+ "n_frames": 60,
+ "crop": {
+  "box": [
+   1019,
+   822,
+   1275,
+   1078
+  ],
+  "size": 256
+ },
+ "cd": [
+  [
+   0.000295875432,
+   1.493412827616e-05
+  ],
+  [
+   1.485987490312e-05,
+   -0.0002958736154721
+  ]
+ ],
+ "published": [
+  {
+   "time": "2025-10-18T21:40:01.920",
+   "ra_deg": 24.59221,
+   "dec_deg": 25.2515,
+   "mag": 18.0,
+   "band": "G",
+   "astcat": "Gaia3E"
+  },
+  {
+   "time": "2025-10-18T21:43:22.368",
+   "ra_deg": 24.61992,
+   "dec_deg": 25.26472,
+   "mag": 18.0,
+   "band": "G",
+   "astcat": "Gaia3E"
+  },
+  {
+   "time": "2025-10-18T21:46:41.088",
+   "ra_deg": 24.64746,
+   "dec_deg": 25.27783,
+   "mag": 18.0,
+   "band": "G",
+   "astcat": "Gaia3E"
+  }
+ ],
+ "tycho_png": {
+  "provid": "C452X51",
+  "frames": 76,
+  "exptime_s": 3,
+  "total_exposure_s": 228,
+  "speed_arcsec_min": 30.6,
+  "pa_deg": 62.19,
+  "mag": 18.0,
+  "band": "G",
+  "time": "2025-10-18T21:40:01.9"
+ },
+ "grouping": "to be determined empirically against the published positions",
+ "frames": [
+  {
+   "file": "frame000.fits",
+   "date_obs": "2025-10-18T21:40:07.722000+00:00",
+   "object_ra_deg": 24.5929421,
+   "object_dec_deg": 25.2518723,
+   "object_xy": [
+    65.36,
+    160.8
+   ]
+  },
+  {
+   "file": "frame001.fits",
+   "date_obs": "2025-10-18T21:40:13.857000+00:00",
+   "object_ra_deg": 24.59379,
+   "object_dec_deg": 25.2522785,
+   "object_xy": [
+    68.15,
+    159.57
+   ]
+  },
+  {
+   "file": "frame002.fits",
+   "date_obs": "2025-10-18T21:40:18.436000+00:00",
+   "object_ra_deg": 24.5944228,
+   "object_dec_deg": 25.2525816,
+   "object_xy": [
+    70.25,
+    158.4
+   ]
+  },
+  {
+   "file": "frame003.fits",
+   "date_obs": "2025-10-18T21:40:24.222000+00:00",
+   "object_ra_deg": 24.5952223,
+   "object_dec_deg": 25.2529647,
+   "object_xy": [
+    72.75,
+    156.84
+   ]
+  },
+  {
+   "file": "frame004.fits",
+   "date_obs": "2025-10-18T21:40:28.621000+00:00",
+   "object_ra_deg": 24.5958303,
+   "object_dec_deg": 25.2532559,
+   "object_xy": [
+    74.83,
+    155.84
+   ]
+  },
+  {
+   "file": "frame005.fits",
+   "date_obs": "2025-10-18T21:40:34.644000+00:00",
+   "object_ra_deg": 24.5966626,
+   "object_dec_deg": 25.2536547,
+   "object_xy": [
+    77.64,
+    154.64
+   ]
+  },
+  {
+   "file": "frame006.fits",
+   "date_obs": "2025-10-18T21:40:39.274000+00:00",
+   "object_ra_deg": 24.5973024,
+   "object_dec_deg": 25.2539612,
+   "object_xy": [
+    79.58,
+    154.11
+   ]
+  },
+  {
+   "file": "frame007.fits",
+   "date_obs": "2025-10-18T21:40:45.068000+00:00",
+   "object_ra_deg": 24.5981031,
+   "object_dec_deg": 25.2543448,
+   "object_xy": [
+    82.29,
+    152.95
+   ]
+  },
+  {
+   "file": "frame008.fits",
+   "date_obs": "2025-10-18T21:40:49.372000+00:00",
+   "object_ra_deg": 24.5986979,
+   "object_dec_deg": 25.2546297,
+   "object_xy": [
+    83.97,
+    152.08
+   ]
+  },
+  {
+   "file": "frame009.fits",
+   "date_obs": "2025-10-18T21:40:55.564000+00:00",
+   "object_ra_deg": 24.5995536,
+   "object_dec_deg": 25.2550397,
+   "object_xy": [
+    86.34,
+    150.83
+   ]
+  },
+  {
+   "file": "frame010.fits",
+   "date_obs": "2025-10-18T21:41:00.136000+00:00",
+   "object_ra_deg": 24.6001856,
+   "object_dec_deg": 25.2553423,
+   "object_xy": [
+    87.86,
+    149.89
+   ]
+  },
+  {
+   "file": "frame011.fits",
+   "date_obs": "2025-10-18T21:41:06.206000+00:00",
+   "object_ra_deg": 24.6010286,
+   "object_dec_deg": 25.2557413,
+   "object_xy": [
+    90.25,
+    148.67
+   ]
+  },
+  {
+   "file": "frame012.fits",
+   "date_obs": "2025-10-18T21:41:10.515000+00:00",
+   "object_ra_deg": 24.6016271,
+   "object_dec_deg": 25.2560246,
+   "object_xy": [
+    92.14,
+    147.42
+   ]
+  },
+  {
+   "file": "frame013.fits",
+   "date_obs": "2025-10-18T21:41:16.711000+00:00",
+   "object_ra_deg": 24.6024876,
+   "object_dec_deg": 25.2564319,
+   "object_xy": [
+    95.07,
+    146.2
+   ]
+  },
+  {
+   "file": "frame014.fits",
+   "date_obs": "2025-10-18T21:41:21.252000+00:00",
+   "object_ra_deg": 24.6031183,
+   "object_dec_deg": 25.2567305,
+   "object_xy": [
+    96.94,
+    145.29
+   ]
+  },
+  {
+   "file": "frame015.fits",
+   "date_obs": "2025-10-18T21:41:27.072000+00:00",
+   "object_ra_deg": 24.6039267,
+   "object_dec_deg": 25.2571131,
+   "object_xy": [
+    99.61,
+    144.01
+   ]
+  },
+  {
+   "file": "frame016.fits",
+   "date_obs": "2025-10-18T21:41:31.373000+00:00",
+   "object_ra_deg": 24.604524,
+   "object_dec_deg": 25.2573958,
+   "object_xy": [
+    101.07,
+    143.13
+   ]
+  },
+  {
+   "file": "frame017.fits",
+   "date_obs": "2025-10-18T21:41:37.551000+00:00",
+   "object_ra_deg": 24.6053821,
+   "object_dec_deg": 25.257802,
+   "object_xy": [
+    103.47,
+    141.89
+   ]
+  },
+  {
+   "file": "frame018.fits",
+   "date_obs": "2025-10-18T21:41:42.171000+00:00",
+   "object_ra_deg": 24.6060238,
+   "object_dec_deg": 25.2581057,
+   "object_xy": [
+    105.26,
+    140.96
+   ]
+  },
+  {
+   "file": "frame019.fits",
+   "date_obs": "2025-10-18T21:41:47.911000+00:00",
+   "object_ra_deg": 24.606821,
+   "object_dec_deg": 25.258483,
+   "object_xy": [
+    107.89,
+    139.83
+   ]
+  },
+  {
+   "file": "frame020.fits",
+   "date_obs": "2025-10-18T21:41:52.253000+00:00",
+   "object_ra_deg": 24.607424,
+   "object_dec_deg": 25.2587685,
+   "object_xy": [
+    109.72,
+    138.96
+   ]
+  },
+  {
+   "file": "frame021.fits",
+   "date_obs": "2025-10-18T21:41:58.328000+00:00",
+   "object_ra_deg": 24.6082678,
+   "object_dec_deg": 25.2591679,
+   "object_xy": [
+    112.61,
+    137.77
+   ]
+  },
+  {
+   "file": "frame022.fits",
+   "date_obs": "2025-10-18T21:42:02.914000+00:00",
+   "object_ra_deg": 24.6089027,
+   "object_dec_deg": 25.2594707,
+   "object_xy": [
+    114.51,
+    136.71
+   ]
+  },
+  {
+   "file": "frame023.fits",
+   "date_obs": "2025-10-18T21:42:08.703000+00:00",
+   "object_ra_deg": 24.6097027,
+   "object_dec_deg": 25.2598539,
+   "object_xy": [
+    117.0,
+    135.16
+   ]
+  },
+  {
+   "file": "frame024.fits",
+   "date_obs": "2025-10-18T21:42:13.077000+00:00",
+   "object_ra_deg": 24.6103072,
+   "object_dec_deg": 25.2601435,
+   "object_xy": [
+    118.95,
+    133.89
+   ]
+  },
+  {
+   "file": "frame025.fits",
+   "date_obs": "2025-10-18T21:42:19.257000+00:00",
+   "object_ra_deg": 24.6111612,
+   "object_dec_deg": 25.2605527,
+   "object_xy": [
+    121.49,
+    132.64
+   ]
+  },
+  {
+   "file": "frame026.fits",
+   "date_obs": "2025-10-18T21:42:23.875000+00:00",
+   "object_ra_deg": 24.6117994,
+   "object_dec_deg": 25.2608584,
+   "object_xy": [
+    123.36,
+    131.71
+   ]
+  },
+  {
+   "file": "frame027.fits",
+   "date_obs": "2025-10-18T21:42:29.675000+00:00",
+   "object_ra_deg": 24.6126009,
+   "object_dec_deg": 25.2612424,
+   "object_xy": [
+    125.44,
+    130.53
+   ]
+  },
+  {
+   "file": "frame028.fits",
+   "date_obs": "2025-10-18T21:42:34.054000+00:00",
+   "object_ra_deg": 24.6132061,
+   "object_dec_deg": 25.2615323,
+   "object_xy": [
+    126.74,
+    129.22
+   ]
+  },
+  {
+   "file": "frame029.fits",
+   "date_obs": "2025-10-18T21:42:40.360000+00:00",
+   "object_ra_deg": 24.6140775,
+   "object_dec_deg": 25.2619498,
+   "object_xy": [
+    129.37,
+    127.95
+   ]
+  },
+  {
+   "file": "frame030.fits",
+   "date_obs": "2025-10-18T21:42:44.944000+00:00",
+   "object_ra_deg": 24.614711,
+   "object_dec_deg": 25.2622532,
+   "object_xy": [
+    131.21,
+    127.03
+   ]
+  },
+  {
+   "file": "frame031.fits",
+   "date_obs": "2025-10-18T21:42:50.751000+00:00",
+   "object_ra_deg": 24.6155135,
+   "object_dec_deg": 25.2626377,
+   "object_xy": [
+    133.22,
+    125.84
+   ]
+  },
+  {
+   "file": "frame032.fits",
+   "date_obs": "2025-10-18T21:42:55.083000+00:00",
+   "object_ra_deg": 24.6161122,
+   "object_dec_deg": 25.2629245,
+   "object_xy": [
+    134.87,
+    124.96
+   ]
+  },
+  {
+   "file": "frame033.fits",
+   "date_obs": "2025-10-18T21:43:01.128000+00:00",
+   "object_ra_deg": 24.6169475,
+   "object_dec_deg": 25.2633242,
+   "object_xy": [
+    137.29,
+    123.74
+   ]
+  },
+  {
+   "file": "frame034.fits",
+   "date_obs": "2025-10-18T21:43:05.608000+00:00",
+   "object_ra_deg": 24.6175667,
+   "object_dec_deg": 25.2636187,
+   "object_xy": [
+    138.95,
+    122.83
+   ]
+  },
+  {
+   "file": "frame035.fits",
+   "date_obs": "2025-10-18T21:43:11.388000+00:00",
+   "object_ra_deg": 24.6183654,
+   "object_dec_deg": 25.2639987,
+   "object_xy": [
+    141.33,
+    121.68
+   ]
+  },
+  {
+   "file": "frame036.fits",
+   "date_obs": "2025-10-18T21:43:15.745000+00:00",
+   "object_ra_deg": 24.6189675,
+   "object_dec_deg": 25.2642851,
+   "object_xy": [
+    142.83,
+    120.79
+   ]
+  },
+  {
+   "file": "frame037.fits",
+   "date_obs": "2025-10-18T21:43:21.936000+00:00",
+   "object_ra_deg": 24.6198231,
+   "object_dec_deg": 25.2646921,
+   "object_xy": [
+    145.55,
+    119.43
+   ]
+  },
+  {
+   "file": "frame038.fits",
+   "date_obs": "2025-10-18T21:43:26.539000+00:00",
+   "object_ra_deg": 24.6204592,
+   "object_dec_deg": 25.2649947,
+   "object_xy": [
+    147.18,
+    118.5
+   ]
+  },
+  {
+   "file": "frame039.fits",
+   "date_obs": "2025-10-18T21:43:32.256000+00:00",
+   "object_ra_deg": 24.6212493,
+   "object_dec_deg": 25.2653705,
+   "object_xy": [
+    149.37,
+    117.08
+   ]
+  },
+  {
+   "file": "frame040.fits",
+   "date_obs": "2025-10-18T21:43:36.609000+00:00",
+   "object_ra_deg": 24.6218508,
+   "object_dec_deg": 25.2656567,
+   "object_xy": [
+    151.0,
+    116.2
+   ]
+  },
+  {
+   "file": "frame041.fits",
+   "date_obs": "2025-10-18T21:43:42.789000+00:00",
+   "object_ra_deg": 24.6227049,
+   "object_dec_deg": 25.266063,
+   "object_xy": [
+    153.56,
+    114.97
+   ]
+  },
+  {
+   "file": "frame042.fits",
+   "date_obs": "2025-10-18T21:43:47.454000+00:00",
+   "object_ra_deg": 24.6233495,
+   "object_dec_deg": 25.2663697,
+   "object_xy": [
+    155.6,
+    114.04
+   ]
+  },
+  {
+   "file": "frame043.fits",
+   "date_obs": "2025-10-18T21:43:53.200000+00:00",
+   "object_ra_deg": 24.6241436,
+   "object_dec_deg": 25.2667474,
+   "object_xy": [
+    158.02,
+    112.89
+   ]
+  },
+  {
+   "file": "frame044.fits",
+   "date_obs": "2025-10-18T21:43:57.497000+00:00",
+   "object_ra_deg": 24.6247374,
+   "object_dec_deg": 25.2670299,
+   "object_xy": [
+    159.55,
+    112.02
+   ]
+  },
+  {
+   "file": "frame045.fits",
+   "date_obs": "2025-10-18T21:44:03.553000+00:00",
+   "object_ra_deg": 24.6255768,
+   "object_dec_deg": 25.2674297,
+   "object_xy": [
+    162.03,
+    110.67
+   ]
+  },
+  {
+   "file": "frame046.fits",
+   "date_obs": "2025-10-18T21:44:08.108000+00:00",
+   "object_ra_deg": 24.6262094,
+   "object_dec_deg": 25.2677312,
+   "object_xy": [
+    164.08,
+    109.76
+   ]
+  },
+  {
+   "file": "frame047.fits",
+   "date_obs": "2025-10-18T21:44:13.876000+00:00",
+   "object_ra_deg": 24.6270106,
+   "object_dec_deg": 25.2681131,
+   "object_xy": [
+    166.63,
+    108.61
+   ]
+  },
+  {
+   "file": "frame048.fits",
+   "date_obs": "2025-10-18T21:44:18.191000+00:00",
+   "object_ra_deg": 24.6276099,
+   "object_dec_deg": 25.2683988,
+   "object_xy": [
+    168.52,
+    107.48
+   ]
+  },
+  {
+   "file": "frame049.fits",
+   "date_obs": "2025-10-18T21:44:24.312000+00:00",
+   "object_ra_deg": 24.62846,
+   "object_dec_deg": 25.268804,
+   "object_xy": [
+    171.0,
+    106.51
+   ]
+  },
+  {
+   "file": "frame050.fits",
+   "date_obs": "2025-10-18T21:44:28.926000+00:00",
+   "object_ra_deg": 24.6291008,
+   "object_dec_deg": 25.2691095,
+   "object_xy": [
+    172.76,
+    105.71
+   ]
+  },
+  {
+   "file": "frame051.fits",
+   "date_obs": "2025-10-18T21:44:34.787000+00:00",
+   "object_ra_deg": 24.6299149,
+   "object_dec_deg": 25.2694975,
+   "object_xy": [
+    174.56,
+    104.49
+   ]
+  },
+  {
+   "file": "frame052.fits",
+   "date_obs": "2025-10-18T21:44:39.166000+00:00",
+   "object_ra_deg": 24.6305231,
+   "object_dec_deg": 25.2697874,
+   "object_xy": [
+    175.98,
+    103.73
+   ]
+  },
+  {
+   "file": "frame053.fits",
+   "date_obs": "2025-10-18T21:44:45.430000+00:00",
+   "object_ra_deg": 24.6313931,
+   "object_dec_deg": 25.2702021,
+   "object_xy": [
+    178.22,
+    102.45
+   ]
+  },
+  {
+   "file": "frame054.fits",
+   "date_obs": "2025-10-18T21:44:50.175000+00:00",
+   "object_ra_deg": 24.6320521,
+   "object_dec_deg": 25.2705162,
+   "object_xy": [
+    179.68,
+    101.46
+   ]
+  },
+  {
+   "file": "frame055.fits",
+   "date_obs": "2025-10-18T21:44:55.983000+00:00",
+   "object_ra_deg": 24.6328588,
+   "object_dec_deg": 25.2709007,
+   "object_xy": [
+    181.79,
+    100.28
+   ]
+  },
+  {
+   "file": "frame056.fits",
+   "date_obs": "2025-10-18T21:45:00.155000+00:00",
+   "object_ra_deg": 24.6334381,
+   "object_dec_deg": 25.2711769,
+   "object_xy": [
+    183.46,
+    99.04
+   ]
+  },
+  {
+   "file": "frame057.fits",
+   "date_obs": "2025-10-18T21:45:06.264000+00:00",
+   "object_ra_deg": 24.6342823,
+   "object_dec_deg": 25.2715785,
+   "object_xy": [
+    186.04,
+    97.69
+   ]
+  },
+  {
+   "file": "frame058.fits",
+   "date_obs": "2025-10-18T21:45:10.595000+00:00",
+   "object_ra_deg": 24.6348808,
+   "object_dec_deg": 25.2718632,
+   "object_xy": [
+    187.5,
+    96.41
+   ]
+  },
+  {
+   "file": "frame059.fits",
+   "date_obs": "2025-10-18T21:45:16.467000+00:00",
+   "object_ra_deg": 24.6356923,
+   "object_dec_deg": 25.2722492,
+   "object_xy": [
+    189.83,
+    95.1
+   ]
+  }
+ ]
+}

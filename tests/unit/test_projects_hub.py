@@ -138,19 +138,9 @@ def window(_point_db_at_tmpdir):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     yield w
     config.is_configured = orig_cfg
     w.close()
-
-
-@pytest.fixture(autouse=True)
-def _legacy_route(window, monkeypatch):
-    # This file exercises the LEGACY dialogs (blink / chart / annotate);
-    # the UFE-default routing (ADR-044) is covered in
-    # test_ufe_integration.py.
-    monkeypatch.setattr(window, "_use_ufe", lambda: False)
 
 
 @pytest.fixture()
@@ -539,8 +529,6 @@ def test_projects_list_populated_at_startup():
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     try:
         for _ in range(3):      # let the deferred startup refresh land
             QCoreApplication.processEvents()
@@ -1556,7 +1544,6 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
     from nightscribe.core import project as proj_mod, followup as fu
     from nightscribe.gui import main_window as mw
     from PySide6.QtWidgets import QPushButton
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     p = _create_and_select(window, "sn", "SN2026visit", {"kind": "sn"})
     sid = fu.create_session(mw.db, p["id"], "2026-09-08")
     fu.add_image(mw.db, sid, "R", "/tmp/fu_visit.fits",
@@ -1648,16 +1635,15 @@ def test_fu_animation_button_writes_files(window, panel):
     assert "evo_mp4" in kinds
 
 
-def test_fu_annotated_fits_button_writes_copy(window, panel, tmp_path,
-                                              monkeypatch):
-    # B10 preview flow: the button opens the annotation dialog over the
-    # first stacked FITS; confirming it registers an annotated copy in
-    # the project folder.
+def test_fu_annotated_fits_button_opens_the_editor(window, panel, tmp_path,
+                                                   monkeypatch):
+    # B10: the button opens the annotated FITS in the editor's Annotate tab
+    # over the newest stacked FITS, with the other visits queued as extra
+    # plates. The classic dialog retired (2026-10-07): the editor is the only
+    # door (ADR-044 rev.).
     import numpy as np
-    from PySide6.QtCore import QObject, Signal
-    from nightscribe.core import project, followup as fu
+    from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
-    from nightscribe.gui import sn_annotate_dialog as dlg_mod
 
     p = _create_and_select(window, "sn", "SN2026ann", {"kind": "sn",
                                                        "ra_deg": 10.0,
@@ -1670,44 +1656,36 @@ def test_fu_annotated_fits_button_writes_copy(window, panel, tmp_path,
 
     seen = {}
 
-    class _StubDialog(QObject):
-        # SnAnnotateDialog with the same contract the hub uses: a saved
-        # signal and an exec() that confirms the save to the project
-        # folder (the default destination the real dialog computes).
-        saved = Signal(str)
+    class _TabAnnotate:
+        def prefill(self, notes=None, extra_paths=None):
+            seen["notes"] = notes
+            seen["extra"] = list(extra_paths or [])
 
-        def __init__(self, parent, images, project, label, **kw):
-            super().__init__(parent)
-            self._project = project
-            self._label = label or "image"
-            seen.update({"images": list(images), "label": label, **kw})
+    class _Dlg:
+        def __init__(self):
+            self.tab_annotate = _TabAnnotate()
 
-        def exec(self):
-            # @return: 1 (the AcceptRole of a confirmed dialog)
-            out = project.storage_dir(self._project) / \
-                f"{self._label}_annotated.fits"
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_bytes(b"ANNOTATED fake")
-            self.saved.emit(str(out))
-            return 1
+        def open_plate(self, path):
+            seen["plate"] = path
+            return True
 
-    monkeypatch.setattr(dlg_mod, "SnAnnotateDialog", _StubDialog)
+        def set_object(self, obj):
+            seen["obj"] = obj
+
+    def _ufe_open(tab_, hook_pid=None, obj=None, session_id=None, **_kw):
+        seen["tab"] = tab_
+        seen["pid"] = hook_pid
+        return _Dlg()
+
+    monkeypatch.setattr(window, "_ufe_open", _ufe_open)
     window._fu_export_annotated(p["id"])
 
-    # the dialog got the registered stack (with its metadata) and the
-    # project's coordinates
-    assert len(seen["images"]) == 1
-    assert seen["images"][0]["fits_path"] == str(fits_in)
-    assert seen["images"][0]["date_obs"] == "2026-09-08"
-    assert seen["images"][0]["filter"] == "Clear"
-    assert seen["images"][0]["exptime_s"] == 60.0
-    assert seen["label"] == "SN2026ann"
-    assert seen["ra_deg"] == 10.0 and seen["dec_deg"] == 20.0
-    # and confirming it registered the copy in the project files
-    files = project.list_files(dbmod.db, p["id"])
-    assert any(f["kind"] == "fits"
-               and f["path"].endswith("SN2026ann_annotated.fits")
-               for f in files)
+    assert seen["tab"] == "annotate"
+    assert seen["pid"] == p["id"]
+    assert seen["plate"] == str(fits_in)
+    assert seen["obj"]["name"] == "SN2026ann"
+    assert seen["notes"]
+    assert seen["extra"] == []
 
 
 def _write_simple_fits(path, data):
@@ -1759,6 +1737,13 @@ def test_create_project_keeps_variable_and_campaign_context(window):
     assert ctx["variable"]["period_d"] == 227.55
     assert ctx["campaign"]["name"] == "Campaña T CrB"
     assert ctx["project_id"] == 7
+    # WHERE the figure comes from (2026-10-07): the planner's magnitude is a
+    # PREDICTION, and a stack run later overwrites the same field with a
+    # MEASUREMENT. Without this, reading 18.28 could not tell you whether
+    # anybody had measured it, and the proposal anchors the comparison stars
+    # on it.
+    assert ctx["mag"] == 10.1
+    assert ctx["mag_origin"] == "predicted"
 
 
 def test_project_header_shows_campaign_badge(window):

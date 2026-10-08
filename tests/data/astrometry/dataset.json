@@ -1,0 +1,102 @@
+{
+  "note": "Real astrometry datasets for the minor-planet track & stack validation (ADR-062). The raw FITS (about 2.5 GB) live outside the repository; this manifest and the cropped fixture are what the tests use. The two PNGs are Tycho-Tracker's own track & stack results and carry the reference astrometry, the measured rate/PA and the stack recipe.",
+  "queried": "2026-10-04",
+  "source": "MPC Observations API (data.minorplanetcenter.net/api/get-obs), station Z41",
+  "site": {
+    "mpc_code": "Z41",
+    "name": "Irydeo Observatory, Camarma de Esteruelas",
+    "lat_deg": 40.55,
+    "lon_deg": -3.37
+  },
+  "equipment": {
+    "camera": "QHY42PRO",
+    "telescope": "CDK17 (0.43-m f/4.9)",
+    "gain": 6,
+    "pixel_um": 11.0,
+    "focal_mm": 2199,
+    "scale_arcsec_px": 1.065,
+    "fov_arcmin": 13.7,
+    "camera_field_arcmin": 35.6
+  },
+  "objects": [
+    {
+      "key": "2025UR",
+      "horizons": "2025 UR",
+      "mpec": "https://minorplanetcenter.net/mpec/K25/K25U52.html",
+      "raw_path": "/home/boreal/Develop/astronomy/dataset/2025UR",
+      "run": "20251018",
+      "date": "2025-10-18",
+      "exptime_s": 3,
+      "filter": "Clear",
+      "temp_c": -28.1,
+      "frames": 140,
+      "frame_size": [2048, 2048],
+      "bitpix": 16,
+      "bzero": 32768,
+      "anchor": "2025-10-18T21:40:01.920",
+      "blocks": [
+        {"start": "2025-10-18T21:40:07.722", "end": "2025-10-18T21:46:51.683", "frames": 78},
+        {"start": "2025-10-18T21:51:41.114", "end": "2025-10-18T21:57:02.482", "frames": 62}
+      ],
+      "published": [
+        {"time": "2025-10-18T21:40:01.920", "ra_deg": 24.59221, "dec_deg": 25.25150, "mag": 18.0, "band": "G", "astcat": "Gaia3E"},
+        {"time": "2025-10-18T21:43:22.368", "ra_deg": 24.61992, "dec_deg": 25.26472, "mag": 18.0, "band": "G", "astcat": "Gaia3E"},
+        {"time": "2025-10-18T21:46:41.088", "ra_deg": 24.64746, "dec_deg": 25.27783, "mag": 18.0, "band": "G", "astcat": "Gaia3E"}
+      ],
+      "tycho_png": {
+        "provid": "C452X51",
+        "frames": 76,
+        "exptime_s": 3,
+        "total_exposure_s": 228,
+        "speed_arcsec_min": 30.6,
+        "pa_deg": 62.19,
+        "mag": 18.0,
+        "band": "G",
+        "time": "2025-10-18T21:40:01.9"
+      },
+      "grouping": "to be determined empirically against the published positions",
+      "fixture_frames": 60
+    },
+    {
+      "key": "2026PY9",
+      "horizons": "2026 PY9",
+      "mpec": "https://minorplanetcenter.net/mpec/K26/K26Q24.html",
+      "raw_path": "/home/boreal/Develop/astronomy/dataset/2026PY9",
+      "run": "20260816",
+      "date": "2026-08-16",
+      "exptime_s": 5,
+      "filter": "Clear",
+      "temp_c": -16.1,
+      "frames": 247,
+      "frame_size": [2048, 2048],
+      "bitpix": 16,
+      "bzero": 32768,
+      "anchor": "2026-08-16T22:34:55.488",
+      "blocks": [
+        {"start": "2026-08-16T22:25:18.227", "end": "2026-08-16T22:32:00.310", "frames": 60},
+        {"start": "2026-08-16T22:33:56.016", "end": "2026-08-16T22:40:37.480", "frames": 60},
+        {"start": "2026-08-16T22:42:32.676", "end": "2026-08-16T22:49:15.732", "frames": 60},
+        {"start": "2026-08-16T22:51:11.037", "end": "2026-08-16T22:57:55.166", "frames": 60},
+        {"start": "2026-08-16T22:59:50.383", "end": "2026-08-16T23:00:30.804", "frames": 7}
+      ],
+      "published": [
+        {"time": "2026-08-16T22:34:55.488", "ra_deg": 313.32933, "dec_deg": -4.86186, "mag": 19.30, "band": "G", "astcat": "Gaia3E"},
+        {"time": "2026-08-16T22:51:54.144", "ra_deg": 313.34554, "dec_deg": -4.87744, "mag": 19.20, "band": "G", "astcat": "Gaia3E"}
+      ],
+      "tycho_png": {
+        "provid": "6HE2A22",
+        "frames": 130,
+        "exptime_s": 5,
+        "total_exposure_s": 650,
+        "speed_arcsec_min": 4.76,
+        "pa_deg": 134,
+        "mag": 19.3,
+        "band": "G",
+        "time": "2026-08-16T22:34:55.5"
+      },
+      "grouping": "to be determined empirically against the published positions",
+      "fixture_frames": 60,
+      "fixture_note": "The object does NOT emerge in a crude stack of this crop (sky ~12000 ADU, mag 19.2): it needs the real pipeline (registration + sigma-clipped + fine-tuning) or the whole night. 2025UR is the fixture that shows the object."
+    }
+  ]
+}

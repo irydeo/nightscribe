@@ -28,47 +28,93 @@ del survey (DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
 
 ```
 | [Abrir][Exportar][Resolver] | [Fit][100 %][Zoom ▾] 100 % | [Vista ▾] | Imagen|Curva |
+| [Blink][Calibrar][Anotar][Serie]                                          |
 |───────────────────┬────────────────────────────────────────┬──────────────|
-|  visita / serie   |                                        |  pestaña     |
-|  (plegable)       |   IMAGEN  (o la curva)                 |  ────────    |
-|                   |   · el objeto, sobre la placa          |  primario    |
-|                   |                                        |  [Ajustes▸]  |
+|  visita           |                                        |  panel       |
+|  · navegador      |   IMAGEN  (o la curva)                 |  ────────    |
+|  · PREVIEWS       |   · el objeto, sobre la placa          |  primario    |
+|  · EXOTIC         |                                        |  [Ajustes▸]  |
 |───────────────────┴────────────────────────────────────────┴──────────────|
 | Histograma ▸  (plegado: 24 px; abierto: ~110, dos filas de controles)    |
 |──────────────────────────────────────────────────────────────────────────|
 | ⓘ estado: una línea, altura fija, nunca crece                            |
 ```
 
+**Los cuatro recados** (2026-10-06) son botones propios en una fila bajo la
+barra: **Blink**, **Calibrar**, **Anotar** y la **serie fotométrica**. Cada uno
+abre una **ventana no modal** sobre la placa, del tamaño de lo que lleva
+dentro, y mientras está abierta manda sobre la placa (el frame del blink, los
+clics de la anotación); al cerrarla devuelve la placa al panel. De una en una.
+Están en su fila y no dentro de la barra por un motivo medido: con el tema
+puesto, cuatro botones de icono cuestan 232 px y dentro de la barra dejaban al
+distintivo del proyecto (lo único que dice EN QUÉ proyecto trabajas) sin sitio
+desde 1200 px hacia abajo. Siguen el modo de la barra: icono con su tooltip por
+defecto, y icono y etiqueta si enciendes las etiquetas en Ajustes.
+
+**Imagen | Curva** está al extremo derecho de la barra: es una vista del
+centro, así que pertenece a la barra y no a una fila propia encima de la
+placa (antes costaba una fila del alto de la placa).
+
+El panel de la **visita**, a la izquierda, lleva el navegador de tomas y los
+**previews de las tomas**. La serie fotométrica y el **ajuste de tránsito
+(EXOTIC)** salieron de él a la ventana de serie (**Serie** en la fila de
+herramientas): un ajuste de tránsito es la serie de una visita de tránsito, así
+que la reducción vive debajo del bloque de serie, y sigue apareciendo solo en
+una visita de tránsito con la secuencia de comparsas armada.
+
+**Previews de las tomas** (2026-10-06): una lista vertical que ocupa toda la
+columna y todo el alto del panel, con una miniatura por toma de la visita, que
+se rellena según se leen (lectura muestreada, ~2 MB por toma de 2048², en un
+worker). La miniatura es tan ancha como la columna (de 140 px a ~250, y sigue
+al divisor) y la leyenda va **sobre la imagen**: «Toma 12 · el_fichero.fits»,
+en pequeño y en el **color del tipo de objeto** (el mismo que llevan el chip,
+el botón héroe y las espinas de los bloques), con un contorno oscuro para que
+se lea sobre cielo negro o sobre una nebulosa brillante. Una toma con algo mal
+lleva **borde rojo** y lo dice, **en rojo**: **ilegible** (una captura cortada
+deja un fichero de 0 bytes) o **sin registrar** por el último run de
+astrometría. El rojo significa problema y nada más. El tooltip lleva los números de
+la toma: tamaño en disco, cielo medido, filtro, exposición y fecha. La cabecera
+las cuenta («207 tomas · 3 con problemas») y **Solo problemas** deja solo esas,
+que es la forma rápida de recorrer una noche de cientos de tomas. Un clic abre
+la toma en el editor (el navegador va y viene en los dos sentidos) y el menú
+contextual la quita de la visita (el fichero NO se toca) o la mueve a la
+carpeta `descartados/` del proyecto (no se borra nada, se puede recuperar).
+
 El marco de la ventana ocupa lo que NECESITA y el área de trabajo se queda
-con el resto: la placa es para lo que existe la ventana. La barra superior
+con el resto: la placa es para lo que existe la ventana. La columna de los
+paneles abre a 420 px y se puede arrastrar hasta 560: su contenido necesita 331
+como mínimo (medido el 2026-10-06, cuando una columna más estrecha cortaba los
+mensajes y metía una barra horizontal en los paneles), así que las etiquetas se
+leen enteras y la placa se queda con el resto. La barra superior
 es estable (antes medía 25 px en una ventana baja y 69 en una alta: el
 `layoutStretch` del Designer no lo aplica el cargador), y la tira del
 histograma es compacta y se pliega recordando cómo la dejaste. El nombre,
 la posición y la magnitud del objeto se pintan SOBRE la placa (y viajan al
 PNG exportado), no en una fila propia.
 
-El bloque de serie del panel izquierdo conserva lo que se toca al medir
-(el navegador de tomas, la agrupación de tomas, **Medir la secuencia**, el
-modo en vivo y el progreso) y deja el resto detrás de dos puertas:
-**Gráfico y calidad…** abre la ventana propia del gráfico (no modal: escala,
-barras de error, agrupación, media, anómalos y exclusiones) y **Serie ▾**
-guarda las acciones ocasionales (deshacer, ExoClock, las figuras de la
-noche, guardar el gráfico, período y fase, la guía). Antes ese mismo panel
-mostraba una treintena de controles apilados.
+La serie fotométrica tiene su propia ventana (Herramientas ▾ → Serie) y
+conserva lo que se toca al medir (la agrupación de tomas, **Medir la
+secuencia**, el modo en vivo y el progreso) con el resto detrás de dos
+puertas: **Gráfico y calidad…** abre la ventana propia del gráfico (no modal:
+escala, barras de error, agrupación, media, anómalos y exclusiones) y
+**Serie ▾** guarda las acciones ocasionales (deshacer, ExoClock, las figuras
+de la noche, guardar el gráfico, período y fase, la guía). Antes ese mismo
+panel mostraba una treintena de controles apilados.
 
 * **Imagen**: ocupa la mayor parte de la ventana. La rueda hace zoom
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
-  coordenadas RA/Dec si la placa trae WCS. En las pestañas que marcan
+  coordenadas RA/Dec si la placa trae WCS. En los paneles que marcan
   (Fotometría, Anotar) el cursor se vuelve una cruz con retícula de
   hueco central que **se pega al centroide de la fuente** bajo el ratón:
   el clic nace centrado. La detección es local y robusta (ve fuentes
   débiles incluso sobre el brillo de una galaxia) y el alcance del
   «pegado» está acotado a 9 px de placa: la retícula nunca salta a una
   estrella brillante lejana.
-* **Pestañas**: una por funcionalidad. **Blink**, **Fotometría**
-  y **Anotar** están disponibles (abajo). Solo la pestaña
-  visible responde a los clics sobre la imagen.
+* **Paneles**: dos, **Fotometría** y **Astrometría**, más las cuatro
+  ventanas de herramienta (Blink, Calibrar, Anotar, Serie) tras
+  **Herramientas ▾**. Solo el panel (o la ventana) que está en escena
+  responde a los clics sobre la imagen.
 
 ## Blink
 
@@ -99,7 +145,7 @@ queda a la vista con sus anillos y rótulos, para poder alternar entre
 construir y medir sin perder de vista lo hecho (ADR-044, revisión de
 distribución, 2026-09-24).
 
-### Secuencia (mitad superior)
+### Secuencia (el bloque de comparsas)
 
 Construye la secuencia fotométrica sobre tu placa (necesita WCS; si
 falta, la resuelve sola con el solver configurado, ASTAP o nova):
@@ -139,7 +185,13 @@ Una toma que falla no para el lote: se cuenta y se nombra en la línea de estado
 Una placa abierta desde un proyecto se resuelve también con su campo, así que el
 botón Resolver de la barra superior responde en un momento.
 
-**Construir la secuencia…** hace toda la cadena de un clic: si la placa no
+**Construir la secuencia (comparsas)…** es el **botón grande** de la pestaña
+Fotometría (ADR-038 rev): al entrar solo se ven él, la línea que dice lo que va
+a hacer, la guía de la pestaña («Haz clic en una estrella…», que vive justo
+debajo) y las **tarjetas** de la columna, todas cerradas salvo la del
+resultado: **«La secuencia de comparsas»**, **«La receta fotométrica»** y
+**«Medición»** (esta última aparece con la primera medida). Hace toda la cadena de un clic: si la
+placa no
 tiene WCS la resuelve primero (el campo del proyecto apunta al resolutor, así
 que es un momento), después consulta el catálogo (el campo) y propone. El
 **Proponer secuencia** de la ventana Manual rellena igual el paso que falte,
@@ -148,7 +200,13 @@ no puede entregar (falla la consulta, no cae nada en esta placa, ninguna
 comparsa válida) mantiene la secuencia que ya tenías y dice por qué.
 
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
-  sabe; la magnitud aproximada sirve de guía a la propuesta.
+  sabe; la magnitud aproximada sirve de guía a la propuesta, y **de dónde
+  sale se dice**: el proyecto guarda si esa cifra es una **medida** (la de
+  un apilado anterior), una **predicción** del planificador (efeméride,
+  catálogo, alerta) o **tuya** (la escribiste tú), y el campo lo declara en
+  su ayuda y en la línea de la propuesta. No es un detalle: la propuesta
+  elige las comparsas alrededor de esa cifra, y una propuesta anclada en una
+  medida y otra anclada en una conjetura no son lo mismo.
 * **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las
   variables VSX alrededor del centro de la placa: las estrellas más
   brillantes aparecen rotuladas (casilla «mostrar magnitudes de
@@ -173,13 +231,13 @@ comparsa válida) mantiene la secuencia que ya tenías y dice por qué.
   botón común «Exportar PNG…» de la barra superior: placa, anillos,
   rótulos y la flecha de norte / barra de escala, exactamente lo que ves.
 
-### Medir (mitad inferior)
+### Medir (el bloque de la receta)
 
 Convierte un clic en una magnitud calibrada de catálogo (fotometría de
 apertura diferencial de una placa):
 
 * Necesita la placa con WCS (si falta, la resuelve sola) y una
-  secuencia en la mitad superior (si no la hay, un botón «Ir a la
+  secuencia con el botón grande (si no la hay, un botón «Ir a la
   secuencia» te lleva).
 * **Clic** sobre la estrella o la SN: centroide sub-píxel, apertura y
   anillo de cielo visibles en la imagen, y el panel cuenta el resultado

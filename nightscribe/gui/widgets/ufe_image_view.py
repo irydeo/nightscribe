@@ -45,6 +45,7 @@ from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsLineItem,
 
 from ...core import chart_annotate
 from ...viz import palette
+from .. import theme
 from .base_chart import ChartView
 
 logger = logging.getLogger("nightscribe.gui.ufe_image_view")
@@ -106,6 +107,32 @@ def cross_marker_items(x, y, scene_w, scene_h, color, box_half,
     return items
 
 
+def mark_cross_items(x, y, color, arm=12.0, pen_width=1.4, alpha=200):
+    # A SHORT crosshair centred on a point, for a mark the observer placed
+    # (the manual mode's centroid): two lines that cross at (x, y) with a
+    # dark shadow, so they read on sky, on stars and on a core alike. It is
+    # deliberately NOT the full-frame cross of cross_marker_items: this one
+    # says "the point is here", not "the object is here on the plate".
+    # @args: x, y - position in scene (plate px) coordinates, color - hex
+    #        string or QColor, arm - half length in scene px, pen_width -
+    #        cosmetic pen width in screen px, alpha - 0-255 for the colour
+    # @return: [4 QGraphicsLineItem] (2 shadow, 2 coloured)
+    items = []
+    for width, col, opacity in ((pen_width + 1.2, QColor(0, 0, 0), 160),
+                                (pen_width, QColor(color), alpha)):
+        col = QColor(col)
+        col.setAlpha(int(opacity))
+        pen = QPen(col)
+        pen.setWidthF(width)
+        pen.setCosmetic(True)
+        for x0, y0, x1, y1 in ((x - arm, y, x + arm, y),
+                               (x, y - arm, x, y + arm)):
+            ln = QGraphicsLineItem(x0, y0, x1, y1)
+            ln.setPen(pen)
+            items.append(ln)
+    return items
+
+
 def ring_marker_items(x, y, color, radius,
                       tick_inner=0.5, tick_outer=1.6, pen_width=2.0):
     # The classic "ring" object marker (ADR-046): a circle with four
@@ -164,6 +191,7 @@ class UfeImageView(ChartView):
         # layer, like the ANNOTATE one, so feature tabs never touch it
         self._object_mark_items = []
         self._object_mark_radec = None   # (ra_deg, dec_deg) or None
+        self._object_mark_color = theme.C_OBJECT_MARK   # the mark's colour
         # the object's line, painted OVER the plate (UFE layout v2: it used
         # to be a row of the window under the top bar, 31 px of height for
         # one line of text and a distraction from the picture)
@@ -394,13 +422,15 @@ class UfeImageView(ChartView):
 
     # ------------------------------------------------------ object mark
 
-    def set_object_mark(self, ra_deg, dec_deg):
+    def set_object_mark(self, ra_deg, dec_deg, color=None):
         # The attached project's object: a subtle full-frame cross with a
         # central box (the classic tracker look) where its RA/Dec land on
         # the plate. Needs a WCS; without one (or off-plate) the layer
         # stays empty.
         # @args: ra_deg, dec_deg - object coordinates in degrees, or None
-        #        to drop the mark
+        #        to drop the mark, color - the mark's colour (the object
+        #        type's own, or the common one: the dialog resolves it);
+        #        None keeps the mark's own
         if ra_deg is None or dec_deg is None:
             self._object_mark_radec = None
         else:
@@ -408,6 +438,8 @@ class UfeImageView(ChartView):
                 self._object_mark_radec = (float(ra_deg), float(dec_deg))
             except (TypeError, ValueError):
                 self._object_mark_radec = None
+        if color is not None:
+            self._object_mark_color = str(color)
         self._rebuild_object_mark()
 
     def set_object_mark_visible(self, on):
@@ -426,7 +458,8 @@ class UfeImageView(ChartView):
         if pos is None:
             return
         w, h = self._state.plate_shape
-        for it in cross_marker_items(pos[0], pos[1], w, h, "#ff6378",
+        for it in cross_marker_items(pos[0], pos[1], w, h,
+                                     self._object_mark_color,
                                      w * 0.011, alpha=128, pen_width=1.2):
             it.setZValue(45)
             it.setVisible(self._show_object_mark)
@@ -604,6 +637,45 @@ class UfeImageView(ChartView):
         vp_h = self.viewport().height()
         corner = self.mapToScene(0, vp_h - 6)
         return corner.x() + 10.0 / scale, corner.y() - br.height()
+
+    def _readout_height(self):
+        # @return: the hover readout's height in scene units, or 0 when it
+        #          is not showing. It is what the scale bar steps up by, so
+        #          a change here is a change in WHERE the bar is painted.
+        if self._tooltip is None:
+            return 0.0
+        return float(self._tooltip.boundingRect().height())
+
+    def _repaint_hud(self):
+        # @return: None. A FULL viewport repaint. The scale bar is a
+        #          device-space HUD piece with no scene rect, so under the
+        #          default MinimalViewportUpdate a partial repaint leaves the
+        #          OLD bar behind and the corner shows two bars, one above
+        #          the other (reported). It is the same trap the pick reticle
+        #          documents; the reticle lives in pick mode only, the bar is
+        #          always there.
+        self.viewport().update()
+
+    def _show_tooltip(self, viewport_pos, text):
+        # The readout appears, disappears or gains a line: the scale bar
+        # moves with its height, so the HUD is repainted whole. The full
+        # repaint happens ONLY when the height really changed, never on every
+        # mouse move (which would repaint the plate continuously).
+        # @args: viewport_pos - QPoint in the viewport, text - str or list
+        # @return: None
+        before = self._readout_height()
+        super()._show_tooltip(viewport_pos, text)
+        if self._readout_height() != before:
+            self._repaint_hud()
+
+    def _hide_tooltip(self):
+        # @return: None. The readout goes: the bar drops back to the corner,
+        #          so the old (raised) bar has to be erased with a full
+        #          repaint. A call with nothing showing costs nothing.
+        before = self._readout_height()
+        super()._hide_tooltip()
+        if before:
+            self._repaint_hud()
 
     def mouseMoveEvent(self, event):
         # The probe stays as always; in pick mode the cursor position is

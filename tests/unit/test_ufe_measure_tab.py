@@ -130,7 +130,7 @@ def dlg(qapp, tmp_path):
     d.state.load(plate)
     d._test_target = target
     d._test_comps = comps
-    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    d.tab_photometry.set_active(True)           # take the stage
     # no modes: the closed manual window already arms the measuring
     yield d
     d.tab_blink.shutdown()
@@ -146,7 +146,7 @@ def _click(dlg, x, y):
 
 def test_tab_present_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate"]
+    assert titles == ["Photometry", "Astrometry"]      # ADR-044 rev
     assert dlg.tab_measure.isEnabled()
 
 
@@ -213,7 +213,7 @@ def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg, qapp):
     qapp.processEvents()
     dlg.tab_photometry._apply()
     assert len(tab._items) == 3 + 5
-    dlg.tabs.setCurrentWidget(dlg.tab_blink)
+    dlg.tabs.setCurrentIndex(1)             # the Astrometry panel
     assert tab._items == []
 
 
@@ -223,12 +223,17 @@ def test_save_in_project_button_follows_the_point_hook(dlg):
     # there is a calibrated point, and hands the payload to the host.
     tab = dlg.tab_measure
     btn = tab.btn_save_project
-    assert not btn.isVisible()          # ad-hoc open: no project attached
+    # isHidden() is the button's OWN flag: since ADR-038 rev the whole row of
+    # result actions (and this button with it) is out of sight until there is
+    # a measurement, so isVisible() alone would not tell the two conditions
+    # apart
+    assert btn.isHidden()               # ad-hoc open: no project attached
     assert dlg.notify_point({"mag": 1.0}) is False     # no hook, no save
 
     seen = []
     dlg.set_point_hook(seen.append)
-    assert btn.isVisible()
+    assert not btn.isHidden()
+    assert not btn.isVisible()          # nothing measured yet: the row waits
     assert not btn.isEnabled()          # nothing measured yet
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)
@@ -477,6 +482,15 @@ class _FakeSubWorker:
 
 def test_host_subtraction_recovers_the_target(dlg, monkeypatch):
     from nightscribe.core import photometry as phot
+    # The APERTURE is pinned BEFORE the sequence, because the sequence SAVES
+    # the recipe and the restore brings it back: pinning it later is pinning
+    # nothing. This test is about the host SUBTRACTION (the difference
+    # image's flux recovery) and the app's default is the matched filter now;
+    # on a difference image the filter recovers 9.6 % less flux than the
+    # aperture here, and that path has NOT been validated with the filter, so
+    # it is written down in the comparative report as a pending check instead
+    # of being hidden by the default.
+    dlg.tab_measure.chk_matched.setChecked(False)
     _sequence(dlg, dlg._test_comps)
     # the reference: the same field WITHOUT the target (a fresh plate)
     data, target, comps = _plate()
@@ -607,7 +621,10 @@ def test_suggest_without_a_measurement_guides(dlg):
 
 def _innermost_row_of(tab, target):
     # the nearest layout that holds `target`, walking the tab's layout
-    # tree (rows are QHBoxLayouts nested in the main QVBoxLayout)
+    # tree (rows are QHBoxLayouts nested in the main QVBoxLayout). It
+    # descends into the widgets' own layouts too: since ADR-038 rev the
+    # recipe lives inside a collapsible block, and the block is a widget
+    # in the column.
     if tab.layout() is None:
         return None
     stack = [tab.layout()]
@@ -620,6 +637,9 @@ def _innermost_row_of(tab, target):
             sub = it.layout()
             if sub is not None and sub is not lay:
                 stack.append(sub)
+            w = it.widget()
+            if w is not None and w.layout() is not None:
+                stack.append(w.layout())
     return None
 
 
@@ -928,6 +948,7 @@ def test_series_block_shows_with_a_visit_and_runs(dlg, qapp, tmp_path):
     _click(dlg, *dlg._test_target)              # the series target
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
                                  "paths": frames})
+    dlg.open_tool("series")                     # ADR-044 rev: its window
     assert tab.grp_series.isVisible()
     dlg.set_points_hook(points_hook)
     dlg.set_run_undo_hook(undo_hook)
@@ -1412,6 +1433,7 @@ def test_the_series_block_stays_narrow_and_keeps_its_actions_reachable(
     # six actions are still THERE, reachable behind their door.
     tab = dlg.tab_measure
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    dlg.open_tool("series")                    # ADR-044 rev: its window
     assert tab.grp_series.isVisible()          # the block is armed
     # the theme pins the font size in px through a stylesheet, so the
     # 1.5x simulation goes through the same channel: 13px -> 20px
@@ -1468,19 +1490,36 @@ def test_series_panel_names_nights_by_their_civil_date(
     assert "Night 61303" not in panel           # the raw MJD is gone
 
 
-def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
-    # The series block sits in its own pane at the left of the image
-    # (hidden unless a visit arms it), not cramped in the Measure tab.
+def test_the_series_is_a_window_armed_by_a_visit(dlg):
+    # ADR-044 rev: the series block left the left pane (and the Measure
+    # column) and is a window of its own, opened from its button in the top
+    # bar. The button is armed by the visit hook (D8: without a visit there
+    # is no series) and says why when it is not.
     tab = dlg.tab_measure
-    assert hasattr(dlg, "series_pane")
-    assert not dlg.series_pane.isVisible()
-    # the group is reparented into the pane
-    assert tab.grp_series.parent() is dlg.visit_panel
+    window = dlg._tools["series"]
+    # the window hosts a BODY that holds the series block and, under it, the
+    # transit reduction (EXOTIC), which moved here on 2026-10-06: a transit
+    # reduction is the series of a transit visit
+    body = window.panel
+    assert tab.grp_series.parent() is body
+    assert dlg.exotic.parent() is body
+    assert not window.isVisible()
+    # ad-hoc open: no visit, so the door is closed and says why
+    assert not dlg.btn_tool_series.isEnabled()
+    assert "visit" in dlg.btn_tool_series.toolTip()
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
-    assert dlg.series_pane.isVisible()
+    assert dlg.btn_tool_series.isEnabled()
+    dlg.btn_tool_series.click()
+    assert window.isVisible()
     assert tab.grp_series.isVisible()
+    # a second press closes it (a door, not a one-way trip)
+    dlg.btn_tool_series.click()
+    assert not window.isVisible()
+    # and detaching the visit closes it: it is a panel about a visit
+    dlg.open_tool("series")
     dlg.set_series_hook(None)
-    assert not dlg.series_pane.isVisible()
+    assert not window.isVisible()
+    assert not dlg.btn_tool_series.isEnabled()
 
 
 # ------------------------------------- the curve in the centre (ADR-051 rev.)
@@ -2347,6 +2386,7 @@ def test_the_block_header_is_never_cut(dlg, qapp):
     tab = dlg.tab_measure
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
                                  "paths": ["/tmp/a.fits"], "visits": 1})
+    dlg.open_tool("series")            # ADR-044 rev: the block has a window
     qapp.processEvents()
     lbl = tab.lbl_series_hint
     assert lbl.isVisible()
@@ -2401,3 +2441,249 @@ def test_the_passes_door_opens_with_room_to_read_it(dlg):
     assert door.tbl_passes.height() >= 200
     assert door.tbl_passes.horizontalHeader().stretchLastSection()
     door.close()
+
+
+# -------------------------------------------------- track & stack plates
+
+def test_a_track_stack_plate_says_why_it_cannot_calibrate_here(dlg):
+    # On an object's stack the stars are TRAILS: a circular aperture on a
+    # streak is not a flux, so the zero point it would set is a lie. Since
+    # the astrometry now writes the stack's WCS, nothing else would stop
+    # the measurement, so the tab has to say it and step aside.
+    dlg.state.header["NS_STACK"] = "object"
+    _click(dlg, *dlg._test_target)
+    text = dlg.tab_measure.lbl_status.text()
+    assert "track & stack" in text
+    assert "Astrometry" in text
+
+
+def test_the_star_stack_says_the_object_is_the_trail(dlg):
+    dlg.state.header["NS_STACK"] = "stars"
+    _click(dlg, *dlg._test_target)
+    assert "trail" in dlg.tab_measure.lbl_status.text()
+
+
+def test_a_track_stack_with_its_pair_is_not_blocked(dlg):
+    # With the star stack saved alongside (NS_PAIR), the pair IS
+    # measurable: the guard steps aside.
+    dlg.state.header["NS_STACK"] = "object"
+    dlg.state.header["NS_PAIR"] = "2025UR_obs1_20251018T214012_stars.fits"
+    _click(dlg, *dlg._test_target)
+    assert "track & stack" not in dlg.tab_measure.lbl_status.text()
+
+
+def test_a_track_stack_reads_the_comps_on_its_pair(dlg, tmp_path):
+    # A track & stack saves TWO files per observation: the object's stack
+    # (its light, and the stars as trails) and the star stack (the comps as
+    # points, and the object as a trail). NS_PAIR carries the name of the
+    # other one, and the measurement reads the comps THERE: on the object's
+    # plate a circular aperture on a streak is not a flux.
+    import shutil
+    from pathlib import Path
+    plate = Path(dlg.state.path)
+    partner = plate.parent / "pair_stars.fits"
+    shutil.copyfile(plate, partner)
+    dlg.state.header["NS_STACK"] = "object"
+    dlg.state.header["NS_PAIR"] = partner.name
+    _sequence(dlg, dlg._test_comps)      # the comps have to be there
+    # the pair is found and read
+    assert dlg.tab_measure._pair_image() is not None
+    # and the guard steps aside: the click really measures
+    _click(dlg, *dlg._test_target)
+    assert dlg.tab_measure._last is not None
+    assert dlg.tab_measure._last.get("mag") is not None
+
+
+def test_the_measurement_can_be_sent_to_the_report(dlg):
+    # D: the observer measured the brightness by hand and says the report
+    # should use it. The button only lives on a stack that KNOWS its run and
+    # its observation (NS_RUN / NS_NOBS, written by the astrometry tab), and
+    # it asks the HOST to write it: the tab never touches the database.
+    dlg.state.header["NS_RUN"] = 8
+    dlg.state.header["NS_NOBS"] = 1
+    calls = []
+
+    def _write(run_id, group, mag, band):
+        calls.append((run_id, group, round(float(mag), 3), band))
+        return True
+
+    dlg.manual_magnitude = _write
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert dlg.tab_measure.btn_manual_mag.isEnabled()
+    dlg.tab_measure.btn_manual_mag.click()
+    assert calls and calls[0][0] == 8 and calls[0][1] == 0
+    assert "report will use" in dlg.tab_measure.lbl_status.text()
+    # a plate that is not an astrometry stack has no run to write to
+    dlg.state.header.pop("NS_RUN")
+    dlg.tab_measure._sync_manual_button()
+    assert not dlg.tab_measure.btn_manual_mag.isEnabled()
+
+
+# ------------------------------------------- the one action (ADR-038 rev)
+
+def test_the_photometry_panel_opens_with_one_action(dlg):
+    # Asked for: entering Photometry shows a BIG button and nothing else.
+    # The button is the sequence builder (the step a photometry session
+    # starts with), it wears the object's hue, and it DELEGATES to the
+    # section's own button, which is hidden while the hero offers it: one
+    # action, one visible place.
+    from nightscribe.gui import theme
+    tab = dlg.tab_photometry
+    assert tab.btn_primary.isVisibleTo(tab)
+    assert tab.btn_primary.isEnabled()
+    assert "Build the sequence" in tab.btn_primary.text()
+    assert theme.C_ACCENT in tab.btn_primary.styleSheet()
+    # the delegate is out of sight (it is the hero's own action today)
+    assert not tab.tab_compare.btn_auto.isVisibleTo(tab.tab_compare)
+    # and the line under the button says what pressing it will do
+    assert tab.lbl_primary_sub.isVisibleTo(tab)
+    assert tab.lbl_primary_sub.text()
+    # every knob is inside a closed block
+    assert not tab.tab_compare._sections["seq"]._expanded
+    assert not tab.tab_measure._sections["recipe"]._expanded
+    assert not tab.tab_compare.spn_mag.isVisibleTo(tab.tab_compare)
+    assert not tab.tab_measure.cmb_band.isVisibleTo(tab.tab_measure)
+
+
+def test_the_photometry_action_presses_the_sequence_builder(dlg, monkeypatch):
+    # The hero does not reimplement anything: it presses the button the
+    # section already had, so the whole path (field, catalogue, proposal) is
+    # the one that was tested.
+    tab = dlg.tab_photometry
+    seen = {}
+    monkeypatch.setattr(tab.tab_compare, "_on_auto",
+                        lambda: seen.setdefault("built", True))
+    tab.btn_primary.click()
+    assert seen.get("built")
+
+
+def test_the_photometry_subtitle_follows_the_sequence(dlg):
+    # The line says what building the sequence will do, or what is missing,
+    # and it follows the section's own state: with a sequence it says how
+    # many stars came back.
+    tab = dlg.tab_photometry
+    before = tab.lbl_primary_sub.text()
+    assert "plate centre" in before
+    tab.tab_compare._entries = [{"name": "C1", "star": {"ra": 1.0,
+                                                        "dec": 2.0}},
+                                {"name": "C2", "star": {"ra": 1.1,
+                                                        "dec": 2.1}}]
+    tab.tab_compare.sequence_changed.emit()
+    assert "2 comparison stars" in tab.lbl_primary_sub.text()
+
+
+def test_the_photometry_action_wears_the_objects_hue(dlg):
+    # The hue comes from the project's own payload (the badge the host
+    # already builds), so the panel speaks the object's colour: the button,
+    # its glyph and the block spines. Without a project the app's accent is
+    # used and there is no glyph.
+    from nightscribe.gui import theme
+    tab = dlg.tab_photometry
+    dlg.set_project_badge({"kind": "transit", "kind_color": "#a06ee0",
+                           "kind_label": "TRN", "name": "WASP-1",
+                           "icon": None})
+    assert "#a06ee0" in tab.btn_primary.styleSheet()
+    assert not tab.btn_primary.icon().isNull()
+    spine = theme.composite("#a06ee0", "70", over=theme.C_BASE)
+    assert spine in tab.tab_compare._sections["seq"].styleSheet()
+    assert spine in tab.tab_measure._sections["recipe"].styleSheet()
+    dlg.set_project_badge(None)
+    assert theme.C_ACCENT in tab.btn_primary.styleSheet()
+    assert tab.btn_primary.icon().isNull()
+
+
+def test_the_photometry_panel_opens_with_the_button_and_its_guides(dlg):
+    # Asked for: on entering, the button and the texts that GUIDE the
+    # observer, and nothing else. The "Click a star..." line belongs under
+    # the button (it says what to do with the tab), not inside a half, and
+    # the whole column lives in ONE scroll area that keeps everything at the
+    # top (the splitter used to hand the folded halves a share of the height,
+    # which is where the empty gaps came from).
+    from PySide6.QtWidgets import QSpacerItem
+    tab = dlg.tab_photometry
+    lay = tab.layout()
+    names = []
+    for i in range(lay.count()):
+        w = lay.itemAt(i).widget()
+        names.append(w.objectName() if w is not None else "")
+    assert names[:4] == ["btn_primary", "lbl_primary_sub", "lbl_hint",
+                         "area_column"]
+    # the guide is the tab's, not the measure half's
+    assert tab.lbl_hint.isVisibleTo(tab)
+    assert not tab.tab_measure.isAncestorOf(tab.lbl_hint)
+    # the column is one scroll area with a trailing stretch: the groups sit
+    # at the top whatever the window height
+    assert tab.area_column.widget() is tab._contents
+    assert tab.tab_compare.parent() is tab._contents
+    assert tab.tab_measure.parent() is tab._contents
+    contents = tab._contents.layout()
+    assert isinstance(contents.itemAt(contents.count() - 1).spacerItem(),
+                      QSpacerItem)
+    # and every group of the column is a bordered card
+    from nightscribe.gui import theme
+    for section in (tab.tab_compare._sections["seq"],
+                    tab.tab_measure._sections["recipe"]):
+        assert "border-left: 3px solid" in section.styleSheet()
+        assert theme.C_ACCENT in section._btn.styleSheet()
+
+
+def test_the_filter_switch_is_in_the_panel_and_is_the_same_recipe(dlg):
+    # Reported 2026-10-07: the switch lived inside Advanced…, two clicks away
+    # from the measurement, and the observer looked for it and did not find
+    # it. It is in the panel now, next to the manual centre, and it is still
+    # the ONE recipe field: the alias points at the panel widget, so
+    # capture_state, the astrometry run and the series read the same value.
+    tab = dlg.tab_measure
+    assert tab.chk_matched is tab._ui.chk_matched
+    assert tab.chk_matched.isChecked() is True
+    assert tab.capture_state()["matched"] is True
+    # the long explanation (what it is, what it produces, the risks) travels
+    # with it, because it is what makes the switch understandable
+    tip = tab.chk_matched.toolTip()
+    assert "best linear estimator" in tip and "RISKS" in tip
+    # the recipe group's header announces the method while the group is
+    # closed, so the switch is not hidden inside a closed block without a
+    # trace: that was the second half of the complaint
+    sec = tab._sections["recipe"]
+    sec.setCollapsed(True)
+    assert sec.headerBadge() == "matched filter"
+    # and the flag the run reads is the one the observer sees
+    tab.chk_matched.setChecked(False)
+    assert tab.capture_state()["matched"] is False
+    assert sec.headerBadge() == "aperture"
+
+
+def test_a_new_plate_starts_from_the_app_setting(qapp, tmp_path,
+                                                 monkeypatch):
+    # The Ajustes key is only the STARTING point: what a NEW plate begins
+    # with, and what the state reset goes back to. A plate that carries its
+    # own recipe keeps it, which is why this is not a global override.
+    from nightscribe.config import config
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    monkeypatch.setitem(config._data, "phot_matched", False)
+    d = UfeDialog()
+    try:
+        assert d.tab_measure.chk_matched.isChecked() is False
+        assert d.tab_measure.capture_state()["matched"] is False
+        assert d.tab_measure.ui_defaults()["matched"] is False
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
+def test_a_recipe_that_does_not_mention_a_knob_does_not_move_it(dlg):
+    # The fallback used to be False, so the key added on 2026-10-07 (matched)
+    # would have unticked itself on every plate saved before it existed, and
+    # the observer's own choice would have looked like a bug. A recipe that
+    # does not mention a knob leaves the knob where it is.
+    tab = dlg.tab_measure
+    tab.chk_matched.setChecked(True)
+    tab.chk_sigmaclip.setChecked(True)
+    tab.apply_state({"band": "G"})            # an old recipe, no switches
+    assert tab.chk_matched.isChecked() is True
+    assert tab.chk_sigmaclip.isChecked() is True
+    # and when the recipe DOES mention it, the recipe wins
+    tab.apply_state({"band": "G", "matched": False})
+    assert tab.chk_matched.isChecked() is False

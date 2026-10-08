@@ -22,21 +22,23 @@ from PySide6 import Shiboken
 from PySide6.QtCore import (QCoreApplication, QEvent, QSize, Qt, Signal,
                             QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QDialog,
+                                QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
-                                QInputDialog, QLabel, QLineEdit,
+                                QHeaderView, QInputDialog, QLabel, QLineEdit,
                                 QListWidget, QListWidgetItem, QMainWindow,
                                 QMessageBox, QProgressBar, QProgressDialog,
                                 QPushButton, QScrollArea,
-                                QSpinBox, QDoubleSpinBox, QComboBox,
+                                QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
-                                QVBoxLayout, QWidget, QTableWidgetItem)
+                                QVBoxLayout, QWidget, QTableWidget,
+                                QTableWidgetItem)
 
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (attention, dates, ephemeris, kinds, mpc_report, orbits,
-                    project, sequence, suggest)
+from ..core import (attention, dates, ephemeris, journal, kinds, mpc_report,
+                    orbits, project, sequence, suggest)
 from ..core.db import db
 from . import pretty, theme
 from .overview import ObjectPanel
@@ -49,7 +51,7 @@ from .widgets.project_row import ProjectRow
 from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
-from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
+from .workers import (CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
                       SunWorker, TonightWorker)
 
@@ -150,6 +152,19 @@ def _parse_date_obs(text):
     return None
 
 
+# Which Settings spin shows each config key of the camera profile: the map
+# the preset fill walks (core/cameras.profile_from_preset returns config keys,
+# the dialog owns the widgets, and this is the only place that knows both).
+_CAM_PRESET_SPINS = {
+    "pixel_um": "spn_pixel_um",
+    "cam_full_well_e": "spn_cam_full_well",
+    "cam_linearity_adu": "spn_cam_linearity",
+    "ccd_read_noise": "spn_cam_ron",
+    "cam_dark_current_e_s": "spn_cam_dark",
+    "cam_max_exposure_s": "spn_cam_max_exp",
+}
+
+
 def _settings_two_columns(dlg):
     # @args: dlg - the settings dialog (holds QTabWidget > pages > QGroupBox)
     # @return: re-lays every tab page into two side-by-side columns. The
@@ -206,6 +221,17 @@ def _settings_two_columns(dlg):
         c[0].setMinimumWidth(col_w[0])
         c[1].setMinimumWidth(col_w[1])
         old.addLayout(cols)
+
+
+def _master_num(value, fmt="{:.3g}"):
+    # @args: value - a master's gain, temperature or exposure (maybe None),
+    #        fmt - how a number is shown
+    # @return: the text for the master table's cell. None becomes an EMPTY
+    #          cell, not "None" and not "0": the library only knows what
+    #          the header said, and a blank says "the file did not say",
+    #          while a zero would be matched against a light as if it were
+    #          a real measurement.
+    return "" if value is None else fmt.format(float(value))
 
 
 # How much of an EXOTIC run log is read to report a failure (P2 #21): the
@@ -419,13 +445,13 @@ class MainWindow(QMainWindow):
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
-        self._blink_pair = None
-        self._blink_ref8 = None
-        self._blink_obs8 = None
-        self._blink_nudge = [0.0, 0.0]
-        self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
+        # Which astrometry run the editor must SHOW when a visit is opened:
+        # (project_id, session_id, run_id) when it was opened from the
+        # Analysis tab's list (the observer picked one), None when it was
+        # opened from the visit (the newest run wins, as always).
+        self._astrometry_run_pref = None
         # ADR-043: the CCD block lives inside the open project's Capture
         # step, so this registry dies with the page (and rebirths with it)
         self._obs_widgets = {}
@@ -482,12 +508,6 @@ class MainWindow(QMainWindow):
         self._now_timer = QTimer(self)
         self._now_timer.timeout.connect(self._refresh_now_badges)
         self._now_timer.start(5 * 60 * 1000)
-        self._blink_timer = QTimer(self)
-        self._blink_timer.timeout.connect(self._blink_tick)
-        self._blink_render_timer = QTimer(self)
-        self._blink_render_timer.setSingleShot(True)
-        self._blink_render_timer.setInterval(120)
-        self._blink_render_timer.timeout.connect(self._blink_render)
 
     def _build_status_progress(self):
         # One global progress bar, docked to the RIGHT of the status bar (the
@@ -567,8 +587,45 @@ class MainWindow(QMainWindow):
         # its plate and stretch survive); its workers are only shut down
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
         self._shell_stack().setCurrentIndex(index)
+        self._sync_sky_bar(index)
+        if index != VIEW_UFE:
+            # the workbench's tool windows (Blink, Calibrate, Annotate, the
+            # series) are floating windows of its page: they must not hang
+            # over the view the observer just opened. The workbench itself
+            # stays alive (ADR-047).
+            ufe = getattr(self, "_ufe", None)
+            leave = getattr(ufe, "leave_view", None)
+            if callable(leave):
+                leave()
         if index == VIEW_PROJECTS:
             self._sync_projects_pane()
+
+    def _sync_sky_bar(self, index):
+        # The night (Moon, darkness, planets and the event chips) lives in
+        # the navigation row and is useful while planning. Inside the image
+        # workbench it is only noise: the observer is looking at a plate, not
+        # at tonight, and the row is the one piece of chrome the workbench
+        # cannot hide. Asked for: out of the UFE, in everywhere else.
+        # @args: index - the view just opened
+        # @return: None. The bar is HIDDEN, never destroyed, so its state
+        #          (texts, chips) is where it was when the observer returns;
+        #          the refresh is skipped while it is out of sight and run
+        #          again on the way back, so nothing is rebuilt for nobody.
+        bar = getattr(self, "_sky_bar", None)
+        if bar is None:
+            return
+        if index == VIEW_UFE:
+            self._sky_bar_out = True
+            bar.setVisible(False)
+            return
+        if getattr(self, "_sky_bar_out", False):
+            self._sky_bar_out = False
+            bar.setVisible(True)
+            # the bar was frozen while the workbench was open: tonight has
+            # moved (or the site has), so it is filled again on the way back
+            self.refresh_sky_bar()
+        else:
+            bar.setVisible(True)
 
     # ---------------- navigation history (Interfaz 1.1, ADR-056) ---------
 
@@ -1213,12 +1270,21 @@ class MainWindow(QMainWindow):
         drop_in(host.parentWidget().layout(), host, self._sky_bar)
         # the sky-event chips land in the bar from now on
         self._sky_chips_row = self._sky_bar.chips
+        # the workbench hides the whole bar (see _sync_sky_bar): the flag is
+        # the source of truth, not isVisible(), which is also False before
+        # the window is first shown
+        self._sky_bar_out = False
         self.refresh_sky_bar()
 
     def refresh_sky_bar(self):
         # Recomputes the bar from the site. All local ephemeris, so it can
         # afford to run whenever the site or the clock may have moved.
-        # @return: None
+        # @return: None. While the workbench has the bar hidden (it is out of
+        #          sight) the work is skipped: the chips are rebuilt on the
+        #          way back (see _sync_sky_bar), and nothing is computed for
+        #          a row nobody can see.
+        if getattr(self, "_sky_bar_out", False):
+            return
         from ..core import night_brief as nb
         try:
             lat = float(config.get("lat") or 0.0)
@@ -1429,7 +1495,6 @@ class MainWindow(QMainWindow):
         self._menus.action_welcome.triggered.connect(
             lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
-        self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
             self._tools_campaigns)
 
@@ -1626,6 +1691,158 @@ class MainWindow(QMainWindow):
         rep = astap.probe(dlg.edt_astap_path.text().strip())
         QMessageBox.information(dlg, self.tr("ASTAP"), rep["message"])
 
+    def _pick_findorb(self, dlg):
+        # Browse for the Find_Orb executable (astrometry plan, D31: the
+        # NON-interactive one; probe refuses the interactive program).
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the Find_Orb executable"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_findorb_path.setText(path)
+
+    def _test_findorb(self, dlg):
+        # Probe the configured binary: `fo` exists, and it is not the
+        # interactive Find_Orb (the mistake everybody makes once).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import findorb
+        _path, message = findorb.probe(dlg.edt_findorb_path.text().strip())
+        QMessageBox.information(dlg, self.tr("Find_Orb"), message)
+
+    def _install_findorb(self, dlg):
+        # ADR-062, D31: the guided installation of Find_Orb. Three steps,
+        # in the order that saves the most work:
+        #   1. is `fo` already on PATH? Then the program is installed and
+        #      the app was never told, which is the common case: fill the
+        #      path and say so.
+        #   2. is there a package manager we can drive? Then offer the one
+        #      command that installs it in a PRIVATE environment.
+        #   3. otherwise, the guide: what to install and what to type.
+        # The app never downloads a package manager on its own: fetching
+        # and running a binary from the internet is the user's decision.
+        # @args: dlg - the settings dialog
+        # @return: None
+        from ..core import findorb_install as fi
+        worker = getattr(self, "_findorb_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            return
+        found = fi.find_on_path()
+        if found:
+            dlg.edt_findorb_path.setText(found)
+            QMessageBox.information(dlg, self.tr("Find_Orb"), self.tr(
+                "Find_Orb is already installed:\n%1\n\nThe path now points "
+                "at it.").replace("%1", found))
+            return
+        name, manager = fi.find_manager()
+        if manager is None:
+            QMessageBox.information(dlg, self.tr("Install Find_Orb"),
+                                    self._findorb_manual_text())
+            return
+        from .. import paths as paths_mod
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Folder for the Find_Orb environment"),
+            str(paths_mod.data_dir()))
+        if not folder:
+            return
+        target = str(Path(folder) / "findorb")
+        plan = fi.install_plan(name, manager, target)
+        if QMessageBox.question(
+                dlg, self.tr("Install Find_Orb"),
+                self.tr("Run this command?\n\n%1\n\nThe environment is "
+                        "private, inside the folder you chose, so nothing "
+                        "of your existing setup is touched. The download "
+                        "takes a few minutes.").replace(
+                            "%1", plan["what"])
+        ) != QMessageBox.Yes:
+            return
+        self._findorb_install_start(dlg, manager, target)
+
+    def _findorb_manual_text(self):
+        # @return: the guide, in plain language, for the case the app
+        #          cannot install Find_Orb for the observer
+        return self.tr(
+            "NightScribe did not find micromamba, mamba or conda, and it "
+            "does not download a package manager on its own.\n\n"
+            "The easy road on Linux and macOS is the conda-forge package "
+            "\"findorb\": it brings the precompiled binaries and the DE430t "
+            "ephemerides the perturbations need, in one command:\n\n"
+            "    micromamba create -p ~/findorb -c conda-forge findorb\n\n"
+            "On Windows, Project Pluto ships the binaries as zips: download "
+            "the console version and the non-interactive fo, unpack both in "
+            "the same folder (they share their configuration and the "
+            "ephemerides) and point the path above at fo64.exe.\n\n"
+            "The whole guide is in the documentation.")
+
+    def _findorb_install_start(self, dlg, manager_path, target):
+        # @args: dlg - the settings dialog, manager_path - the package
+        #        manager, target - the private environment
+        # @return: None. The manager's own output is streamed into the
+        #          dialog's label: when an install fails, that log is the
+        #          only thing that says why.
+        from PySide6.QtWidgets import QProgressDialog
+        from .workers import FindOrbInstallWorker
+        prog = QProgressDialog(self.tr("Installing Find_Orb…"),
+                               self.tr("Cancel"), 0, 0, dlg)
+        prog.setWindowTitle(self.tr("Install Find_Orb"))
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setAutoClose(False)
+        prog.setAutoReset(False)
+        worker = FindOrbInstallWorker(manager_path, target)
+        self._findorb_worker = worker
+        self._findorb_prog = prog
+        worker.line.connect(lambda text: prog.setLabelText(
+            text.strip()[-160:] or self.tr("Installing Find_Orb…")))
+        worker.finished.connect(
+            lambda out: self._findorb_install_done(dlg, target, out))
+        worker.failed.connect(
+            lambda message: self._findorb_install_failed(dlg, message))
+        prog.canceled.connect(worker.cancel)
+        self._keep(worker)
+        worker.start()
+        prog.show()
+
+    def _findorb_install_close(self):
+        # @return: None. The progress window goes, whatever the outcome.
+        prog = getattr(self, "_findorb_prog", None)
+        if prog is not None:
+            prog.reset()
+            prog.close()
+        self._findorb_prog = None
+        self._findorb_worker = None
+
+    def _findorb_install_done(self, dlg, target, out):
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        target - the environment, out - the worker's report
+        # @return: None
+        self._findorb_install_close()
+        out = out if isinstance(out, dict) else {}
+        path = out.get("path")
+        if not Shiboken.isValid(dlg):
+            return
+        if out.get("ok") and path:
+            dlg.edt_findorb_path.setText(path)
+            from ..core import findorb
+            _probe, message = findorb.probe(path)
+            QMessageBox.information(dlg, self.tr("Find_Orb"), message)
+            return
+        QMessageBox.warning(dlg, self.tr("Find_Orb"), self.tr(
+            "The installation did not finish. The last lines of the "
+            "package manager were:\n\n%1\n\nYou can still install Find_Orb "
+            "by hand (the guide is in the documentation) and point the "
+            "path above at it.").replace(
+                "%1", "\n".join(out.get("log") or [])[-700:]))
+
+    def _findorb_install_failed(self, dlg, message):
+        # @args: dlg - the settings dialog, message - the error (English)
+        # @return: None
+        self._findorb_install_close()
+        if Shiboken.isValid(dlg):
+            QMessageBox.warning(
+                dlg, self.tr("Find_Orb"),
+                self.tr("The installation failed:") + f" {message}")
+
     def _pick_exotic_python(self, dlg):
         # Browse for the Python <=3.10 interpreter that will host EXOTIC.
         from PySide6.QtWidgets import QFileDialog
@@ -1645,25 +1862,17 @@ class MainWindow(QMainWindow):
 
     def _cam_preset_selected(self, dlg):
         # Fill the datasheet template from the chosen camera preset,
-        # without stomping a value the user set by hand.
+        # without stomping a value the user set by hand. The RULE lives in
+        # core/cameras (shared with the Welcome step); here we only map its
+        # config keys to the spins.
         from ..core import cameras
+        current = {key: getattr(dlg, spin).value()
+                   for key, spin in _CAM_PRESET_SPINS.items()}
         p = cameras.preset(dlg.cmb_cam_preset.currentData())
-        if p is not None:
-            dlg.spn_pixel_um.setValue(float(p["pixel_um"]))
-            if dlg.spn_cam_full_well.value() == 0 and p.get("full_well_e"):
-                dlg.spn_cam_full_well.setValue(float(p["full_well_e"]))
-            if dlg.spn_cam_linearity.value() == 0 and p.get("linearity_adu"):
-                dlg.spn_cam_linearity.setValue(float(p["linearity_adu"]))
-            # the read noise is a datasheet fact, so the preset may fill it
-            # (the GAIN never: it is per unit and per gain setting, and the
-            # preset itself says so)
-            if dlg.spn_cam_ron.value() == 0 and p.get("read_noise_e"):
-                dlg.spn_cam_ron.setValue(float(p["read_noise_e"]))
-            if dlg.spn_cam_dark.value() == 0 and p.get("dark_current_e_s"):
-                dlg.spn_cam_dark.setValue(float(p["dark_current_e_s"]))
-            if dlg.spn_cam_max_exp.value() == 0 and p.get("regime") == "short" \
-                    and p.get("exp_max_s"):
-                dlg.spn_cam_max_exp.setValue(round(float(p["exp_max_s"])))
+        for key, value in cameras.profile_from_preset(p, current).items():
+            spin = _CAM_PRESET_SPINS.get(key)
+            if spin is not None:
+                getattr(dlg, spin).setValue(value)
         self._cam_ref_update(dlg)
 
     def _cam_ref_update(self, dlg):
@@ -1844,6 +2053,31 @@ class MainWindow(QMainWindow):
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
+        # The astrometry's own settings (ADR-062). They lived ONLY in the
+        # config file until 2026-10-06: the report said "Settings →
+        # Astrometry" and there was no such place, so the submission floor
+        # (the one that decides whether a report has lines at all) could not
+        # be changed from the app.
+        dlg.spn_astro_gate.setValue(float(config.get("astrometry_snr_sigma",
+                                                     3.5)))
+        dlg.spn_astro_floor.setValue(float(config.get(
+            "astrometry_submit_snr", 10.0)))
+        dlg.spn_astro_sweep_pct.setValue(float(config.get(
+            "astrometry_sweep_pct", 5.0)))
+        dlg.spn_astro_steps.setValue(int(config.get(
+            "astrometry_sweep_steps", 25)))
+        dlg.spn_astro_margin.setValue(int(config.get(
+            "astrometry_cutout_margin_px", 64)))
+        dlg.chk_astro_check.setChecked(bool(config.get(
+            "astrometry_check_enabled", True)))
+        dlg.spn_astro_check_sigma.setValue(float(config.get(
+            "astrometry_check_sigma", 3.0)))
+        dlg.spn_astro_check_floor.setValue(float(config.get(
+            "astrometry_check_floor_arcsec", 1.0)))
+        dlg.spn_astro_check_window.setValue(int(config.get(
+            "astrometry_check_window_days", 30)))
+        dlg.spn_astro_threads.setValue(int(config.get(
+            "astrometry_threads", 0)))
         # plate solver (ADR-051): auto | astap | astrometry
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
@@ -1853,9 +2087,21 @@ class MainWindow(QMainWindow):
         dlg.edt_astap_path.setText(config.get("astap_path", ""))
         dlg.chk_solve_save.setChecked(
             bool(config.get("solve_save", True)))
+        dlg.chk_phot_matched.setChecked(
+            bool(config.get("phot_matched", True)))
         dlg.btn_astap_browse.clicked.connect(
             lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
+        # Find_Orb (astrometry plan, D31): the NON-interactive `fo` that
+        # checks our measurements against the published observations
+        dlg.edt_findorb_path.setText(config.get("findorb_path", ""))
+        dlg.btn_findorb_browse.clicked.connect(
+            lambda: self._pick_findorb(dlg))
+        dlg.btn_findorb_test.clicked.connect(lambda: self._test_findorb(dlg))
+        # the guided install (D31): the observer does not have to live in a
+        # terminal to get Find_Orb
+        dlg.btn_findorb_install.clicked.connect(
+            lambda: self._install_findorb(dlg))
         # EXOTIC orchestration (plan phase A): the external Python <=3.10
         # and its private environment
         dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))
@@ -1919,6 +2165,17 @@ class MainWindow(QMainWindow):
             bool(config.get("chart_data", True)))
         dlg.chk_chart_boxes.setChecked(
             bool(config.get("chart_boxes", False)))
+        # the object's marks in the editor (the crosshair, the run's measured
+        # cross and the circle with the name): whether that circle opens
+        # shown, and the colour of all three
+        dlg.chk_annot_visible.setChecked(
+            bool(config.get("annot_visible", False)))
+        dlg.cmb_mark_color.addItem(
+            self.tr("The object type's colour"), "kind")
+        dlg.cmb_mark_color.addItem(self.tr("One common colour"), "common")
+        _mark = dlg.cmb_mark_color.findData(
+            config.get("marker_color", "kind"))
+        dlg.cmb_mark_color.setCurrentIndex(_mark if _mark >= 0 else 0)
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
         dlg.spn_horizon_margin.setValue(
             float(config.get("horizon_margin_deg", 0)))
@@ -1943,8 +2200,6 @@ class MainWindow(QMainWindow):
         # ADR-044 rev (2026-09-24): icons-only top bar in the UFE
         dlg.chk_ufe_bar_icons.setChecked(
             bool(config.get("ufe_bar_icons", True)))
-        dlg.chk_ufe_default.setChecked(bool(config.get("ufe_default",
-                                                       True)))
         # Interfaz 1.4: motion is opt-out, never imposed. The Welcome sky
         # breathes and the view fades in only while this is on.
         dlg.chk_animations.setChecked(bool(config.get("ui_animations", True)))
@@ -1985,6 +2240,13 @@ class MainWindow(QMainWindow):
             lambda: self._projects_browse_into(dlg))
         dlg.btn_projects_reset.clicked.connect(
             lambda: dlg.edt_projects_root.setText(""))
+        # the master library (ADR-061): the editor's Calibration tab
+        # resolves a recipe against it and names the master it uses, so
+        # the place that fills the library belongs in Settings. The
+        # pseudo-flat policy lives WITH the recipe, in that tab: it used to
+        # be duplicated here, and the copy that the stack read was not the
+        # one the observer saw.
+        self._settings_masters_init(dlg)
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
@@ -2001,9 +2263,25 @@ class MainWindow(QMainWindow):
         config.set("min_alt", dlg.spn_min_alt.value())
         config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
+        config.set("astrometry_snr_sigma", dlg.spn_astro_gate.value())
+        config.set("astrometry_submit_snr", dlg.spn_astro_floor.value())
+        config.set("astrometry_sweep_pct", dlg.spn_astro_sweep_pct.value())
+        config.set("astrometry_sweep_steps", dlg.spn_astro_steps.value())
+        config.set("astrometry_cutout_margin_px", dlg.spn_astro_margin.value())
+        config.set("astrometry_check_enabled",
+                   dlg.chk_astro_check.isChecked())
+        config.set("astrometry_check_sigma",
+                   dlg.spn_astro_check_sigma.value())
+        config.set("astrometry_check_floor_arcsec",
+                   dlg.spn_astro_check_floor.value())
+        config.set("astrometry_check_window_days",
+                   dlg.spn_astro_check_window.value())
+        config.set("astrometry_threads", dlg.spn_astro_threads.value())
         config.set("solver", dlg.cmb_solver.currentData() or "auto")
         config.set("astap_path", dlg.edt_astap_path.text().strip())
+        config.set("findorb_path", dlg.edt_findorb_path.text().strip())
         config.set("solve_save", dlg.chk_solve_save.isChecked())
+        config.set("phot_matched", dlg.chk_phot_matched.isChecked())
         config.set("exotic_python_path",
                    dlg.edt_exotic_python.text().strip())
         config.set("exotic_install_dir",
@@ -2035,6 +2313,9 @@ class MainWindow(QMainWindow):
                    dlg.cmb_marker_style.currentData() or "ring")
         config.set("chart_data", dlg.chk_chart_data.isChecked())
         config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
+        config.set("annot_visible", dlg.chk_annot_visible.isChecked())
+        config.set("marker_color",
+                   dlg.cmb_mark_color.currentData() or "kind")
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
@@ -2054,8 +2335,8 @@ class MainWindow(QMainWindow):
         config.set("ui_animations", dlg.chk_animations.isChecked())
         if self._welcome is not None:
             self._welcome.refresh_animations()
-        # Development tab (ADR-044): which UI the FITS work opens in
-        config.set("ufe_default", dlg.chk_ufe_default.isChecked())
+        # Development tab (ADR-044): the UFE's top bar, the only switch left
+        # there since the classic dialogs retired (2026-10-07)
         config.set("ufe_bar_icons", dlg.chk_ufe_bar_icons.isChecked())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
@@ -2103,6 +2384,170 @@ class MainWindow(QMainWindow):
                 8000)
         else:
             self.statusBar().showMessage(self.tr("Settings saved"), 6000)
+
+    # ---------------- the master library (ADR-061) ----------------
+
+    def _settings_masters_init(self, dlg):
+        # The library of calibration masters lives in Settings. The
+        # editor's Calibration tab resolves a recipe against it and says
+        # which master each piece uses; before this, nothing in the GUI
+        # could put a master IN, so that tab could only ever report what
+        # was missing.
+        # @args: dlg - the settings dialog
+        # @return: None
+        from ..core import calibration
+        for kind in calibration.KINDS:
+            dlg.cmb_master_kind.addItem(self._master_kind_label(kind), kind)
+        dlg.btn_master_add.clicked.connect(
+            lambda: self._settings_master_add(dlg))
+        dlg.btn_master_remove.clicked.connect(
+            lambda: self._settings_master_remove(dlg))
+        dlg.tbl_masters.itemSelectionChanged.connect(
+            lambda: self._settings_masters_sync(dlg))
+        self._settings_masters_refresh(dlg)
+
+    def _master_kind_label(self, kind):
+        # @args: kind - one of core.calibration.KINDS
+        # @return: its name in the observer's language. The four kinds are
+        #          not synonyms: they are four different arithmetics, and
+        #          the help label above the table says what each one is.
+        return {"bias": self.tr("Bias"),
+                "dark": self.tr("Dark"),
+                "dark_flat": self.tr("Dark of the flats"),
+                "flat": self.tr("Flat")}.get(kind, kind)
+
+    def _settings_masters_refresh(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The table is filled from the database, newest
+        #          first, and the Remove button follows the selection: a
+        #          button that can act on nothing is a trap (U5).
+        from pathlib import Path
+        from ..core import calibration
+        masters = calibration.list_masters(db)
+        tbl = dlg.tbl_masters
+        tbl.setRowCount(len(masters))
+        for row, m in enumerate(masters):
+            cells = [Path(m.path).name, self._master_kind_label(m.kind),
+                     m.camera or "", _master_num(m.gain),
+                     _master_num(m.temp_c), _master_num(m.exptime_s),
+                     m.filter or "", (m.created or "")[:10]]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    # the file name is what fits; the whole path (and the
+                    # row's id, for the Remove button) travel with it
+                    item.setToolTip(m.path)
+                    item.setData(Qt.UserRole, m.id)
+                tbl.setItem(row, col, item)
+        self._settings_masters_sync(dlg)
+
+    def _settings_masters_sync(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None
+        selected = bool(dlg.tbl_masters.selectionModel().selectedRows())
+        dlg.btn_master_remove.setEnabled(selected)
+
+    def _settings_master_selected_id(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: the id of the selected master, or None
+        rows = dlg.tbl_masters.selectionModel().selectedRows()
+        if not rows:
+            return None
+        item = dlg.tbl_masters.item(rows[0].row(), 0)
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _masters_index_files(self, kind, files):
+        # @args: kind - one of core.calibration.KINDS, files - the FITS paths
+        # @return: (added, repeated, failed) with failed = [(name, why)].
+        # One home for the indexing, shared by the Settings dialog and the
+        # editor's Calibration tab (ADR-061 rev): a master is INDEXED, never
+        # copied or moved, and what makes it valid is read from its own
+        # header.
+        from pathlib import Path
+        from ..core import calibration
+        known = {m.path for m in calibration.list_masters(db, kind=kind)}
+        added, repeated, failed = 0, 0, []
+        for path in files:
+            if str(path) in known:
+                repeated += 1
+                continue
+            try:
+                calibration.add_master(db, path, {"kind": kind})
+                added += 1
+            except Exception as err:
+                # one unreadable file must not lose the rest of the batch
+                failed.append((Path(path).name, str(err)))
+        return added, repeated, failed
+
+    def _masters_add_words(self, kind, added, repeated, failed):
+        # @args: kind - the kind indexed, added/repeated - counts, failed -
+        #        [(name, why)]
+        # @return: the result in words, for the label that asked for it
+        bits = [self.tr("Indexed %1 masters (%2).").replace(
+            "%1", str(added)).replace("%2", self._master_kind_label(kind))
+            if added else self.tr("Nothing new to index.")]
+        if repeated:
+            bits.append(self.tr("%1 were already in the library.").replace(
+                "%1", str(repeated)))
+        for name, why in failed[:3]:
+            bits.append(f"✕ {name}: {why}")
+        return "  ".join(bits)
+
+    def _ufe_add_masters(self, kind):
+        # ADR-061 rev: the editor's Calibration tab fills the library from
+        # where the recipe is read. The tab never touches the database: this
+        # opens the dialog and answers with words.
+        # @args: kind - one of core.calibration.KINDS
+        # @return: what happened, in words ("" when nothing was chosen)
+        files, _sel = QFileDialog.getOpenFileNames(
+            self, self.tr("Add masters"), "",
+            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
+        if not files:
+            return ""
+        added, repeated, failed = self._masters_index_files(kind, files)
+        return self._masters_add_words(kind, added, repeated, failed)
+
+    def _settings_master_add(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The files are INDEXED, never copied or moved: a
+        #          master can be big and the library only needs to know
+        #          where it is and what makes it valid (camera, gain,
+        #          temperature, exposure, filter). Any of those the file's
+        #          own header carries is read from it.
+        from ..core import calibration
+        files, _sel = QFileDialog.getOpenFileNames(
+            dlg, self.tr("Add masters"), "",
+            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
+        if not files:
+            return
+        kind = dlg.cmb_master_kind.currentData() or "dark"
+        added, repeated, failed = self._masters_index_files(kind, files)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self._masters_add_words(kind, added, repeated, failed))
+
+    def _settings_master_remove(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. Only the INDEX entry goes: the file on disk is
+        #          the observer's own data and is never deleted from here.
+        from pathlib import Path
+        from ..core import calibration
+        mid = self._settings_master_selected_id(dlg)
+        if mid is None:
+            return
+        master = next((m for m in calibration.list_masters(db)
+                       if m.id == mid), None)
+        name = Path(master.path).name if master is not None else ""
+        if QMessageBox.question(
+                dlg, self.tr("Remove from the library"),
+                self.tr("Take %1 out of the master library? The file on "
+                        "disk is not touched.").replace("%1", name)
+        ) != QMessageBox.Yes:
+            return
+        calibration.delete_master(db, mid, delete_file=False)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self.tr("Removed %1 from the library.").replace("%1", name))
 
     def _horizon_browse_into(self, dlg):
         # @args: dlg - the settings dialog; fills its file field with a
@@ -3428,9 +3873,9 @@ class MainWindow(QMainWindow):
             w.lbl_cmeta.setText("—")
             w.lbl_cgoal.setText(self.tr(
                 "A campaign groups the projects of one shared observation "
-                "effort — several nights, several observatories, one goal "
-                "(e.g. “T CrB 2026 eruption”). A project is one object "
-                "with its three steps: capture, track, follow-up."))
+                "effort: several nights, several observatories, one goal. "
+                "A project is one object with its three steps: capture, "
+                "track, follow-up."))
             w.lbl_urls.setText("")
             w.lbl_protocol.setText("—")
             tbl.setRowCount(0)
@@ -3764,6 +4209,7 @@ class MainWindow(QMainWindow):
         from ..core import kinds as _kinds
         detail_text = _kinds.context_line(kind, p.get("context") or {})
         return {
+            "kind": kind,
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
             "campaign_name": camp_names.get(p.get("campaign_id")),
@@ -4369,7 +4815,6 @@ class MainWindow(QMainWindow):
             self._step_done(self._next_step_key)
 
 
-
     def _scroll_to_section(self, key):
         # Deep link (Next card Go, dashboard, the ⋯ menu, cadence
         # chips, double-click): land on the part of the project the
@@ -4647,7 +5092,8 @@ class MainWindow(QMainWindow):
         if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
             from ..core import exposure
             scale = exposure.plate_scale(config.get("pixel_um"),
-                                          config.get("focal_mm"))
+                                          config.get("focal_mm"),
+                                          config.get("pixel_binning"))
             t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
             if t_max:
                 body.addWidget(QLabel(
@@ -5466,6 +5912,11 @@ class MainWindow(QMainWindow):
             # editor's series block for this visit (D8/D36)
             measure_series=lambda sid:
                 self._visit_measure_series(pid, sid),
+            # ADR-062, phase 7: the visit's "Astrometry" opens the editor's
+            # Track & Stack tab for this visit (D15); it is the entry point
+            # the observer looks for, next to the series one.
+            astrometry=lambda sid:
+                self._visit_astrometry(pid, sid),
             # quality plan (C): the period search works on the project's
             # curve, from the visit window where the observer already is
             phase=lambda pid_: self._open_phase_dialog(pid_),
@@ -5511,6 +5962,10 @@ class MainWindow(QMainWindow):
         pair.setStretch(1, 11)
         layout.addLayout(pair, 1)
         self._analysis_ribbon_refresh(p)
+        # ADR-062 (D): the astrometry runs of a moving object, where the
+        # observer reads them back without opening the editor
+        if kind in ("neo", "pccp", "comet"):
+            self._analysis_astrometry_block(layout, p, pid)
         if kind == "transit":
             self._analysis_transit_block(layout, pid)
         elif kind == "hads":
@@ -5522,6 +5977,243 @@ class MainWindow(QMainWindow):
         if kind in FOLLOWUP_KINDS:
             self._fu_science_blocks(layout, p, ctx, pid)
         layout.addStretch()
+
+    # ---------------- the astrometry runs of the project (ADR-062) ------
+
+    def _analysis_astrometry_block(self, layout, p, pid):
+        # The astrometry runs, listed in the Analysis tab. The numbers
+        # already live in astrometry_runs/points (phase 8); what was
+        # missing was a place to READ them without opening the editor, and
+        # to undo one execution without hunting for the right visit.
+        # @args: layout - the Analysis section content, p - project dict,
+        #        pid - project id
+        # @return: None
+        from .widgets.collapsible_section import CollapsibleSection
+        sec = CollapsibleSection(self.tr("Astrometry runs"))
+        inner = QWidget()
+        v = QVBoxLayout(inner)
+        v.setContentsMargins(12, 0, 0, 0)
+        sec.setContentWidget(inner)
+        layout.addWidget(sec)
+        hint = QLabel(self.tr(
+            "Each run is one pass of the track & stack: the positions it "
+            "measured, the motion it resolved and the brightness it read. "
+            "The magnitude says WHO wrote it: the run itself (automatic) or "
+            "a measurement you made by hand in the Photometry tab and sent "
+            "to the report. The MPC report is drafted in the editor."))
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        tbl = QTableWidget(0, 6)
+        tbl.setHorizontalHeaderLabels([
+            self.tr("Date"), self.tr("Observations"), self.tr("Motion"),
+            self.tr("Magnitude"), self.tr("Check"), self.tr("State")])
+        tbl.verticalHeader().setVisible(False)
+        tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        # each column fits what it says ("17.98 G (by hand)" is the longest
+        # magnitude) and the last one takes the slack
+        header = tbl.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setStretchLastSection(True)
+        # a project with many nights must not push the curve off the page
+        tbl.setMaximumHeight(160)
+        tbl.itemSelectionChanged.connect(
+            lambda: self._analysis_astrometry_sync(tbl))
+        v.addWidget(tbl)
+        row = QHBoxLayout()
+        btn_open = QPushButton(self.tr("Open in the editor"))
+        btn_open.setToolTip(self.tr(
+            "Open the visit's frames in the editor with the track & stack "
+            "tab on stage, to re-measure or to draft the report"))
+        btn_open.clicked.connect(lambda: self._analysis_astrometry_open(tbl))
+        row.addWidget(btn_open)
+        btn_undo = QPushButton(self.tr("Undo this run"))
+        btn_undo.setToolTip(self.tr(
+            "Undo the execution whole: its positions and its frame manifest "
+            "go, and the run stays marked as undone for the audit"))
+        btn_undo.clicked.connect(lambda: self._analysis_astrometry_undo(tbl))
+        row.addWidget(btn_undo)
+        row.addStretch()
+        v.addLayout(row)
+        note = QLabel("")
+        note.setWordWrap(True)
+        v.addWidget(note)
+        w = self._project_widgets
+        w["astrometry_runs_sec"] = sec
+        w["astrometry_runs_tbl"] = tbl
+        w["astrometry_runs_btn_open"] = btn_open
+        w["astrometry_runs_btn_undo"] = btn_undo
+        w["astrometry_runs_note"] = note
+        self._analysis_astrometry_refresh(pid)
+
+    def _analysis_astrometry_refresh(self, pid):
+        # @args: pid - project id
+        # @return: None. The whole section hides itself when the project has
+        #          no run: an empty list of runs says nothing, and a folded
+        #          block with nothing inside is noise (ADR-038).
+        w = self._project_widgets
+        tbl = w.get("astrometry_runs_tbl")
+        if tbl is None:
+            return
+        from ..core import astrometry_store as store
+        runs = store.list_runs(db, pid) if pid is not None else []
+        sec = w.get("astrometry_runs_sec")
+        if sec is not None:
+            sec.setVisible(bool(runs))
+        tbl.setRowCount(len(runs))
+        # newest first: the run you just made is the one you are looking at
+        for row, run in enumerate(reversed(runs)):
+            points = store.points_for_run(db, run["id"])
+            # the STACK is the object's own measurement (the per-frame one
+            # is the other half of the double check): its magnitude and its
+            # check are what the report carries
+            stack = next((q for q in points
+                          if q.get("source") == "stack"), None)
+            cells = [self._astrometry_when(run),
+                     str(run.get("n_obs") or run.get("points") or 0),
+                     self._astrometry_motion(run),
+                     self._astrometry_magnitude(stack),
+                     self._astrometry_check(stack),
+                     self._astrometry_state(run)]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    item.setData(Qt.UserRole, run["id"])
+                    item.setToolTip(self.tr(
+                        "Run %1 of %2").replace(
+                            "%1", str(run["id"])).replace(
+                            "%2", run.get("object_name") or ""))
+                if col == 4 and stack is not None and stack.get("check_note"):
+                    # the check's own words, not a paraphrase of them
+                    item.setToolTip(str(stack["check_note"]))
+                tbl.setItem(row, col, item)
+        self._analysis_astrometry_sync(tbl)
+
+    def _astrometry_when(self, run):
+        # @args: run - a run dict
+        # @return: the run's timestamp, "YYYY-MM-DD HH:MM". `created` holds
+        #          epoch seconds and SQLite's TEXT affinity hands them back
+        #          as a string, so the number is PARSED: slicing it would
+        #          print "1791221326.12345" in the Date column.
+        raw = run.get("created")
+        try:
+            stamp = float(raw)
+        except (TypeError, ValueError):
+            return str(raw or "")
+        return datetime.datetime.fromtimestamp(stamp).strftime(
+            "%Y-%m-%d %H:%M")
+
+    def _astrometry_motion(self, run):
+        # @args: run - a run dict
+        # @return: the motion the run resolved, or a dash when it did not
+        rate = run.get("rate_arcsec_min")
+        if not rate:
+            return "—"
+        text = f"{rate:.2f}″/min"
+        if run.get("pa_deg") is not None:
+            text += f" · PA {run['pa_deg']:.0f}°"
+        return text
+
+    def _astrometry_magnitude(self, stack):
+        # @args: stack - the run's stack point, or None
+        # @return: the brightness AND who wrote it. The observer must never
+        #          read a magnitude without knowing whether the machine
+        #          measured it or they did (D).
+        if stack is None or stack.get("mag") is None:
+            return "—"
+        who = (self.tr("by hand") if stack.get("mag_source") == "manual"
+               else self.tr("automatic"))
+        band = stack.get("band") or ""
+        return f"{stack['mag']:.2f} {band} ({who})".strip()
+
+    def _astrometry_check(self, stack):
+        # @args: stack - the run's stack point, or None
+        # @return: the check against the other observers, in words
+        if stack is None or stack.get("check_ok") is None:
+            return self.tr("not checked")
+        return (self.tr("in order") if stack.get("check_ok")
+                else self.tr("see the note"))
+
+    def _astrometry_state(self, run):
+        # @args: run - a run dict
+        # @return: what became of the execution, in words
+        return {"complete": self.tr("complete"),
+                "not_detected": self.tr("not detected"),
+                "incomplete": self.tr("incomplete"),
+                "undone": self.tr("undone")}.get(
+                    run.get("status"), run.get("status") or "")
+
+    def _analysis_astrometry_sync(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None. Both buttons act on a selected run, so they follow
+        #          the selection: a button that can act on nothing is a trap
+        #          (U5).
+        has = bool(tbl.selectionModel().selectedRows())
+        for key in ("astrometry_runs_btn_open", "astrometry_runs_btn_undo"):
+            btn = self._project_widgets.get(key)
+            if btn is not None:
+                btn.setEnabled(has)
+
+    def _analysis_astrometry_selected(self, tbl):
+        # @args: tbl - the runs table
+        # @return: the selected run id, or None
+        rows = tbl.selectionModel().selectedRows()
+        if not rows:
+            return None
+        item = tbl.item(rows[0].row(), 0)
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _analysis_astrometry_run(self, run_id):
+        # @args: run_id - the execution
+        # @return: its run dict, or None
+        from ..core import astrometry_store as store
+        pid = (self._current_project or {}).get("id")
+        if pid is None:
+            return None
+        return next((r for r in store.list_runs(db, pid)
+                     if r["id"] == run_id), None)
+
+    def _analysis_astrometry_open(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None. The editor opens on the run's OWN visit: a run
+        #          belongs to one night, and that night is where its frames
+        #          are.
+        run = self._analysis_astrometry_run(
+            self._analysis_astrometry_selected(tbl))
+        if run is None:
+            return
+        if run.get("session_id") is None:
+            self.statusBar().showMessage(self.tr(
+                "This run has no visit behind it: open the editor from the "
+                "visit whose frames you want to re-measure."), 8000)
+            return
+        # The run the observer PICKED is the one the editor must show, not
+        # the visit's newest (a visit holds many passes)
+        self._visit_astrometry(run["project_id"], run["session_id"],
+                               run_id=run["id"])
+
+    def _analysis_astrometry_undo(self, tbl):
+        # @args: tbl - the runs table
+        # @return: None
+        run = self._analysis_astrometry_run(
+            self._analysis_astrometry_selected(tbl))
+        if run is None:
+            return
+        if QMessageBox.question(
+                self, self.tr("Undo this run"),
+                self.tr("Undo run %1 whole? Its positions and its frame "
+                        "manifest go; the run stays marked as undone for "
+                        "the audit.").replace("%1", str(run["id"]))
+        ) != QMessageBox.Yes:
+            return
+        removed = self._ufe_astrometry_undo(run["id"])
+        self._analysis_astrometry_refresh(run["project_id"])
+        note = self._project_widgets.get("astrometry_runs_note")
+        if note is not None:
+            note.setText(self.tr(
+                "Run %1 undone: %2 positions removed.").replace(
+                    "%1", str(run["id"])).replace("%2", str(removed or 0)))
 
     def _selected_visit_id(self):
         # @return: the visits panel's selected visit id, or None
@@ -5872,7 +6564,19 @@ class MainWindow(QMainWindow):
         if meta.get("ufe"):
             dlg.apply_plate_state(meta["ufe"])
         p = project.get(db, pid) or {}
-        dlg.load_saved_sequence((p.get("context") or {}).get("sequence"))
+        ctx = p.get("context") or {}
+        dlg.load_saved_sequence(ctx.get("sequence"))
+        # the object's magnitude, from the project (the planner put it
+        # there, or the astrometry measured it): the Compare tab's proposal
+        # anchors on it, and without this it showed a default nobody chose.
+        # A host double from before the magnitude existed simply has no
+        # setter, and that is not an error.
+        setter = getattr(dlg, "set_target_magnitude", None)
+        if callable(setter):
+            # with its origin: "measured" after a run, "predicted" from the
+            # planner, "manual" if the observer set it. The field says which,
+            # because the proposal anchors the comparison stars on this figure
+            setter(ctx.get("mag"), ctx.get("mag_origin"))
 
     def _ufe_sequence_hook(self, pid, state):
         # The editor's sequence changed by the observer: keep it in the
@@ -5886,8 +6590,14 @@ class MainWindow(QMainWindow):
             "fov_arcmin": state.get("fov_arcmin"),
             "target_mag": state.get("target_mag"),
             "entries": entries}}
-        if state.get("target_mag") is not None:
+        if state.get("target_mag"):
+            # only a magnitude somebody chose becomes the project's: the
+            # sentinel ("no data") is falsy on purpose, so a widget default
+            # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
+            # the observer's own figure (the Compare tab's field): neither a
+            # prediction nor a measurement of ours
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
 
     def _visit_open_in_editor(self, pid, path, sid):
@@ -5895,11 +6605,6 @@ class MainWindow(QMainWindow):
         # object context, and both hooks land on THIS visit (ADR-045:
         # nothing attaches without one).
         # @args: pid - project id, path - the FITS to open, sid - visit id
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to measure from the editor"), 8000)
-            return
         p = project.get(db, pid)
         if not p:
             return
@@ -5944,11 +6649,6 @@ class MainWindow(QMainWindow):
         # editor opens on the visit's first plate (the reference WCS) with
         # the series block armed; a visit with no FITS says so.
         # @args: pid - project id, session_id - the visit
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to measure from the editor"), 8000)
-            return
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
@@ -5967,6 +6667,39 @@ class MainWindow(QMainWindow):
         # ADR-048 follow-up: the series/EXOTIC flow starts from the
         # sequence already built (plate state first, project second)
         self._load_editor_sequence(dlg, pid, paths[0])
+
+    def _visit_astrometry(self, pid, session_id, run_id=None):
+        # ADR-062, phase 7 (D15): the visit's frames become a track & stack
+        # run. The editor opens on the visit's first plate with the visit
+        # armed (the astrometry hook), and the Track & Stack tab on stage.
+        # @args: pid - project id, session_id - the visit, run_id - the
+        #        execution the editor must SHOW (the one picked in the
+        #        Analysis tab's list), or None for the newest (the visit's
+        #        own button, whose meaning is "the last pass of this night")
+        # A visit accumulates several passes, and the tab restores the LAST
+        # one unless it is told otherwise: without this, opening the
+        # 2-observation run of a visit whose last pass was 1 observation
+        # showed 1 (reported 2026-10-07).
+        self._astrometry_run_pref = (
+            (pid, session_id, int(run_id)) if run_id is not None else None)
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("This visit has no FITS frames to stack."), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
+                             session_id=session_id)
+        dlg.open_plate(paths[0])
+        dlg.set_object(obj)
+        show = getattr(dlg, "show_tab", None)
+        if callable(show):
+            show("trackstack")
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -5993,11 +6726,6 @@ class MainWindow(QMainWindow):
                         "image anymore."), 8000)
             return
         pid = row["project_id"]
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to open this plate"), 8000)
-            return
         p = project.get(db, pid)
         if not p:
             return
@@ -6033,6 +6761,10 @@ class MainWindow(QMainWindow):
         if chart is not None:
             # the curve follows the visit and the scope the observer chose
             self._fu_curve_refresh(pid)
+        if w.get("astrometry_runs_tbl") is not None:
+            # a visit changed: the runs list is the observer's own record of
+            # what they measured and it is never stale
+            self._analysis_astrometry_refresh(pid)
         camp = w.get("fu_campaign_text")
         if camp is not None:
             camp.setText(self._fu_campaign_text(p, pid))
@@ -6648,7 +7380,7 @@ class MainWindow(QMainWindow):
                 if float(ctx["mag"]) <= 10.0:
                     lbl_sat = QLabel(self.tr(
                         "⚠ Bright star: watch the saturation — a slight "
-                        "defocus helps (T CrB lesson)"))
+                        "defocus helps"))
                     lbl_sat.setWordWrap(True)
                     lbl_sat.setStyleSheet("color: #e0c060;")
                     gl.addWidget(lbl_sat)
@@ -6725,8 +7457,14 @@ class MainWindow(QMainWindow):
             "fov_arcmin": state.get("fov_arcmin"),
             "target_mag": state.get("target_mag"),
             "entries": state.get("entries") or []}}
-        if state.get("target_mag") is not None:
+        if state.get("target_mag"):
+            # only a magnitude somebody chose becomes the project's: the
+            # sentinel ("no data") is falsy on purpose, so a widget default
+            # can never be written here as if it were data
             ctx_update["mag"] = state["target_mag"]
+            # the observer's own figure (the Compare tab's field): neither a
+            # prediction nor a measurement of ours
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
 
     def _exotic_write(self, pid, e):
@@ -7675,11 +8413,12 @@ class MainWindow(QMainWindow):
                 self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
 
     def _fu_export_annotated(self, pid):
-        # B10: open the preview dialog; the observer picks which of the
-        # registered stacked FITS to annotate (several visits => several
-        # plates), checks the marker, overlays and stretch, and only then
-        # confirms: a copy is written with the SN marked (AIJ ANNOTATE
-        # card) at that moment.
+        # B10: the annotated FITS opens in the unified editor; the observer
+        # picks which of the registered stacked FITS to annotate (several
+        # visits => several plates), checks the marker, overlays and stretch,
+        # and only then confirms: a copy is written with the SN marked (AIJ
+        # ANNOTATE card) at that moment. The editor's Annotate tab is the only
+        # door since the classic dialog retired (2026-10-07).
         from ..core import followup as fu
         p = project.get(db, pid)
         if not p:
@@ -7698,52 +8437,17 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("No stacked images registered"), 5000)
             return
-        ctx = p.get("context") or {}
-        sn_ra = ctx.get("ra_deg")
-        sn_dec = ctx.get("dec_deg")
-        if self._use_ufe():
-            # ADR-044: the annotated FITS inside the editor; the whole
-            # object attaches (marker on its sky position), the other
-            # visits queue as extra plates, and written copies register
-            # like the legacy dialog's did
-            obj = self._ufe_object_from_project(p)
-            dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
-            if not dlg.open_plate(images[-1]["fits_path"]):
-                return
-            dlg.set_object(obj)          # re-apply on the fresh plate
-            dlg.tab_annotate.prefill(
-                notes=self.tr("SN follow-up"),
-                extra_paths=[im["fits_path"] for im in images[:-1]])
+        # the whole object attaches (marker on its sky position), the other
+        # visits queue as extra plates, and written copies register through
+        # the editor's save hook
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
+        if not dlg.open_plate(images[-1]["fits_path"]):
             return
-        # Preview first: the observer chooses the plate, checks the marker,
-        # the overlays and the stretch. The dialog resolves the WCS from
-        # the chosen frame's header (each visit may carry the SN on a
-        # different plate) and writes the copy only on confirm.
-        from .sn_annotate_dialog import SnAnnotateDialog
-        try:
-            dlg = SnAnnotateDialog(
-                self, images, p, p["object_name"],
-                ra_deg=sn_ra, dec_deg=sn_dec,
-                default_notes=self.tr("SN follow-up"))
-        except Exception as err:
-            self.statusBar().showMessage(
-                self.tr("Could not open the FITS for annotation: %1")
-                .replace("%1", str(err)), 8000)
-            return
-        dlg.saved.connect(lambda path: self._fu_annotated_saved(pid, path))
-        dlg.exec()
-
-    def _fu_annotated_saved(self, pid, path):
-        # @args: pid - project id, path - annotated copy just written
-        try:
-            project.add_file(db, pid, path, "fits")
-            self._populate_project_files(pid)
-        except Exception as err:
-            logger.warning("annotated FITS saved but not registered: %s",
-                           err)
-        self.statusBar().showMessage(
-            self.tr("Annotated FITS written to %1")
-            .replace("%1", str(path)), 8000)
+        dlg.set_object(obj)              # re-apply on the fresh plate
+        dlg.tab_annotate.prefill(
+            notes=self.tr("SN follow-up"),
+            extra_paths=[im["fits_path"] for im in images[:-1]])
 
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
@@ -7887,204 +8591,12 @@ class MainWindow(QMainWindow):
         self._load_editor_sequence(dlg, pid, fits_path)
 
     def _fu_sequence_dialog(self, pid):
-        if self._use_ufe():
-            self._fu_sequence_via_ufe(pid)
-            return
-        # Options dialog + launch of the comparison chart (ADR-042). The
-        # heavy work (VizieR, image, render) runs in a SequenceWorker: the
-        # GUI never blocks.
-        p = project.get(db, pid)
-        if not p:
-            return
-        ctx = p.get("context") or {}
-        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
-        if ra is None or dec is None:
-            self.statusBar().showMessage(self.tr(
-                "This project has no coordinates: cannot build the chart"),
-                8000)
-            return
-        camp = None
-        if p.get("campaign_id"):
-            from ..core import campaign as _camp
-            camp = _camp.get(db, p["campaign_id"])
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Comparison chart"))
-        form = QFormLayout(dlg)
-        intro = QLabel(self.tr(
-            "«With what do I compare?» Choose the catalog and NightScribe "
-            "proposes the reference stars over the field image: brighter "
-            "than the target, of similar colour when known, and never a "
-            "known variable."))
-        intro.setWordWrap(True)
-        form.addRow(intro)
-        cmb_cat = QComboBox()
-        cmb_cat.addItem("Gaia EDR3 (G)", "gaia")
-        cmb_cat.addItem("APASS DR9 (V)", "apass")
-        form.addRow(self.tr("Catalog:"), cmb_cat)
-        spn_fov = QSpinBox()
-        spn_fov.setRange(3, 60)
-        spn_fov.setValue(18)
-        spn_fov.setSuffix(" \u2032")
-        form.addRow(self.tr("Field of view:"), spn_fov)
-        spn_comps = QSpinBox()
-        spn_comps.setRange(2, 15)
-        spn_comps.setValue(8)
-        form.addRow(self.tr("Comparison stars:"), spn_comps)
-        mag0 = ctx.get("mag")
-        if mag0 is None:
-            mag0 = (ctx.get("variable") or {}).get("max")
-        spn_mag = QDoubleSpinBox()
-        spn_mag.setRange(-2.0, 25.0)
-        spn_mag.setDecimals(2)
-        spn_mag.setValue(float(mag0) if mag0 is not None else 12.0)
-        spn_mag.setToolTip(self.tr(
-            "Used to propose brighter comparisons; the current best "
-            "estimate comes pre-filled"))
-        form.addRow(self.tr("Target magnitude:"), spn_mag)
-        fits_row = QHBoxLayout()
-        ed_fits = QLineEdit()
-        ed_fits.setPlaceholderText(self.tr(
-            "Optional: your stacked FITS as the background"))
-        fits_row.addWidget(ed_fits)
-
-        def _browse():
-            path, _ = QFileDialog.getOpenFileName(
-                dlg, self.tr("Your FITS image"), "",
-                "FITS (*.fits *.fit *.fts);;" + self.tr("All files (*)"))
-            if path:
-                ed_fits.setText(path)
-
-        btn_browse = QPushButton(self.tr("Browse…"))
-        btn_browse.clicked.connect(_browse)
-        fits_row.addWidget(btn_browse)
-        form.addRow(self.tr("Background:"), fits_row)
-        lbl_fits_hint = QLabel(self.tr(
-            "If your FITS has no astrometry we solve it with "
-            "Astrometry.net (your file is never modified); without it, "
-            "the background is the DSS2 survey image"))
-        lbl_fits_hint.setWordWrap(True)
-        lbl_fits_hint.setStyleSheet("color: #8a90a6; font-size: 12px;")
-        form.addRow(lbl_fits_hint)
-        chk_camp = None
-        if camp is not None:
-            chk_camp = QCheckBox(self.tr(
-                "Also save the sequence to the campaign protocol"))
-            chk_camp.setChecked(True)
-            form.addRow(chk_camp)
-        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        box.button(QDialogButtonBox.Ok).setText(self.tr("Generate"))
-        box.accepted.connect(dlg.accept)
-        box.rejected.connect(dlg.reject)
-        form.addRow(box)
-        if dlg.exec() != QDialog.Accepted:
-            return
-
-        from .workers import SequenceWorker
-        fits_path = ed_fits.text().strip()
-        w = SequenceWorker(p["object_name"], ra, dec,
-                           cmb_cat.currentData(), float(spn_fov.value()),
-                           spn_comps.value(), spn_mag.value(),
-                           Path(fits_path) if fits_path else None,
-                           self._lang())
-        # The build takes seconds (VizieR + image download): a modal busy
-        # dialog says so plainly — the status bar alone reads as "nothing
-        # is happening". No Cancel: a download cannot be aborted halfway,
-        # so the dialog never promises what it cannot keep.
-        wait = QProgressDialog(
-            self.tr("Building the comparison chart…"), "", 0, 0, self)
-        wait.setWindowTitle(self.tr("Comparison chart"))
-        wait.setWindowModality(Qt.WindowModal)
-        wait.setCancelButton(None)
-        wait.setMinimumDuration(0)
-        w.progress.connect(wait.setLabelText)
-        w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
-        save_camp = chk_camp is not None and chk_camp.isChecked()
-        w.finished.connect(
-            lambda out: self._fu_sequence_landed(wait, pid, out, save_camp))
-        self._keep(w)
-        self.statusBar().showMessage(
-            self.tr("Building the comparison chart…"), 0)
-        w.start()
-
-    def _fu_sequence_landed(self, wait, pid, out, save_campaign):
-        # The SequenceWorker finished: the wait dialog is closed and reaped
-        # BEFORE anything else runs — the picker's exec() spins a nested
-        # loop, so any pending dialog would otherwise linger on top of it.
-        # close()+deleteLater(): the reap discipline of e31f394.
-        # @args: wait - the busy QProgressDialog, pid - project id,
-        #        out - worker payload, save_campaign - protocol flag
-        wait.close()
-        wait.deleteLater()
-        self._fu_sequence_done(pid, out, save_campaign)
-
-    def _fu_sequence_done(self, pid, out, save_campaign):
-        # Lands the SequenceWorker result: warnings on the status bar and
-        # the interactive picker dialog (ADR-042 phase 4); files/context
-        # are only written when the user saves from the dialog.
-        self.statusBar().clearMessage()
-        if out.get("status") != "ok":
-            self.statusBar().showMessage(
-                out.get("error") or self.tr("Could not build the chart"),
-                10000)
-            return
-        p = project.get(db, pid)
-        if not p:
-            return
-        notes = []
-        if out.get("vsx_warning"):
-            notes.append(self.tr(
-                "VSX did not answer: field variables are not flagged"))
-        if out.get("fits_error"):
-            notes.append(out["fits_error"])
-        if out.get("target_outside"):
-            notes.append(self.tr(
-                "the target falls outside your image: DSS2 used instead"))
-        if notes:
-            self.statusBar().showMessage(". ".join(notes), 10000)
-        from .seqchart_dialog import SeqChartDialog
-        dlg = SeqChartDialog(
-            self, p["object_name"], out["field"], out["entries"],
-            image=out.get("image"), wcs=out.get("wcs"),
-            img_label=out.get("img_label", ""), lang=self._lang(),
-            default_dir=project.storage_dir(p),
-            on_save=lambda entries, files: self._fu_sequence_save(
-                pid, entries, files, out, save_campaign))
-        dlg.exec()
-
-    def _fu_sequence_save(self, pid, entries, files, out, save_campaign):
-        # Persists the sequence the user confirmed in the picker dialog:
-        # files registered, sequence into the project context (and the
-        # campaign protocol when asked), status line refreshed.
-        # @args: pid - project id, entries - sequence entries, files -
-        #        {"csv", "png"} written by the dialog, out - the worker
-        #        payload (catalog metadata), save_campaign - protocol flag
-        p = project.get(db, pid)
-        if not p:
-            return
-        project.add_file(db, pid, files["csv"], "report")
-        project.add_file(db, pid, files["png"], "chart")
-        project.update_context(db, pid, {"sequence": {
-            "catalog": out["catalog"], "catalog_name": out["catalog_name"],
-            "fov_arcmin": out["fov_arcmin"], "target_mag":
-            out["target_mag"], "entries": entries, "csv": files["csv"],
-            "png": files["png"]}})
-        if save_campaign and p.get("campaign_id"):
-            from ..core import campaign as _camp
-            c = _camp.get(db, p["campaign_id"])
-            if c:
-                prot = c.get("protocol") or {}
-                prot["comp_stars"] = [
-                    f"{e['name']} {e['star']['band']} "
-                    f"{e['star']['mag']:.2f}" for e in entries]
-                _camp.update(db, c["id"], protocol=prot)
-        self.statusBar().showMessage(
-            self.tr("Comparison chart ready"), 8000)
-        p = project.get(db, pid)
-        lbl = self._project_widgets.get("fu_sequence")
-        if lbl is not None and p:
-            lbl.setText(self._fu_sequence_status_text(p))
-        self._populate_project_files(pid)
+        # The comparison chart lives in the unified editor (ADR-044):
+        # the project's newest registered plate when there is one, else
+        # the Compare tab's own survey (DSS2) download. The classic
+        # options dialog, its SequenceWorker and its picker retired on
+        # 2026-10-07, when the UFE became the only door (ADR-044 rev.).
+        self._fu_sequence_via_ufe(pid)
 
     def _fu_export_report(self, pid):
         # Exports the project's photometry to CSV or AAVSO EFF (HJD in-app,
@@ -8627,6 +9139,21 @@ class MainWindow(QMainWindow):
                   "perihelion_date", "transit", "approach", "hads",
                   "variable", "campaign", "project_id", "notes")
                  if target.get(k) is not None}
+        if ctx.get("mag") is not None:
+            # WHERE the figure comes from, said out loud (2026-10-07). The
+            # planner's magnitude is a PREDICTION (an ephemeris, a catalogue,
+            # an alert) and a stack run later overwrites it with a
+            # MEASUREMENT: the same field, two very different things, and the
+            # app uses it to choose the comparison stars. The stack already
+            # says which of the two it carries (NS_MAGSR); the project had no
+            # way to say it, and reading 18.28 could not tell you whether
+            # anybody had measured it.
+            # The name is mag_ORIGIN and not mag_source on purpose: the
+            # points table already has a mag_source that answers a
+            # different question (WHO wrote the figure: "auto" or
+            # "manual"), and two things with the same name is how a
+            # provenance gets lost.
+            ctx["mag_origin"] = "predicted"
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
@@ -8880,16 +9407,15 @@ class MainWindow(QMainWindow):
 
     def _campaign_help(self):
         # The ⓘ next to "New campaign…" (UX-PC U5, plain-language rule):
-        # what a campaign IS, with a real example, right where the user
-        # meets the concept.
+        # what a campaign IS, right where the user meets the concept. It
+        # explains the idea and does NOT name an example: a help that cites a
+        # particular object ages badly and reads as if that were the only
+        # case (the same rule the stacking helps follow).
         QMessageBox.information(
             self, self.tr("What is a campaign?"),
             self.tr("A campaign groups the projects of one shared "
-                    "observation effort — several nights, several "
+                    "observation effort: several nights, several "
                     "observatories, one goal.\n\n"
-                    "Example: “T CrB 2026 eruption” (obsSN group) — every "
-                    "night you measure T CrB with the same protocol and "
-                    "report the results together.\n\n"
                     "A project is one object with its three steps: plan, "
                     "process, publish."))
 
@@ -8961,14 +9487,6 @@ class MainWindow(QMainWindow):
                                         self.tr("Object:"))
         if ok and name.strip():
             self._open_explore_dialog(name.strip())
-
-    def _tools_blink(self):
-        # ADR-044: with the UFE as default the ad-hoc blink opens in the
-        # editor; the classic dialog stays one setting away
-        if self._use_ufe():
-            self._ufe_open("blink")
-            return
-        self._open_blink_dialog()
 
     def _tools_campaigns(self):
         # Campaigns live in their own top-level tab (UX-a; supersedes
@@ -9248,355 +9766,6 @@ class MainWindow(QMainWindow):
         post_w.lbl_files.setText(
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)
-
-    def _open_blink_dialog(self, sn_name=None, ra=None, dec=None,
-                            fits_path=None):
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Blink"))
-        dlg.resize(1100, 640)
-        layout = QVBoxLayout(dlg)
-        blink_w = _load_ui("blink_tab")
-        layout.addWidget(blink_w)
-        if sn_name:
-            blink_w.edt_sn_name.setText(sn_name)
-        if ra is not None and dec is not None:
-            blink_w.chk_manual.setChecked(True)
-            blink_w.edt_ra.setEnabled(True)
-            blink_w.edt_dec.setEnabled(True)
-            blink_w.edt_ra.setText(f"{ra:.5f}")
-            blink_w.edt_dec.setText(f"{dec:+.5f}")
-        if fits_path:
-            blink_w.edt_fits.setText(fits_path)
-        blink_w.btn_browse.clicked.connect(
-            lambda: self._dialog_blink_browse(blink_w))
-        blink_w.btn_prepare.clicked.connect(
-            lambda: self._dialog_blink_prepare(blink_w))
-        blink_w.chk_manual.stateChanged.connect(
-            lambda s: self._dialog_blink_manual(blink_w, s))
-        blink_w.btn_auto_stretch.clicked.connect(
-            lambda: self._dialog_blink_auto_stretch(blink_w))
-        for sld in (blink_w.sld_black, blink_w.sld_white, blink_w.sld_gamma,
-                    blink_w.sld_balance, blink_w.sld_fade, blink_w.sld_marker):
-            sld.valueChanged.connect(
-                lambda: self._dialog_blink_render_soon(blink_w))
-        blink_w.chk_marker.stateChanged.connect(
-            lambda: self._dialog_blink_render_soon(blink_w))
-        blink_w.cmb_zoom.currentIndexChanged.connect(
-            lambda: self._dialog_blink_render(blink_w))
-        blink_w.btn_balance_auto.clicked.connect(
-            lambda: self._dialog_blink_balance_auto(blink_w))
-        blink_w.btn_up.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.0, 0.5))
-        blink_w.btn_down.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.0, -0.5))
-        blink_w.btn_left.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, -0.5, 0.0))
-        blink_w.btn_right.clicked.connect(
-            lambda: self._dialog_blink_nudge(blink_w, 0.5, 0.0))
-        blink_w.btn_gif.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "gif"))
-        blink_w.btn_video.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "video"))
-        blink_w.btn_png.clicked.connect(
-            lambda: self._dialog_blink_export(blink_w, "png"))
-        self._blink_dialog_widget = blink_w
-        dlg.exec()
-        self._blink_timer.stop()
-        w = getattr(self, "_blink_worker", None)
-        if w is not None and w.isRunning():
-            try:
-                w.progress.disconnect()
-                w.finished.disconnect()
-            except RuntimeError:
-                pass
-            self._blink_worker = None
-
-    # ---- blink dialog helpers ----
-
-    def _dialog_blink_browse(self, b):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("Choose FITS"), "",
-            "FITS (*.fits *.fit *.fts);;All files (*)")
-        if path:
-            b.edt_fits.setText(path)
-
-    def _dialog_blink_manual(self, b, state):
-        b.edt_ra.setEnabled(bool(state))
-        b.edt_dec.setEnabled(bool(state))
-
-    def _dialog_blink_manual_coords(self, b):
-        if not b.chk_manual.isChecked():
-            return None
-        try:
-            ra = float(b.edt_ra.text().strip().replace(",", "."))
-            dec = float(b.edt_dec.text().strip().replace(",", "."))
-        except ValueError:
-            return None
-        if not (0.0 <= ra < 360.0 and -90.0 <= dec <= 90.0):
-            return None
-        return ra, dec
-
-    def _dialog_blink_prepare(self, b):
-        image = b.edt_fits.text().strip()
-        if not image:
-            b.lbl_blink_status.setText(self.tr("Choose a FITS image first."))
-            return
-        name = b.edt_sn_name.text().strip()
-        ra = dec = None
-        if b.chk_manual.isChecked():
-            manual = self._dialog_blink_manual_coords(b)
-            if manual is None:
-                b.lbl_blink_status.setText(
-                    self.tr("Manual coordinates invalid"))
-                return
-            ra, dec = manual
-        elif not name:
-            b.lbl_blink_status.setText(
-                self.tr("Type the supernova name or tick 'Manual coordinates'."))
-            return
-        b.btn_prepare.setEnabled(False)
-        b.lbl_blink_status.setText(self.tr("Reading the FITS image…"))
-        w = BlinkWorker(image, sn_name=name or None, ra=ra, dec=dec)
-        self._blink_worker = w
-        w.progress.connect(lambda msg: b.lbl_blink_status.setText(
-            self._txt(msg)))
-        w.finished.connect(lambda pair, errors: self._dialog_blink_done(
-            b, pair, errors))
-        self._keep(w)
-        w.start()
-
-    def _dialog_blink_done(self, b, pair, errors):
-        b.btn_prepare.setEnabled(True)
-        if errors:
-            b.lbl_blink_status.setText("⚠ " + self._txt(errors))
-            return
-        self._blink_pair = pair
-        self._blink_nudge = [0.0, 0.0]
-        b.lbl_nudge.setText("(0.0, 0.0)")
-        for wgt, val in ((b.sld_black, 10), (b.sld_white, 995),
-                         (b.sld_gamma, 100), (b.sld_balance, 100),
-                         (b.sld_marker, 10), (b.cmb_zoom, 0)):
-            wgt.blockSignals(True)
-            if hasattr(wgt, "setValue"):
-                wgt.setValue(val)
-            else:
-                wgt.setCurrentIndex(val)
-            wgt.blockSignals(False)
-        h, w = pair["obs"].shape
-        b.lbl_blink_status.setText(
-            f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:+.5f}) — "
-            f"{pair['ref_label']} · {w}×{h}px")
-        if pair.get("flipped"):
-            b.lbl_blink_status.setText(
-                b.lbl_blink_status.text() + " · " + self.tr("mirrored"))
-        self._blink_dialog_widget = b
-        self._dialog_blink_render(b)
-        if b.chk_blink_live.isChecked():
-            self._blink_timer.start(b.spn_interval.value())
-
-    def _dialog_blink_auto_stretch(self, b):
-        for sld, val in ((b.sld_black, 10), (b.sld_white, 995),
-                         (b.sld_gamma, 100)):
-            sld.setValue(val)
-        self._dialog_blink_render(b)
-
-    def _dialog_blink_render_soon(self, b):
-        self._blink_dialog_widget = b
-        self._blink_render_timer.start()
-
-    def _dialog_blink_render(self, b):
-        if not self._blink_pair:
-            return
-        import numpy as np
-        from ..viz import blink_view
-        black = b.sld_black.value() / 10.0
-        white = b.sld_white.value() / 10.0
-        gamma = b.sld_gamma.value() / 100.0
-        gain = b.sld_balance.value() / 100.0
-        pair = self._blink_pair
-        ref_f = blink_view.apply_stretch(
-            pair["ref"], *blink_view.auto_limits(pair["ref"], black, white),
-            gamma)
-        obs_f = blink_view.apply_stretch(
-            pair["obs"], *blink_view.auto_limits(pair["obs"], black, white),
-            gamma)
-        ref_f = blink_view.apply_gain(ref_f, gain)
-        self._blink_ref8 = self._blink_shift_ref(blink_view.to_uint8(ref_f))
-        self._blink_obs8 = blink_view.to_uint8(obs_f)
-        zoom = (1, 2, 4)[b.cmb_zoom.currentIndex()]
-        disp_ref, disp_obs, sn_disp = self._blink_display_frames(zoom)
-        if b.chk_blink_live.isChecked():
-            self._blink_pix = (self._blink_pixmap(disp_ref, sn_disp),
-                               self._blink_pixmap(disp_obs, sn_disp))
-            self._blink_show_dlg(b, self._blink_pix[int(self._blink_phase)])
-        else:
-            self._blink_timer.stop()
-            a = b.sld_fade.value() / 100.0
-            mix = ((1.0 - a) * disp_ref + a * disp_obs).astype(np.uint8)
-            self._blink_show_dlg(b, self._blink_pixmap(mix, sn_disp))
-
-    def _blink_show_dlg(self, b, pix):
-        b.lbl_blink.setPixmap(
-            pix.scaled(b.lbl_blink.size(), Qt.KeepAspectRatio,
-                       Qt.SmoothTransformation))
-
-    def _dialog_blink_balance_auto(self, b):
-        if not self._blink_pair:
-            return
-        from ..viz import blink_view
-        black = b.sld_black.value() / 10.0
-        white = b.sld_white.value() / 10.0
-        gamma = b.sld_gamma.value() / 100.0
-        pair = self._blink_pair
-        ref_f = blink_view.apply_stretch(
-            pair["ref"], *blink_view.auto_limits(pair["ref"], black, white),
-            gamma)
-        obs_f = blink_view.apply_stretch(
-            pair["obs"], *blink_view.auto_limits(pair["obs"], black, white),
-            gamma)
-        b.sld_balance.setValue(round(blink_view.auto_gain(ref_f, obs_f) * 100))
-
-    def _dialog_blink_nudge(self, b, dx, dy):
-        if not self._blink_pair:
-            return
-        self._blink_nudge[0] += dx
-        self._blink_nudge[1] += dy
-        b.lbl_nudge.setText(
-            f"({self._blink_nudge[0]:+.1f}, {self._blink_nudge[1]:+.1f})")
-        self._dialog_blink_render(b)
-
-    def _dialog_blink_export(self, b, kind):
-        if not self._blink_pair or self._blink_ref8 is None:
-            return
-        pair = self._blink_pair
-        # A4: per-project folder when opened from a project, flat posts/ otherwise
-        if self._current_project:
-            outdir = project.storage_dir(self._current_project)
-        else:
-            outdir = paths.data_dir() / "posts"
-            outdir.mkdir(parents=True, exist_ok=True)
-        if kind == "gif":
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export GIF"),
-                str(outdir / f"{pair['name']}_blink.gif"), "GIF (*.gif)")
-        elif kind == "video":
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export video"),
-                str(outdir / f"{pair['name']}_blink.mp4"),
-                "MP4 video (*.mp4)")
-        else:
-            out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export PNG"),
-                str(outdir / f"{pair['name']}_before_after.png"),
-                "PNG (*.png)")
-        if not out:
-            return
-        # A4: register the blink export in the project if we came from one
-        if self._current_project:
-            project.add_file(db, self._current_project["id"], out, "chart")
-            self._populate_project_files(self._current_project["id"])
-        effect = "blink" if b.rdo_blink.isChecked() else "fade"
-        sn = pair["sn_xy"] if b.chk_marker.isChecked() else None
-        b.lbl_blink_status.setText(self.tr("Rendering…"))
-        # ADR-046: corner boxes, marker look and the N/E compass follow
-        # the settings (the legacy previews stay as they were)
-        boxes = compass = None
-        if config.get("chart_boxes", False):
-            from ..core import chart_annotate, fits_meta
-            from ..viz import blink_view as _bv
-            boxes = _bv.pair_boxes(
-                pair, fits_meta.read_meta(pair["image_path"]),
-                chart_annotate.site_from_config(config))
-            compass = _bv.pair_compass(pair)
-        w = BlinkExportWorker(
-            kind, self._blink_ref8, self._blink_obs8, sn, out, effect=effect,
-            name=pair["name"], ref_label=pair["ref_label"],
-            lang=self._lang(),
-            observatory=config.get("observatory_name", ""),
-            zoom=(1, 2, 4)[b.cmb_zoom.currentIndex()],
-            marker_scale=b.sld_marker.value() / 10.0,
-            interval_ms=b.spn_interval.value(),
-            boxes=boxes,
-            marker_style=config.get("marker_style", "ring"),
-            compass=compass)
-        w.finished.connect(lambda out, err: b.lbl_blink_status.setText(
-            self.tr("Written to %1").replace("%1", out) if out else
-            self.tr("Export failed: %1").replace("%1", err)))
-        self._keep(w)
-        w.start()
-
-    def _blink_tick(self):
-        if not self._blink_pair or not hasattr(self, "_blink_pix"):
-            self._blink_timer.stop()
-            return
-        self._blink_phase = not self._blink_phase
-        pix = self._blink_pix[int(self._blink_phase)]
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None:
-            self._blink_show_dlg(b, pix)
-
-    def _blink_render(self, *_args):
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None and self._blink_pair:
-            self._dialog_blink_render(b)
-
-    def _blink_shift_ref(self, ref8):
-        dx, dy = self._blink_nudge
-        if dx == 0.0 and dy == 0.0:
-            return ref8
-        import numpy as np
-        from PIL import Image
-        im = Image.fromarray(ref8, mode="L")
-        im = im.transform(im.size, Image.AFFINE, (1, 0, -dx, 0, 1, -dy),
-                          fillcolor=0)
-        return np.asarray(im)
-
-    def _blink_display_frames(self, zoom):
-        import numpy as np
-        from ..viz import blink_view
-        disp_ref = np.ascontiguousarray(np.flipud(self._blink_ref8))
-        disp_obs = np.ascontiguousarray(np.flipud(self._blink_obs8))
-        sn = self._blink_pair.get("sn_xy") if self._blink_pair else None
-        if sn is None:
-            return disp_ref, disp_obs, None
-        h = self._blink_obs8.shape[0]
-        sn_disp = (sn[0], h - 1 - sn[1])
-        disp_ref, _sr = blink_view.crop_zoom(disp_ref, sn_disp, zoom)
-        disp_obs, sn_disp = blink_view.crop_zoom(disp_obs, sn_disp, zoom)
-        return (np.ascontiguousarray(disp_ref),
-                np.ascontiguousarray(disp_obs), sn_disp)
-
-    def _blink_pixmap(self, disp8, sn_disp):
-        from PySide6.QtGui import QImage, QPixmap
-        h, w = disp8.shape
-        img = QImage(disp8.data, w, h, w, QImage.Format_Grayscale8).copy()
-        pix = QPixmap.fromImage(img)
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None and b.chk_marker.isChecked() and sn_disp is not None:
-            if 0 <= sn_disp[0] < w and 0 <= sn_disp[1] < h:
-                pix = self._blink_draw_marker(pix, sn_disp)
-        return pix
-
-    def _blink_draw_marker(self, pix, sn):
-        from PySide6.QtCore import QPointF, QRectF
-        from PySide6.QtGui import QColor, QPainter, QPen
-        b = getattr(self, "_blink_dialog_widget", None)
-        scale = (b.sld_marker.value() / 10.0) if b is not None else 1.0
-        x, y = sn
-        r = 0.06 * min(pix.width(), pix.height()) * scale
-        p = QPainter(pix)
-        pen = QPen(QColor("#ffb347"))
-        pen.setWidth(max(2, round(2 * scale)))
-        p.setPen(pen)
-        p.drawEllipse(QPointF(x, y), r, r)
-        p.drawLine(QPointF(x - 1.6 * r, y), QPointF(x - 0.5 * r, y))
-        p.drawLine(QPointF(x + 0.5 * r, y), QPointF(x + 1.6 * r, y))
-        p.drawLine(QPointF(x, y - 1.6 * r), QPointF(x, y - 0.5 * r))
-        p.drawLine(QPointF(x, y + 0.5 * r), QPointF(x, y + 1.6 * r))
-        p.drawText(QRectF(x - 120, y - 2.6 * r, 240, 1.4 * r),
-                   Qt.AlignHCenter | Qt.AlignBottom, self._blink_pair["name"])
-        p.end()
-        return pix
 
     # ---------------- Solar ----------------
 
@@ -9992,12 +10161,6 @@ class MainWindow(QMainWindow):
         self._ufe_page()
         self.navigate(VIEW_UFE)
 
-    def _use_ufe(self):
-        # @return: True when FITS work opens in the unified editor
-        #          (Settings → Development; the classic dialogs stay
-        #          reachable for the review period, ADR-044)
-        return bool(config.get("ufe_default", True))
-
     def _ufe_object_from_project(self, p):
         # Everything the project knows about the object, for the UFE:
         # name, sky position, magnitude (planner → VSX max → the last
@@ -10064,6 +10227,58 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(self._ufe_run_undo)
             dlg.set_exoclock_hook(
                 lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # astrometry plan, phase 7: the visit context for the
+            # Calibration and Track & Stack tabs (their frames and the
+            # project's object, D15) and the way a generated report
+            # reaches the visit's MPC block. Asked defensively, like
+            # every other hook: a host double need not have the method.
+            astro_hook = getattr(dlg, "set_astrometry_hook", None)
+            if callable(astro_hook):
+                astro_hook(
+                    lambda: self._ufe_astrometry_context(hook_pid,
+                                                         session_id))
+            # ADR-065: the run the visit already holds, so reopening it
+            # SHOWS the result instead of an empty column. Goes with the
+            # context hook (the tab asks for it as soon as it is armed).
+            result_hook = getattr(dlg, "set_astrometry_result_hook", None)
+            if callable(result_hook):
+                result_hook(
+                    lambda: self._ufe_astrometry_result(hook_pid, session_id))
+            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
+            if callable(mpc_hook):
+                mpc_hook(self._ufe_mpc_send)
+            # ADR-061 rev: the Calibration tab fills the master library from
+            # where the recipe is read (it used to be only in Settings, so an
+            # observer with real flats had no way to put them in)
+            masters_hook = getattr(dlg, "set_add_masters_hook", None)
+            if callable(masters_hook):
+                masters_hook(self._ufe_add_masters)
+            # the visit's frames, from the editor's preview list (2026-10-06):
+            # the panel never touches the registry, it asks the host, and the
+            # frames can be taken out of the visit or moved aside
+            frames_hook = getattr(dlg, "set_visit_frames_hooks", None)
+            if callable(frames_hook):
+                frames_hook(
+                    lambda paths: self._ufe_frames_remove(hook_pid,
+                                                          session_id, paths),
+                    lambda paths: self._ufe_frames_discard(hook_pid,
+                                                           session_id, paths))
+            # ADR-062, phase 8: the run is persisted by the HOST (the tab
+            # never touches the database), with its undo per execution
+            persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
+            if callable(persist_hook):
+                persist_hook(
+                    lambda payload: self._ufe_astrometry_persist(
+                        hook_pid, session_id, payload))
+            undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
+            if callable(undo_hook):
+                undo_hook(self._ufe_astrometry_undo)
+            # D: a brightness measured by hand in the Photometry tab can
+            # take over the one the report uses, with the run's own value
+            # kept beside it
+            manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
+            if callable(manual_hook):
+                manual_hook(self._ufe_manual_magnitude)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10121,6 +10336,30 @@ class MainWindow(QMainWindow):
             dlg.set_points_hook(None)
             dlg.set_run_undo_hook(None)
             dlg.set_exoclock_hook(None)
+            astro_hook = getattr(dlg, "set_astrometry_hook", None)
+            if callable(astro_hook):
+                astro_hook(None)
+            result_hook = getattr(dlg, "set_astrometry_result_hook", None)
+            if callable(result_hook):
+                result_hook(None)
+            persist_hook = getattr(dlg, "set_astrometry_persist_hook", None)
+            if callable(persist_hook):
+                persist_hook(None)
+            undo_hook = getattr(dlg, "set_astrometry_undo_hook", None)
+            if callable(undo_hook):
+                undo_hook(None)
+            manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
+            if callable(manual_hook):
+                manual_hook(None)
+            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
+            if callable(mpc_hook):
+                mpc_hook(None)
+            masters_hook = getattr(dlg, "set_add_masters_hook", None)
+            if callable(masters_hook):
+                masters_hook(None)
+            frames_hook = getattr(dlg, "set_visit_frames_hooks", None)
+            if callable(frames_hook):
+                frames_hook(None, None)
             dlg.set_exotic_hooks(None, None)
             dlg.set_sequence_hook(None)
             passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
@@ -10136,9 +10375,17 @@ class MainWindow(QMainWindow):
             if callable(badge):
                 badge(None)              # ad-hoc: no project behind it
         self._ufe_page()
-        dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
-                      "annotate": dlg.tab_annotate,
-                      "measure": dlg.tab_measure}[tab])
+        # Defensive, like every other hook here: a host double in a test
+        # need not have the new tabs.
+        tabs = {"blink": getattr(dlg, "tab_blink", None),
+                "compare": getattr(dlg, "tab_compare", None),
+                "annotate": getattr(dlg, "tab_annotate", None),
+                "measure": getattr(dlg, "tab_measure", None),
+                "calibration": getattr(dlg, "tab_calibration", None),
+                "trackstack": getattr(dlg, "tab_trackstack", None)}
+        target = tabs.get(tab)
+        if target is not None:
+            dlg.show_tab(target)
         self.navigate(VIEW_UFE, pid=hook_pid)
         return dlg
 
@@ -10159,8 +10406,13 @@ class MainWindow(QMainWindow):
         if not p:
             return
         for path in paths:
-            fkind = {"fits": "fits", "chart": "chart",
-                     "report": "report"}.get(kind)
+            # Every kind a tab can send has to be mapped: an unmapped one
+            # becomes None and the INSERT dies against NOT NULL, so the
+            # file is written and then silently left out of the visit (the
+            # astrometry stacks did exactly that). The map lives in
+            # core/journal.py, next to the readable labels, so a test can
+            # walk the kinds the tabs send and demand one for each.
+            fkind = journal.FILE_KINDS.get(kind)
             if kind == "sequence":
                 fkind = "chart" if payload.get("which") == "png" \
                     else "report"
@@ -10183,6 +10435,7 @@ class MainWindow(QMainWindow):
             # the magnitude lives in the project from now on (the next
             # prefill finds it at the top level)
             ctx_update["mag"] = payload["target_mag"]
+            ctx_update["mag_origin"] = "manual"
         project.update_context(db, pid, ctx_update)
         # ADR-047: the sequence lands in the OPEN plate's saved state
         # too, merged over whatever it already carries (stretch and
@@ -10439,6 +10692,83 @@ class MainWindow(QMainWindow):
 
     # ---------------- UFE plate resets (ADR-047) ----------------
 
+    def _ufe_frames_remove(self, pid, session_id, paths):
+        # @args: pid - project id, session_id - the visit, paths - the frames
+        #        to take out of it
+        # @return: what happened, in words
+        # The editor's preview list asks for this: the frames stop being part
+        # of the visit (the registry row goes) and NOTHING on disk is touched
+        # (project.delete_file unlinks, it never deletes). The frames can be
+        # attached again from the visit's window.
+        taken = 0
+        wanted = {str(p) for p in (paths or [])}
+        for f in project.files_for_session(db, session_id):
+            if str(f.get("path")) not in wanted:
+                continue
+            if project.delete_file(db, f["id"]):
+                taken += 1
+        if taken:
+            # the tab's own context (frames, plan, result) is re-read: what
+            # is on screen is what the visit holds now
+            self._refresh_visit_after_frames(pid, session_id)
+        return (self.tr("%1 frames are no longer part of the visit "
+                        "(the files stay where they are).").replace(
+                            "%1", str(taken)) if taken
+                else self.tr("Nothing was taken out: those frames are not "
+                             "part of this visit any more."))
+
+    def _ufe_frames_discard(self, pid, session_id, paths):
+        # @args: pid - project id, session_id - the visit, paths - the frames
+        #        to move aside
+        # @return: what happened, in words
+        # A REAL move, into `descartados/` inside the project (free_space
+        # does the work and the registry follows it). Nothing is deleted and
+        # the frames can be brought back from that folder.
+        from ..core import free_space
+        p = project.get(db, pid) or {}
+        storage = project.storage_dir(p) if p else None
+        if not storage:
+            return self.tr("This project has no folder to move them into.")
+        report = free_space.discard_files(db, paths, storage)
+        if report.moved:
+            self._refresh_visit_after_frames(pid, session_id)
+        bits = [self.tr("%1 frames moved to discarded/.").replace(
+            "%1", str(report.moved))]
+        if report.skipped:
+            bits.append(self.tr("%1 were not there any more.").replace(
+                "%1", str(len(report.skipped))))
+        for err in report.errors[:2]:
+            bits.append(f"✕ {err}")
+        return " ".join(bits)
+
+    def _refresh_visit_after_frames(self, pid, session_id):
+        # @args: pid - project id, session_id - the visit
+        # @return: None. The editor's own context (its frame list, the
+        #          astrometry tab's sequence, the visit's window) is told
+        #          that the visit changed: the frames are the visit's, and
+        #          half of the app reads them.
+        dlg = getattr(self, "_ufe", None)
+        if dlg is not None:
+            hook = getattr(dlg, "refresh_visit_context", None)
+            if callable(hook):
+                try:
+                    hook()
+                except Exception as err:      # a refresh never breaks a move
+                    logger.warning("visit context refresh failed: %s", err)
+        self._visit_sync(pid, session_id)
+
+    def _visit_sync(self, pid, session_id):
+        # @args: pid - project id, session_id - the visit
+        # @return: None. The visit's window, when it is open, is told too
+        #          (the panel's own refresh repopulates its resources).
+        win = self._visit_window()
+        refresh = getattr(win, "refresh", None)
+        if callable(refresh):
+            try:
+                refresh()
+            except Exception as err:
+                logger.warning("the visit's window could not refresh: %s", err)
+
     def _ufe_series_context(self, pid, session_id, scope="visit"):
         # ADR-048 (D8): the series works from a visit's frames, never a
         # folder dialog. No visit (or no FITS in it): no series block.
@@ -10487,6 +10817,338 @@ class MainWindow(QMainWindow):
                 "scope": "visit", "nights": 1,
                 "visits": len(visits),
                 "path_sessions": {path: session_id for path in paths}}
+
+    def _ufe_astrometry_context(self, pid, session_id):
+        # Astrometry plan, phase 7 (D15): the Calibration and Track &
+        # Stack tabs work from the visit's frames and the project's
+        # object, never a folder dialog. No visit (or no FITS in it): the
+        # tabs stay disarmed and say why.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: {"pid", "session_id", "paths", "object_name"} or None
+        if session_id is None:
+            return None
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            return None
+        p = project.get(db, pid) or {}
+        ctx = p.get("context") or {}
+        # The NEO's photometry reuses the SERIES engine, which calibrates
+        # frame by frame against comparison stars. The project's saved
+        # sequence is the observer's own choice of them (the Compare tab);
+        # when there is none the worker proposes one from the catalog.
+        seq = ctx.get("sequence") or {}
+        comps = [e for e in (seq.get("entries") or [])
+                 if (e.get("kind") or "comp") == "comp"]
+        return {"pid": pid, "session_id": session_id, "paths": paths,
+                "object_name": p.get("object_name") or "",
+                "comps": comps,
+                "target_mag": seq.get("target_mag") or ctx.get("mag")}
+
+    def _astrometry_summary(self, payload):
+        # @args: payload - the worker's result dict
+        # @return: a JSON-safe summary of the run, stored in the run's own
+        #          cfg_json so the visit can RESTORE it (ADR-065): the
+        #          detection, the sweep, the brightness, the registration and
+        #          the check. The heavy pieces already have a home (the
+        #          stacks are files, the points are rows); this is what
+        #          neither of them carries, and it needs no schema change.
+        import json
+        def _scalar(v):
+            # numpy scalars are not JSON's: .item() unwraps them (a
+            # np.bool_ serialised by default=str would come back as the
+            # STRING "True", which is truthy for the wrong reason)
+            if v is None or isinstance(v, (bool, int, float, str)):
+                return v
+            item = getattr(v, "item", None)
+            if callable(item):
+                try:
+                    return _scalar(item())
+                except Exception:
+                    return str(v)
+            if isinstance(v, (list, tuple)):
+                return [_scalar(x) for x in v]
+            if isinstance(v, dict):
+                return {str(k): _scalar(x) for k, x in v.items()}
+            return str(v)
+        def _obj(o, keys):
+            if o is None:
+                return None
+            return {k: _scalar(getattr(o, k, None)) for k in keys}
+        summary = {
+            "method": payload.get("method"),
+            "ephem_source": payload.get("ephem_source"),
+            "n_failed": payload.get("n_failed"),
+            "n_off_frame": payload.get("n_off_frame"),
+            "phot_skipped": bool(payload.get("phot_skipped")),
+            # What the manual mode needs to place a mark on a run that was
+            # REOPENED: the base stack's cutout origin in the reference grid
+            # (the mark is in the stack's pixels and the pipeline wants the
+            # grid). The stack itself is a file in the project.
+            "box_all": _scalar(payload.get("box_all")),
+            "base_rate": _scalar(payload.get("base_rate")),
+            "base_pa": _scalar(payload.get("base_pa")),
+            # The ephemeris' own answer about the light: the band shows it,
+            # labelled, when the run did not measure the brightness.
+            "ephem_mag": _scalar(payload.get("ephem_mag")),
+            "ephem_band": _scalar(payload.get("ephem_band")),
+            "ephem_mag_source": _scalar(payload.get("ephem_mag_source")),
+            "detection": _obj(payload.get("detection"),
+                              ("detected", "snr", "x", "y", "fwhm",
+                               "roundness", "mag_limit", "notes")),
+            "dither": _obj(payload.get("dither"),
+                           ("dithered", "spread_px", "note")),
+            "wcs_qc": _obj(payload.get("wcs_qc"),
+                           ("checked", "max_offset_arcsec", "ok", "note")),
+            "sweep": _obj(payload.get("sweep"), ("best", "grid", "method")),
+            "check": _obj(payload.get("check"),
+                          ("available", "blocked", "outlier", "no_reference",
+                           "our_residual", "scatter", "z", "n_others",
+                           "n_stations", "note")),
+            "photometry": _scalar(payload.get("photometry")),
+            "register_report": _scalar(payload.get("register_report")),
+            "calibration": _scalar(payload.get("calibration")),
+            # The run's own record of what it could NOT use: the frames it
+            # could not read and the ones it could not register (by path).
+            # They live here because neither the points nor the stacks say
+            # them, and reopening the visit must mark the bad frames again
+            # instead of forgetting them (2026-10-07).
+            "n_unreadable": _scalar(payload.get("n_unreadable")),
+            "failed_frames": _scalar(payload.get("failed_frames")),
+            # The PLAN of the run: which frames went into each observation.
+            # Without it a reopened run can only guess the "N frames" of each
+            # observation from its points, and the stack point carries 0 on
+            # purpose (core/astrometry.py): the combo read "1 frames".
+            "groups": _scalar(payload.get("groups")),
+        }
+        try:
+            return json.loads(json.dumps(summary, ensure_ascii=False))
+        except (TypeError, ValueError) as err:  # never lose a run over this
+            logger.warning("the astrometry summary is not serialisable: %s",
+                           err)
+            return {}
+
+    def _ufe_astrometry_persist(self, pid, session_id, payload):
+        # ADR-062, phase 8: one execution, its observations and the frame
+        # manifest land in the database (the tab never touches it). The run
+        # id comes back so the tab can offer "undo this run".
+        # @args: pid - project id, session_id - the visit, payload - the
+        #        worker's result dict
+        # @return: the run id, or None (no visit, or nothing measured)
+        from ..core import astrometry_store as store
+        payload = payload or {}
+        # the worker's verdict is ok|not_detected|error|cancelled; the store
+        # speaks complete|not_detected|incomplete|undone
+        status = {"ok": "complete"}.get(payload.get("status"),
+                                        payload.get("status"))
+        if session_id is None or status not in ("complete", "not_detected"):
+            return None
+        points = payload.get("points") or []
+        if status == "complete" and not points:
+            return None
+        p = project.get(db, pid) or {}
+        det = payload.get("detection")
+        sweep = payload.get("sweep")
+        dither = payload.get("dither")
+        frames = payload.get("frames") or []
+        gate = float(config.get("astrometry_snr_sigma", 3.5))
+        floor = float(config.get("astrometry_submit_snr", 10.0))
+        best = (sweep.best if sweep is not None else None) or {}
+        run_id = store.create_run(
+            db, pid, session_id,
+            cfg={"n_obs": payload.get("n_obs"),
+                 "method": payload.get("method"),
+                 "n_failed": payload.get("n_failed"),
+                 "snr_gate": gate, "submit_snr": floor,
+                 # the run's own words, JSON-safe: this is what the visit
+                 # paints again when it is reopened (ADR-065)
+                 "result": self._astrometry_summary(payload)},
+            status=status, object_name=p.get("object_name") or "",
+            method=payload.get("method") or "", n_frames=len(frames),
+            n_obs=len(points), rate_arcsec_min=best.get("rate"),
+            pa_deg=best.get("pa"),
+            sweep=(sweep.grid if sweep is not None else None),
+            dither=(dither.dithered if dither is not None else None),
+            snr_gate=gate, submit_snr=floor,
+            detected=(det.detected if det is not None else None))
+        # The project learns the object's magnitude from the measurement:
+        # the next comparison proposal anchors on a datum instead of a
+        # guess, and the Photometry tab's field stops being empty. The
+        # magnitude is the run's own summary, so nothing is invented.
+        phot = payload.get("photometry") or {}
+        if phot.get("mag"):
+            project.update_context(db, pid, {
+                "mag": float(phot["mag"]),
+                # and it SAYS so: from here on, the project's figure is a
+                # measurement and the interface can tell the observer which
+                # of the two it is anchoring on
+                "mag_origin": "measured"})
+        # The comparison stars the run used are SAVED when the project had
+        # none: opening the Photometry tab then finds the same sequence
+        # instead of proposing a different one, and the next run starts from
+        # the observer's own field. A project that already had a sequence
+        # keeps it: the run used it, so there is nothing to write.
+        comps = phot.get("comps") if isinstance(phot, dict) else None
+        ctx = p.get("context") or {}
+        if comps and not ((ctx.get("sequence") or {}).get("entries")):
+            project.update_context(db, pid, {"sequence": {
+                "catalog": phot.get("catalog") or "gaia",
+                "catalog_name": "Gaia (proposed by the run)",
+                "target_mag": phot.get("mag"),
+                "entries": comps}})
+        rows = []
+        for sp, fp, _flags in points:
+            for source, pt in (("stack", sp), ("frames", fp)):
+                if pt is None:
+                    continue
+                rows.append({
+                    "run_id": run_id, "project_id": pid,
+                    "session_id": session_id, "group_index": pt.group_index,
+                    "mjd": pt.mjd, "ra": pt.ra, "dec": pt.dec,
+                    "rms_ra": pt.rms_ra, "rms_dec": pt.rms_dec,
+                    "mag": pt.mag, "band": pt.band, "x": pt.x, "y": pt.y,
+                    "n_frames": pt.n_frames, "snr": pt.snr, "source": source,
+                    "method": payload.get("method"),
+                    "flags": list(pt.flags or [])})
+        store.add_points(db, rows)
+        frame_rows = []
+        for f in frames:
+            try:
+                size = Path(f.path).stat().st_size
+            except OSError:
+                size = None
+            frame_rows.append({"path": f.path, "size": size,
+                               "filter": f.filter, "exptime_s": f.exptime_s,
+                               "date_obs": f.date_obs})
+        store.add_frames(db, run_id, frame_rows)
+        logger.info("astrometry run %s persisted (%d points, %d frames)",
+                    run_id, len(rows), len(frame_rows))
+        # the Analysis tab's list of runs is live if that project is open:
+        # the run just measured shows up without reopening the project
+        if self._project_widgets.get("astrometry_runs_tbl") is not None:
+            self._analysis_astrometry_refresh(pid)
+        return run_id
+
+    def _ufe_astrometry_result(self, pid, session_id):
+        # ADR-065: what the visit already holds, so reopening it SHOWS the
+        # run instead of an empty column. The last complete (or
+        # not-detected) execution of THIS visit, its points and the stack
+        # files the visit registered. Nothing is recomputed here: the tab
+        # paints it.
+        # @args: pid - project id, session_id - the visit
+        # @return: {"run", "points", "stacks"} or None
+        from ..core import astrometry_store as store
+        if pid is None or session_id is None:
+            return None
+        try:
+            runs = [r for r in store.list_runs(db, pid)
+                    if r.get("session_id") == session_id
+                    and r.get("status") in ("complete", "not_detected")]
+        except Exception as err:
+            logger.warning("the astrometry runs could not be listed: %s", err)
+            return None
+        if not runs:
+            return None
+        # The run the editor was TOLD to show wins (the one picked in the
+        # Analysis tab's list); with none, the newest, which is what the
+        # visit's own "Astrometry" button means ("the last pass of the
+        # night").
+        pref = getattr(self, "_astrometry_run_pref", None)
+        run = None
+        if pref and pref[0] == pid and pref[1] == session_id:
+            run = next((r for r in runs if r["id"] == pref[2]), None)
+        if run is None:
+            run = runs[-1]                # oldest first: the newest one wins
+        try:
+            points = store.points_for_run(db, run["id"])
+            files = project.files_for_session(db, session_id)
+        except Exception as err:
+            logger.warning("the astrometry result could not be read: %s", err)
+            return None
+        # The stacks: deduplicated (a visit used to register the same file
+        # once per look) and, when the files say so, only THIS run's. A visit
+        # accumulates the stacks of every pass, and matching them by the
+        # observation number alone showed ANOTHER pass's image (reported
+        # 2026-10-07: a 2-observation run came out with the first stack of a
+        # different run). An old run carries no NS_RUN card, and then the
+        # whole set is offered, as it always was.
+        from ..core import fits_io
+        stacks, seen = [], set()
+        for f in files:
+            path = f.get("path")
+            if f.get("kind") != "stack" or not path:
+                continue
+            path = str(path)
+            if path in seen or not Path(path).exists():
+                continue
+            seen.add(path)
+            stacks.append(path)
+        mine = []
+        for path in stacks:
+            try:
+                header = fits_io.read_header(path)
+            except Exception:
+                continue
+            if header.get("NS_RUN") == run["id"]:
+                mine.append(path)
+        if mine:
+            stacks = mine
+        return {"run": run, "points": points, "stacks": stacks}
+
+    def _ufe_manual_magnitude(self, run_id, group_index, mag, band=None):
+        # @args: run_id - the execution, group_index - the observation,
+        #        mag - the magnitude measured by hand in the Photometry tab,
+        #        band - its band
+        # @return: True when the observation took it. The EFFECTIVE
+        #          magnitude moves and the run's own value stays in mag_auto:
+        #          the report uses the first, the audit keeps both, and
+        #          nothing is sent without its trace (D).
+        from ..core import astrometry_store as store
+        try:
+            done = bool(store.set_manual_magnitude(db, int(run_id),
+                                                   int(group_index),
+                                                   float(mag), band))
+        except Exception as err:
+            logger.warning("the manual magnitude could not be stored: %s",
+                           err)
+            return False
+        if done:
+            # the list says WHO wrote the magnitude: a measurement made by
+            # hand has to show up there at once
+            run = self._analysis_astrometry_run(int(run_id))
+            if run is not None and self._project_widgets.get(
+                    "astrometry_runs_tbl") is not None:
+                self._analysis_astrometry_refresh(run["project_id"])
+        return done
+
+    def _ufe_astrometry_undo(self, run_id):
+        # ADR-062, phase 8 (D14): undo THIS execution, its points and its
+        # frame manifest. The run row stays, marked "undone", for the audit
+        # trail (the same shape the series' undo has).
+        # @args: run_id - the execution
+        # @return: how many points were removed, or None
+        from ..core import astrometry_store as store
+        if run_id is None:
+            return None
+        removed = store.delete_run(db, run_id)
+        return removed.get("points") if isinstance(removed, dict) else removed
+
+    def _ufe_mpc_send(self, text):
+        # The Track & Stack tab's report lands in the visit's MPC paste
+        # box (ADR-045 form A: the block lives in the visit window), and
+        # the block's own ADR-022 validator speaks right away.
+        # @args: text - the generated report
+        # @return: True when the block received it
+        win = self._visit_window()
+        txt = getattr(win, "txt_mpc", None)
+        if txt is None:
+            return False
+        txt.setPlainText(text)
+        validate = getattr(win, "_on_mpc_validate", None)
+        if callable(validate):
+            validate()
+        return True
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its

@@ -61,8 +61,6 @@ def window(qapp):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     yield w
     config.is_configured = orig
     w.close()
@@ -188,3 +186,40 @@ def test_planets_visible_tonight(window):
         got_dim = by_name[disp].foreground().color() == dim
         assert got_dim == expect_dim, \
             f"{name}: dim={got_dim} but best alt {arc['max_alt']}° tonight"
+
+
+def test_the_night_leaves_the_bar_inside_the_workbench(window):
+    # Asked for: the Moon, the darkness window, the planets and the chips
+    # are noise inside the image workbench, where the observer is looking at
+    # a plate and not at tonight. They all live in the SAME widget
+    # (gui/widgets/sky_bar.py), so hiding it takes the five of them out at
+    # once, and the workbench is the only view where it happens.
+    from nightscribe.gui.main_window import VIEW_HOME, VIEW_TONIGHT, VIEW_UFE
+    window.navigate(VIEW_HOME)
+    assert window._sky_bar.isVisibleTo(window)
+    window.navigate(VIEW_UFE)
+    assert not window._sky_bar.isVisibleTo(window)
+    assert not window._sky_chips_row.parentWidget().isVisibleTo(window)
+    # and it is back, with its chips, as soon as the workbench is left
+    window.navigate(VIEW_TONIGHT)
+    assert window._sky_bar.isVisibleTo(window)
+    window._skyevent_chips([_ev("opposition", NOW_JD + 5, ["saturn"],
+                                mag=0.6)])
+    assert len(_sky_chips(window)) == 1
+    assert window._sky_bar.isVisibleTo(window)
+
+
+def test_the_bar_is_not_rebuilt_while_the_workbench_hides_it(window,
+                                                             monkeypatch):
+    # The refresh is local maths but it is pointless work: while the bar is
+    # out of sight nothing is recomputed, and coming back fills it again
+    # (tonight has moved, or the site has).
+    from nightscribe.gui.main_window import VIEW_HOME, VIEW_UFE
+    window.navigate(VIEW_UFE)
+    seen = []
+    monkeypatch.setattr(window._sky_bar, "refresh",
+                        lambda brief: seen.append(brief))
+    window.refresh_sky_bar()
+    assert seen == []                       # nothing for nobody
+    window.navigate(VIEW_HOME)
+    assert seen, "the bar is filled again on the way back"

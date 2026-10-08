@@ -118,7 +118,7 @@ def test_vsx_crossmatch_disqualifies_variables():
     assert matched["star"] is not None
     assert matched["star"]["id"] == "2100000000000008"
     # one-way link: the snapshot never points back at the star (a var<->star
-    # cycle segfaulted the SequenceWorker's Signal(dict) emission)
+    # cycle once segfaulted the comparison chart's worker on Signal(dict))
     assert "vsx" not in matched["star"]
     assert unmatched["star"] is None
     assert unmatched["distance_arcsec"] > compstars.VSX_MATCH_ARCSEC

@@ -88,6 +88,19 @@ marcadores al instante: se aplica en la siguiente interacción o reapertura
 es la de la placa fuente cuando el llamador la conoce (UFE) y la del frame
 de trabajo en los caminos legacy/CLI.
 
+**Revisión (2026-10-07): las marcas del objeto son opcionales y llevan el color del tipo.**
+El círculo con el nombre que el run de astrometría escribe en cada apilado (tarjeta
+`ANNOTATE`) ya no sale por defecto: el editor abre la placa sólo con la cruz del objeto y
+el botón «A» de la barra superior lo devuelve cuando se quiere (`annot_visible`, por
+defecto apagado, es el valor de partida en cada apertura). El color de las tres marcas del
+objeto en el editor (la cruceta a todo el campo, la cruz que mide el run y ese círculo)
+lo decide `marker_color`: el propio del tipo de objeto (`theme.KIND_COLORS`, el mismo que
+tiñe la pestaña y el proyecto) por defecto, o **un color común** para las tres
+(`theme.C_OBJECT_MARK`, el rojo de la marca del objeto). Un solo resolutor
+(`theme.mark_color`) lo reparte, así que las tres no pueden discrepar; y en el caso del
+círculo el color viaja en la tarjeta, que es el modelo AIJ, así que el fichero dice lo
+mismo que se ve.
+
 ## English
 
 **Context.** The charts the observatory publishes carried only the object
@@ -205,6 +218,35 @@ dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
   (arriba a la derecha bajo la banda, abajo a la izquierda): ya no hay esquinas que
   liberar.
 
+**Revisión (2026-10-05): la banda de un stack de asteroide dice su movimiento.** Al
+apilar una secuencia de un asteroide (ADR-062), la banda que ya encabeza la placa añade
+lo que el run ha medido, con las mismas reglas de color:
+
+- **Línea 1 (identidad)**: nombre, **posición medida**, magnitud medida, **velocidad y
+  PA**. La posición medida (el centroide astrométrico de esa placa) gana a la del
+  catálogo colocada por la solución: es de esta placa, así que va en tinta y sin el
+  `(cat)`. La velocidad y el PA llevan el mismo color por rol: `motion` en tinta cuando
+  el barrido de velocidad los midió, y `motion-eph` apagado y con la palabra `(eph)`
+  cuando solo son la predicción de la efeméride (simétrico a `pos` / `pos-cat` y a
+  `mag` / `mag-cat`). La velocidad y el PA son **dos segmentos**, unidos por el
+  separador propio de la banda (el mismo punto que separa el nombre, la posición y la
+  magnitud): `1.23″/min · PA 245°`.
+- **Línea 2 (contexto)**: la exposición de un stack se escribe **«N × T s»** (las tomas
+  que combina por su exposición), no una exposición suelta que ocultaría cuánta luz hay.
+  `format_exposure` lo decide y `n_frames` viaja dentro de `meta`.
+- **Orden de descarte**: en la línea 1 el movimiento se suelta primero (es el relato, no
+  la identidad), luego la magnitud y por último la posición (`DROP_ORDER_NAME`).
+- **De dónde salen los datos del stack**: se escriben en la **cabecera del propio
+  stack** cuando el run lo guarda (`gui/ufe_trackstack_tab.py`): `NS_RATE` / `NS_PA` /
+  `NS_MOT` (el movimiento medido o predicho), `NS_MAG` / `NS_MAGER` / `NS_MAGB` /
+  `NS_MAGNC` / `NS_MAGOK` (la magnitud de esa observación con las señales que la
+  colorean) y, copiadas del frame, `EXPTIME` / `DATE-OBS` / `FILTER` / `INSTRUME` /
+  `TELESCOP` (sin ellas un stack no tenía fecha, exposición ni filtro). La posición
+  medida ya viajaba como `NS_RA` / `NS_DEC` (la anotación). Así la banda dice lo mismo
+  recién hecho el run y meses después, sin la base de datos y sin el run en memoria. El
+  stack de estrellas lleva el movimiento pero nunca la magnitud: allí el objeto es una
+  traza y no se midió.
+
 **Revision (2026-09-30): the plate says its own thing in a band, not in boxes**. The
 boxes were to be rethought: the same style as the band that already heads the image
 (name, coordinates, magnitude), with what was missing (exposure, Stn, PSc, FOV) and
@@ -256,3 +298,93 @@ boxes were to be rethought: the same style as the band that already heads the im
   (off by default) now governs the other charts' boxes only. The compass and the scale
   bar return to their classic spots (top right under the band, bottom left): there are
   no corners to free any more.
+
+**Revision (2026-10-05): an asteroid stack's band says its motion.** When a sequence of
+an asteroid is stacked (ADR-062), the band that already heads the plate adds what the
+run measured, under the same colour rules:
+
+- **Line 1 (identity)**: name, **measured position**, measured magnitude, **velocity
+  and PA**. The measured position (that plate's astrometric centroid) beats the
+  catalogue's placed by the solution: it is this plate's, so it wears the ink and no
+  `(cat)`. Velocity and PA follow the same colour-per-role: `motion` in ink when the
+  velocity sweep measured them, and `motion-eph` dimmed with the word `(eph)` when they
+  are only the ephemeris' prediction (symmetric to `pos` / `pos-cat` and `mag` /
+  `mag-cat`). The rate and the PA are **two segments**, joined by the band's own
+  separator (the same dot that separates the name, the position and the magnitude):
+  `1.23″/min · PA 245°`.
+- **Line 2 (context)**: a stack's exposure is written **"N × T s"** (the frames it
+  combines times their exposure), not a bare exposure that would hide how much light
+  there is. `format_exposure` decides it and `n_frames` travels inside `meta`.
+- **Drop order**: on line 1 the motion goes first (it is the story, not the identity),
+  then the magnitude and the position last (`DROP_ORDER_NAME`).
+- **Where a stack's data comes from**: it is written into the **stack's own header**
+  when the run saves it (`gui/ufe_trackstack_tab.py`): `NS_RATE` / `NS_PA` / `NS_MOT`
+  (the measured or predicted motion), `NS_MAG` / `NS_MAGER` / `NS_MAGB` / `NS_MAGNC` /
+  `NS_MAGOK` (that observation's brightness with the signals that colour it) and, copied
+  from the frame, `EXPTIME` / `DATE-OBS` / `FILTER` / `INSTRUME` / `TELESCOP` (without
+  them a stack had no date, exposure or filter). The measured position already travelled
+  as `NS_RA` / `NS_DEC` (the annotation). So the band says the same right after the run
+  and months later, with no database and no run in memory. The star stack carries the
+  motion but never the magnitude: there the object is a trail and was not measured.
+
+**Revisión (2026-10-06): cada cifra dice de dónde sale.** Se pidió poder distinguir en
+la banda si la velocidad, el PA y la magnitud son medidas o previstas, y que la
+magnitud aparezca SIEMPRE (aunque el run no la haya medido). La regla pasa a ser
+simétrica en los dos sentidos:
+
+- **Magnitud**: medida en esta placa → rol de calidad (`mag` / `mag-fair` / `mag-doubt`)
+  y la palabra `(measured)`; predicha por la efeméride → rol nuevo **`mag-eph`**
+  (apagado, como `motion-eph`) y `(eph)`; del catálogo o del proyecto → `mag-cat` y
+  `(cat)`, como antes. La predicción gana al catálogo, porque es la misma fuente que
+  sitúa el objeto. `NS_MAGSR` (`measured` | `ephemeris`) viaja en la cabecera del stack
+  y es lo que la banda lee: sin esa tarjeta, un valor guardado se lee como medición,
+  que es lo que eran todos los stacks escritos antes.
+- **Velocidad y PA**: `(measured)` cuando los midió el barrido, `(eph)` cuando son la
+  predicción. Antes lo medido iba en tinta y sin palabra: la ausencia de etiqueta era
+  la única señal, y eso obliga a saber la regla para leer la placa.
+- **El stack base** (la secuencia entera, ADR-062) lleva su banda propia: el movimiento,
+  la magnitud con su origen y **la detección hecha sobre esa misma imagen** (`NS_FOUND`,
+  `NS_SNR`, `NS_GATE`, `NS_LIMIT` = magnitud límite), que se pinta en la línea de
+  contexto como `SNR 1.4 (gate 3.5σ) · limit 19.4`. Es la medida del stack base, y sin
+  ella la imagen apilada no decía nada del objeto.
+- **Regla de los nombres de tarjeta**: ocho caracteres o menos. El lector propio de
+  FITS (`core/fits_io.py`, ADR-018) no entiende `HIERARCH`, así que una tarjeta más
+  larga la escribe astropy y la pierde el lector: la banda diría que no hay dato.
+
+**Revision (2026-10-06): every figure says where it comes from.** Asked for: the band
+must show whether the velocity, the PA and the magnitude were measured or predicted,
+and the magnitude must ALWAYS be there (even when the run did not measure it). The rule
+is now symmetric both ways:
+
+- **Magnitude**: measured on this plate → the quality role (`mag` / `mag-fair` /
+  `mag-doubt`) plus the word `(measured)`; predicted by the ephemeris → new role
+  **`mag-eph`** (dimmed, like `motion-eph`) and `(eph)`; from the catalogue or the
+  project → `mag-cat` and `(cat)`, as before. The prediction beats the catalogue,
+  because it is the same source that places the object. `NS_MAGSR` (`measured` |
+  `ephemeris`) travels in the stack's header and is what the band reads: without that
+  card a stored value reads as a measurement, which is what every stack written before
+  it was.
+- **Velocity and PA**: `(measured)` when the sweep measured them, `(eph)` when they are
+  the prediction. Measured used to be ink with no word: the absence of a label was the
+  only signal, and that forces the reader to know the rule.
+- **The base stack** (the whole sequence, ADR-062) carries its own band: the motion, the
+  magnitude with its origin and **the detection made on that very image** (`NS_FOUND`,
+  `NS_SNR`, `NS_GATE`, `NS_LIMIT` = limit magnitude), painted on the context line as
+  `SNR 1.4 (gate 3.5σ) · limit 19.4`. It is the base stack's own measurement, and
+  without it the stacked image said nothing about the object.
+- **Card-name rule**: eight characters or fewer. The app's own FITS reader
+  (`core/fits_io.py`, ADR-018) does not understand `HIERARCH`, so a longer card is
+  written by astropy and lost by the reader: the band would say there is no datum.
+
+**Revision (2026-10-07): the object's marks are optional and carry the kind colour.**
+The circle with the name that the astrometry run writes on every stack (the `ANNOTATE`
+card) no longer shows by default: the editor opens the plate with the object's cross
+only, and the top bar's "A" button brings it back when wanted (`annot_visible`, off by
+default, is the starting value at every show). The colour of the editor's three object
+marks (the full-frame crosshair, the cross the run measured with and that circle) is
+decided by `marker_color`: the object type's own (`theme.KIND_COLORS`, the one that
+tints the tab and the project) by default, or **one common colour** for all three
+(`theme.C_OBJECT_MARK`, the object mark's red). A single resolver
+(`theme.mark_color`) hands it out, so the three cannot disagree; and for the circle the
+colour travels in the card, which is the AIJ model, so the file says the same as what is
+seen.

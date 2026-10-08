@@ -106,7 +106,6 @@ H):
   is the most common mistake.
 
 ### 5. What is what today
-
 | Piece | Status |
 |---|---|
 | Sub-pixel centroid, aperture, median sky, guards | Exists (`core/series.py`) |
@@ -117,6 +116,38 @@ H):
 | Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Exists (phase H, 2026-09-23: `core/photometry.py` + Photometry tab) |
 | Host-galaxy subtraction | Exists (phase H: the blink's aligned PS1 reference, comp-scaled) |
 | Per-frame normalized series + detrending for transits | In progress: pieces T1–T8 in `docs/PLANS/series-photometry.md` (ADR-015 reopened 2026-09-27; ADR-048 to ADR-051) |
+
+### 6. What really limits a faint series (measured)
+
+On a short exposure the limit is usually not the software, and it is worth
+knowing which of the two you are fighting. Measured on the author's own 1 s
+series (2025 FG18, a 0.43 m telescope):
+
+* the differential scatter between two stars **6 arcmin apart is 19 mmag**,
+  and between two stars **30 arcmin apart it is 38 mmag**;
+* that growth with separation is the signature of **spatially correlated
+  noise**: scintillation and atmospheric transparency move whole patches of
+  sky together, so two nearby stars see the same atmosphere and two distant
+  ones do not;
+* the app's own scintillation model (Young, 1967) predicts **131 mmag** for
+  0.43 m and 1 s, which is the same order as what is measured.
+
+Two consequences, and the second is the important one:
+
+1. **No amount of algorithm fixes this.** The engine was measured against a
+   photutils-based one on this same data (ADR-067): same precision on single
+   measurements, and on the series a median of 1.8 % of improvement, with one
+   dataset at 9.7 %. The atmosphere was not in the difference.
+2. **What does fix it** is collecting more light per unit of time: a longer
+   exposure (scintillation falls as 1/sqrt(2t)), a larger aperture (as
+   D^(-2/3)), a lower airmass, or binning the series in time, which trades
+   cadence for precision. A transit that needs 1 mmag per binned point wants
+   the longest exposure that does not smear the ingress.
+
+The practical way to read your own limit: measure two stars of similar
+brightness at different separations and compare their scatter. If it grows
+with distance, you are atmosphere-limited; if it does not, you are
+photon-limited and the exposure or the aperture is what is missing.
 
 ---
 

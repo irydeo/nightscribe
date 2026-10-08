@@ -43,12 +43,16 @@ from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
 from ..core import chart_annotate, coords, fits_meta, photometry, \
     photometry_export, \
     series_measure, stretch
+from ..config import config
 from ..viz import palette
+from . import theme
 from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ufe_host import host_of
 from .ufe_centre_dialog import UfeCentreDialog
 from .ufe_series_dialog import UfeSeriesDialog
 from .ufe_passes_dialog import UfePassesDialog
 from .ui_loader import adopt_ui
+from .widgets.collapsible_section import CollapsibleSection
 from .widgets.lightcurve_widget import LightCurveChart
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
@@ -152,6 +156,28 @@ class UfeMeasureTab(QWidget):
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
         self._status_hook = None     # the window's single status line (U4)
+        # ADR-038 rev: the recipe (band, apertures, manual centre, Suggest
+        # and Advanced) lives in ONE block, closed on entry, because the
+        # panel's hero button is what the observer came for and the defaults
+        # are what most nights want. The block's container comes from the
+        # Designer file, so the structure stays there (ADR-005).
+        self._sections = {
+            "recipe": self._wrap_section(
+                "sec_recipe_content", self.tr("The photometry recipe"),
+                "photometry_recipe_open"),
+            # The measurement's own result (the panel with the numbers and
+            # the ways out of it) is a group too, and it appears with the
+            # first measurement: an empty box is furniture. It is CLOSED like
+            # every other group (asked for 2026-10-06), with a fresh key
+            # because the previous design opened it by default; the magnitude
+            # announces itself on its header (see _draw_measurement), so the
+            # observer knows there is something to read without opening it.
+            "result": self._wrap_section(
+                "sec_result_content", self.tr("Measurement"),
+                "photometry_result_open2"),
+        }
+        self._sections["result"].setVisible(False)
+        self.refresh_accent()
         self._curve_load = None      # fn() -> the visit's saved points (D)
         self._curve_clear = None     # fn() -> undo every series run (D)
         self._curve_from_visit = False   # the chart shows the visit's curve
@@ -216,6 +242,25 @@ class UfeMeasureTab(QWidget):
         # the public attributes the tests and the measure flow pin
         self.chk_sigmaclip = self._advanced.chk_sigmaclip
         self.chk_seeing = self._advanced.chk_seeing
+        # The switch lives in the PANEL and not inside Advanced… (2026-10-07):
+        # a knob that decides how the light is measured cannot be two clicks
+        # away from the measurement. It was in the advanced window and the
+        # observer looked for it and did not find it. It is the same recipe
+        # field as always, so capture_state, the astrometry run and the series
+        # read it from here and nothing else had to move.
+        self.chk_matched = self._ui.chk_matched
+        # It STARTS at the app's own default (Ajustes -> Photometry), read
+        # here so that `ui_defaults()` and the state reset go back to that
+        # default and not to a value baked into the .ui file
+        self.chk_matched.setChecked(bool(config.get("phot_matched", True)))
+        # And the recipe group's HEADER says the method while the group is
+        # closed: the switch was invisible twice over (inside Advanced… and
+        # inside a closed group), and a method that changes the published
+        # magnitude cannot be a secret. The chip goes when the group opens,
+        # because then the switch itself is there.
+        self.chk_matched.toggled.connect(
+            lambda _c: self._sync_method_notice())
+        self._sync_method_notice()
         self.chk_color = self._advanced.chk_color
         self.chk_subtract = self._advanced.chk_subtract
         self.cmb_sky = self._advanced.cmb_sky
@@ -225,6 +270,8 @@ class UfeMeasureTab(QWidget):
             lambda _i: self._remeasure())
         self.chk_sigmaclip.toggled.connect(lambda _c: self._remeasure())
         self.chk_seeing.toggled.connect(self._on_seeing_toggled)
+        # el metodo de medida cambia el numero: la medida viva se rehace
+        self.chk_matched.toggled.connect(lambda _c: self._remeasure())
         self.chk_color.toggled.connect(lambda _c: self._remeasure())
         self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
         self.chk_subtract.toggled.connect(self._on_subtract_toggled)
@@ -261,7 +308,16 @@ class UfeMeasureTab(QWidget):
         # and the tests use is untouched, and their texts and tooltips keep
         # living in the Designer file (ADR-005). Same mechanism as the
         # window's doors (U2) and the series' one (U6).
+        # The actions of a measurement belong to the RESULT (ADR-038 rev):
+        # with nothing measured they are furniture, so they live in one
+        # container that appears with the panel's lines.
+        self.w_result_actions = self._ui.w_result_actions
         self.btn_export_more = self._ui.btn_export_more
+        # D: the write-back of a magnitude measured by hand. The button only
+        # lives when the plate is an astrometry stack that knows its run and
+        # its observation (see _sync_manual_button).
+        self.btn_manual_mag = self._ui.btn_manual_mag
+        self.btn_manual_mag.clicked.connect(self._on_manual_magnitude)
         self.btn_reset_more = self._ui.btn_reset_more
         self._door(self.btn_export_more, (self.btn_csv, self.btn_eff))
         self._door(self.btn_reset_more, (self.btn_reset_state,
@@ -524,6 +580,18 @@ class UfeMeasureTab(QWidget):
         self._advanced.raise_()
         self._advanced.activateWindow()
 
+    def _sync_method_notice(self):
+        # @return: None. The recipe group's header carries the method while
+        #          the group is closed, so the observer sees which one will
+        #          measure without opening anything (the chip is the group's
+        #          own way of announcing itself: see CollapsibleSection).
+        sec = self._sections.get("recipe")
+        if sec is None:
+            return
+        sec.setHeaderBadge(self.tr("matched filter")
+                           if self.chk_matched.isChecked()
+                           else self.tr("aperture"))
+
     def _on_group_quick(self, value):
         # the series block's Group frames drives the Advanced… one
         if self._advanced.spn_group_n.value() != value:
@@ -539,6 +607,39 @@ class UfeMeasureTab(QWidget):
             self.spn_group_quick.blockSignals(False)
 
     # ------------------------------------------------------- activation
+
+    # -------------------------------------------------------- the block
+
+    def _wrap_section(self, name, title, key, open_by_default=False):
+        # @args: name - the .ui container's objectName, title - the block's
+        #        title in plain language, key - the settings key that
+        #        remembers whether it stays open, open_by_default - the state
+        #        before the observer chooses
+        # @return: the CollapsibleSection
+        content = getattr(self._ui, name)
+        section = CollapsibleSection(title, self)
+        self.layout().replaceWidget(content, section)
+        content.setParent(None)
+        section.contentLayout().addWidget(content)
+        content.setVisible(True)
+        section.setCollapsed(
+            not bool(config.get(key, 1 if open_by_default else 0)))
+        section.sectionToggled.connect(
+            lambda opened, k=key: config.set(k, 1 if opened else 0))
+        return section
+
+    def refresh_accent(self):
+        # @return: None. The recipe block wears the object's hue on its
+        #          spine, like every other block of the panel.
+        ask = getattr(host_of(self), "project_accent", None)
+        hue = None
+        if callable(ask):
+            try:
+                hue = (ask() or {}).get("hue")
+            except Exception as err:
+                logger.warning("the project accent could not be read: %s", err)
+        for section in getattr(self, "_sections", {}).values():
+            section.setAccent(hue or theme.C_ACCENT)
 
     def set_active(self, flag, keep_overlays=False):
         # Only the section that owns the stage takes the clicks, and on
@@ -604,9 +705,64 @@ class UfeMeasureTab(QWidget):
         self.btn_csv.setEnabled(flag)
         self.btn_eff.setEnabled(flag)
         self.btn_export_more.setEnabled(flag)
+        # the manual write-back needs the same magnitude plus the run and the
+        # observation in the stack's header
+        self._sync_manual_button()
         # the door shows it at once, not only when it opens
         from .widgets.door_menu import refresh_door
         refresh_door(self.btn_export_more)
+
+    def _manual_target(self):
+        # @return: (run_id, group_index) when this plate is an astrometry
+        #          stack that knows which observation it is, or None
+        # The run's id and the observation travel in the stack's own header
+        # (NS_RUN / NS_NOBS): the tab never guesses from a file name.
+        header = getattr(self._state, "header", None) or {}
+        run = header.get("NS_RUN")
+        obs = header.get("NS_NOBS")
+        if run is None or obs is None:
+            return None
+        try:
+            return int(run), int(obs) - 1
+        except (TypeError, ValueError):
+            return None
+
+    def _sync_manual_button(self):
+        # @return: None. The button writes the measurement THIS plate shows
+        #          into the observation the stack belongs to, so it needs all
+        #          three: a calibrated measurement, the run and the
+        #          observation in the header, and a host to write it.
+        host = host_of(self)
+        can = (self._last is not None and self._last.get("mag") is not None
+               and self._manual_target() is not None
+               and callable(getattr(host, "manual_magnitude", None)))
+        self.btn_manual_mag.setEnabled(bool(can))
+
+    def _on_manual_magnitude(self):
+        # @return: None. The observer measured the brightness by hand and
+        #          says the report should use it: the tab asks the host (it
+        #          never touches the database) and says what happened.
+        target = self._manual_target()
+        if target is None or self._last is None:
+            return
+        write = getattr(host_of(self), "manual_magnitude", None)
+        if not callable(write):
+            return
+        run_id, group = target
+        mag = float(self._last.get("mag"))
+        band = self._last.get("band") or self._band
+        try:
+            done = bool(write(run_id, group, mag, band))
+        except Exception as err:
+            logger.warning("the manual magnitude failed: %s", err)
+            done = False
+        if done:
+            self._say(self.tr(
+                "The report will use this measurement: %1 %2").replace(
+                    "%1", f"{mag:.3f}").replace("%2", str(band or "")))
+        else:
+            self._say(self.tr(
+                "The measurement could not be written to the observation."))
 
     # -------------------------------------------------- resets (ADR-047)
 
@@ -639,7 +795,7 @@ class UfeMeasureTab(QWidget):
         # ADR-047: the working state back to the editor's defaults: the
         # recipe, the stretch, the sequence. No confirmation: nothing on
         # disk is lost, the saved state is just overwritable.
-        dlg = self.window()
+        dlg = host_of(self)
         f = getattr(dlg, "reset_state_local", None)
         if not callable(f) or not f():
             self._say(self.tr(
@@ -657,7 +813,7 @@ class UfeMeasureTab(QWidget):
         # ADR-047: destructive for the light curve: every measured point
         # saved on THIS plate is dropped. The plan requires a
         # confirmation here, and the hook fires only after a yes.
-        dlg = self.window()
+        dlg = host_of(self)
         if not dlg.state.has_image:
             self._say(self.tr(
                 "Load a plate first: there are no plate points to reset."))
@@ -705,7 +861,7 @@ class UfeMeasureTab(QWidget):
             # it to its project_files row and saves the plate's state.
             "path": self._state.path,
         }
-        dlg = self.window()
+        dlg = host_of(self)
         if not dlg or not dlg.notify_point(payload):
             self._say(
                 self.tr("Could not save the point in the project."))
@@ -736,9 +892,15 @@ class UfeMeasureTab(QWidget):
         # auto-scale is free to size the apertures for this plate again.
         self._radii_manual = False
         self._last = None
+        # the old plate's summary goes with it: a later repaint (the chart's
+        # own notes) must not bring a stale measurement back to the panel
+        self._panel_summary = []
         self._drop_items()
         self._drop_subtraction()
         self.lbl_result.setText("–")
+        # nothing measured on this plate: the group with the result and the
+        # ways out of it is not there at all
+        self._sections["result"].setVisible(False)
         self._set_export_enabled(False)
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
@@ -748,6 +910,52 @@ class UfeMeasureTab(QWidget):
         self._sync_centre_dialog()
 
     # -------------------------------------------------------- measuring
+
+    def _track_stack_plate(self):
+        # @return: "object" | "stars" when the open plate is a track & stack
+        #          (the astrometry tab writes NS_STACK when it saves one),
+        #          or None for an ordinary plate
+        header = getattr(self._state, "header", None) or {}
+        kind = header.get("NS_STACK")
+        return str(kind).strip().lower() if kind else None
+
+    def _track_stack_blocks_measure(self):
+        # @return: the reason this plate cannot set a zero point, or None
+        # On an object's stack the stars are TRAILS: a circular aperture on
+        # a 90 px streak measures a fraction of a flux, so the zero point
+        # it would set is a lie. On a star stack the comps are points but
+        # the OBJECT is the streak. Either way the measurement needs the
+        # pair, and until it is there the honest answer is to say why.
+        kind = self._track_stack_plate()
+        if kind is None:
+            return None
+        header = getattr(self._state, "header", None) or {}
+        if header.get("NS_PAIR"):
+            return None            # the pair is here: it can be measured
+        if kind == "object":
+            return self.tr(
+                "This plate is an object's track & stack: its stars are "
+                "TRAILS, so the comparison stars cannot set a zero point "
+                "here (a streak read with a circular aperture is not a "
+                "flux). The brightness is measured in the Astrometry tab, "
+                "which reads the comps on a second stack aligned on the "
+                "stars. Here you can still adjust the RECIPE that tab "
+                "uses: the apertures, the sky and the centroid.")
+        if kind == "base":
+            return self.tr(
+                "This plate is the WHOLE-SEQUENCE stack of a track & stack: "
+                "every frame combined with the object frozen, so the object "
+                "is as deep as the visit goes and the stars are trails. The "
+                "comparison stars cannot set a zero point here (a streak "
+                "read with a circular aperture is not a flux): the "
+                "brightness is measured in the Astrometry tab, on the "
+                "observations' own stacks.")
+        return self.tr(
+            "This plate is the STAR stack of a track & stack: the comps are "
+            "points here, but the OBJECT is a trail, so it cannot be "
+            "measured on this plate. Open the object's stack and measure "
+            "there. Here you can still adjust the RECIPE the Astrometry "
+            "tab uses.")
 
     def _explain_no_wcs_measure(self):
         # The automatic solve did not land: the click cannot be measured.
@@ -768,13 +976,21 @@ class UfeMeasureTab(QWidget):
     def _on_scene_clicked(self, scene_pt):
         if not self._active or not self._state.has_image:
             return
+        # A track & stack cannot set a zero point out of its streaks (or
+        # measure an object that is one): say it BEFORE the solve, because
+        # the WCS is there and the measurement would otherwise proceed and
+        # produce a magnitude nobody could trust.
+        blocked = self._track_stack_blocks_measure()
+        if blocked:
+            self._say(blocked)
+            return
         if self._state.wcs is None:
             # ADR-051: the plate is solved automatically and the click
             # lands; never a dead end asking for a manual solve
             self._say(self.tr(
                 "The plate has no WCS: solving it to locate the "
                 "comparison stars…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_scene_clicked(scene_pt),
@@ -890,6 +1106,7 @@ class UfeMeasureTab(QWidget):
             "sky": self.cmb_sky.currentData() or "median",
             "target_bv": float(self.spn_target_bv.value()),
             "manual_centre": bool(self.chk_manual_centre.isChecked()),
+            "matched": bool(self.chk_matched.isChecked()),
         }
 
     def apply_state(self, st):
@@ -914,8 +1131,15 @@ class UfeMeasureTab(QWidget):
         self._radii_manual = False
         for chk, key in ((self.chk_sigmaclip, "sigmaclip"),
                          (self.chk_seeing, "seeing"),
-                         (self.chk_color, "color")):
-            want = bool(st.get(key, False))
+                         (self.chk_color, "color"),
+                         (self.chk_matched, "matched")):
+            # A recipe that does not mention a knob does NOT move it: the
+            # fallback is where the widget already is (the .ui's default, or
+            # the app's own setting), so a plate saved before a key existed
+            # inherits the default instead of silently turning it off. With
+            # `False` as the fallback, the key added yesterday (matched)
+            # unticked itself on every old plate.
+            want = bool(st.get(key, chk.isChecked()))
             if chk.isChecked() != want:
                 chk.setChecked(want)
         sky = st.get("sky")
@@ -1064,11 +1288,14 @@ class UfeMeasureTab(QWidget):
             self._centre.raise_()
         self._remeasure()
 
-    def _apertures(self, entries):
+    def _apertures(self, entries, image=None):
         # H3: when the seeing checkbox is on, measure the comps' FWHM on
         # the plate and scale the radii; the spins follow so the numbers
         # stay visible and tweakable. A hand edit wins until the next
         # plate (the observer's radii are never stomped).
+        # @args: entries - the comparison sequence, image - where the seeing
+        #        is measured (None: the plate itself; a track & stack passes
+        #        its star stack, where the comps are points)
         if not self.chk_seeing.isChecked() or self._radii_manual:
             return (self.spn_rap.value(), self.spn_rin.value(),
                     self.spn_rout.value()), None
@@ -1081,8 +1308,9 @@ class UfeMeasureTab(QWidget):
             except Exception:
                 continue
         sat = photometry.saturation_ceiling(self._state.header)
-        fwhm = photometry.estimate_fwhm(self._state.data, positions,
-                                        sat_adu=sat)
+        fwhm = photometry.estimate_fwhm(
+            image if image is not None else self._state.data, positions,
+            sat_adu=sat)
         r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm)
         if fwhm is not None:
             for spn, v in ((self.spn_rap, r_ap), (self.spn_rin, r_in),
@@ -1127,15 +1355,49 @@ class UfeMeasureTab(QWidget):
         lbl.setText(self.tr("auto: {0}").format(" · ".join(parts)) if parts
                     else self.tr("auto: no ceiling known (plateau only)"))
 
+    def _pair_image(self):
+        # @return: the star stack that goes with this plate, or None
+        # A track & stack saves TWO files per observation: the object's stack
+        # (its light, and the stars as TRAILS) and the star stack (the comps
+        # as points, and the object as a trail). NS_PAIR carries the name of
+        # the other one, so whichever is opened the tab knows its partner.
+        # The comps read on the star stack and the target on the object's:
+        # that is the only way a zero point means anything on this kind of
+        # plate.
+        header = getattr(self._state, "header", None) or {}
+        name = header.get("NS_PAIR")
+        if not name or not self._state.path:
+            return None
+        partner = Path(self._state.path).parent / str(name)
+        if not partner.exists():
+            return None
+        try:
+            from ..core import fits_io
+            _header, data = fits_io.read_fits(str(partner))
+            return np.ascontiguousarray(data, dtype=np.float32)
+        except Exception as err:
+            logger.warning("the pair %s could not be read: %s", partner, err)
+            return None
+
     def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
         # shared with the series engine), and paint the outcome.
         from ..config import config
-        radii, fwhm = self._apertures(entries)
+        # the star stack, when this plate is half of a track & stack pair:
+        # the seeing is measured on IT too (there the comps are points, and
+        # a FWHM taken from their trails would size the aperture with a
+        # smear)
+        pair = self._pair_image()
+        radii, fwhm = self._apertures(entries, image=pair)
         if self._diff is not None:
             image, comp_image = self._diff, self._pair_obs
             comp_scale = self._diff_scale
+        elif pair is not None:
+            image, comp_image, comp_scale = self._state.data, pair, 1.0
+            self._say(self.tr(
+                "The comparison stars are read on the star stack of these "
+                "same frames: on this plate they are trails."))
         else:
             image, comp_image, comp_scale = self._state.data, None, 1.0
         cfg = photometry.PlateConfig(
@@ -1144,6 +1406,10 @@ class UfeMeasureTab(QWidget):
             band=self.cmb_band.currentText() or self._band,
             radii=radii, fwhm=fwhm,
             sigmaclip=self.chk_sigmaclip.isChecked(),
+            # the measurement the LIVE tab shows follows the checkbox: the
+            # default of the config is the filter, and a tab that ignored the
+            # checkbox would measure with one method and say another
+            matched=self.chk_matched.isChecked(),
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
             target_bv=self.spn_target_bv.value(),
@@ -1261,7 +1527,7 @@ class UfeMeasureTab(QWidget):
         # @return: the frames context {"paths", "session_id", ...} the host
         #          hooked, or None (ad-hoc open, or no frames for that
         #          scope)
-        dlg = self.window()
+        dlg = host_of(self)
         getter = getattr(dlg, "series_context", None)
         if not callable(getter):
             return None
@@ -1363,7 +1629,7 @@ class UfeMeasureTab(QWidget):
             return None
         if self._last is not None and self._last.get("col") is not None:
             return (self._last["col"], self._last["row"])
-        obj = getattr(self.window(), "object", lambda: None)()
+        obj = getattr(host_of(self), "object", lambda: None)()
         if obj and obj.get("ra") is not None and obj.get("dec") is not None:
             try:
                 return self._state.wcs.sky_to_pixel(float(obj["ra"]),
@@ -1387,6 +1653,7 @@ class UfeMeasureTab(QWidget):
                                      self.spn_rin.value(),
                                      self.spn_rout.value()),
             sigmaclip=self.chk_sigmaclip.isChecked(),
+            matched=self.chk_matched.isChecked(),
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
             target_bv=self.spn_target_bv.value(),
@@ -1484,7 +1751,7 @@ class UfeMeasureTab(QWidget):
             # ADR-051: solve the reference plate and start the series
             self._say(self.tr(
                 "The plate has no WCS: solving it to place the series…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(self._on_measure_series,
@@ -1544,7 +1811,7 @@ class UfeMeasureTab(QWidget):
                 "Measure the series first: the figure is the curve."))
             return
         name = ""
-        window = self.window()
+        window = host_of(self)
         obj = getattr(window, "object", None)
         if callable(obj):
             name = (obj() or {}).get("name") or ""
@@ -1566,7 +1833,7 @@ class UfeMeasureTab(QWidget):
         self._say(self.tr(
             "Chart written as you see it: {0}").format(out))
         # ADR-045: the scene export registers like the other tabs' files
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify([out], "chart")
@@ -1639,7 +1906,7 @@ class UfeMeasureTab(QWidget):
         # @return: the folder (a Path), created if it did not exist
         from .. import paths as paths_mod
         folder = None
-        ask = getattr(self.window(), "export_folder", None)
+        ask = getattr(host_of(self), "export_folder", None)
         if callable(ask):
             try:
                 folder = ask()
@@ -1700,7 +1967,7 @@ class UfeMeasureTab(QWidget):
         # (reported: "el botón Night Conditions (PNG) no hace nada").
         folder = self._export_folder()
         name = "series"
-        window = self.window()
+        window = host_of(self)
         obj = getattr(window, "object", None)
         if callable(obj):
             name = (obj() or {}).get("name") or name
@@ -1745,7 +2012,7 @@ class UfeMeasureTab(QWidget):
         # observer does not have to hunt for the other door.
         ctx = self._series_context() or {}
         pid = ctx.get("pid")
-        dlg = self.window()
+        dlg = host_of(self)
         hook = getattr(dlg, "_open_phase_dialog", None)
         if pid and callable(hook):
             hook(pid)
@@ -1927,7 +2194,7 @@ class UfeMeasureTab(QWidget):
         # project): the tab never touches the database. A host without the
         # hook (a test double, an ad-hoc open) simply has none.
         # @return: {"runs": [...], "curve_run_id": int|None} or {}
-        ask = getattr(self.window(), "visit_passes", None)
+        ask = getattr(host_of(self), "visit_passes", None)
         if not callable(ask):
             return {}
         try:
@@ -1963,7 +2230,7 @@ class UfeMeasureTab(QWidget):
         # of the other passes stay in the project.
         # @args: run_id - the pass to draw
         # @return: None
-        choose = getattr(self.window(), "choose_visit_curve", None)
+        choose = getattr(host_of(self), "choose_visit_curve", None)
         if not callable(choose):
             return
         try:
@@ -1981,7 +2248,7 @@ class UfeMeasureTab(QWidget):
         # marked undone and the chart falls back to the pass before it.
         # @args: run_id - the pass to undo
         # @return: None
-        undo = getattr(self.window(), "undo_run", None)
+        undo = getattr(host_of(self), "undo_run", None)
         count = 0
         if callable(undo):
             count = int(undo(run_id) or 0)
@@ -2168,7 +2435,17 @@ class UfeMeasureTab(QWidget):
             lines += ["· " + n for n in notes]
         if not lines:
             self.lbl_result.setText("–")
+            # An empty box is furniture: with nothing measured the panel and
+            # its actions are not there at all (ADR-038 rev: on entering, the
+            # action is what the observer sees). They come back the moment
+            # there is a line.
+            self._sections["result"].setVisible(False)
             return
+        self._sections["result"].setVisible(True)
+        # the news rides the header of the (closed) group: the magnitude of
+        # this plate, so the observer reads it without opening the panel
+        # (asked for 2026-10-06: a group that holds something says so)
+        self._sections["result"].setNotice(self._result_badge())
         # THE PANEL WEARS THE SAME COLOUR CODE AS THE BAND: the lines that
         # carry a magnitude keep their role (see _fill_panel) and the rest is
         # plain text. It goes out as HTML with everything escaped, so the
@@ -2219,7 +2496,7 @@ class UfeMeasureTab(QWidget):
         else:
             self._say("")
         rows = self._series_rows(result.points)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_points", None)
         self._series_run_id = None
         if callable(notify) and rows:
@@ -2504,7 +2781,7 @@ class UfeMeasureTab(QWidget):
         # know the window's layout (a dialog is not always the parent, so
         # the guard is honest about it).
         # @return: True when the curve is in front
-        show = getattr(self.window(), "show_curve", None)
+        show = getattr(host_of(self), "show_curve", None)
         if callable(show):
             show()
             return True
@@ -2531,7 +2808,7 @@ class UfeMeasureTab(QWidget):
                      for m in check["messages"]]
             self._say("⚠ " + " · ".join(lines))
         planet = ""
-        obj = getattr(self.window(), "object", lambda: None)()
+        obj = getattr(host_of(self), "object", lambda: None)()
         if obj and obj.get("name"):
             planet = obj["name"]
         else:
@@ -2577,10 +2854,10 @@ class UfeMeasureTab(QWidget):
             return
         self._say(
             self.tr("ExoClock files written. Upload them at exoclock.space"))
-        notify = getattr(self.window(), "notify_saved", None)
+        notify = getattr(host_of(self), "notify_saved", None)
         if callable(notify):
             notify([out], "report")
-        hook = getattr(self.window(), "notify_exoclock", None)
+        hook = getattr(host_of(self), "notify_exoclock", None)
         if callable(hook):
             hook({"planet": planet, "points": len(pts)})
         QDesktopServices.openUrl(QUrl("https://exoclock.space/upload/"))
@@ -2594,7 +2871,7 @@ class UfeMeasureTab(QWidget):
         run_ids += list(self._live_run_ids)
         if not run_ids:
             return
-        dlg = self.window()
+        dlg = host_of(self)
         undo = getattr(dlg, "undo_run", None)
         count = 0
         if callable(undo):
@@ -2675,7 +2952,7 @@ class UfeMeasureTab(QWidget):
         # @args: result - the batch's SeriesResult
         # @return: None; the curve and the counter follow.
         rows = self._series_rows(result.points)
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_points", None)
         if callable(notify) and rows:
             echo = dict(self._series_cfg_dict or {})
@@ -2748,7 +3025,7 @@ class UfeMeasureTab(QWidget):
         root = paths_mod.docs_dir()
         name = "SEQUENCES.es.md" if self._lang != "en" else "SEQUENCES.md"
         start = root / name if (root / name).exists() else None
-        open_browser(root, self.window(), start=start)
+        open_browser(root, host_of(self), start=start)
 
     def _restore_advanced_defaults(self):
         # D25: every knob back to the .ui's shipped default.
@@ -2822,6 +3099,14 @@ class UfeMeasureTab(QWidget):
             lines.append(self.tr(
                 "Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})")
                 .format(zp["zp"], zp["zp_err"], zp["n"], band))
+        # THE CEILING THE RULE COULD NOT ENFORCE (ADR-066): with the camera's
+        # linearity unset, a star over it but under the plate's clip slips
+        # through, and the observer has to know which limit is really being
+        # applied. Said here, where the zero point is read.
+        warning = photometry.ceiling_warning(self._state.header or {},
+                                             config)
+        if warning is not None:
+            lines.append("⚠ " + warning.get(self._lang, warning["en"]))
         if last["mag"] is not None:
             err_txt = (self.tr("± {0:.3f}").format(last["err"])
                        if last["err"] is not None else "")
@@ -2972,6 +3257,17 @@ class UfeMeasureTab(QWidget):
 
     # ---------------------------------------------------------- overlays
 
+    def _result_badge(self):
+        # @return: the short news for the "Measurement" group's header: the
+        #          magnitude just measured (the number the observer came
+        #          for), or "new" when there is a result without one.
+        last = getattr(self, "_last", None) or {}
+        mag = last.get("mag")
+        if mag is not None:
+            band = str(last.get("band") or "")
+            return f"{float(mag):.3f} {band}".strip()
+        return self.tr("new")
+
     def _draw_measurement(self):
         # Aperture + annulus on the measured point, thin rings on the
         # comps that calibrated it (all in plate px, cosmetic pens).
@@ -3034,7 +3330,7 @@ class UfeMeasureTab(QWidget):
             self._say(self.tr(
                 "The plate has no WCS: solving it for the aligned "
                 "reference…"))
-            dlg = self.window()
+            dlg = host_of(self)
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(lambda: self._on_subtract_toggled(True),
@@ -3212,7 +3508,7 @@ class UfeMeasureTab(QWidget):
         self._say(self.tr("Written to {0}").format(out))
         # ADR-045: the one-row report registers in the watching project
         # (the visit it was measured from), like every other UFE file
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify([out], "report")

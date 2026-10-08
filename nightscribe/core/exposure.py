@@ -18,14 +18,70 @@ import datetime
 # "latest safe start" against the local horizon (ADR-020).
 
 
-def plate_scale(pixel_um, focal_mm):
+def binning_factor(binning):
+    # On-chip binning as a number. The config stores it as text ("2x2", the
+    # same string the EXOTIC handoff writes) and a binned pixel is that many
+    # sensor pixels wide, so the plate scale grows with it: 2x2 on a 3.76 um
+    # sensor gives an 7.52 um effective pixel.
+    # @args: binning - "1x1" | "2x2" | "3x3" | a number | None
+    # @return: the factor (float); 1.0 when unknown or unusable
+    if binning in (None, ""):
+        return 1.0
+    if isinstance(binning, (int, float)):
+        return float(binning) or 1.0
+    text = str(binning).strip().lower().replace(" ", "")
+    if "x" in text:
+        text = text.split("x", 1)[0]
+    try:
+        return float(text) or 1.0
+    except ValueError:
+        return 1.0
+
+
+def plate_scale(pixel_um, focal_mm, binning=None):
     # Arcseconds per pixel from the camera pixel size and telescope focal
-    # length: scale = 206.265 * pixel(um) / focal(mm).
-    # @args: pixel_um - camera pixel in microns, focal_mm - focal length in mm
+    # length: scale = 206.265 * pixel(um) / focal(mm). The binning enters
+    # because the pixel the light falls on is the BINNED one: without it a
+    # 2x2 plate reads half its real scale, and everything that hangs off the
+    # scale (the transit exposure, the solver's hint, the field of view, the
+    # sampling verdict) would be off by that factor. It was left out until
+    # 2026-10-07: the value only mattered for someone who bins, and nothing
+    # said so.
+    # @args: pixel_um - camera pixel in microns, focal_mm - focal length in
+    #        mm, binning - "2x2" or a number, None = 1x1
     # @return: plate scale in arcsec/pixel
     if not focal_mm:
         return 0.0
-    return 206.265 * float(pixel_um) / float(focal_mm)
+    px = float(pixel_um) * binning_factor(binning)
+    return 206.265 * px / float(focal_mm)
+
+
+# The band where the image is sampled the way its resolution wants: a star's
+# FWHM landing on two or three pixels. A typical amateur site sees a couple
+# of arcseconds, so the useful plate scale sits roughly between 0.5 and 2.0
+# arcsec/pixel. Below the fine edge the sensor spends pixels it cannot
+# resolve (more read noise per star, bigger files); above the coarse edge the
+# star falls on barely a pixel and the image loses detail. The edges are a
+# rule of thumb, not a law: the right number depends on the seeing of the
+# site, which no form can tell us.
+SAMPLE_FINE_MAX_ARCSEC_PX = 0.5
+SAMPLE_COARSE_MIN_ARCSEC_PX = 2.0
+
+
+def sampling(scale_arcsec_px):
+    # @args: scale_arcsec_px - plate scale in arcsec/pixel (0/None = unknown)
+    # @return: "fine" | "ok" | "coarse", or None when there is no scale
+    try:
+        scale = float(scale_arcsec_px)
+    except (TypeError, ValueError):
+        return None
+    if scale <= 0:
+        return None
+    if scale < SAMPLE_FINE_MAX_ARCSEC_PX:
+        return "fine"
+    if scale > SAMPLE_COARSE_MIN_ARCSEC_PX:
+        return "coarse"
+    return "ok"
 
 
 def max_exposure_no_trail(rate_arcsec_min, plate_scale_arcsec_px, tol_px=1.0):

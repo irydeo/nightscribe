@@ -555,3 +555,20 @@ def test_the_dispatcher_hands_the_pointing_to_nova(tmp_path, monkeypatch):
                             pointing=(49.99038, 49.86875))
     assert cards == {"CRVAL1": 31.3121}
     assert seen.get("pointing") == (49.99038, 49.86875)
+
+
+def test_cancelled_accepts_a_plain_callable_and_a_solve_cancel():
+    # The GUI workers hand the engines a callable (lambda: self._cancel)
+    # while the solve dialog uses a SolveCancel with attach()/is_set().
+    # Asking for .is_set() unconditionally is what blew up with
+    # "'function' object has no attribute 'attach'" the first time the
+    # track & stack solve ran on a plate with no WCS in its header.
+    from nightscribe.core.sources import astap
+    from nightscribe.core.solve import SolveCancel
+    assert astap._cancelled(None) is False
+    assert astap._cancelled(lambda: False) is False
+    assert astap._cancelled(lambda: True) is True
+    cancel = SolveCancel()
+    assert astap._cancelled(cancel) is False
+    cancel.set()
+    assert astap._cancelled(cancel) is True

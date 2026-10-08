@@ -156,14 +156,19 @@ class ProjectRow(QFrame):
     def set_project(self, *, kind_label, kind_color, name, favorite,
                     campaign_name, progress_text, next_text,
                     activity_text, window_text, sparkline, icon=None,
-                    sparkline_text=None, detail_text=""):
+                    sparkline_text=None, detail_text="", kind=None):
         # @args: everything already rendered to words by the caller
         #        (kind_label/chips are plain text; sparkline is a QPixmap,
         #        null when there is nothing to draw; icon is the kind's
         #        QPixmap drawn by the caller — None leaves a flat colour wash
         #        that still anchors the hue; sparkline_text is the
-        #        thumbnail's tooltip: what the curve is, in words)
+        #        thumbnail's tooltip: what the curve is, in words; kind is
+        #        the kind ID the row is painted for; the row itself draws
+        #        its label and hue from it, and the callers that need to
+        #        draw the SAME glyph somewhere else (the astrometry tab's
+        #        hero button) read it back from the payload)
         # @return: None
+        self._kind = kind
         self._kind_color = kind_color
         self.lbl_kind.setText(kind_label)
         self.lbl_kind.setStyleSheet(theme.chip_style(kind_color))

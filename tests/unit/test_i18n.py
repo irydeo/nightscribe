@@ -58,3 +58,36 @@ def test_no_double_escaped_entities():
                         assert token not in el.text, (
                             f"{lang}: {ctx.findtext('name')} {node} "
                             f"{el.text[:60]!r} carries a re-escaped {token}")
+
+
+def test_the_english_catalogue_repeats_the_source():
+    # "en" is the PASS-THROUGH language: its catalogue repeats every source
+    # verbatim, and that is what the app reads when the observer works in
+    # English. Nothing else notices when it does not, and it did not:
+    #
+    #   * on 2026-10-07, four strings of the resampling combo (Bilinear,
+    #     Cubic, Quintic and the "Resampling:" label) shipped with their
+    #     SPANISH value in the English catalogue, because the script that
+    #     filled the two files wrote the same table into both. The English
+    #     interface showed "Remuestreo: [Bilineal (más limpio)]", and the
+    #     whole suite stayed green;
+    #   * and three more were already there, of a subtler kind: a string that
+    #     is CONCATENATED to a line (" along PA %1°") had lost its leading
+    #     space, so English read "mag 18.3along PA 46°".
+    #
+    # Vanished and obsolete entries are skipped: they are strings that no
+    # longer exist in the code and nothing reads them.
+    tree = ET.parse(I18N / "nightscribe_en.ts")
+    wrong = []
+    for ctx in tree.getroot().findall("context"):
+        for msg in ctx.findall("message"):
+            src = msg.find("source")
+            tr = msg.find("translation")
+            if src is None or src.text is None or tr is None:
+                continue
+            if tr.get("type") in ("vanished", "obsolete"):
+                continue
+            if (tr.text or "") != src.text:
+                wrong.append((ctx.findtext("name"), src.text, tr.text))
+    assert not wrong, ("the English catalogue must repeat the source "
+                       "verbatim: %r" % (wrong,))

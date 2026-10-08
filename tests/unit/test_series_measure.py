@@ -140,10 +140,14 @@ def _comp_set(wcs):
 
 
 def _config(wcs, comps, **over):
+    # The APERTURE is pinned here on purpose: these tests are about the
+    # aperture (its scaling with the seeing, the radii, the detrend), and the
+    # app's default is the matched filter. A test that measures a method has
+    # to say which one, or it pins whatever the default happens to be.
     base = dict(wcs=wcs, target_xy=TARGET_XY, comp_set=tuple(comps),
                 band="V", site_gain=2.0, site_ron=5.0,
                 site_lat=40.0, site_lon=-3.0, site_aperture_m=0.254,
-                site_height_m=650.0)
+                site_height_m=650.0, matched=False)
     base.update(over)
     return sm.SeriesConfig(**base)
 
@@ -1117,3 +1121,101 @@ def test_an_inherited_alignment_does_not_crash_the_report(tmp_path,
     # (the previous transform's own shift, which is the honest value)
     assert "shift_median_px" in rep and "shift_max_px" in rep
     monkeypatch.setattr(register, "trusted", real)
+
+
+def test_the_aperture_tuning_never_uses_a_star_over_the_ceiling(tmp_path):
+    # ADR-066 (the rule of the house: never a saturated star, never one over
+    # the camera's linearity). The aperture tuning measured the check star
+    # WITHOUT the ceilings, so a clipped star could tune the aperture the
+    # whole night would then use. It is refused now, with the same two
+    # ceilings every other path asks for.
+    from astropy.io import fits
+    from nightscribe.core import series_measure as sm
+    size = 64
+    yy, xx = np.mgrid[0:size, 0:size]
+    # the peak lands at ~40 200 ADU: over a 30 000 ADU linearity, well under
+    # a 65 535 one (the app treats 85 % of a ceiling as saturated, so the
+    # star has to stay clear of that too)
+    star = (200.0 + 40000.0 * np.exp(-(((xx - 32.0) ** 2 + (yy - 32.0) ** 2)
+                                       / (2 * 2.0 ** 2))))
+    paths = []
+    for i in range(4):
+        p = tmp_path / f"f{i}.fits"
+        hdu = fits.PrimaryHDU(star.astype(np.float32))
+        hdu.header["DATE-OBS"] = f"2026-10-06T22:0{i}:00"
+        hdu.header["EXPTIME"] = 1.0
+        hdu.writeto(str(p), overwrite=True)
+        paths.append(str(p))
+    w = _reference_wcs()
+    ra, dec = w.pixel_to_sky(32.0, 32.0)
+    check = {"ra": ra, "dec": dec, "mag": 12.0, "id": "C1",
+             "band": "V", "bands": [{"label": "V", "value": 12.0,
+                                     "err": 0.01, "derived": False}]}
+    cfg = sm.SeriesConfig(comp_set=[{"kind": "check", "name": "CHK",
+                                     "star": check}], wcs=w,
+                          site_linear=30000.0, site_saturate=65535.0)
+    out = sm.sweep_aperture(paths, cfg)
+    # the star is over the linearity (40 200 > 30 000): nothing is tuned with
+    # it, so no night comes back
+    assert out == {}
+    # and with a linearity that clears it, the tuning happens
+    cfg2 = sm.SeriesConfig(comp_set=cfg.comp_set, wcs=w,
+                           site_linear=60000.0, site_saturate=65535.0)
+    out2 = sm.sweep_aperture(paths, cfg2)
+    assert out2, "con el techo por encima de la estrella, el ajuste sí se hace"
+
+
+def test_the_series_survives_an_engine_that_reports_a_negative_flux(
+        tmp_path, monkeypatch):
+    # The crash was HERE. The GUI builds its series with
+    # seeing_aperture=True (see main_window), which is what puts a FWHM in
+    # the plate recipe, and with matched=True (the SeriesConfig default) the
+    # recipe then measures with the filter. A target whose filter flux came
+    # out negative killed the whole 2025 FG18 visit (207 frames) with "math
+    # domain error" on frame 15. The engine cannot produce that any more, and
+    # this pins that the run does not depend on it either: a run that cannot
+    # measure says so and keeps going.
+    paths, wcs, comps = _write_frames(tmp_path, 3, noise=4.0, seed=5)
+
+    def _liar(data, x, y, psf, **kw):
+        out = dict(phot.measure_point(data, x, y, **kw))
+        out.update(ok=True, reason=None, flux=-845.6, snr=-0.97)
+        return out
+
+    monkeypatch.setattr(phot, "measure_matched", _liar)
+    res = sm.measure_series(paths, _config(wcs, comps, matched=True,
+                                           seeing_aperture=True))
+    assert res.status == "complete"
+    assert len(res.points) == 3
+    # every star came back with a flux that is not a measurement: the curve
+    # has no magnitudes, and every point says why
+    assert all(p.mag is None for p in res.points)
+    assert all(p.flags for p in res.points)
+
+
+def test_the_frame_seeing_is_measured_once_and_shared(tmp_path, monkeypatch):
+    # 2026-10-07. The centroid used to estimate the seeing PER STAR, from a
+    # single 19 px cutout: on the real 2025 FG18 visit that gave 3.2 to 11.0 px
+    # where the session was 4.64, and it moved the centroid by up to 0.28 px
+    # (measured). Every star of a frame shares one atmosphere, so the recipe
+    # measures the frame's seeing ONCE and every star of that frame is
+    # centroided with it: one call per frame, not one per star.
+    paths, wcs, comps = _write_frames(tmp_path, 3)
+    calls = []
+    orig = phot.estimate_fwhm
+
+    def _count(data, positions, **kw):
+        calls.append(len(positions))
+        return orig(data, positions, **kw)
+
+    monkeypatch.setattr(phot, "estimate_fwhm", _count)
+    res = sm.measure_series(paths, _config(wcs, comps))
+    assert res.status == "complete"
+    # one measurement per frame (the recipe's), and nothing else: the per-star
+    # estimates inside the centroid are what this test exists to prevent
+    assert len(calls) == 3, calls
+    # and it is the frame's own spots (target + comps), not one star
+    assert all(n > 1 for n in calls), calls
+    # every point still carries the frame's seeing for the report and the
+    # detrend, and it is the SAME number the centroid used
+    assert all(p.fwhm is not None for p in res.points)

@@ -46,17 +46,23 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_annotate)     # take the stage
+    d.open_tool("annotate")                     # take the stage (ADR-044 rev)
     yield d
     d.view._render_timer.stop()      # never fire on a deleted widget
     d.deleteLater()
 
 
-def test_tab_replaces_the_placeholder(dlg):
+def test_annotate_is_a_window_and_the_place_it_left_is_free(dlg):
+    # ADR-044 rev: Annotate is not a tab any more. It is a non-modal window
+    # of its own, opened from the top bar, and the column keeps the two
+    # panels an observer lives in.
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate"]
-    tab = dlg.tab_annotate
-    assert dlg.tabs.indexOf(tab) == 2
+    assert titles == ["Photometry", "Astrometry"]
+    window = dlg._tools["annotate"]
+    assert window.panel is dlg.tab_annotate
+    assert window.isVisible()
+    assert window.windowTitle() == "Annotate"
+    assert window.isModal() is False
 
 
 def test_marker_starts_centred_and_tab_enabled(dlg):
@@ -75,16 +81,23 @@ def test_click_places_marker_with_fits_flip(dlg):
     assert tab._marker == [100.0, 2047 - 1 - 200.0]
 
 
-def test_clicks_are_ignored_while_another_tab_is_current(dlg):
+def test_the_open_window_keeps_the_plate_when_the_column_switches(dlg):
+    # One tool at a time, and it owns the plate while it is open (ADR-044
+    # rev): switching the panel in the column does not steal the clicks from
+    # a window the observer has open in front of them. Closing it hands the
+    # plate back to the panel that is selected.
     from PySide6.QtCore import QPointF
     tab = dlg.tab_annotate
-    before = list(tab._marker)
-    dlg.tabs.setCurrentIndex(0)               # the Blink placeholder
-    assert len(tab._items) == 0               # overlays leave the stage
+    dlg.tabs.setCurrentIndex(1)               # the Astrometry panel
+    assert dlg._active_tool == "annotate"     # the tool still owns it
+    assert len(tab._items) == 5
     dlg.view.scene_clicked.emit(QPointF(500.0, 500.0))
-    assert tab._marker == before
-    dlg.tabs.setCurrentWidget(tab)
-    assert len(tab._items) == 5               # and come back
+    assert tab._marker[0] == 500.0            # and the click still marks
+    dlg._tools["annotate"].close_panel()
+    assert dlg._active_tool is None
+    assert len(tab._items) == 0               # overlays leave with it
+    dlg.view.scene_clicked.emit(QPointF(300.0, 300.0))
+    assert tab._marker[0] == 500.0            # and no longer marks
 
 
 def test_nudge_applies_and_clamps(dlg):

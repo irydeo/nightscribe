@@ -26,7 +26,7 @@ import logging
 import numpy as np
 
 from . import style
-from ..core import sn_templates
+from ..core import outliers, sn_templates
 
 logger = logging.getLogger(__name__)
 
@@ -248,7 +248,7 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
         all_mags += [m for _ph, m in schematic]
     if all_mags:
         med = float(np.median(all_mags))
-        mad = 1.4826 * float(np.median(np.abs(np.asarray(all_mags) - med)))
+        mad = float(outliers.scaled_mad(np.asarray(all_mags), centre=med))
         if mad > 0.0:
             lo = max(med - _ROBUST_K * mad, float(np.min(all_mags)))
             hi = min(med + _ROBUST_K * mad, float(np.max(all_mags)))

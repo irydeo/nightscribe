@@ -908,62 +908,20 @@ def test_blink_end_to_end(tmp_path):
     assert png.exists() and png.stat().st_size > 10000
 
 
-def test_blink_tab_offscreen(tmp_path):
-    # The Blink dialog must drive the whole flow without crashing the GUI.
-    # Under UX v3 the tab is a modal dialog (ADR-019), so we build the same
-    # widget the dialog loads and drive prepare/render/nudge directly (offscreen Qt).
-    import os
-    import time
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QCoreApplication
-    from PySide6.QtWidgets import QApplication
-    app = QApplication.instance() or QApplication([])
-    from nightscribe.gui.main_window import MainWindow, _load_ui
-    w = MainWindow()
-    b = _load_ui("blink_tab")
-    img = _solved_fits(tmp_path / "u.fits", 187.705, 12.391,
-                       width=320, height=240)
-    b.edt_fits.setText(str(img))
-    b.chk_manual.setChecked(True)
-    # comma decimal separator must work too (locale-proof fields)
-    b.edt_ra.setText("187,705")
-    b.edt_dec.setText("12.391")
-    w._dialog_blink_prepare(b)
-    t0 = time.time()
-    while w._blink_pair is None and time.time() - t0 < 60:
-        QCoreApplication.processEvents()
-        time.sleep(0.05)
-    assert w._blink_pair is not None, "blink worker never delivered a pair"
-    assert w._blink_dialog_widget is b
-    pix = b.lbl_blink.pixmap()
-    assert pix is not None and not pix.isNull()
-    # exercise the interactive controls: nudge, gamma, fade, marker toggle
-    w._dialog_blink_nudge(b, 0.5, -0.5)
-    assert w._blink_nudge == [0.5, -0.5]
-    b.sld_gamma.setValue(60)
-    b.chk_blink_live.setChecked(False)
-    b.sld_fade.setValue(30)
-    b.chk_marker.setChecked(False)
-    w._dialog_blink_render(b)
-    assert w._blink_ref8 is not None and w._blink_obs8 is not None
-    w.close()
-
-
 def test_gui_boots_offscreen():
     import os
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtWidgets import QApplication, QTabWidget
+    from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.main_window import (MainWindow, VIEW_CAMPAIGNS,
+                                             VIEW_PROJECTS, VIEW_TONIGHT)
     w = MainWindow()
-    tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    # Three top-level tabs (ADR-036: History & Sun & sky left the bar for
-    # the Tools-menu dialogs; ADR-043 removed the Observatory tab):
-    # Tonight · Projects · Campaigns
-    assert tabs.count() == 3
-    assert tabs.tabText(0) == "Tonight"
-    assert tabs.tabText(1) == "Projects"
-    assert tabs.tabText(2) == "Campaigns"
+    # Interfaz 1.0 (ADR-055): the top-level QTabWidget retired with the tab
+    # bar; the shell is a stacked view whose pages are the projects hub
+    # (Home), Tonight, Campaigns, Welcome and the embedded editor.
+    stack = w._shell_stack()
+    assert stack.count() == 5
+    assert (VIEW_PROJECTS, VIEW_TONIGHT, VIEW_CAMPAIGNS) == (0, 1, 2)
     # suggestion grid container exists
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)

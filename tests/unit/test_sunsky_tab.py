@@ -35,8 +35,6 @@ def window(qapp):
     config.is_configured = lambda: False   # no startup network worker
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     yield w
     config.is_configured = orig
     w.close()

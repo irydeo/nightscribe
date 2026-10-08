@@ -58,8 +58,9 @@ To get files there from a listing, use **"Attach files to the visit"**
 
 ## 4. Step by step
 
-1. **Build the comparison sequence** in the editor's Photometry tab (top half,
-   "Build the sequence..."). The series uses those comparisons on every frame.
+1. **Build the comparison sequence** with the big button of the editor's
+   Photometry tab ("Build the sequence (comparisons)..."). The series uses
+   those comparisons on every frame.
 2. **Measure the target** once (a click) so the series knows where to measure;
    or open the editor from the sheet with coordinates, which land by themselves.
 3. Click **"Measure the sequence"**. A **run** starts (with its `run_id`), the
@@ -449,7 +450,7 @@ working.
 
 - **"No visit with frames"**: open the editor from a visit, not from the loose
   Tools menu.
-- **"No comparison sequence"**: build it in the top half of the Photometry tab.
+- **"No comparison sequence"**: build it with the big button of the Photometry tab.
 - **"Measure the target once"**: a click on the target (or open from the sheet
   with coordinates).
 - **A transit that does not fit**: check comp saturation, the ceiling, and that

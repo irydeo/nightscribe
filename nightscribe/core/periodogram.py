@@ -35,6 +35,8 @@ import math
 
 import numpy as np
 
+from . import outliers
+
 logger = logging.getLogger(__name__)
 
 # Frequency grid: this many samples per peak of the spectral window, the
@@ -373,7 +375,7 @@ def reject_folded(t, y, dy=None, period_d=None, bins=25, k=4.0, rounds=2):
                          where=count > 0)
         resid = y[ids] - mean[idx]
         med = float(np.median(resid))
-        mad = 1.4826 * float(np.median(np.abs(resid - med)))
+        mad = float(outliers.scaled_mad(resid, centre=med))
         if mad <= 0.0:
             break
         good = np.abs(resid - med) <= k * mad

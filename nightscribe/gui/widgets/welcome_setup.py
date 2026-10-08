@@ -12,23 +12,27 @@
 ############################################################
 
 """The Welcome view (Interfaz 1.4): the old modal QWizard lives here as an
-inline stepper (Observatory -> Targets -> Data) wrapped in a painted night
-sky.
+inline stepper (Observatory -> Equipment -> Targets -> Data) wrapped in a
+painted night sky.
 
 Two things make this screen worth looking at:
 
    * the hero is a real sky. gui/widgets/welcome_sky.py paints our vector
      sky and the Moon AT TONIGHT'S PHASE, so the first frame says "this
      app looks at your sky", not "fill this form";
-   * the "your night, now" strip answers back. It is computed here, 100%
-     offline (core/coords + core/ephem_minor): darkness window, Moon set
-     and the planets up at dusk. Type a latitude and the sky answers in
-     the same breath; that is the whole hook.
+   * the screen answers back, twice. The "your night, now" strip of the
+     observatory step computes darkness, Moon set and the planets up at
+     dusk; the "your scale, now" strip of the equipment step computes the
+     plate scale and says whether the sampling fits the seeing. Both are
+     100% offline maths on the numbers already on screen (core/coords,
+     core/ephem_minor, core/exposure): type and the app answers in the same
+     breath. That is the whole hook.
 
-The heavy lifting is still the SAME code as the wizard: the helpers in
-gui/wizard.py (_detect, _resolve_site, _setup_kinds, _setup_data,
-_apply_site, _apply_kinds, _mark_done) are reused against the loaded
-widget, so the two never drift. _setup_kinds runs in card mode here.
+The heavy lifting is still the SAME code as the old wizard's: the helpers in
+gui/wizard.py (_detect, _resolve_site, _setup_kinds, _setup_equipment,
+_setup_data, _apply_site, _apply_kinds, _apply_equipment, _mark_done) are
+reused against the loaded widget, so the setup has one implementation.
+_setup_kinds runs in card mode here.
 
 The host (MainWindow) decides when Welcome is shown (first run, a pending
 update, or no projects) and gates navigation on the Data step while an
@@ -143,16 +147,19 @@ class WelcomeSetup(QWidget):
         # the rail buttons keep their .ui text; we re-read it so the "done"
         # tick can be added and removed without losing the translation
         self._step_text = {btn.objectName(): btn.text() for btn in
-                           (u.btn_step_obs, u.btn_step_kinds, u.btn_step_data)}
+                           (u.btn_step_obs, u.btn_step_equip,
+                            u.btn_step_kinds, u.btn_step_data)}
 
         u.btn_card2_guide.clicked.connect(self.open_guide.emit)
         u.btn_card3_skycal.clicked.connect(self.open_skycal.emit)
         u.btn_detect.clicked.connect(lambda: wz._detect(u))
         u.btn_resolve.clicked.connect(lambda: wz._resolve_site(u))
         u.btn_step_obs.clicked.connect(lambda: self.show_step("obs"))
+        u.btn_step_equip.clicked.connect(lambda: self.show_step("equip"))
         u.btn_step_kinds.clicked.connect(lambda: self.show_step("kinds"))
         u.btn_step_data.clicked.connect(lambda: self.show_step("data"))
         u.btn_obs_next.clicked.connect(self._obs_next)
+        u.btn_equip_next.clicked.connect(self._equip_next)
         u.btn_kinds_next.clicked.connect(self._kinds_next)
         u.btn_data_ack.clicked.connect(self.finished.emit)
         # The two buttons are roles, not meanings: _primary/_secondary
@@ -163,8 +170,11 @@ class WelcomeSetup(QWidget):
         u.btn_night_set.clicked.connect(self._night_set)
         u.btn_kinds_all.clicked.connect(lambda: self._set_all(True))
         u.btn_kinds_none.clicked.connect(lambda: self._set_all(False))
-        # the kinds grid (cards) and the migration report are data (ADR-005)
+        # the kinds grid (cards), the equipment combo and the migration
+        # report are data (ADR-005)
         self._boxes = wz._setup_kinds(u, card=True)
+        wz._setup_equipment(u)
+        u.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
         wz._setup_data(u, self._snapshot)
         for box in self._boxes.values():
             box.toggled.connect(lambda _on: self._update_kinds_count())
@@ -177,10 +187,15 @@ class WelcomeSetup(QWidget):
             w.valueChanged.connect(lambda _v: self._site_changed())
         u.edt_site_name.textChanged.connect(lambda _t: self._site_changed())
         u.edt_site_mpc.textChanged.connect(lambda _t: self._site_changed())
+        # The same for the equipment: the scale strip answers as the pixel
+        # size or the focal length move. The preset changes the pixel size,
+        # so it arrives here through this very signal.
+        for w in (u.spn_pixel_um, u.spn_focal_mm):
+            w.valueChanged.connect(lambda _v: self._fill_scale())
 
     def _fill_from_config(self):
         # Seeds the form from the current settings so a re-visit shows what
-        # is already saved (a first run shows zeros / empty).
+        # is already saved (a first run shows the app's defaults).
         from ...config import config
         u = self.ui
         u.spn_site_lat.setValue(float(config.get("lat") or 0.0))
@@ -188,7 +203,14 @@ class WelcomeSetup(QWidget):
         u.spn_site_height.setValue(int(config.get("height") or 0))
         u.edt_site_name.setText(config.get("observatory_name") or "")
         u.edt_site_mpc.setText(config.get("mpc_code") or "")
+        # the equipment: the same keys the Settings dialog writes, so the two
+        # screens are two views of one setup and never disagree
+        u.spn_aperture.setValue(float(config.get("aperture_inches", 10)))
+        u.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
+        u.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
+        u.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
         self._refresh_create()
+        self._fill_scale()
 
     def _fill_doors(self):
         # The first door lists what you can observe as coloured chips: the
@@ -315,6 +337,44 @@ class WelcomeSetup(QWidget):
         self.show_step("obs")
         self.ui.spn_site_lat.setFocus()
 
+    # ------------------------------------------------------- your scale, now
+
+    def _fill_scale(self):
+        # The equipment step's answer, the same trick as the night strip: the
+        # plate scale from the pixel size and the focal length on screen, and
+        # a verdict on the sampling. All local maths (core/exposure), so it
+        # can run on every keystroke. The binning is not asked in this step:
+        # it comes from Settings, and the scale reads it so a binned camera
+        # gets its real number here too.
+        u = self.ui
+        from ...config import config
+        from ...core import exposure
+        scale = exposure.plate_scale(u.spn_pixel_um.value(),
+                                     u.spn_focal_mm.value(),
+                                     config.get("pixel_binning"))
+        if scale <= 0:
+            u.lbl_scale_value.setText(self.tr(
+                "Set the pixel size and the focal length and this becomes "
+                "your scale."))
+            u.lbl_scale_note.setText("")
+            return
+        u.lbl_scale_value.setText(
+            self.tr("{scale}″/px").format(scale=f"{scale:.2f}"))
+        u.lbl_scale_note.setText({
+            "fine": self.tr(
+                "Finer than the seeing needs: each star covers more pixels "
+                "than its size warrants, so you gain no resolution and pay "
+                "in read noise and bigger files."),
+            "ok": self.tr(
+                "Well matched to the seeing of a typical site: each star "
+                "lands on a couple of pixels, which is what the resolution "
+                "needs."),
+            "coarse": self.tr(
+                "Coarse: a star falls on barely a pixel. Fine for a wide "
+                "field and bright targets, but the image loses resolution "
+                "and the faint stars' light lands on too few pixels."),
+        }.get(exposure.sampling(scale), ""))
+
     # -------------------------------------------------------------- actions
 
     # ------------------------------------------------- who is looking at this
@@ -345,14 +405,14 @@ class WelcomeSetup(QWidget):
                 self.tr("UPDATED TO {version}").format(
                     version=self._update_version))
         # The hero must not tell someone who has been using the app for
-        # months to "set up your observatory in three steps": on an update
+        # months to "set up your observatory in four steps": on an update
         # it explains WHY the app stopped here.
         u.welcomeLead.setText(
             self.tr("NightScribe has been updated to {version}. Your "
                     "database was copied and verified before anything else, "
                     "and below is what changed.").format(
                         version=self._update_version) if update else
-            self.tr("Three steps, then the app walks you through every "
+            self.tr("Four steps, then the app walks you through every "
                     "project: record, capture, analysis and publishing."))
         # The report's own note: on an update it says what happens after,
         # because the gate blocks navigation until it is read.
@@ -368,9 +428,9 @@ class WelcomeSetup(QWidget):
         self._mark_primary(u.btn_data_ack, update)
         for w in (u.btn_create, u.lbl_cta_sub, u.btn_skip):
             w.setVisible(not update)
-        # The rail tells the truth about an update: steps 1 and 2 were
-        # configured long ago, so they read as done from the first frame.
-        self._done_before = (0, 1) if update else ()
+        # The rail tells the truth about an update: the first three steps
+        # were configured long ago, so they read as done from the first frame.
+        self._done_before = (0, 1, 2) if update else ()
         self.show_step(self._step_key)
 
     def _mark_primary(self, button, on):
@@ -435,23 +495,23 @@ class WelcomeSetup(QWidget):
             box.setChecked(on)
 
     def show_step(self, key, done_before=None):
-        # @args: key - "obs" | "kinds" | "data"; done_before - steps that
-        #        were already completed BEFORE this visit (an update marks
-        #        the observatory and the targets as configured), or None to
-        #        keep whatever was set
+        # @args: key - "obs" | "equip" | "kinds" | "data"; done_before -
+        #        steps that were already completed BEFORE this visit (an
+        #        update marks the observatory, the equipment and the targets
+        #        as configured), or None to keep whatever was set
         if done_before is not None:
             self._done_before = tuple(done_before)
         self._step_key = key
-        idx = {"obs": 0, "kinds": 1, "data": 2}.get(key, 0)
+        idx = {"obs": 0, "equip": 1, "kinds": 2, "data": 3}.get(key, 0)
         u = self.ui
         u.setup_stack.setCurrentIndex(idx)
         # A step is "done" when it is behind us or when it was already
         # configured; the step we are LOOKING at is never done, whatever
         # else is true (you are working on it right now).
-        done = {i for i in range(3)
+        done = {i for i in range(4)
                 if (i < idx or i in self._done_before) and i != idx}
-        steps = ((u.btn_step_obs, 0), (u.btn_step_kinds, 1),
-                 (u.btn_step_data, 2))
+        steps = ((u.btn_step_obs, 0), (u.btn_step_equip, 1),
+                 (u.btn_step_kinds, 2), (u.btn_step_data, 3))
         for btn, i in steps:
             base = self._step_text.get(btn.objectName(), btn.text())
             btn.setChecked(i == idx)
@@ -464,7 +524,8 @@ class WelcomeSetup(QWidget):
         # the rail fills up to the last done step: each connector belongs to
         # the step on its left
         for sep, reached in ((u.rail_sep1, 0 in done),
-                             (u.rail_sep2, 1 in done)):
+                             (u.rail_sep2, 1 in done),
+                             (u.rail_sep3, 2 in done)):
             sep.setProperty("state", "done" if reached else "")
             sep.style().unpolish(sep)
             sep.style().polish(sep)
@@ -479,6 +540,17 @@ class WelcomeSetup(QWidget):
         wz._apply_site(self.ui)
         self._refresh_create()
         self._fill_night()
+        self.show_step("equip")
+
+    def _equip_next(self):
+        # The equipment step never blocks: its fields come pre-filled with
+        # the app's defaults, and Settings is a click away for whoever wants
+        # to refine them (the step says so). What it does do is make the
+        # choice effective: the preset's profile and the plate-scale pair
+        # are stored here.
+        from .. import wizard as wz
+        wz._apply_equipment(self.ui)
+        self._fill_scale()
         self.show_step("kinds")
 
     def _kinds_next(self):

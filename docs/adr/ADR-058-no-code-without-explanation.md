@@ -110,3 +110,28 @@ price of not leaving the reader half done. Every new classification or
 figure must add its entry in `core/explain.py` and its test; the tile
 tooltips grow, but the visible value stays short. i18n: new strings are
 translated ES/EN and the `.ts`/`.qm` are regenerated.
+
+**Nota (2026-10-07)**: la regla se extiende de las cifras al **origen de las
+cifras**. Una magnitud sin decir si es una **medida**, una **predicción** o un
+**valor del observador** es media cifra, y este ADR es exactamente sobre eso.
+Hoy lo dicen tres sitios, con el mismo vocabulario: la cabecera del apilado
+(`NS_MAGSR`: `measured` o `ephemeris`), el contexto del proyecto (`mag_origin`:
+`measured`, `predicted` o `manual`, porque el mismo campo guarda la predicción
+del planificador y luego la medida del run) y la pestaña Comparar, que declara
+en su ayuda y en la línea de la propuesta con qué está anclando las comparsas.
+El nombre es `mag_origin` y no `mag_source` a propósito: la tabla de puntos ya
+tiene un `mag_source` que responde a otra pregunta (quién escribió la cifra), y
+dos cosas con el mismo nombre es como se pierde una procedencia.
+
+**Note (2026-10-07)**: the rule extends from figures to the **origin of
+figures**. A magnitude that does not say whether it is a **measurement**, a
+**prediction** or an **observer's figure** is half a figure, and this ADR is
+exactly about that. Three places say it today, with the same vocabulary: the
+stack's header (`NS_MAGSR`: `measured` or `ephemeris`), the project's context
+(`mag_origin`: `measured`, `predicted` or `manual`, because the same field
+holds the planner's prediction and then the run's measurement) and the Compare
+tab, which declares in its help and in the proposal's own line what it is
+anchoring the comparisons on. The name is `mag_origin` and not `mag_source` on
+purpose: the points table already has a `mag_source` that answers a different
+question (who wrote the figure), and two things with the same name is how a
+provenance gets lost.

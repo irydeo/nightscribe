@@ -100,8 +100,6 @@ def window(_point_db_at_tmpdir):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     # drain the constructor's deferred singleShot (main_window L370:
     # singleShot(0, on_refresh_projects)). If it fires LATER (inside a test's
     # processEvents), the list rebuild finds no current selection and

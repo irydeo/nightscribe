@@ -232,7 +232,8 @@ def make_inits(ctx, d, cfg, plan=None, out_dir=None, plate_solution=False,
     filt_code, filt_min, filt_max = _FILTERS.get(filt_slot, ("O", None, None))
     scale = None
     if cfg:
-        ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"))
+        ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"),
+                                  cfg.get("pixel_binning"))
         scale = round(ps, 3) if ps else None
 
     def _f(x):

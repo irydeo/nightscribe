@@ -181,9 +181,10 @@ nunca se modifica.
   El anillo y la línea «Píxel» se dibujan en el centroide medido, no en
   el clic; si el centroide se movió más de 1 px, el panel lo dice.
 * **«Sugerir aperturas»**: el botón vive en la sección Medir, justo
-  bajo las tres aperturas, en el flujo diario (banda, aperturas,
-  sugerir); las demás opciones de receta (cielo, sigma-clip, seeing,
-  término de color, sustracción del anfitrión) se abren en la pequeña
+  bajo las tres aperturas, en el flujo diario (banda, aperturas, centro
+  manual, **filtro adaptado**, sugerir); las demás opciones de receta
+  (cielo, sigma-clip, seeing, término de color, sustracción del
+  anfitrión) se abren en la pequeña
   ventana no modal «Advanced…», que deja seguir midiendo mientras
   está abierta, y el registro de resultados tiene scroll propio para
   los informes largos. Propone los radios desde la curva de crecimiento
@@ -229,6 +230,13 @@ nunca se modifica.
   el objetivo en la imagen diferencia; las comps calibran en la placa
   original. Para SNe en núcleos es la diferencia entre «no medible» y
   «0,03–0,05 mag».
+* **El filtro adaptado merece su frase**: la casilla decide cómo se mide la
+  luz (cada píxel pesado por la forma de la estrella, el objetivo Y las
+  comparsas, para que el cero punto salga de la misma aritmética). Es el
+  método por defecto **por medida**, y sus números y sus riesgos están en su
+  tooltip y en `docs/SNR.es.md`; el encabezado del bloque dice el método
+  aunque el bloque esté cerrado, y **Ajustes → Fotometría** decide con qué
+  empiezan las placas nuevas.
 
 **Fórmula 3: la magnitud diferencial**
 
@@ -516,8 +524,28 @@ saturada, así que la app **excluye esas comps/check** con el motivo explícito
 en el CSV. En sensores muy sensibles (GSENSE400) es lo que impide usar las
 estrellas más brillantes del campo.
 
+**Esto es una regla de la casa, no un detalle (ADR-066)**: nunca se usa una
+estrella saturada ni una por encima de la linealidad de tu cámara, en **ningún**
+camino que calibre con una estrella (la placa suelta, la serie, el run de
+astrometría, la propuesta de comparsas y el ajuste de apertura). Los dos techos
+salen de un solo sitio (`photometry.star_ceilings`), así que ningún camino puede
+olvidarlos, y cuando la **linealidad no está puesta** la app sigue midiendo con
+el mejor techo que tenga (la tarjeta SATURATE o el recorte de la propia placa) y
+lo **dice**, en el panel y en las notas del run, con el sitio donde se ajusta:
+medir con un techo que no es el que manda, en silencio, es como un cero punto
+malo parece bueno.
+
 Referencia rápida: `full well / ganancia` da la saturación en ADU, y la
 linealidad suele quedar por debajo. **Si cambias de ganancia, remide.**
+
+Los techos son del **sensor**, en ADU de **un** fotograma. Un apilado que
+**suma** sus tomas (el método `sum` del run de astrometría) tiene N veces el
+nivel, así que los techos se multiplican por el número de tomas antes de
+compararlos con la placa (ADR-062 rev). Sin eso, el propio cielo de un stack
+`sum` queda por encima de la linealidad de la cámara y se rechazan **todas**
+las comparadas: medido en la visita 2025 FG18 del autor (cielo 1552 ADU, 207
+tomas, linealidad 53 000) el cielo del `sum` solo ya son 321 000 ADU y el run
+no daba ninguna magnitud.
 
 ---
 

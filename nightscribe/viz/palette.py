@@ -78,5 +78,8 @@ MEASURE_COLOURS = {
     "mag-fair": FAIR,     # usable, but not clean
     "mag-doubt": DANGER,  # not worth reporting without looking
     "mag-cat": CATALOG,   # a catalogue value: not a measurement
+    "mag-eph": MUTED,     # the ephemeris' prediction, not measured here
+    "motion": FG,         # the object's motion, measured on this plate
+    "motion-eph": MUTED,  # only the ephemeris' prediction, not measured
     "context": MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
 }

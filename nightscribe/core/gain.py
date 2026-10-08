@@ -43,6 +43,8 @@ import math
 
 import numpy as np
 
+from . import outliers
+
 logger = logging.getLogger(__name__)
 
 # A gain outside this range is not a gain (a mis-typed value, a different
@@ -112,7 +114,7 @@ def frame_boxes(f1, f2, box=64, clip=_CLIP_SIGMA, min_keep=_MIN_KEEP,
             n_boxes += 1
             sub = diff[y0:y0 + box, x0:x0 + box]
             med = float(np.median(sub))
-            mad = 1.4826 * float(np.median(np.abs(sub - med)))
+            mad = float(outliers.scaled_mad(sub, centre=med))
             if mad <= 0.0:
                 continue
             keep = np.abs(sub - med) <= clip * mad

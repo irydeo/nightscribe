@@ -34,6 +34,7 @@ colours is a badge that drifts from the list the observer just left.
 import logging
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFontMetrics
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
 from .. import theme
@@ -46,11 +47,22 @@ class UfeProjectBadge(QWidget):
     # with everything else in the tooltip. Read-only on purpose: it says
     # where you are, it is not another button.
     #
+    # It ELIDES what does not fit. The bar is a finite row and a long object
+    # name ("C/2025 A1 (ATLAS)") plus a long next action ("measure tonight,
+    # 12 d since the last visit") can outgrow it: the layout then squeezed
+    # the pill and the two labels ran over each other (reported from a real
+    # session). Eliding keeps the full words one hover away, in the tooltip,
+    # and never invents a different truth on screen.
+    #
     # @args: parent - the widget it lives in
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("ufe_project_badge")
+        # the full words, kept beside what is painted (see _elide)
+        self._full_name = ""
+        self._full_next = ""
+        self._full_hint = None
         lay = QHBoxLayout(self)
         lay.setContentsMargins(6, 0, 2, 0)
         lay.setSpacing(8)
@@ -65,9 +77,37 @@ class UfeProjectBadge(QWidget):
         lay.addWidget(self.lbl_kind)
         lay.addWidget(self.lbl_name)
         lay.addWidget(self.lbl_next)
-        self.setSizePolicy(self.sizePolicy().horizontalPolicy(),
-                           self.sizePolicy().verticalPolicy())
         self.setVisible(False)
+
+    def sizeHint(self):
+        # @return: the width the FULL words need. The badge asks for the
+        #          whole thing and elides only when the bar squeezes it:
+        #          without this the elided (shorter) text would shrink the
+        #          hint, the bar would shrink the pill again and it would
+        #          collapse to "…" in two passes.
+        if self._full_hint is not None:
+            return self._full_hint
+        return super().sizeHint()
+
+    def resizeEvent(self, event):
+        # The bar changed: what fits is painted again (see _elide).
+        super().resizeEvent(event)
+        self._elide()
+
+    def _elide(self):
+        # @return: None. Only what is PAINTED is shortened; _full_name and
+        #          _full_next keep the words and the tooltip keeps them too.
+        for lbl, full in ((self.lbl_name, self._full_name),
+                          (self.lbl_next, self._full_next)):
+            if not full:
+                lbl.setText("")
+                continue
+            metrics = QFontMetrics(lbl.font())
+            room = lbl.width()
+            if room <= 0 or room >= metrics.horizontalAdvance(full):
+                lbl.setText(full)
+            else:
+                lbl.setText(metrics.elidedText(full, Qt.ElideRight, room))
 
     def set_badge(self, payload, show_next=True):
         # Shows the project this window belongs to.
@@ -83,16 +123,26 @@ class UfeProjectBadge(QWidget):
         if not payload:
             self.setVisible(False)
             self.setToolTip("")
+            self._full_name = ""
+            self._full_next = ""
             return
         colour = payload.get("kind_color") or theme.C_TEXT_DIM
         self.lbl_kind.setText(payload.get("kind_label") or "")
         self.lbl_kind.setStyleSheet(theme.chip_style(colour, font_size=10))
-        self.lbl_name.setText(payload.get("name") or "")
+        self._full_name = payload.get("name") or ""
         next_text = payload.get("next_text") if show_next else None
-        self.lbl_next.setText(next_text or "")
-        self.lbl_next.setVisible(bool(next_text))
+        self._full_next = next_text or ""
+        # the full words FIRST: the width the badge asks for is theirs, and
+        # it is measured by the real layout so it never drifts from the font
+        self.lbl_name.setText(self._full_name)
+        self.lbl_next.setText(self._full_next)
+        self.lbl_next.setVisible(bool(self._full_next))
+        self.layout().activate()
+        self._full_hint = self.layout().sizeHint()
         self.setToolTip(self._tooltip(payload, show_next=show_next))
         self.setVisible(True)
+        if self.isVisible():
+            self._elide()
 
     def _tooltip(self, payload, show_next=True):
         # The whole identity, in the list's own words: what the badge has no

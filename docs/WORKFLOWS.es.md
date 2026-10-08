@@ -1060,7 +1060,11 @@ mando** (Mark done/Skip junto a Go →; las secciones conservan solo un pie
 discreto); la **prominencia a tres niveles** (primario visible / menú ⋯ /
 bloque colapsable con título en lenguaje llano — Calibration y «Lo que
 guardaste de la sesión» arrancan cerrados; las herramientas de fotometría
-tras un ⋯); el **ciclo de vida consolidado** en el ⋯ de la cabecera del
+tras un ⋯), **afinada el 2026-10-06**: en Fotometría y Astrometría el
+primario es **un botón grande pintado en el color del tipo de objeto**, con
+una línea que dice lo que hará, y todos los ajustes en bloques **cerrados**
+(ADR-038 rev), y **todo, incluidos los resultados, en tarjetas con
+borde** (un grupo sin borde no deja ver dónde acaba); el **ciclo de vida consolidado** en el ⋯ de la cabecera del
 proyecto; el **control CCDciel completando su mudanza a Observatory**
 (grupo «Live capture» — Send plan lee el plan guardado del objetivo);
 **Campaigns como sala de guerra** («Está pasando ahora» — renombrado desde
@@ -1467,3 +1471,23 @@ botón «Volver» del UFE se retira (lo cubre la pila general).
 
 **Punto de entrada**: `gui/main_window.py` (`_build_shell`, `_update_vtab_visibility`,
 `_drawer_open`); tests en `tests/unit/test_shell_real_case.py` y `test_projects_hub.py`.
+
+### 7unvicies. Interfaz 1.9: el equipo, un paso más, y el código clásico se retira (2026-10-07, ADR-055 rev. + ADR-044 rev.)
+
+Motivación: la Bienvenida tenía tres pasos y le faltaba el que decide la escala
+de la imagen; y el UFE llevaba meses siendo el camino normal mientras los tres
+diálogos clásicos y su interruptor seguían en el código «por si acaso».
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| El paso de equipo | Bienvenida pasa a cuatro pasos (dónde estás, equipo, objetivos, datos). El paso nuevo pide apertura, píxel, focal, tipo de cámara y un preset de cámara, y NO bloquea: viene con los valores de la app | **Hecho** |
+| La escala contesta | La tira «Tu escala, ahora» calcula los arcsec por píxel y dice si el muestreo encaja con el seeing de un sitio típico (`exposure.sampling`), el mismo gancho que «Tu noche, ahora» | **Hecho** |
+| El binning | `plate_scale` aplica el binning del config: un 2x2 da escala doble, y sus lectores (planificador, exposición NEO, ASTAP, EXOTIC, campo de visión, CLI) dejan de estar desviados por ese factor | **Hecho** |
+| La limpieza | Fuera el diálogo clásico de blink, `SnAnnotateDialog`, la carta clásica con su `SequenceWorker` y el interruptor `ufe_default`: el UFE queda como única puerta. Unas 2.000 líneas menos | **Hecho** |
+| El asistente modal | Fuera `wizard.ui`, `maybe_run_wizard`, `_build` y `_page_ok` (código muerto de la Interfaz 1.0); los ayudantes que sí se usan se quedan compartidos en `gui/wizard.py` | **Hecho** |
+
+**Punto de entrada**: `gui/ui/welcome_tab.ui`, `gui/widgets/welcome_setup.py`,
+`gui/wizard.py`, `core/exposure.py`, `core/cameras.py`; la limpieza en
+`gui/main_window.py`, `gui/workers.py` y `gui/ui/settings_dialog.ui`; tests en
+`test_welcome_setup.py`, `test_wizard_site.py`, `test_exposure.py` y
+`test_ufe_integration.py`.

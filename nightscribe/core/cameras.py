@@ -204,3 +204,33 @@ def full_well_adu(p, gain_e_per_adu):
             or p.get("full_well_e") is None:
         return None
     return float(p["full_well_e"]) / float(gain_e_per_adu)
+
+
+def profile_from_preset(p, current=None):
+    # The datasheet values a camera preset fills, in CONFIG keys, without
+    # stomping a number the observer already set by hand: a field with a value
+    # keeps it (0 counts as "unknown"). The SYSTEM GAIN is never filled on
+    # purpose: it is per unit and per gain setting, and no datasheet can know
+    # it (the preset itself says so). The pixel size is always filled, because
+    # choosing a preset IS saying which sensor this is.
+    #
+    # It returns a dict instead of touching widgets so the Settings dialog and
+    # the Welcome step share ONE rule (2026-10-07): two places filling the same
+    # profile by hand is how they drift apart.
+    # @args: p - a preset dict (None -> nothing), current - {config_key: value}
+    #        already on screen
+    # @return: {config_key: value} to write
+    if not p:
+        return {}
+    current = current or {}
+    out = {"pixel_um": float(p["pixel_um"])}
+    for key, field in (("cam_full_well_e", "full_well_e"),
+                       ("cam_linearity_adu", "linearity_adu"),
+                       ("ccd_read_noise", "read_noise_e"),
+                       ("cam_dark_current_e_s", "dark_current_e_s")):
+        if not current.get(key) and p.get(field) is not None:
+            out[key] = float(p[field])
+    if (not current.get("cam_max_exposure_s")
+            and p.get("regime") == "short" and p.get("exp_max_s")):
+        out["cam_max_exposure_s"] = round(float(p["exp_max_s"]))
+    return out

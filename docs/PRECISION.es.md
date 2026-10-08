@@ -116,6 +116,38 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 | Sustracción de galaxia huésped | Existe (fase H: referencia PS1 alineada del blink, escalada por las comps) |
 | Serie normalizada por frame + detrending para tránsitos | Hecho (2026-09-27): T1–T7 y el ajuste (T8) en `core/series_measure.py`, `core/transit_fit.py` y `core/exoclock_export.py`; paridad de modelo D27 cerrada (<1e-5 vs batman) y compuerta EXOTIC end-to-end abierta por la fotometría real. Ver `docs/SEQUENCES.es.md` y `docs/PLANS/series-photometry.md` |
 
+### 6. Qué limita de verdad una serie débil (medido)
+
+Con exposición corta el límite normalmente no es el programa, y conviene saber
+contra cuál de los dos estás peleando. Medido en la propia serie de 1 s del
+autor (2025 FG18, telescopio de 0,43 m):
+
+* la dispersión diferencial entre dos estrellas a **6 minutos de arco es 19
+  mmag**, y entre dos a **30 minutos de arco es 38 mmag**;
+* ese crecimiento con la separación es la firma de **ruido correlacionado**:
+  el centelleo y la transparencia atmosférica mueven manchas enteras de cielo
+  a la vez, así que dos estrellas cercanas ven la misma atmósfera y dos
+  lejanas no;
+* el propio modelo de centelleo de la app (Young, 1967) predice **131 mmag**
+  para 0,43 m y 1 s, del mismo orden que lo medido.
+
+Dos consecuencias, y la segunda es la importante:
+
+1. **Ningún algoritmo arregla esto.** El motor se midió contra uno basado en
+   photutils sobre estos mismos datos (ADR-067): misma precisión en medida
+   individual, y en la serie un 1,8 % de mediana de mejora, con un conjunto al
+   9,7 %. La atmósfera no estaba en la diferencia.
+2. **Lo que sí lo arregla** es recoger más luz por unidad de tiempo: más
+   exposición (el centelleo cae como 1/sqrt(2t)), más apertura (como
+   D^(-2/3)), menos masa de aire, o agrupar la serie en el tiempo, que cambia
+   cadencia por precisión. Un tránsito que necesita 1 mmag por punto agrupado
+   pide la exposición más larga que no emborrone el ingreso.
+
+La forma práctica de leer tu propio límite: mide dos estrellas de brillo
+parecido a distintas separaciones y compara su dispersión. Si crece con la
+distancia, estás limitado por la atmósfera; si no, estás limitado por fotones y
+lo que falta es exposición o apertura.
+
 ---
 
 ## Apéndice: referencia técnica de la implementación

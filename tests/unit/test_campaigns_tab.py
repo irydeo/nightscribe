@@ -88,8 +88,6 @@ def window(_point_db_at_tmpdir):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     # hermetic object card: the fake loader means no ExploreWorker QThread
     orig_loader = w._proj_panel_loader
     w._proj_panel_loader = (lambda name, fallback_target=None:
@@ -408,7 +406,12 @@ def test_cmore_menu_carries_the_secondary_actions(window):
 
 
 def test_campaign_help_pops_with_plain_words(window, monkeypatch):
-    # UX-PC (U5): the ⓘ help explains the concept with an example.
+    # UX-PC (U5): the ⓘ help explains the concept in plain words.
+    #
+    # It used to do it WITH an example ("T CrB 2026 eruption"), and since
+    # 2026-10-07 a help names no concrete case: the example ages badly and
+    # reads as if that object were the only one (AGENTS.md; the guard is
+    # tests/unit/test_help_texts.py).
     from PySide6.QtWidgets import QMessageBox
     seen = {}
     monkeypatch.setattr(
@@ -417,7 +420,9 @@ def test_campaign_help_pops_with_plain_words(window, monkeypatch):
     window.campaigns.btn_help.click()
     assert seen, "the ⓘ help did not open"
     text = str(seen["args"][-1])
-    assert "T CrB" in text and "campaign" in text.lower()
+    assert "campaign" in text.lower()
+    assert "several nights" in text
+    assert "T CrB" not in text
 
 
 def test_signals_console_empty_box(window):

@@ -24,7 +24,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QFile
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import QWidget
+from PySide6.QtWidgets import QLayout, QWidget
 
 logger = logging.getLogger("nightscribe.gui.ui_loader")
 
@@ -95,9 +95,10 @@ def _register_children(root):
     # own name fallback: that fallback resolves a name to whatever object
     # carries it, and under a full test run it has handed back a
     # QWidgetItem (a LAYOUT ITEM, not a widget) for
-    # `visit_panel.ph_series` and `visit_panel.btn_solve_visit` (that second
-    # one lives in the top bar since 2026-09-30, next to "Solve
-    # astrometry…"), which
+    # `visit_panel.ph_series` (a placeholder that hosted the series group
+    # until ADR-044 rev moved it to its own window) and
+    # `visit_panel.btn_solve_visit` (that second one lives in the top bar
+    # since 2026-09-30, next to "Solve astrometry…"), which
     # crashed the dialog while it was being built ("'QWidgetItem' object has
     # no attribute 'clicked'") and fed `drop_in` the wrong kind of argument
     # (intermittent: not reproducible in 120 builds in a row, nor in
@@ -128,6 +129,26 @@ def adopt_ui(host, name):
     host.setLayout(ui.layout())
     ui.hide()
     return ui
+
+
+def out_of_layout(widget):
+    # Takes a widget OUT of whatever layout holds it, before reparenting
+    # it somewhere else.
+    #
+    # A layout does NOT drop its item when the widget is reparented: Qt
+    # keeps a QWidgetItem pointing at it and goes on setting geometry on a
+    # widget that now belongs elsewhere. Measured in the door menu: the bar
+    # still held 22 items after its eighteen buttons had been moved out of
+    # it. So the caller asks here first, then reparents.
+    # @args: widget - the widget about to be reparented
+    # @return: None
+    parent = widget.parentWidget()
+    if parent is None:
+        return
+    for lay in [parent.layout()] + parent.findChildren(QLayout):
+        if lay is not None and lay.indexOf(widget) != -1:
+            lay.removeWidget(widget)
+            return
 
 
 def drop_in(layout, placeholder, widget):

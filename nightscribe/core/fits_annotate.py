@@ -51,8 +51,12 @@ _BLOCK = 2880   # FITS header block, bytes
 _OWNED = {"ANNOTATE", "NS_RA", "NS_DEC", "NS_SCALE", "NS_NORTH", "NS_NOTES"}
 
 # AIJ annotation flags after the size: marker on, no background, label on,
-# "highlight" flag, orange. NightScribe follows the same convention.
-_AIJ_FLAGS = "30,1,0,1,1,orange"
+# "highlight" flag. The colour goes last, and its default is the one the app
+# has always written; a caller may pass its own (a name like "orange" or a
+# "#rrggbb": the editor resolves it with QColor, and the card stays a plain
+# string either way).
+_AIJ_FLAGS = "30,1,0,1,1"
+_DEFAULT_ANNOT_COLOR = "orange"
 
 
 def _num(value):
@@ -115,7 +119,7 @@ def _split_header(raw):
 
 def write_annotated_fits(input_path, output_path, sn_xy=None, scale=None,
                          north_pa=None, obj_name=None, ra_deg=None,
-                         dec_deg=None, notes=""):
+                         dec_deg=None, notes="", color=None):
     # Writes an annotated **copy** of the FITS (module doc for the format).
     # With nothing to annotate it copies the bytes verbatim. The input
     # file is never modified.
@@ -123,7 +127,8 @@ def write_annotated_fits(input_path, output_path, sn_xy=None, scale=None,
     #        sn_xy - (x, y) 0-based pixel of the SN (drives the ANNOTATE
     #        card), scale - arcsec/pixel, north_pa - degrees east of north,
     #        obj_name - SN name (ANNOTATE label), ra_deg/dec_deg - J2000,
-    #        notes - free-text night notes
+    #        notes - free-text night notes, color - the ANNOTATE marker
+    #        colour (a name or "#rrggbb"); None keeps the app's own (orange)
     # @return: output Path
     input_path = Path(input_path)
     output_path = Path(output_path)
@@ -146,8 +151,10 @@ def write_annotated_fits(input_path, output_path, sn_xy=None, scale=None,
     tail = []
     if sn_xy is not None:
         x, y = sn_xy
+        mark_color = str(color or "").strip() or _DEFAULT_ANNOT_COLOR
         tail.append(_format_card(
-            "ANNOTATE", f"{float(x):.2f},{float(y):.2f},{_AIJ_FLAGS}",
+            "ANNOTATE",
+            f"{float(x):.2f},{float(y):.2f},{_AIJ_FLAGS},{mark_color}",
             str(obj_name or "").strip()))
     if ra_deg is not None:
         tail.append(_format_card("NS_RA", _num(ra_deg)))

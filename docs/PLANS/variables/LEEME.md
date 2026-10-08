@@ -29,7 +29,8 @@ Copia tal cual (cambia solo el nombre del módulo):
 - Comentario corto sobre cada función pública con `# @args:` / `# @return:`,
   al estilo de `core/project.py`. Sin docstrings robóticos.
 - Funciones cortas. Sin magia. Sin dependencias nuevas.
-- **Prohibido** astropy/photutils (ADR-004); numpy/PIL sí.
+- **Dependencias**: numpy/PIL primero; astropy/scipy/photutils entran cuando
+  aportan (ADR-060, que reabre ADR-004). En este track no hacen falta.
 - Toda consulta de red va por `core/db.py` (`db.http_get` / `db.cache_get`),
   y solo desde módulos de `core/sources/`. Nunca `requests` fuera de ahí.
 - Toda cadena visible en la GUI pasa por `self.tr()`. Pares ES/EN de datos

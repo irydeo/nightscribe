@@ -45,9 +45,12 @@ Tres misiones, un solo bucle:
 
 Y la pieza que las une: cada objetivo elegido se convierte en un
 **proyecto**, una entidad persistente con su propia carpeta, que te guía por
-**planificar → capturar → procesar → publicar** sin volver a preguntarte nada
-que ya sepa (coordenadas, ventana, magnitud, plan de exposición). Semanas
-después, el proyecto sigue ahí: revisitas, curva de luz, resultado final.
+**Ficha → Captura → Análisis → Publicación** sin volver a preguntarte nada
+que ya sepa (coordenadas, ventana, magnitud, plan de exposición). Y la app no
+se queda en el plan: maneja tu montura y tu cámara, y calibra, apila y mide
+tus propias tomas (astrometría, fotometría, períodos) sin salir de la
+ventana. Semanas después, el proyecto sigue ahí: revisitas, curva de luz,
+resultado final.
 
 ## Qué puedes seguir
 
@@ -61,9 +64,14 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
   elementos orbitales preliminares con sus sigmas, calculados desde la
   astrometría del MPC. La app conoce tu cámara y te dice la exposición máxima
   sin traza; exportas la efeméride a tu planetario y la secuencia a tu
-  software de captura, mides en tu herramienta de astrometría y validas el
-  reporte antes de enviarlo. La animación de movimiento, tus tomas alineadas
-  con un marcador sobre la posición predicha, es la prueba de fuego.
+  software de captura, y luego las tomas se **apilan y se miden en la app**
+  (el track & stack: resolver la referencia, registrar, apilar siguiendo al
+  objeto, detectar, barrer la velocidad y medir cada observación), o pegas la
+  astrometría que haya producido tu herramienta y el validador la revisa
+  línea a línea. El reporte MPC se genera en ADES o en 80 columnas y se
+  contrasta con las observaciones que han publicado otras estaciones. La
+  animación de movimiento, tus tomas alineadas con un marcador sobre el
+  objeto, es la prueba de fuego.
 - **Cometas.** Magnitudes observadas en vivo desde COBS, fechas de perihelio
   e indicadores de actividad, para saber cómo está cada cometa esta noche y
   no la del mes pasado.
@@ -83,7 +91,8 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
   predicción, que es la razón científica de reobservar. La ficha te dice si
   el tránsito entero cabe en tu noche, si es detectable con tu apertura y a
   qué hora empezar a capturar, con una línea de tiempo visual, checklist
-  pre-vuelo y exportación pre-rellenada para EXOTIC.
+  pre-vuelo y el handoff a EXOTIC: la app escribe el `inits.json`, ejecuta
+  EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto.
 - **Aproximaciones cercanas.** Los próximos acercamientos de ESA NEOCC:
   distancia de paso, tamaño estimado y magnitud máxima, para cazar el
   visitante rápido de la semana.
@@ -98,7 +107,11 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
   predicho por el VSX, tus vigilias permanentes (la erupción de T CrB, la
   caída de R CrB) chequeadas a diario contra ZTF y la fotometría comunitaria
   de la AAVSO, y el canal editorial de la AAVSO con sus alertas y campañas
-  activas. Siempre que la estrella esté arriba esta noche.
+  activas. Siempre que la estrella esté arriba esta noche. Las tomas se miden
+  en la app (la serie fotométrica: un punto calibrado por toma, con el cero
+  atado por una comparada en cada frame y el conjunto de comparadas con su
+  veto de valores atípicos) y el período se busca ahí mismo (Lomb-Scargle y
+  PDM, con la probabilidad de falsa alarma y la curva plegada por noche).
 - **El Sol y el cielo.** El estado del Sol con los últimos canales de NASA
   SDO y los índices de NOAA, los tránsitos y sombras de las lunas de Júpiter
   filtrados para tu sitio, y un calendario del cielo de 60 días calculado en
@@ -111,7 +124,7 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
 |---|---|
 | **Obligatorio** | Linux o Windows · Python 3.11+ (recomendado 3.12) *o* el instalador autónomo (sin Python) · ~500 MB de disco · conexión a internet para los datos en vivo (todo lo demás funciona offline) |
 | **Recomendado** | Tu **código de observatorio MPC** (p. ej. `Z41`): el asistente inicial resuelve tus coordenadas automáticamente y desbloquea la lista de NEOs específica de tu sitio · tu **fichero de horizonte local** (`.hrz` de TheSkyX o simples pares «az alt») · la apertura de tu telescopio y el píxel/focal de tu cámara |
-| **Opcional** | **CCDciel** en ejecución local, si quieres que la app maneje montura y cámara (es la primera integración con el observatorio; NINA y otros están previstos) · cuatro claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, bot de TNS, token AAVSO); ver *Integraciones opcionales* |
+| **Opcional** | **CCDciel** en ejecución local, si quieres que la app maneje montura y cámara (es la primera integración con el observatorio; NINA y otros están previstos) · cuatro claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, bot de TNS, token AAVSO) · dos herramientas externas opcionales, **Find_Orb** (el chequeo contra otros observadores) y **EXOTIC** (la reducción de tránsitos); ver *Integraciones opcionales* |
 
 Sin cuentas, sin registros, sin telemetría: NightScribe corre en tu ordenador
 y solo habla con los servicios públicos de datos listados más abajo.
@@ -156,12 +169,15 @@ Cómo se siente usar NightScribe, en cinco escenas:
    para Cartes du Ciel y la secuencia para tu software de captura; o, con
    CCDciel conectado, envías el plan y arrancas la captura sin salir de la
    app.
-4. **Procesado.** Mides el apilado en Tycho Tracker, la herramienta de
-   astrometría estándar, que ya genera el fichero para el MPC. **Pegas** las
-   líneas en el proyecto y NightScribe las valida una a una (formato, tu
-   código MPC, designación) antes de que salgan: si un campo se ha
-   desplazado, lo sabes aquí y no en la respuesta del MPC. El reporte queda
-   archivado con la sesión.
+4. **Análisis.** De vuelta a casa abres la visita en el editor. La app resuelve
+   el frame de referencia, registra la secuencia y **la apila siguiendo al
+   objeto**; busca el punto, barre la velocidad, mide cada observación dos
+   veces (en su apilado y por frame) y contrasta el resultado con lo que han
+   publicado otras estaciones. El reporte MPC sale en ADES o en 80 columnas
+   con los instantes de mitad de exposición y las incertidumbres propagadas,
+   listo para enviar. (También puedes medir en Tycho Tracker u otra
+   herramienta y **pegar** las líneas: NightScribe las valida una a una antes
+   de que salgan.)
 5. **Las semanas siguientes.** El diario recuerda esa noche por sí solo. La
    supernova que confirmaste mantiene su propia curva de luz, y el panel te
    avisa cuando han pasado tres noches sin revisitarla. Si te apetece
@@ -229,16 +245,20 @@ El flujo que convierte un puntito en movimiento en una observación reportada:
   astrométrico** añade un ciclo de resolución de placa y corrección que
   absorbe el error de efeméride: la vía fiable para NEOCPs con grandes
   incertidumbres.
-- Procesa en tu herramienta habitual de astrometría (Tycho Tracker u otra) y
-  **pega la astrometría** en el proyecto: NightScribe valida cada línea
-  (80 columnas o ADES PSV, tu código MPC, la designación) y deja el **informe
-  MPC** empaquetado y archivado. El correo lo envías tú; el fichero ya está
-  listo y comprobado.
-- La **animación de movimiento** es la prueba de fuego: tus tomas alineadas
-  por las estrellas, un marcador cabalgando la posición *predicha* con la
-  tasa y el PA previstos y la fuente de la efeméride en el pie. Si un punto
-  permanece bajo el marcador mientras las estrellas derivan, ese es tu
-  objeto.
+- Las tomas vuelven a casa y la astrometría la hace la app: resuelve el frame
+  de referencia, registra la secuencia, la apila siguiendo al objeto, busca el
+  punto, barre la velocidad y mide cada observación dos veces (en su apilado y
+  por frame), marcando cualquier desacuerdo. El resultado se contrasta con las
+  observaciones que han publicado otras estaciones y el **informe MPC** se
+  genera en ADES PSV o en 80 columnas, con el tipo de instrumento de tu
+  cámara, listo para enviar.
+- También puedes medir en tu herramienta habitual (Tycho Tracker u otra) y
+  **pegar la astrometría** en la visita: NightScribe valida cada línea
+  (80 columnas o ADES PSV, tu código MPC, la designación) antes de que salga.
+- La **animación de movimiento** es la prueba de fuego, ahora reproducida en
+  el editor: los apilados de tus observaciones centrados en el objeto, las
+  estrellas arrastrándose mientras el asteroide se queda quieto. Si se queda
+  quieto en todos los paneles, la detección es sólida.
 
 ### Confirmar y seguir supernovas
 
@@ -281,9 +301,11 @@ Pensado para que *cualquiera se atreva* a capturar su primer tránsito:
 - Exposición sugerida y cadencia máxima (para resolver el ingress), con el
   overhead de lectura explícito, y un aviso cuando la baseline no cabe. Una
   **checklist pre-vuelo** persistente de cinco pasos acompaña la captura.
-- La reducción es 100 % externa: NightScribe exporta un **`inits.json`
-  pre-rellenado para EXOTIC** (el pipeline de ciencia ciudadana de NASA/JPL) y
-  guía el envío final a ExoClock o a la AAVSO Exoplanet Database.
+- La reducción se delega en **EXOTIC** (el pipeline de ciencia ciudadana de
+  NASA/JPL), pero la app lo **orquesta**: escribe el `inits.json` de la visita,
+  lo ejecuta por ti en su entorno y **importa** su curva de luz y sus
+  parámetros al proyecto; y guía el envío final a ExoClock o a la AAVSO
+  Exoplanet Database.
 
 ### Estrellas variables, HADS, campañas y vigilias
 
@@ -343,17 +365,67 @@ Desde el menú **Herramientas**:
 
 ### Manejar tu observatorio (CCDciel)
 
-La cuarta pestaña habla con tu **CCDciel** local por JSON-RPC, solo mientras
-CCDciel está realmente en ejecución: estado de un vistazo (versión,
-temperatura del CCD, seguimiento, movimiento), **Apuntar telescopio** (slew
-rápido a la posición recién calculada de un objetivo en movimiento), **Goto
-astrométrico** (slew, captura, resolución de placas y corrección) y
-**captura en vivo** (prepara el plan guardado del proyecto y arranca la
-secuencia).
+El paso **Captura** de cada proyecto habla con tu **CCDciel** local por
+JSON-RPC, solo mientras CCDciel está realmente en ejecución: estado de un
+vistazo (versión, temperatura del CCD, seguimiento, movimiento), **Apuntar
+telescopio** (slew rápido a la posición recién calculada de un objetivo en
+movimiento), **Goto astrométrico** (slew, captura, resolución de placas y
+corrección) y **captura en vivo** (prepara el plan guardado del proyecto y
+arranca la secuencia).
 
 CCDciel es la primera integración directa con el observatorio; NINA y otros
 están en la hoja de ruta. Mientras tanto, la exportación de secuencias como
 fichero ya cubre NINA (JSON), el propio CCDciel y CSV genérico.
+
+### Reducir y medir en la app (el editor)
+
+Todo lo que produjo la noche se abre en un solo banco de trabajo, el **editor
+FITS unificado**: la placa con su histograma y su estirado, una banda que dice
+lo que la placa misma sabe (posición, magnitud, fecha, exposición, equipo,
+estación, escala) y, colgando de cada visita, las tomas que volvieron. El
+trabajo ocurre en pestañas, y cada cifra que muestra viene explicada donde
+aparece.
+
+- **Fotometría.** Las estrellas de comparación se proponen junto al objetivo
+  (nunca las más brillantes del campo: saturan) y la placa se mide con una
+  receta calibrada (apertura o filtro adaptado, cielo, término de color, el
+  catálogo sobre el que se apoya el punto cero). En una secuencia completa, el
+  motor de **serie** mide un punto por toma, con el cero atado por una
+  comparada en cada frame, el conjunto de comparadas vetando un valor atípico,
+  la apertura óptima por noche y un detrend multinoche honesto; de ahí sale la
+  curva de luz, y se exporta como CSV o AAVSO EFF, o directamente a ExoClock.
+- **Período y fase.** Lomb-Scargle (con media flotante) y PDM, la ventana
+  espectral, la probabilidad de falsa alarma por bootstrap, cuántos ciclos
+  cubren realmente los datos y la curva plegada noche a noche: un período se
+  afirma con su evidencia, no como un número suelto.
+- **Calibración.** Una biblioteca de masters (dark/bias y flat) indexada por
+  cámara, ganancia, temperatura, exposición y filtro, y una receta
+  declarativa: el flat se normaliza, un dark ya lleva el bias y un dark sin
+  coincidencia exacta de exposición no se escala. Cuando la biblioteca no
+  tiene flat para el filtro, se construye uno con las propias tomas (si la
+  secuencia tiene dithering) y la ejecución lo dice. Una estrella que toca la
+  saturación o la linealidad no entra en el punto cero.
+- **Astrometría (track & stack).** La secuencia se convierte en observaciones
+  MPC: se resuelve el frame de referencia, se registran las tomas (rotación
+  pequeña incluida), se apila la secuencia **siguiendo al objeto** para
+  concentrar su luz mientras las estrellas dejan traza, se detecta el punto y
+  se barre la velocidad; cada observación se apila aparte y se mide dos veces
+  (en su apilado y por frame, con el desacuerdo marcado). El resultado se
+  contrasta con las observaciones que publicaron otras estaciones (Find_Orb,
+  leave-one-out) y el informe se genera en ADES PSV o en 80 columnas, con los
+  instantes de mitad de exposición, las incertidumbres propagadas y el tipo de
+  instrumento de tu cámara. Por debajo de la puerta de detección hay **modo
+  manual** (marcar el objeto a ojo sobre el apilado de toda la secuencia) y la
+  **animación** reproduce las observaciones en el editor para ver el asteroide
+  quieto mientras las estrellas se arrastran.
+- **Blink y anotación.** Tu FITS parpadeado contra una referencia PanSTARRS
+  DR1 g pedida con la geometría exacta de tu imagen (GIF animado, MP4 H.264,
+  PNG antes/después) y una copia anotada compatible con AIJ con la posición
+  del objeto escrita en la cabecera.
+
+Las herramientas externas conservan su sitio: lo que produce la app son
+ficheros FITS, ADES y AAVSO estándar, así que Tycho Tracker, AstroImageJ,
+EXOTIC o tus propios scripts siguen exactamente donde ella lo deja.
 
 ### Recordarlo todo: diario y atención
 
@@ -432,6 +504,8 @@ servicio. Si una fuente cae, el resto de la app nunca se rompe; consulta
 | SIMBAD (CDS) | Transitorios y galaxias anfitrionas (espejo de Harvard como respaldo) | 7 d | No |
 | TNS | Posiciones de transitorios frescos, días antes de que SIMBAD los ingiera | 6 h | No (solo para imágenes de descubrimiento) |
 | NASA Exoplanet Archive | Periodo, radio, masa del planeta, estrella anfitriona | 7 d | No |
+| VizieR (CDS) | Campos estelares para las secuencias de comparación y las referencias astrométricas (Gaia EDR3, APASS DR9, VSX) | 30 d | No |
+| MPC Observations API | Lo que otras estaciones han publicado del objeto, para el chequeo antes de enviar | 6 h | No |
 | ALeRCE / ZTF | Contexto de referencia de curvas de luz | 30 d | No |
 
 **Sol y entorno:**
@@ -453,9 +527,12 @@ servicio. Si una fuente cae, el resto de la app nunca se rompe; consulta
 planetas (algoritmos de Schlyter, precisión de arcminutos), propagación de
 cuerpos menores (Kepler desde los elementos SBDB), instantes de tránsito,
 fechas julianas heliocéntricas, todo el calendario del cielo de 60 días y los
-fenómenos de las lunas de Júpiter. Las imágenes van acreditadas (NASA/SDO,
-PanSTARRS, DSS); las webs externas (SolarMonitor, ETD, NEOfixer, TNS…) se
-abren en tu navegador, nunca incrustadas.
+fenómenos de las lunas de Júpiter. Y la **reducción misma**: el registro, el
+apilado, la medida astrométrica y fotométrica, la serie, la búsqueda de
+período y la curva de luz son aritmética sobre tus propios píxeles, sin ningún
+servicio de por medio. Las imágenes van acreditadas (NASA/SDO, PanSTARRS,
+DSS); las webs externas (SolarMonitor, ETD, NEOfixer, TNS…) se abren en tu
+navegador, nunca incrustadas.
 
 ## Integraciones opcionales
 
@@ -464,12 +541,14 @@ lo dice. Se configuran en **Herramientas → Configuración → Integraciones**.
 
 | Integración | Qué desbloquea |
 |---|---|
-| **CCDciel** (local, host/puerto) | La pestaña Observatorio: estado, apuntar telescopio, goto astrométrico, captura en vivo. Solo con CCDciel en ejecución. Primera integración con el observatorio; NINA y otros están previstos |
+| **CCDciel** (local, host/puerto) | El paso **Captura** de cada proyecto: estado, apuntar telescopio, goto astrométrico, preparar el plan y captura en vivo. Solo con CCDciel en ejecución. Primera integración con el observatorio; NINA y otros están previstos |
 | **Clave API de NEOfixer** | Reportar `will_observe` / `observed` de vuelta para la coordinación comunitaria |
 | **Clave de Astrometry.net** (gratuita) | Resolución ciega de FITS sin WCS en el blink |
 | **Credenciales de bot TNS** | Imágenes de descubrimiento dentro de la app (respetando la licencia de cada survey) |
 | **Token API de AAVSO** | Fotometría comunitaria para las vigilias de estrellas brillantes |
 | **Código de observador AAVSO** | Se rellena en las exportaciones fotométricas y en el handoff a EXOTIC |
+| **Find_Orb** (binario externo) | El chequeo de tu medida astrométrica contra las observaciones que publicaron otras estaciones, antes del informe MPC. Sin él el chequeo no está disponible, y la app lo dice en vez de fingirlo |
+| **EXOTIC** (Python 3.10 o anterior, externo) | La reducción de tránsitos: la app escribe el handoff, ejecuta EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto. Sin él el handoff sigue siendo tuyo para lanzarlo a mano |
 
 ## Tus datos son tuyos
 
@@ -486,13 +565,15 @@ Sección de honestidad, para que sepas dónde están los bordes:
 
 - **No es un planetario.** No sustituye a Stellarium o Cartes du Ciel: exporta
   efemérides *hacia* ellos.
-- **No reduce tus tomas.** La calibración, el apilado y la medida
-  astrométrica y fotométrica ocurren en tus herramientas habituales
-  (Tycho Tracker, AstroImageJ, EXOTIC…). NightScribe prepara la noche, valida
-  y archiva los resultados, y escribe la historia.
-- **El informe MPC se valida y se archiva; el correo lo envías tú.** Las
-  herramientas de astrometría ya lo generan; NightScribe es la red de
-  seguridad que lo revisa antes de que salga.
+- **Reduce, y además te deja reducir fuera.** La app calibra, apila y mide
+  astrometría y fotometría ella misma (ver *Reducir y medir en la app*), y lo
+  que produce son ficheros FITS, ADES y AAVSO estándar, así que las
+  herramientas en las que ya confías (Tycho Tracker, AstroImageJ…) siguen
+  funcionando sobre su salida. **EXOTIC** sigue siendo externo: la app lo
+  orquesta, no lo reimplementa.
+- **El informe MPC se genera y se valida; el correo lo envías tú.** La app lo
+  escribe desde sus propias medidas, o revisa el que pegues, y lo contrasta
+  con las demás estaciones antes de que salga.
 - **Formatos de exportación**: el formato de secuencias CCDciel está validado
   contra una exportación real de CCDciel, y las efemérides TheSkyX y Cartes du
   Ciel contra importaciones reales; las secuencias NINA y CSV genérico son
@@ -501,7 +582,7 @@ Sección de honestidad, para que sepas dónde están los bordes:
   probables*, etiquetados como tales, y los fenómenos de los galileanos llevan
   su etiqueta ±10 min.
 - **Estado: alpha.** Es la herramienta diaria de un observatorio real
-  (MPC Z41) con una suite de más de 1.300 tests automatizados, pero espera
+  (MPC Z41) con una suite de más de 3.000 tests automatizados, pero espera
   algún borde afilado; y por favor, repórtalo.
 
 ## Inicio rápido y CLI
@@ -524,8 +605,10 @@ en cada uno para más detalles):
 | `post <objeto>` | borradores bilingües + tuit (`--png` añade los gráficos) |
 | `solar` | estado del Sol (`--png` genera el panel) |
 | `blink <nombre> <fits>` | blink de supernova contra PanSTARRS (`--video`, `--post`, `--zoom`, `--efecto blink/fade`…) |
+| `sequence <objeto>` | secuencia fotométrica + carta de comparación (`--mag`, `--fov`, `--comps`, `--catalog gaia/apass`, `--fits` como fondo) |
 | `history` | el diario de observación en el terminal |
 | `project …` | gestión mínima de proyectos: `list`, `create`, `advance`, `show`, `close`, `reopen`, `files` |
+| `inject <carpeta>` | inyección y recuperación: se añaden fuentes sintéticas de brillo conocido a una copia de tus tomas y se miden de vuelta, para decir hasta dónde llega de verdad el pipeline |
 
 Consulta [INSTALL.es.md](INSTALL.es.md) para instrucciones completas por
 sistema operativo, el paquete pip y el instalador autónomo, y

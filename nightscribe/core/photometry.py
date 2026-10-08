@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import coords, fits_meta, series
+from . import coords, fits_meta, outliers, series
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +68,14 @@ _INFERRED_CEILING_FRAC = 0.94   # flag peaks this close to an INFERRED
                                 # cores before they sit exactly on it
 _PLATEAU_MAX_FWHM = 4.0     # the 99 %-plateau rule in suggest_apertures
                             # is only believed within this many FWHM
+# How far a star's peak must clear the local noise before the second
+# moments can measure its width. The window's positive half of the noise
+# is a pedestal (about 0.4 sigma per pixel over the 19x19 cutout) and the
+# moments integrate it as if it were light: for a PSF of ~1.2 px the
+# pedestal overtakes the star's own flux below ~20 sigma, and the FWHM
+# comes out three times too large (measured on 2025 UR: 13 px against the
+# radial profile's 2.7). Above it the moments are the better of the two.
+_MOMENTS_MIN_SNR = 20.0
 
 # One comparison star tells us nothing about the scatter; the quoted
 # uncertainty floors at a generous constant instead of pretending to be zero.
@@ -286,6 +294,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         sky_pp = 0.0
     flux = total - sky_pp * n_pix
     n_sky = int(ann_pixels.size)
+    # The sky's own noise per pixel, from the SAME annulus that is already
+    # in hand: it is the honest denominator of this star's signal-to-noise,
+    # and it is what the limiting-magnitude fit and the matched filter stand
+    # on. One robust median over a few hundred pixels, so it is cheap.
+    sigma_pp = sky_sigma(ann_pixels) if ann_pixels.size else None
     frame_max = float(np.nanmax(data))
     # A star that clipped the detector leaves a plateau: many pixels
     # stuck at exactly the frame maximum (a gaussian core has one
@@ -332,9 +345,515 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         return _fail("sin señal medible", "no measurable signal") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
             "n_pix": n_pix, "n_sky": n_sky}
+    snr = None
+    if sigma_pp and n_pix > 0:
+        # the aperture's signal-to-noise with the sky's noise only: the
+        # object's own shot noise is a second-order term for the faint
+        # sources this exists for, and it is the CCD equation (below) that
+        # carries it in the error budget
+        snr = float(flux) / (float(sigma_pp) * math.sqrt(float(n_pix)))
     return {"x": cx, "y": cy, "flux": flux, "sky_pp": sky_pp,
             "peak": peak, "n_pix": n_pix, "n_sky": n_sky, "saturated": False,
-            "ok": True, "reason": None, "cen_ok": cen_ok}
+            "ok": True, "reason": None, "cen_ok": cen_ok,
+            "sigma_pp": (float(sigma_pp) if sigma_pp else None), "snr": snr}
+
+
+# ------------------------------------------------- the point spread (P2)
+
+# The PSF model's half-size in pixels: big enough to hold the wings of a
+# seeing-limited star (measured on 2025 UR: FWHM 5.4 px, so this is a bit
+# over 4 FWHM across) and small enough that the matched filter stays a
+# patch operation.
+PSF_HALF_DEFAULT = 12
+# FWHM = 2 * sqrt(2 ln 2) * sigma, the constant that ties a Gaussian's
+# width to what the observer measures on the screen.
+_FWHM_TO_SIGMA = 2.3548200450309493
+# Below this trail (px) the object is called round. Measured on synthetic
+# stars of the same seeing: a ROUND star reads up to 1.45 px of trail at
+# SNR ~20, because the second moments of a noisy image are not exactly
+# isotropic. Calling that a trail would send the observer to shorten an
+# exposure that was already fine.
+TRAIL_MIN_PX = 1.5
+
+
+def gaussian_psf(fwhm_px, half=None, ratio=1.0, pa_deg=0.0):
+    # @args: fwhm_px - the point spread's FWHM in px (None: 3 px),
+    #        half - the box's half-size in px, ratio - the minor/major axis
+    #        ratio (1.0 round, below 1 trailed), pa_deg - the major axis's
+    #        position angle in the same convention as the trail
+    # @return: a normalised (2*half+1)^2 PSF that SUMS to one
+    # Summing to one is what makes the matched filter's amplitude the
+    # star's own flux: the filter answers "how much flux, in this shape",
+    # and the shape carries no scale of its own.
+    fwhm = float(fwhm_px) if fwhm_px else 3.0
+    half = int(PSF_HALF_DEFAULT if half is None else half)
+    sigma = max(1e-3, fwhm / _FWHM_TO_SIGMA)
+    yy, xx = np.mgrid[-half:half + 1, -half:half + 1]
+    # the trail: stretch along the position angle and squeeze across it,
+    # which moves the light without adding any (the area is kept)
+    ang = math.radians(float(pa_deg))
+    u = xx * math.cos(ang) + yy * math.sin(ang)
+    v = -xx * math.sin(ang) + yy * math.cos(ang)
+    sx = sigma / math.sqrt(max(1e-6, float(ratio)))
+    sy = sigma * math.sqrt(max(1e-6, float(ratio)))
+    m = np.exp(-0.5 * ((u / sx) ** 2 + (v / sy) ** 2))
+    total = float(m.sum())
+    return (m / total) if total > 0 else m
+
+
+def empirical_psf(cutouts, half=None):
+    # @args: cutouts - list of (2h+1, 2h+1) star patches, already
+    #        sky-subtracted and centred on the star, half - the box's
+    #        half-size (taken from the patches when None)
+    # @return: a normalised PSF (sums to one), or None when nothing is
+    #          usable
+    # The MEDIAN of the patches, never the mean: a cosmic ray, a hot pixel
+    # or a close neighbour in one star must not become part of the shape.
+    # The empirical profile is the honest one because it carries the real
+    # wings, and the wings are exactly where a matched filter beats an
+    # aperture: an aperture gives them the same weight as the core, and
+    # they are mostly noise.
+    stack = [np.asarray(c, dtype=np.float64) for c in (cutouts or [])]
+    stack = [c for c in stack if c.ndim == 2 and c.size]
+    if not stack:
+        return None
+    shapes = {c.shape for c in stack}
+    if len(shapes) != 1:
+        return None
+    cube = np.stack(stack, axis=0)
+    med = np.median(cube, axis=0)
+    # the patches are sky-subtracted but a residual pedestal can survive
+    # (a comp on a faint gradient): removing the corners' median keeps the
+    # shape from carrying a pedestal of its own
+    h, w = med.shape
+    edge = np.concatenate([med[:2].ravel(), med[-2:].ravel(),
+                           med[:, :2].ravel(), med[:, -2:].ravel()])
+    med = med - float(np.median(edge))
+    med = np.clip(med, 0.0, None)
+    total = float(med.sum())
+    if not np.isfinite(total) or total <= 0:
+        return None
+    return med / total
+
+
+def _shift_psf(psf, dx, dy):
+    # @args: psf - a normalised PSF on an odd grid, centred, dx/dy - the
+    #        sub-pixel shift to apply (in px, the fractional part of the
+    #        object's position inside its central pixel)
+    # @return: the shifted PSF, renormalised so it still sums to one
+    # Bilinear on purpose: the PSF is smooth, and a spline's ringing on a
+    # 25x25 grid would put negative "light" in the wings, which a matched
+    # filter would then subtract from the star.
+    if abs(dx) < 1e-6 and abs(dy) < 1e-6:
+        return psf
+    m = np.asarray(psf, dtype=np.float64)
+    h, w = m.shape
+    yy, xx = np.mgrid[0:h, 0:w]
+    xs = xx - dx
+    ys = yy - dy
+    x0 = np.floor(xs).astype(int)
+    y0 = np.floor(ys).astype(int)
+    fx = xs - x0
+    fy = ys - y0
+    out = np.zeros_like(m)
+    for oy in (0, 1):
+        for ox in (0, 1):
+            xa = np.clip(x0 + ox, 0, w - 1)
+            ya = np.clip(y0 + oy, 0, h - 1)
+            weight = (fx if ox else 1.0 - fx) * (fy if oy else 1.0 - fy)
+            out += weight * m[ya, xa]
+    total = float(out.sum())
+    return (out / total) if total > 0 else m
+
+
+def sky_sigma(values):
+    # @args: values - 1D sky samples (ADU)
+    # @return: the sky's noise per pixel (ADU), or None when it cannot be
+    #          measured
+    # The scaled MAD, not the standard deviation: the sky samples of an
+    # annulus carry the object's wings and any neighbour that fell inside,
+    # and a robust estimator ignores them by construction. This is the
+    # sigma the matched filter needs, and it is the SAME one the aperture
+    # comparison uses, so the two differ only in their weighting.
+    arr = np.asarray(values, dtype=np.float64)
+    arr = arr[np.isfinite(arr)]
+    if arr.size < 5:
+        return None
+    sigma = float(outliers.scaled_mad(arr))
+    return sigma if np.isfinite(sigma) and sigma > 0 else None
+
+
+def _matched_fail(ap, reason_es, reason_en, sigma):
+    # The shape EVERY failure of the matched filter comes back with.
+    #
+    # The APERTURE's own numbers are kept (flux_ap): it is a different
+    # measurement of the same star and it may well be fine, and the observer
+    # is entitled to see it. What is None is the filter's own.
+    #
+    # ok is False and the reason travels, because the previous version of
+    # these paths returned ok=True with flux=None, which is the worst of both
+    # worlds: a caller that trusted "ok" then did log10(None) or
+    # log10(negative). Fixed on 2026-10-07 after the real 2025 FG18 visit
+    # (frame 15, target T18 at 306,1669) came back with flux -845.6 ADU and
+    # ok=True, and measure_plate died with "math domain error" instead of
+    # marking one point as unmeasurable.
+    # @args: ap - the aperture measurement of the same star, reason_es/en -
+    #        the plain-language pair, sigma - the sky noise per pixel (None
+    #        when it could not be measured either)
+    # @return: the dict, with ok=False
+    out = dict(ap)
+    out.update(ok=False, reason={"es": reason_es, "en": reason_en},
+               flux=None, flux_ap=ap.get("flux"), snr=None, snr_ap=None,
+               n_eff=None, sigma_pp=sigma)
+    return out
+
+
+def measure_matched(data, x, y, psf, r_ap=R_AP, r_ann_in=R_ANN_IN,
+                    r_ann_out=R_ANN_OUT, sat_adu=None, fwhm=None,
+                    centroid_mode="gaussian", sigma_clip=True,
+                    linear_adu=None, sky_mode="median", robust=True):
+    # @args: data - 2D array (ADU), x/y - the object's position, psf - a
+    #        normalised PSF (sums to one) on an odd grid, the same
+    #        apertures as measure_point, sat_adu - the ceiling, fwhm - the
+    #        seeing, centroid_mode/sigma_clip/linear_adu/sky_mode/robust -
+    #        as measure_point: the filter has to honour the SAME recipe as
+    #        the aperture, or a plate measured one way and the other would
+    #        not be comparable
+    # @return: {"ok", "reason", "x", "y", "flux", "flux_ap", "snr",
+    #          "snr_ap", "n_eff", "n_pix", "sky_pp", "sigma_pp", "peak"}
+    # THE MATCHED FILTER. With a known shape m (summing to one) and white
+    # noise sigma per pixel, the best estimate of the star's flux is
+    #
+    #     A = sum(m * (p - sky)) / sum(m^2)
+    #
+    # and its signal-to-noise is
+    #
+    #     SNR = sum(m * (p - sky)) / (sigma * sqrt(sum(m^2)))
+    #
+    # which is the largest SNR any LINEAR filter can reach on that data
+    # (Cauchy-Schwarz: the optimal weight is proportional to the shape
+    # itself). An aperture is the special case m = 1 inside the circle,
+    # and it is not optimal: it gives the noisy wings the same weight as
+    # the core. The gain is largest exactly where it matters, at low SNR.
+    #
+    # Both numbers come out of the SAME centroid and the SAME sky, and
+    # both SNRs use the same sigma: the only difference between them is
+    # the weighting, so the comparison measures the FILTER and nothing
+    # else. A new centroid or a new sky per method would hide the effect
+    # inside the difference of two other estimates.
+    ap = measure_point(data, x, y, r_ap=r_ap, r_ann_in=r_ann_in,
+                       r_ann_out=r_ann_out, sat_adu=sat_adu, fwhm=fwhm,
+                       centroid_mode=centroid_mode, sigma_clip=sigma_clip,
+                       linear_adu=linear_adu, sky_mode=sky_mode,
+                       robust=robust)
+    if not ap.get("ok"):
+        out = dict(ap)
+        out.update(flux=None, flux_ap=None, snr=None, snr_ap=None,
+                   n_eff=None, sigma_pp=None)
+        return out
+    cx, cy = float(ap["x"]), float(ap["y"])
+    sky_pp = float(ap.get("sky_pp") or 0.0)
+    h, w = data.shape
+    half = (np.asarray(psf).shape[0] - 1) // 2
+    # the patch has to hold the whole PSF around the object, and the sky
+    # annulus is measured on the SAME patch the aperture used (its own)
+    pad = int(math.ceil(max(r_ann_out, r_ap, half))) + 2
+    py0 = max(0, int(math.floor(cy)) - pad)
+    py1 = min(h, int(math.ceil(cy)) + pad + 1)
+    px0 = max(0, int(math.floor(cx)) - pad)
+    px1 = min(w, int(math.ceil(cx)) + pad + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
+    r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+    # The noise per pixel is the one the aperture already measured, on the
+    # SAME annulus (measure_point returns it), so both SNRs share the
+    # denominator and the comparison is about the WEIGHTING alone. The
+    # fallback recomputes it if an older caller did not pass it through.
+    sigma = ap.get("sigma_pp")
+    if sigma is None:
+        ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
+        sigma = sky_sigma(sub[ann_mask])
+    if sigma is None:
+        return _matched_fail(ap, "sin ruido de cielo medible",
+                             "no measurable sky noise", None)
+    # the PSF placed where the object actually is, inside its pixel
+    m = _shift_psf(psf, cx - math.floor(cx), cy - math.floor(cy))
+    mh = (m.shape[0] - 1) // 2
+    ix = int(math.floor(cx)) - px0 - mh
+    iy = int(math.floor(cy)) - py0 - mh
+    patch = np.full(sub.shape, 0.0)
+    sx0, sy0 = max(0, ix), max(0, iy)
+    sx1 = min(sub.shape[1], ix + m.shape[1])
+    sy1 = min(sub.shape[0], iy + m.shape[0])
+    if sx1 <= sx0 or sy1 <= sy0:
+        return _matched_fail(ap, "sin píxeles utilizables",
+                             "no usable pixels", sigma)
+    patch[sy0:sy1, sx0:sx1] = m[sy0 - iy:sy1 - iy, sx0 - ix:sx1 - ix]
+    net = sub - sky_pp
+    num = float(np.nansum(patch * net))
+    gg = float(np.nansum(patch ** 2))
+    if gg <= 0:
+        return _matched_fail(ap, "sin píxeles utilizables",
+                             "no usable pixels", sigma)
+    flux = num / gg
+    snr = num / (sigma * math.sqrt(gg))
+    if not math.isfinite(flux) or flux <= 0.0:
+        # THE FILTER CAN COME OUT NEGATIVE, and it is not a rare accident:
+        # the matched filter correlates a PSF with the data, and on noise the
+        # correlation is as often negative as positive. A negative flux is
+        # not a faint measurement, it is the absence of one, and the callers
+        # take -2.5*log10(flux) with a truthiness guard that a negative
+        # number passes. Measured on the real 2025 FG18 visit (frame 15,
+        # target T18 at 306,1669): flux -845.6 ADU, snr -0.97, and the whole
+        # 207-frame run died instead of marking one point.
+        return _matched_fail(ap, "sin señal medible",
+                             "no measurable signal", sigma)
+    # the aperture's own SNR with the SAME noise per pixel and the same
+    # sky: this is what isolates the weighting (see the docstring)
+    n_ap = float(ap.get("n_pix") or 0.0)
+    flux_ap = float(ap.get("flux") or 0.0)
+    snr_ap = ap.get("snr")
+    if snr_ap is None and n_ap > 0:
+        snr_ap = flux_ap / (sigma * math.sqrt(n_ap))
+    return {"ok": True, "reason": None, "x": cx, "y": cy, "flux": flux,
+            "flux_ap": flux_ap, "snr": snr, "snr_ap": snr_ap,
+            "n_eff": 1.0 / gg, "n_pix": n_ap, "sky_pp": sky_pp,
+            "sigma_pp": sigma, "peak": ap.get("peak"),
+            "saturated": ap.get("saturated"), "n_sky": ap.get("n_sky")}
+
+
+def psf_elongation(data, x, y, fwhm_px=None, r_max=None, sky_pp=None,
+                   thresh=1.0):
+    # @args: data - 2D array, x/y - the object's position, fwhm_px - the
+    #        seeing when the caller knows it, r_max - the moment window's
+    #        radius (default: 2x the FWHM, see below), sky_pp - the sky per
+    #        pixel when the caller knows it, thresh - how many sigma above
+    #        the sky a pixel has to be to count (default 1)
+    # @return: {"ok", "reason", "ratio", "pa_deg", "trail_px", "fwhm_px",
+    #          "fwhm_major_px", "significant", "sky_pp", "sigma_pp"}
+    # The shape of what was measured, from its second moments: the axis
+    # ratio (minor over major), the position angle of the MAJOR axis, and
+    # the equivalent TRAIL length.
+    #
+    # The trail is the honest part. A moving object smears along its path,
+    # and a uniform line of length L convolved with a round PSF of width
+    # sigma comes out as a Gaussian whose long axis carries
+    # sigma_long^2 = sigma^2 + L^2/12 (the variance of a uniform segment).
+    # Inverting that turns "the object looks elongated" into "the exposure
+    # was 2.4 px too long for this motion", which is a number the observer
+    # can act on.
+    #
+    # The window and the threshold are MEASURED, not chosen by taste. A
+    # wide window makes the second moments chase the sky noise (measured
+    # with a 4-FWHM window on a round, bright star: it reported a 1.56 px
+    # trail out of nothing), and a low threshold lets the noise's positive
+    # half in. The table below is a synthetic Gaussian of FWHM 3.5 px with
+    # sky 1000 ADU and sigma 5, injected trails of 0, 3, 6 and 10 px, ten
+    # realisations each:
+    #
+    #     window   thresh   flux 20000        flux 2000         flux 300
+    #     2 FWHM   1.0      0.4 3.4 6.2 9.7   1.5 2.7 5.6 9.1   3.4 3.1 3.0 5.4
+    #     2 FWHM   0.0      0.6 4.9 4.9 4.9   1.8 4.9 4.9 4.9   3.6 4.9 4.9 4.9
+    #     4 FWHM   1.0      (a round star reads 1.5 px of trail)
+    #
+    # so the window is 2 FWHM and the threshold 1 sigma, and the result is
+    # only called a trail above TRAIL_MIN_PX: a round star reads up to
+    # 1.45 px at SNR ~20, and a trail shorter than that is not one.
+    if data is None or data.size == 0:
+        return _fail("no hay imagen", "no image")
+    h, w = data.shape
+    if not (0 <= x < w and 0 <= y < h):
+        return _fail("fuera del marco", "out of frame")
+    if fwhm_px is None:
+        # the radial profile, not the moments: on a broad or noisy PSF the
+        # radial one is the robust of the two (see estimate_fwhm's table)
+        fwhm_px = estimate_fwhm(data, [(x, y)], method="radial")
+    fwhm_px = float(fwhm_px) if fwhm_px else 3.0
+    if r_max is None:
+        r_max = int(max(5, min(30, round(2.0 * fwhm_px))))
+    r_max = int(max(4, min(r_max, min(h, w) // 2 - 1)))
+    px0 = max(0, int(math.floor(x)) - r_max)
+    px1 = min(w, int(math.ceil(x)) + r_max + 1)
+    py0 = max(0, int(math.floor(y)) - r_max)
+    py1 = min(h, int(math.ceil(y)) + r_max + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
+    r2 = (xx - x) ** 2 + (yy - y) ** 2
+    ann = (r2 >= (0.75 * r_max) ** 2) & (r2 <= r_max ** 2)
+    sigma = None
+    if sky_pp is None:
+        sky_pp = 0.0
+        if np.any(ann):
+            med, _n = _sigma_clipped_median(sub[ann])
+            sky_pp = float(med or 0.0)
+    if np.any(ann):
+        sigma = sky_sigma(sub[ann])
+    floor = float(sky_pp) + (float(thresh) * sigma if sigma else 0.0)
+    weight = np.where(r2 <= r_max ** 2, sub - floor, 0.0)
+    weight = np.clip(weight, 0.0, None)
+    total = float(weight.sum())
+    if total <= 0:
+        return _fail("sin luz que medir", "no light to measure")
+    mx = float((weight * (xx - x)).sum()) / total
+    my = float((weight * (yy - y)).sum()) / total
+    vxx = float((weight * (xx - x - mx) ** 2).sum()) / total
+    vyy = float((weight * (yy - y - my) ** 2).sum()) / total
+    vxy = float((weight * (xx - x - mx) * (yy - y - my)).sum()) / total
+    # the eigenvectors of the covariance give the axes without a fit
+    half_trace = 0.5 * (vxx + vyy)
+    disc = math.sqrt(max(0.0, 0.25 * (vxx - vyy) ** 2 + vxy ** 2))
+    major = half_trace + disc
+    minor = half_trace - disc
+    if major <= 0 or minor <= 0:
+        return _fail("la luz no tiene forma medible",
+                     "the light has no measurable shape")
+    ratio = math.sqrt(max(0.0, minor / major))
+    # the position angle of the MAJOR axis, in the image's own convention
+    pa = 0.5 * math.atan2(2.0 * vxy, vxx - vyy)
+    # the trail: the extra length a line would add along the major axis
+    sigma_long = math.sqrt(major)
+    sigma_short = math.sqrt(minor)
+    extra = max(0.0, major - minor)
+    trail = math.sqrt(12.0 * extra) if extra > 0 else 0.0
+    return {"ok": True, "reason": None, "ratio": float(ratio),
+            "pa_deg": float(math.degrees(pa) % 180.0),
+            "trail_px": float(trail),
+            "significant": bool(trail >= TRAIL_MIN_PX),
+            "fwhm_px": float(sigma_short * _FWHM_TO_SIGMA),
+            "fwhm_major_px": float(sigma_long * _FWHM_TO_SIGMA),
+            "sky_pp": float(sky_pp),
+            "sigma_pp": (float(sigma) if sigma else None)}
+
+
+# ------------------------------------------------- the night's diagnosis (P3)
+
+# The slope of log10(SNR) against magnitude for a sky-limited star. Every
+# magnitude is a factor 10^0.4 = 2.512 in flux, and the noise does not care
+# how bright the star is, so the SNR must fall with that same factor. It is
+# not a constant to trust blindly: it is a CHECK. A field measured under a
+# bright moon, with a very short exposure or with saturated comparisons
+# comes out far from it, and then the limiting magnitude is not quotable.
+SKY_LIMITED_SLOPE = -0.4
+# How far the fitted slope may sit from it and still be called sky-limited.
+# A slope of -0.3 means a factor 2.0 per magnitude instead of 2.512, i.e. a
+# quarter of the flux unaccounted for at every step: that is already a
+# broken field (a bright moon, saturation at the bright end, a very short
+# exposure) and the number is not to be quoted. Measured on the synthetic
+# cases of test_photometry_diagnostics: a clean sky-limited set lands within
+# 0.02 of -0.4, and a set with a factor 4 per magnitude lands at -0.6.
+_SLOPE_TOLERANCE = 0.15
+
+
+def limiting_magnitude(pairs, snr_target=5.0, sigma_clip=2.5):
+    # @args: pairs - [(magnitude, snr)] of the field stars, snr_target - the
+    #        signal-to-noise the limit is quoted at (5 by convention),
+    #        sigma_clip - how far a star may sit from the fitted line
+    # @return: {"ok", "reason", "mag", "slope", "intercept", "n", "used",
+    #          "mag_range"}
+    # "How faint can I go tonight?" answered with THIS night's own stars.
+    # For a sky-limited source the signal-to-noise falls as a power law:
+    #
+    #     log10(SNR) = a + b * mag          with b ~ -0.4
+    #
+    # and fitting that line to the stars actually measured on the stack, then
+    # solving it for SNR = 5, gives the limiting magnitude with the sky, the
+    # seeing, the exposure and the aperture all inside the two numbers. No
+    # table, no model: the night measures itself.
+    #
+    # The fit is a plain least squares with one outlier pass, because a
+    # single saturated comparison star or a cosmic ray would otherwise drag
+    # the line. And the SLOPE is checked against the physics: a fit far from
+    # -0.4 means the field is not sky-limited, and the reason says so rather
+    # than quoting a figure nobody should trust.
+    pts = [(float(m), float(s)) for m, s in (pairs or [])
+           if m is not None and s is not None and s > 0]
+    if len(pts) < 4:
+        return {"ok": False, "reason": "fewer than four stars to fit",
+                "mag": None, "slope": None, "intercept": None, "n": len(pts),
+                "used": [], "mag_range": None}
+    mags = np.asarray([p[0] for p in pts])
+    logs = np.log10(np.asarray([p[1] for p in pts]))
+    # Theil-Sen: the MEDIAN of the slopes of every PAIR of stars, and the
+    # median of the intercepts that slope implies. With a handful of
+    # comparisons this is the honest robust estimator and not a taste: a
+    # saturated star or a cosmic ray moves a least-squares line (measured on
+    # the seven-point case of the tests: it moved the limit by 0.5 mag and
+    # the clip could not repair it, because the dragged line inflates the
+    # MAD the clip is measured against), and it cannot move a median of 21
+    # pairs. It also needs no threshold to tune, which on five points is a
+    # guess dressed as a parameter.
+    slopes = []
+    for i in range(len(pts)):
+        for j in range(i + 1, len(pts)):
+            dm = mags[j] - mags[i]
+            if abs(dm) > 1e-6:
+                slopes.append((logs[j] - logs[i]) / dm)
+    if not slopes:
+        return {"ok": False, "reason": "every star has the same magnitude",
+                "mag": None, "slope": None, "intercept": None,
+                "n": len(pts), "used": [], "mag_range": None}
+    slope = float(np.median(slopes))
+    intercept = float(np.median(logs - slope * mags))
+    if not np.isfinite(slope) or slope >= 0:
+        return {"ok": False, "reason": "the signal-to-noise does not fall "
+                "with magnitude", "mag": None, "slope": None,
+                "intercept": None, "n": len(pts), "used": [],
+                "mag_range": None}
+    limit = (math.log10(float(snr_target)) - intercept) / slope
+    # `used` is a REPORT, not the fit: it says which stars sit on the line
+    # and which do not, so the interface can name the ones that were left
+    # out of the picture without having changed the answer.
+    resid = logs - (slope * mags + intercept)
+    mad = float(outliers.scaled_mad(resid))
+    used = ([True] * len(pts) if mad <= 0
+            else [bool(abs(r) <= sigma_clip * mad) for r in resid])
+    return {"ok": True, "reason": None, "mag": float(limit),
+            "slope": slope, "intercept": intercept, "n": len(pts),
+            "used": used, "mag_range": (float(mags.min()), float(mags.max())),
+            "sky_limited": bool(
+                abs(slope - SKY_LIMITED_SLOPE) <= _SLOPE_TOLERANCE)}
+
+
+def quality_grid(points, shape, n=4):
+    # @args: points - [(x, y, residual_arcsec)] of the measured stars,
+    #        shape - the plate (h, w) or (naxis1, naxis2), n - divisions per
+    #        axis
+    # @return: {"ok", "reason", "cells": [[median|None]], "median", "worst",
+    #          "spread", "n"}
+    # A plate solution can be good in the middle and bad at the corners
+    # (distortion, a wrong scale, a tilted chip), and one number for the
+    # whole plate hides exactly that. The median residual per cell of an
+    # n x n grid says WHERE, in one glance, and the spread between the cells
+    # says whether the solution is even. Tycho's Image Statistics draws the
+    # same map for the same reason.
+    #
+    # The MEDIAN per cell, not the mean: one bad match or a cosmic ray must
+    # not paint a corner red on its own.
+    pts = [(float(x), float(y), float(r)) for x, y, r in (points or [])
+           if x is not None and y is not None and r is not None
+           and np.isfinite(r)]
+    if len(pts) < 4:
+        return {"ok": False, "reason": "fewer than four stars to judge",
+                "cells": [], "median": None, "worst": None, "spread": None,
+                "n": len(pts)}
+    width = float(shape[1] if len(shape) > 1 else shape[0])
+    height = float(shape[0])
+    cells = [[None for _ in range(n)] for _ in range(n)]
+    for j in range(n):
+        for i in range(n):
+            sel = [p[2] for p in pts
+                   if (j / n) <= (p[1] / max(height, 1e-9)) < ((j + 1) / n)
+                   and (i / n) <= (p[0] / max(width, 1e-9)) < ((i + 1) / n)]
+            if sel:
+                cells[j][i] = float(np.median(sel))
+    filled = [c for row in cells for c in row if c is not None]
+    if not filled:
+        return {"ok": False, "reason": "no cell has a star in it",
+                "cells": cells, "median": None, "worst": None,
+                "spread": None, "n": len(pts)}
+    return {"ok": True, "reason": None, "cells": cells,
+            "median": float(np.median(filled)), "worst": float(max(filled)),
+            "spread": float(max(filled) - min(filled)), "n": len(pts)}
 
 
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
@@ -412,7 +931,7 @@ def calibrate_zero_point(inst_mags, cat_mags):
         zp_err = SINGLE_COMP_ZP_ERR
     else:
         mad = float(np.median(np.abs(values - zp)))
-        zp_err = 1.4826 * mad / math.sqrt(n)
+        zp_err = outliers.MAD_TO_SIGMA * mad / math.sqrt(n)
     if n < 3:
         logger.warning("only %d comparison star(s) on this plate; the "
                        "quoted uncertainty is floor-bounded", n)
@@ -631,8 +1150,7 @@ def fwhm_radial(data, x, y, rmax=None, level=None, bin_width=0.5):
     return None
 
 
-def estimate_fwhm(data, positions, sat_adu=None, method="moments",
-                  rmax=12.0):
+def estimate_fwhm(data, positions, sat_adu=None, method="auto", rmax=12.0):
     # The median seeing of a frame, measured on several stars.
     #
     # Two definitions are available, and which one is right DEPENDS on the
@@ -662,8 +1180,18 @@ def estimate_fwhm(data, positions, sat_adu=None, method="moments",
     #
     # @args: data - 2D array, positions - [(x, y)] star pixels,
     #        sat_adu - ceiling in ADU, stars near it are skipped,
-    #        method - "moments" | "radial", rmax - radial reach (px)
+    #        method - "auto" | "moments" | "radial", rmax - radial reach (px)
     # @return: the median FWHM in px, or None when nothing is usable
+    #
+    # "auto" (the default) asks the DATA which estimator it can afford: a
+    # star whose peak barely clears the noise goes to the radial profile,
+    # and a bright one to the moments, which are the more accurate of the
+    # two on a narrow PSF. The reason is measured, not aesthetic: on 2025
+    # UR the sky noise is 261 ADU and a mag-17.4 comp peaks 816 above it,
+    # so the positive half of the noise over the 19x19 window is FIVE times
+    # the star's own flux and the moments came out at 13 px where the
+    # radial profile says 2.7. Silently handing a 17 px aperture to the
+    # observer is worse than a 18 % bias on a narrow star.
     if data is None:
         return None
     if method == "radial":
@@ -691,6 +1219,16 @@ def estimate_fwhm(data, positions, sat_adu=None, method="moments",
         if sat_adu is not None and peak >= SAT_FRAC * float(sat_adu):
             continue
         sky = float(np.nanmedian(sub))
+        noise = float(outliers.scaled_mad(sub))
+        if method == "auto" and noise > 0.0 \
+                and (peak - sky) < _MOMENTS_MIN_SNR * noise:
+            # this star cannot afford the moments: the window's positive
+            # noise is a pedestal the second moments integrate as if it
+            # were light (see the note above the function)
+            value = fwhm_radial(data, x, y, rmax=rmax)
+            if value is not None and 0.8 <= value <= 50.0:
+                fwhms.append(value)
+            continue
         bright = sub - sky
         bright[bright < 0] = 0.0
         total = float(bright.sum())
@@ -785,6 +1323,56 @@ def linearity_ceiling(cfg):
     return None
 
 
+def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
+    # THE TWO CEILINGS EVERY STAR MUST CLEAR, from ONE place (ADR-066).
+    #
+    # The rule, asked for as a rule of the house: a star whose peak reaches
+    # the detector's saturation OR the camera's linearity limit is NEVER used
+    # to build a zero point. A clipped core is not proportional at all, and a
+    # star above the linearity limit calibrates nothing even when it is not
+    # clipped yet (its flux stopped following the light): the zero point it
+    # would set is a number that looks fine and is wrong.
+    #
+    # Each caller used to pass these two numbers by hand, and one path (the
+    # series' aperture tuning) forgot: one home means no path can forget.
+    #
+    # @args: header - the plate's header dict, cfg - a config-like object
+    #        with .get (or None), linear_adu - an explicit linearity limit
+    #        (a per-run recipe wins over the camera profile), saturate - an
+    #        explicit saturation ceiling (same)
+    # @return: (saturation, linearity) in ADU, either of them None when
+    #          nobody knows. The header's own SATURATE card still wins over
+    #          the setting, exactly as before.
+    cfg_like = {"ccd_saturate": saturate} if saturate is not None else cfg
+    sat = saturation_ceiling(header, cfg_like)
+    lin = linear_adu if linear_adu is not None else linearity_ceiling(cfg)
+    return sat, lin
+
+
+def ceiling_warning(header, cfg=None, linear_adu=None, saturate=None):
+    # @args: as star_ceilings
+    # @return: a bilingual warning when the camera's LINEARITY limit is not
+    #          known (so the app is measuring with the best ceiling it has,
+    #          which is not the same thing), or None when it is.
+    # Asked for 2026-10-06: with the linearity unset the app used to fall back
+    # to the SATURATE card or to the plate's own clip in SILENCE, and a star
+    # that is over the (unknown) linearity but under the clip slips through.
+    # The observer has to know which limit is being enforced.
+    _sat, lin = star_ceilings(header, cfg, linear_adu=linear_adu,
+                              saturate=saturate)
+    if lin is not None:
+        return None
+    return {"es": "No sé el límite de linealidad de tu cámara: estoy "
+                  "midiendo con el mejor techo que tengo (la tarjeta "
+                  "SATURATE o el recorte de la propia placa). Ponlo en "
+                  "Ajustes → Perfil de cámara para que la regla se cumpla "
+                  "de verdad.",
+            "en": "I do not know your camera's linearity limit: I am "
+                  "measuring with the best ceiling I have (the SATURATE card "
+                  "or the plate's own clip). Set it in Settings → Camera "
+                  "profile so the rule really holds."}
+
+
 def effective_ceiling(header, cfg=None, linear_adu=None):
     # The single, honest ceiling the photometry obeys: the MINIMUM of the
     # known limits. The camera profile's linearity is usually the strictest
@@ -860,7 +1448,7 @@ def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
         resid = (cat - inst)[keep] - (zp + k * bv[keep])
         if len(resid) < 4:
             break
-        sig = 1.4826 * float(np.median(np.abs(resid - np.median(resid))))
+        sig = float(outliers.scaled_mad(resid))
         sig = max(sig, 0.02)          # the catalog noise floor (mag)
         # deviations are measured from the residuals' own median: a fit
         # pulled by an outlier must not condemn the honest majority
@@ -870,8 +1458,7 @@ def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
         keep[np.where(keep)[0][worst]] = False
     resid = (cat - inst)[keep] - (zp + k * bv[keep])
     n = int(keep.sum())
-    sig = 1.4826 * float(np.median(np.abs(resid - np.median(resid)))) \
-        if n > 1 else 0.0
+    sig = float(outliers.scaled_mad(resid)) if n > 1 else 0.0
     zp_err = sig / math.sqrt(n) if n > 1 else SINGLE_COMP_ZP_ERR
     bv_spread = float(np.std(bv[keep])) if n > 1 else 0.0
     k_err = (sig / (math.sqrt(n) * bv_spread)) if bv_spread > 0 else None
@@ -943,33 +1530,61 @@ def local_sources(data, k=4.0, min_sep=6, ring=4, max_sources=50):
         return []
     diffs = np.concatenate([np.diff(clean, axis=1).ravel(),
                             np.diff(clean, axis=0).ravel()])
-    noise = 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    noise = float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
     if noise <= 0:
         # a noiseless plate (synthetic fixtures are flat to the last bit):
         # fall back to the classic global estimator
         noise = float(np.nanstd(clean))
     if noise <= 0:
         return []
+    # THE CANDIDATES, IN ONE PASS (2026-10-07). This used to be a Python loop
+    # over every pixel of the cutout (1369 iterations on the 45 px window the
+    # centroid's deblending uses, measured at 4.7 ms) with a slice and a ring
+    # median per local maximum, and on noise it spent all of that to find
+    # nothing. The test is the same one: a pixel that is not lower than any of
+    # its eight neighbours, with the plateau tie left to the upper-left pixel.
+    core = clean[ring:h - ring, ring:w - ring]
+    is_max = np.ones(core.shape, dtype=bool)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            is_max &= core >= clean[ring + dy:h - ring + dy,
+                                    ring + dx:w - ring + dx]
+    is_max &= core != clean[ring:h - ring, ring - 1:w - ring - 1]
+    is_max &= core != clean[ring - 1:h - ring - 1, ring:w - ring]
+    ys, xs = np.nonzero(is_max)
+    if ys.size == 0:
+        return []
+    # the local sky of every candidate at once: the SAME ring as before (the
+    # top and bottom rows and the two side columns), gathered for all of them
+    # and medianed along the second axis
+    offsets = []
+    for dx in range(-ring, ring + 1):
+        offsets.append((-ring, dx))
+        offsets.append((ring, dx))
+    for dy in range(-ring + 1, ring):
+        offsets.append((dy, -ring))
+        offsets.append((dy, ring))
+    yy = ring + ys
+    xx = ring + xs
+    ring_vals = np.stack([clean[yy + dy, xx + dx] for dy, dx in offsets],
+                         axis=1)
+    sig = (core[ys, xs] - np.median(ring_vals, axis=1)) / noise
+    keep = np.nonzero(sig >= k)[0]
+    if keep.size == 0:
+        return []
+    # the min_sep dedup runs in RASTER order, which is the order the old loop
+    # visited the pixels in: the result of a tie must not depend on how the
+    # candidates were found
+    keep = keep[np.lexsort((xs[keep], ys[keep]))]
     out = []
-    for y in range(ring, h - ring):
-        for x in range(ring, w - ring):
-            v = clean[y, x]
-            if v < clean[y - 1:y + 2, x - 1:x + 2].max():
-                continue
-            if v == clean[y, x - 1] or v == clean[y - 1, x]:
-                continue        # plateau tie: the upper-left px speaks
-            loc = np.concatenate([clean[y - ring, x - ring:x + ring + 1],
-                                  clean[y + ring, x - ring:x + ring + 1],
-                                  clean[y - ring + 1:y + ring, x - ring],
-                                  clean[y - ring + 1:y + ring, x + ring]])
-            sig = (v - float(np.median(loc))) / noise
-            if sig < k:
-                continue
-            if any((px - x) ** 2 + (py - y) ** 2 < min_sep ** 2
-                   for px, py, _p, _s in out):
-                continue
-            out.append((float(x), float(y), float(v), float(sig)))
+    for i in keep:
+        y, x = int(ys[i]) + ring, int(xs[i]) + ring
+        if any((px - x) ** 2 + (py - y) ** 2 < min_sep ** 2
+               for px, py, _p, _s in out):
+            continue
+        out.append((float(x), float(y), float(clean[y, x]), float(sig[i])))
     out.sort(key=lambda s: s[3], reverse=True)
     return [(x, y, pk) for x, y, pk, _s in out[:max_sources]]
 
@@ -1196,8 +1811,7 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None, robust=True):
         cap = _core_cap(resid, sx, sy, x0, y0)
         if cap > 0.0:
             resid = np.minimum(resid, cap)
-    mad = float(np.median(np.abs(resid - np.median(resid))))
-    noise = max(1.4826 * mad, 1e-9)
+    noise = max(float(outliers.scaled_mad(resid)), 1e-9)
     ys, xs = np.mgrid[y0:y1, x0:x1]
     # the deblending mask: a pixel closer to the neighbour than to us is
     # the neighbour's, and our template has no business integrating it
@@ -1309,8 +1923,7 @@ def refined_centroid(data, x, y, sky_pp=None, fwhm=None):
         else:
             sky = float(sky_pp)
         resid = sub - sky
-        mad = float(np.median(np.abs(resid - np.median(resid))))
-        sigma = 1.4826 * mad
+        sigma = float(outliers.scaled_mad(resid))
         keep = resid > max(2.0 * sigma, 0.0)
         if int(keep.sum()) < 5:
             return {"x": float(x), "y": float(y), "ok": False,
@@ -1549,6 +2162,15 @@ class PlateConfig:
                                     # centroid): "none" pins the hand-placed
                                     # centre, for a very faint SN
     sigmaclip: bool = True
+    # Measure the target AND the comps with the matched filter instead of
+    # the aperture, so the zero point comes from the SAME method as the
+    # target. ON BY DEFAULT, and that is a measured decision: on real 2025 UR
+    # data the filter reaches 1.55 to 1.63x the aperture's signal-to-noise,
+    # its zero-point error is 2.6x smaller (0.035 against 0.092 mag) and the
+    # brightness bias at low signal-to-noise is halved, for +3 % of runtime.
+    # The observer can turn it off, and the aperture's value is kept beside
+    # the reported one either way, for the audit.
+    matched: bool = True
     sky_mode: str = "median"
     color: bool = False
     target_bv: float = 0.0
@@ -1556,6 +2178,19 @@ class PlateConfig:
                                     # even without a catalog value
     linear_adu: float = None        # the camera profile's linearity limit
                                     # (per gain), or None when unset
+    stack_scale: float = 1.0        # how many frames the plate ADDS: N for a
+                                    # "sum" stack, 1 for a mean/median/sigma.
+                                    # The ceilings are the SENSOR's, in the
+                                    # units of ONE frame, so on a sum stack
+                                    # they are multiplied by this before the
+                                    # plate's own level is compared against
+                                    # them. Measured on the author's own 2025
+                                    # FG18 visit (sky 1552 ADU, camera
+                                    # linearity 53000, 207 frames): the sum's
+                                    # sky alone is 321 000 ADU, six times the
+                                    # linearity, so every comparison star was
+                                    # rejected and the run reported no
+                                    # magnitude at all.
     # site (Ajustes, ADR-028): the same values the panel has always used
     site_gain: float = None
     site_ron: float = None
@@ -1570,6 +2205,13 @@ class PlateConfig:
     # plate orientation, at comp_scale plate px per comp-image px
     comp_image: object = None
     comp_scale: float = 1.0
+    # ...or each comp on its OWN small image: a list parallel to `entries`,
+    # each (image, x, y) in that image's own pixels, or None. The track &
+    # stack builds one small stack per comp instead of stacking the whole
+    # frame a second time (measured on 2025 UR: 74 s for the full star
+    # stack against a second for the eight windows, same zero point), so
+    # the number does not change, only what it costs.
+    comp_images: list = None
 
 
 @dataclass
@@ -1605,6 +2247,12 @@ class PlateResult:
     sky_mode: str = "median"
     sigma_clip: bool = True
     gain: float = None
+    # WHAT ACTUALLY MEASURED, and not what the recipe asked for: the filter
+    # needs a seeing, and with no FWHM (the comps could not be measured on
+    # this stack) the aperture measures instead. A caller that reported the
+    # recipe's flag said "measured with the matched filter" while the
+    # aperture had done it: the run has to be able to say the truth.
+    matched_used: bool = False
 
 
 def _check_verdict(entries, used_entries, band, zp, err_total):
@@ -1627,6 +2275,12 @@ def _check_verdict(entries, used_entries, band, zp, err_total):
     if zp.get("color_used") and zp.get("k") is not None \
             and check["star"].get("bv") is not None:
         zp_check = zp["zp"] + zp["k"] * check["star"]["bv"]
+    if (used.get("flux") or 0.0) <= 0.0:
+        # a magnitude needs a POSITIVE flux: the check star goes through the
+        # same engine as everything else, and an engine that reports ok with
+        # a non-positive flux (the matched filter can, see _matched_fail)
+        # must not reach the logarithm
+        return None
     measured = -2.5 * math.log10(used["flux"]) + zp_check
     delta = measured - catalog
     return {"delta": delta, "ok": abs(delta) <= 2.5 * err_total,
@@ -1662,13 +2316,51 @@ def measure_plate(image, cfg):
     scale = float(cfg.comp_scale) if cfg.comp_image is not None else 1.0
     radii = tuple(cfg.radii) if cfg.radii else (R_AP, R_ANN_IN, R_ANN_OUT)
     fwhm = cfg.fwhm
-    sat = saturation_ceiling(cfg.header,
-                             {"ccd_saturate": cfg.site_saturate})
+    # THE MEASUREMENT ITSELF, chosen in ONE place (P3 of the SNR campaign).
+    # The aperture is the proven path; the matched filter is the one P2
+    # measured at 1.55-1.63x its SNR on real data and P4c measured less
+    # biased at low SNR. Both share the centroid, the sky and the sigma, so a
+    # plate measured one way and a plate measured the other stay comparable,
+    # and the ZERO POINT is measured with the same method as the target:
+    # mixing them (the target with the filter, the comps with the aperture)
+    # would put the difference between the two methods straight into the
+    # magnitude.
+    _psf = None
+    if getattr(cfg, "matched", False) and fwhm:
+        # the Gaussian from the measured seeing: P2 measured that on the real
+        # 2025 UR stack it agrees with the empirical profile to the last
+        # digit, and it does not drag the comps' noise into the shape
+        _psf = gaussian_psf(float(fwhm))
+
+    def _one(img, x, y, **kw):
+        # @args: img/x/y - where to measure, kw - the aperture, centroid and
+        #        sky knobs the call sites pass
+        # @return: the measurement dict, from whichever method was asked for
+        if _psf is None:
+            return measure_point(img, x, y, **kw)
+        return measure_matched(img, x, y, _psf, **kw)
+    # The ceilings are the SENSOR's, in the units of ONE frame; a stack that
+    # ADDS its frames ("sum") has N times the level. A pixel saturates when
+    # the FRAME it came from did, and on a sum stack the per-frame equivalent
+    # of a plate value V is V/N, so the ceilings are multiplied by the scale
+    # and the same test (plate value against ceiling) answers the same
+    # question. Without this, a sum stack's own sky (measured on the author's
+    # own 2025 FG18 visit: 1552 ADU per frame, 207 frames, so 321 000 ADU in
+    # the sum) sat six times above the camera's linearity of 53 000 and EVERY
+    # comparison star was thrown out: the run reported no magnitude at all.
+    stack_scale = max(1.0, float(getattr(cfg, "stack_scale", 1.0) or 1.0))
+    # THE TWO CEILINGS, from their one home (ADR-066). The per-run recipe's
+    # linearity and the site's saturation setting travel in the PlateConfig;
+    # the header's SATURATE card still wins, as it always did.
+    sat, lin = star_ceilings(cfg.header, None, linear_adu=cfg.linear_adu,
+                             saturate=cfg.site_saturate)
+    sat = (sat * stack_scale) if sat is not None else None
     # the camera profile's linearity limit is in plate ADU; it does not
     # apply to a resampled/downsampled work frame (host subtraction)
-    lin = cfg.linear_adu if scale == 1.0 else None
+    lin = lin if scale == 1.0 else None
+    lin = (lin * stack_scale) if lin is not None else None
     res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
-                      sigma_clip=cfg.sigmaclip)
+                      sigma_clip=cfg.sigmaclip, matched_used=_psf is not None)
     # ---- the targets ------------------------------------------------
     # One target is the historical case; several is the campaign pass, and
     # the whole point is what is NOT repeated: the comparison stars are
@@ -1685,16 +2377,22 @@ def measure_plate(image, cfg):
         bv = (float(entry[3]) if len(entry) > 3 and entry[3] is not None
               else cfg.target_bv)
         if cfg.comp_image is not None:
-            # H2b: the target on the difference, the comps on the work frame
-            target = measure_point(
+            # H2b: the target on one image, the comps on another. When the
+            # two SHARE the plate scale (scale == 1: the object's stack and
+            # the star stack of the same frames) the camera's ceilings
+            # apply to the target too; on a resampled difference image they
+            # do not, because those ADU are not the sensor's.
+            target = _one(
                 image, tx / scale, ty / scale,
                 r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
                 r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
-                sat_adu=None, sky_mode=cfg.sky_mode,
+                sat_adu=(sat if scale == 1.0 else None),
+                linear_adu=(lin if scale == 1.0 else None),
+                sky_mode=cfg.sky_mode,
                 centroid_mode=cfg.centroid_mode,
                 fwhm=(fwhm / scale if fwhm else None))
         else:
-            target = measure_point(
+            target = _one(
                 image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
                 r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
                 linear_adu=lin, sky_mode=cfg.sky_mode,
@@ -1703,12 +2401,20 @@ def measure_plate(image, cfg):
         mx, my = target["x"], target["y"]
         if cfg.comp_image is not None:
             mx, my = mx * scale, my * scale
+        # A MEASUREMENT IS A POSITIVE FLUX, whatever the engine says. The
+        # matched filter used to report ok=True with a negative one (see
+        # _matched_fail), and everything below assumes the opposite: the
+        # logarithm of the instrumental magnitude, the CCD error budget, the
+        # zero point. It is decided ONCE, here, so no later line has to
+        # wonder, and a target the engine could not really measure comes back
+        # as "unmeasurable" with its reason instead of as a magnitude of a
+        # negative number.
+        ok = bool(target["ok"]) and (target.get("flux") or 0.0) > 0.0
         measured.append({
             "label": label, "target": target, "col": mx, "row": my,
-            "bv": bv, "ok": bool(target["ok"]),
+            "bv": bv, "ok": ok,
             "reason": target.get("reason"),
-            "inst_t": (-2.5 * math.log10(target["flux"])
-                       if target["ok"] and target.get("flux") else None),
+            "inst_t": (-2.5 * math.log10(target["flux"]) if ok else None),
             # calibrated further down; every key exists from here so a
             # caller writing a curve always reads the same shape
             "zp": None, "mag": None, "err_internal": None,
@@ -1730,29 +2436,44 @@ def measure_plate(image, cfg):
     # applies to them too: a clipped comp poisons the zero point
     inst, cat, bvs, used_entries = [], [], [], []
     skipped = {}
-    for e in cfg.entries:
+    for j, e in enumerate(cfg.entries):
         star = e["star"]
-        try:
-            ccol, crow = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
-        except Exception:
-            skipped["off"] = skipped.get("off", 0) + 1
-            continue
-        if cfg.comp_image is not None:
-            r = measure_point(
-                cfg.comp_image, ccol / scale, crow / scale,
-                r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
-                r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
-                sat_adu=None, sky_mode=cfg.sky_mode,
-                fwhm=(fwhm / scale if fwhm else None))
+        own = (cfg.comp_images[j]
+               if cfg.comp_images and j < len(cfg.comp_images) else None)
+        if own is not None:
+            # the comp on its own small stack, already aligned on the
+            # stars: the aperture and the annulus fit inside it by
+            # construction (the caller sized the window for them)
+            r = _one(
+                own[0], own[1], own[2], r_ap=radii[0], r_ann_in=radii[1],
+                r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
+                robust=cfg.robust_centroid)
         else:
-            r = measure_point(image, ccol, crow, r_ap=radii[0],
-                              r_ann_in=radii[1], r_ann_out=radii[2],
-                              sigma_clip=cfg.sigmaclip, sat_adu=sat,
-                              linear_adu=lin, sky_mode=cfg.sky_mode,
-                              fwhm=fwhm,
-                              robust=cfg.robust_centroid)
+            try:
+                ccol, crow = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
+            except Exception:
+                skipped["off"] = skipped.get("off", 0) + 1
+                continue
+            if cfg.comp_image is not None:
+                r = _one(
+                    cfg.comp_image, ccol / scale, crow / scale,
+                    r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+                    r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+                    sat_adu=None, sky_mode=cfg.sky_mode,
+                    fwhm=(fwhm / scale if fwhm else None))
+            else:
+                r = _one(image, ccol, crow, r_ap=radii[0],
+                                  r_ann_in=radii[1], r_ann_out=radii[2],
+                                  sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                                  linear_adu=lin, sky_mode=cfg.sky_mode,
+                                  fwhm=fwhm,
+                                  robust=cfg.robust_centroid)
         value, derived = band_of(star, band)
-        if not r["ok"]:
+        if not r["ok"] or (r.get("flux") or 0.0) <= 0.0:
+            # a comparison star that cannot give a positive flux cannot
+            # calibrate anything: it is skipped like a clipped one, with its
+            # reason, instead of reaching the logarithm below
             if r.get("saturated"):
                 key = "sat"
             elif r.get("nonlinear"):

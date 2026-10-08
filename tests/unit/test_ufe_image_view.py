@@ -345,6 +345,26 @@ def test_cross_marker_items_span_the_plate(view):
     assert all(it.pen().isCosmetic() for it in items)
 
 
+def test_mark_cross_items_are_short_and_centred(view):
+    # The manual mode's mark: a SHORT crosshair whose arms cross exactly on
+    # the point, with a shadow pass so it reads on sky, on a star and on a
+    # core alike. It is not the full-frame cross of cross_marker_items: that
+    # one says "the object is on this plate", this one says "the point is
+    # HERE".
+    from nightscribe.gui.widgets.ufe_image_view import mark_cross_items
+    items = mark_cross_items(50.0, 70.0, "#ffb347", arm=12.0)
+    assert len(items) == 4                  # two arms, two passes each
+    seg = [(ln.line().x1(), ln.line().y1(), ln.line().x2(), ln.line().y2())
+           for ln in items]
+    assert (38.0, 70.0, 62.0, 70.0) in seg
+    assert (50.0, 58.0, 50.0, 82.0) in seg
+    # both passes cross on the point (a shadow and the colour), and the
+    # shadow is the wider one so the colour stays visible on top
+    assert all(it.pen().isCosmetic() for it in items)
+    widths = sorted(it.pen().widthF() for it in items)
+    assert widths[0] < widths[-1]
+
+
 def test_the_band_follows_the_toggle_on_export(view, tmp_path):
     # The band burns into the exported PNG (what you see is what lands in
     # the file) and the toggle governs what it says: with the data off it
@@ -433,6 +453,47 @@ def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
     assert ducked < plain                         # the bar moved UP
     assert plain - ducked >= 24                   # by the readout's height
     view.set_pick_cursor(False)
+
+
+def test_the_scale_bar_repaints_whole_when_the_readout_moves_it(qapp):
+    # The scale bar is a device-space HUD piece with no scene rect: under
+    # MinimalViewportUpdate a partial repaint left the OLD bar behind and
+    # the bottom-left showed two bars, one above the other (reported). The
+    # view now repaints the HUD whole, but ONLY when the readout's height
+    # changes (it appears, disappears or gains a line), never on every move.
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.ufe_image_view import UfeImageView
+
+    class _View(UfeImageView):
+        def __init__(self, state):
+            super().__init__(state)
+            self.hud_repaints = 0
+
+        def _repaint_hud(self):
+            self.hud_repaints += 1
+
+    state = UfeImageState()
+    v = _View(state)
+    v.resize(600, 400)
+    state.load(MONO)
+    assert v.hud_repaints == 0
+    # the readout appears: the bar steps up, so the HUD is repainted whole
+    v._show_tooltip(QPointF(10, 10), ["(1, 1)  DN 5.0"])
+    assert v.hud_repaints == 1
+    # the same text again, only repositioned: the bar does not move
+    v._show_tooltip(QPointF(20, 20), ["(1, 1)  DN 5.0"])
+    assert v.hud_repaints == 1
+    # one more line: the readout grows and the bar moves with it
+    v._show_tooltip(QPointF(20, 20), ["(1, 1)  DN 5.0", "RA 00 00 00"])
+    assert v.hud_repaints == 2
+    # it goes: the bar drops back to the corner, another full repaint
+    v._hide_tooltip()
+    assert v.hud_repaints == 3
+    # hiding again costs nothing (nothing was showing)
+    v._hide_tooltip()
+    assert v.hud_repaints == 3
+    v._render_timer.stop()
+    v.deleteLater()
 
 
 # ------------------------------------------------- global object mark
@@ -616,6 +677,7 @@ def test_every_role_of_the_band_has_its_colour(qapp):
     from nightscribe.gui.widgets.ufe_image_view import BAND_COLOURS
     for role in (ca.ROLE_NAME, ca.ROLE_POS, ca.ROLE_POS_CAT, ca.ROLE_MAG,
                  ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT,
+                 ca.ROLE_MAG_EPH, ca.ROLE_MOTION, ca.ROLE_MOTION_EPH,
                  ca.ROLE_CONTEXT):
         assert role in BAND_COLOURS, role
     # and the magnitude's scale is FOUR different colours (green, orange,
@@ -628,3 +690,6 @@ def test_every_role_of_the_band_has_its_colour(qapp):
     assert BAND_COLOURS[ca.ROLE_MAG_FAIR] == palette.FAIR
     assert BAND_COLOURS[ca.ROLE_MAG_DOUBT] == palette.DANGER
     assert BAND_COLOURS[ca.ROLE_MAG_CAT] == palette.CATALOG
+    # the motion distinguishes measured (ink) from predicted (dimmed)
+    assert BAND_COLOURS[ca.ROLE_MOTION] == palette.FG
+    assert BAND_COLOURS[ca.ROLE_MOTION_EPH] == palette.MUTED

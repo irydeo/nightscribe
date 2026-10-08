@@ -61,6 +61,36 @@ class Wcs:
             return None
         return cls(crval1, crval2, crpix1, crpix2, cd, naxis1, naxis2)
 
+    @classmethod
+    def from_astropy(cls, w):
+        # @args: w - an astropy WCS (the astrometry flow's currency)
+        # @return: Wcs
+        # The astrometry flow speaks astropy WCS; the series engine
+        # (ADR-048) speaks this class. The two meet here and nowhere else,
+        # so neither side has to know about the other.
+        crval = [float(v) for v in w.wcs.crval]
+        crpix = [float(v) for v in w.wcs.crpix]
+        if getattr(w.wcs, "has_cd", None) and w.wcs.has_cd():
+            cd = [[float(w.wcs.cd[0][0]), float(w.wcs.cd[0][1])],
+                  [float(w.wcs.cd[1][0]), float(w.wcs.cd[1][1])]]
+        else:
+            # PC + CDELT: the linear matrix is their product, and the
+            # scale lives in the CDELTs (a PC alone is dimensionless)
+            pc = getattr(w.wcs, "pc", None)
+            pc = ([[1.0, 0.0], [0.0, 1.0]] if pc is None
+                  else [[float(pc[0][0]), float(pc[0][1])],
+                        [float(pc[1][0]), float(pc[1][1])]])
+            cdelt = [float(v) for v in w.wcs.cdelt]
+            cd = [[pc[0][0] * cdelt[0], pc[0][1] * cdelt[0]],
+                  [pc[1][0] * cdelt[1], pc[1][1] * cdelt[1]]]
+        if getattr(w, "pixel_shape", None) is not None:
+            naxis1, naxis2 = int(w.pixel_shape[0]), int(w.pixel_shape[1])
+        else:
+            naxis1 = int(getattr(w, "naxis1", 0) or 0)
+            naxis2 = int(getattr(w, "naxis2", 0) or 0)
+        return cls(crval[0], crval[1], crpix[0], crpix[1], cd,
+                   max(naxis1, 1), max(naxis2, 1))
+
     @staticmethod
     def _cd_matrix(header):
         # Extracts the 2x2 linear matrix (deg/pixel) in its three flavours.

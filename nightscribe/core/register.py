@@ -42,6 +42,8 @@ import math
 
 import numpy as np
 
+from . import outliers
+
 logger = logging.getLogger(__name__)
 
 # Below this many paired stars the star verification cannot speak: the
@@ -51,10 +53,31 @@ MIN_MATCH = 6
 # A paired-star residual above this (px) is not an alignment: the fit and
 # the stars disagree, so the frame inherits the previous transform and is
 # flagged. A real series lands at a few tenths of a pixel.
+#
+# This is the FALLBACK gate, used when the caller does not know the
+# session's point spread. When it does (the astrometry path measures it),
+# the residual is judged as a FRACTION of the FWHM instead, because that
+# is what actually matters: a misregistration broadens the stacked PSF in
+# proportion to it, so 0.8 px is harmless on 3.5 px seeing and a lot on
+# 1.2 px. Measured on the 2025 UR visit: its second run (five minutes
+# later, field turned 0.12 deg, 884 px away) fits at 0.80 px against a
+# FWHM of 3.56 px, i.e. 0.22 FWHM, and this absolute 0.75 px gate threw
+# all 62 of its frames away.
 MAX_RMS_PX = 0.75
+# The residual as a fraction of the FWHM: a quarter of the point spread is
+# well aligned (it adds ~0.03 px^2 to a PSF of FWHM f), half already
+# shows. The floor keeps a very small PSF from demanding an impossible
+# precision: on a 1.2 px PSF a quarter is 0.3 px, which is star-noise
+# territory, so below the floor the ratio stops ruling.
+MAX_RMS_FWHM = 0.25
+MIN_RMS_PX = 0.5
 # Residual above which a translation is considered insufficient and the
-# rigid fit is tried (px). The point spread of a real star sits here.
-_ROTATE_TRIGGER_PX = 0.7
+# rigid fit is tried (px). The point spread of a real star sits here. It is
+# public because the CALLER needs the same line: estimate_transform returns
+# a translation it could not make fit when it is not allowed to rotate, and
+# the caller has to know that "accepted" is not the same as "good".
+ROTATE_TRIGGER_PX = 0.7
+_ROTATE_TRIGGER_PX = ROTATE_TRIGGER_PX
 # The rigid fit only wins if it removes this fraction of the residual; a
 # spurious rotation never does.
 _RIGID_IMPROVE = 0.25
@@ -107,6 +130,34 @@ def _bilinear(data, xs, ys):
 
 # ---------------- the sky is not a star: remove it first ----------------
 
+def _block_grid(arr, block):
+    # The grid of block medians and the block edges, one entry per cell.
+    # @args: arr - 2D float64 array, block - cell size in pixels
+    # @return: (grid (bh, bw), ys, xs) with the edges of every cell
+    h, w = arr.shape
+    bh = max(1, h // block)
+    bw = max(1, w // block)
+    ys = np.linspace(0, h, bh + 1).astype(np.int64)
+    xs = np.linspace(0, w, bw + 1).astype(np.int64)
+    if h % block == 0 and w % block == 0:
+        # The common case (a 2048 frame, block 32): the blocks line up
+        # exactly with a reshape, so the whole grid is ONE median call in C
+        # instead of bh*bw Python ones. Measured on 2048^2: 54 ms against
+        # 131 ms, the same numbers to the last digit (a block median does
+        # not care who computes it). A frame whose size is not a multiple of
+        # the block keeps the loop, because linspace then makes the last
+        # block a pixel narrower and the reshape would be a lie.
+        return (np.median(arr.reshape(bh, block, bw, block), axis=(1, 3)),
+                ys, xs)
+    grid = np.empty((bh, bw), dtype=np.float64)
+    for j in range(bh):
+        y0, y1 = ys[j], max(ys[j + 1], ys[j] + 1)
+        for i in range(bw):
+            x0, x1 = xs[i], max(xs[i + 1], xs[i] + 1)
+            grid[j, i] = float(np.median(arr[y0:y1, x0:x1]))
+    return grid, ys, xs
+
+
 def _background(data, block=_BG_BLOCK):
     # A smooth background by block medians, bilinearly re-expanded. The
     # median shrugs off the stars a mean would drag up.
@@ -114,16 +165,8 @@ def _background(data, block=_BG_BLOCK):
     # @return: the background, same shape as data
     arr = np.asarray(data, dtype=np.float64)
     h, w = arr.shape
-    bh = max(1, h // block)
-    bw = max(1, w // block)
-    ys = np.linspace(0, h, bh + 1).astype(np.int64)
-    xs = np.linspace(0, w, bw + 1).astype(np.int64)
-    grid = np.empty((bh, bw), dtype=np.float64)
-    for j in range(bh):
-        y0, y1 = ys[j], max(ys[j + 1], ys[j] + 1)
-        for i in range(bw):
-            x0, x1 = xs[i], max(xs[i + 1], xs[i] + 1)
-            grid[j, i] = float(np.median(arr[y0:y1, x0:x1]))
+    grid, ys, xs = _block_grid(arr, block)
+    bh = grid.shape[0]
     cy = (ys[:-1] + ys[1:] - 1) / 2.0
     cx = (xs[:-1] + xs[1:] - 1) / 2.0
     # expand along x for every grid row (few rows), then along y
@@ -182,7 +225,7 @@ def _corr_quality(corr):
     # The correlation peak against the robust scatter of the whole map:
     # a figure that only speaks when the frames really share structure.
     # @return: peak / (robust sigma of the map)
-    sigma = 1.4826 * float(np.median(np.abs(corr - np.median(corr))))
+    sigma = float(outliers.scaled_mad(corr))
     return float(corr.max()) / (sigma + 1e-12)
 
 
@@ -305,8 +348,7 @@ def detect_stars(src, nmax=60, k=8.0, margin=8, sat=None, factor=2):
         small = arr
     diffs = np.concatenate([np.diff(small, axis=1).ravel(),
                             np.diff(small, axis=0).ravel()])
-    noise = 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    noise = float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
     if not np.isfinite(noise) or noise <= 0.0:
         return empty
     loc = np.ones(small.shape, dtype=bool)
@@ -480,7 +522,7 @@ def _fit_translation(ref_xy, src_xy, dx, dy):
 
 
 def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
-                       tol=3.0, allow_rotation=True):
+                       tol=3.0, allow_rotation=True, ref_src=None):
     # Estimate the transform that maps `src` onto `ref` (rotation about
     # the frame centre plus subpixel translation), in the module's
     # convention: {"angle", "dx", "dy"} so that apply_transform(src,
@@ -500,10 +542,13 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
     #        the reference (the caller caches it), sat - saturation
     #        ceiling, tol - star pairing tolerance (px), allow_rotation -
     #        False pins the answer to a translation (the observer asked
-    #        for "translation only")
+    #        for "translation only"), ref_src - the reference's source image
+    #        when the caller already built it (the sequence keeps ONE and
+    #        passes it to every frame: rebuilding it per frame was ~140 ms
+    #        of pure waste on a 2048^2 frame, ~20 s over a 140-frame visit)
     # @return: {"angle", "dx", "dy", "quality", "rms_px", "n",
     #          "scale", "angle_deg", "shift_px", "stars", "rotated"}
-    ref_src = source_image(ref)
+    ref_src = source_image(ref) if ref_src is None else ref_src
     src_src = source_image(src)
     shape = tuple(np.shape(ref))
     if ref_stars is None:
@@ -638,20 +683,43 @@ def _pair_fit(ref_xy, src_xy, dx, dy, angle, tol, shape, rigid=True):
     return fit
 
 
-def trusted(tr):
+def rms_limit(fwhm_px=None):
+    # @args: fwhm_px - the session's point spread in pixels, or None
+    # @return: the largest paired-star residual (px) still called aligned.
+    #          The caller that knows the seeing passes it, so the gate
+    #          follows the night instead of a fixed number: this is what
+    #          recovers a whole second run whose frames fit at 0.8 px on a
+    #          3.5 px PSF (see MAX_RMS_FWHM).
+    if not fwhm_px or fwhm_px <= 0:
+        return MAX_RMS_PX
+    return max(MIN_RMS_PX, MAX_RMS_FWHM * float(fwhm_px))
+
+
+def trusted(tr, fwhm_px=None, require_stars=False):
     # The honest quality gate (D44): the transform is trusted when
     # enough stars verified it and they land close to where it said. A
     # star-poor field falls back to the correlation figure, and a frame
     # that fails both is flagged, never silently used.
-    # @args: tr - estimate_transform output
+    # @args: tr - estimate_transform output, fwhm_px - the session's point
+    #        spread (see rms_limit), or None for the absolute fallback,
+    #        require_stars - refuse the correlation fallback
     # @return: bool
+    #
+    # require_stars is for the answers that need PROOF, not a hint: the
+    # correlation figure compares the two frames as images, and two frames
+    # of the same field look alike whatever the transform between them, so
+    # it says "these are the same sky", never "this is the mapping".
+    # Measured on the 2025 UR visit: a frame whose star voting failed
+    # (n=0) was then handed a -106 deg rotation certified by TWO paired
+    # stars and a correlation of 635, and the fallback would have stacked
+    # it rotated. Two stars cannot certify a rotation.
     if tr is None:
         return False
     n = int(tr.get("n") or 0)
     rms = tr.get("rms_px")
-    if n >= MIN_MATCH and rms is not None and rms <= MAX_RMS_PX:
-        return True
     if n >= MIN_MATCH and rms is not None:
+        return rms <= rms_limit(fwhm_px)
+    if require_stars:
         return False
     return float(tr.get("quality") or 0.0) >= QUALITY_MIN
 

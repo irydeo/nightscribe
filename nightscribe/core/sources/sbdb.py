@@ -34,6 +34,18 @@ def parse_sbdb(data):
     elements = {e["name"]: float(e["value"])
                 for e in data.get("orbit", {}).get("elements", [])
                 if e.get("value") is not None}
+    # The EPOCH is not one of the element rows: it is orbit.epoch, a JD, and
+    # dropping it broke every LOCAL propagation from these elements. Without
+    # it, _mean_anomaly fell back to "epoch = the instant asked for", which
+    # freezes the mean anomaly at its value at the solution's epoch and
+    # misses the object by tens of degrees (measured: 82 deg on 2026 PY9).
+    # The elements are only meaningful WITH the epoch they belong to.
+    try:
+        _epoch = (data.get("orbit") or {}).get("epoch")
+        if _epoch is not None:
+            elements["epoch"] = float(_epoch)
+    except (TypeError, ValueError):
+        pass
     phys = {}
     for p in data.get("phys_par", []):
         try:
@@ -44,6 +56,7 @@ def parse_sbdb(data):
     # observation of the orbit solution — both normalised to ISO
     disc = (data.get("discovery") or {}).get("date")
     first_obs = (data.get("orbit") or {}).get("first_obs")
+    orbit = data.get("orbit") or {}
     return {
         "fullname": obj.get("fullname") or obj.get("des"),
         "des": obj.get("des"),
@@ -55,6 +68,11 @@ def parse_sbdb(data):
         "elements": elements,
         "moid": elements.get("moid") or data.get("orbit", {}).get("moid"),
         "phys": phys,
+        # the observation history the card shows (D28): how many residuals
+        # the solution used, when it was last seen and how long the arc is
+        "n_obs_used": orbit.get("n_obs_used"),
+        "last_obs": dates.normalize_date(orbit.get("last_obs")),
+        "data_arc": orbit.get("data_arc"),
         "disc_date": dates.normalize_date(disc)
         or dates.normalize_date(first_obs),
     }
@@ -63,8 +81,13 @@ def parse_sbdb(data):
 def _fetch_one(sstr):
     # @args: sstr - SBDB search string
     # @return: (body bytes, content_type); raises on HTTP/network error
+    # full-prec=1: without it SBDB answers with three significant figures
+    # ("a": "2.33", "e": "0.551"), and those are useless to propagate an
+    # orbit: the rounding moves the object by degrees. With the flag the
+    # values come complete ("2.329264345717").
     r = requests.get(URL, params={"sstr": sstr, "phys-par": "1",
-                                  "discovery": "1"}, timeout=30)
+                                  "discovery": "1", "full-prec": "1"},
+                     timeout=30)
     r.raise_for_status()
     return r.content, "application/json"
 
@@ -89,7 +112,10 @@ def get(name, force=False):
                 return _fetch_one(short)
             raise
     try:
-        body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch, force=force)
+        # ":fp" versions the cache key with the full-precision request: a
+        # body cached before the flag carried three significant figures, and
+        # reusing it would silently propagate a rounded orbit.
+        body, _ = db.http_get(f"sbdb:{name}:fp", "sbdb", fetch, force=force)
         return parse_sbdb(json.loads(body.decode("utf-8", "replace")))
     except (requests.RequestException, ValueError) as err:
         logger.warning("SBDB lookup failed for %s: %s", name, err)

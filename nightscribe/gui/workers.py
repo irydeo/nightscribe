@@ -12,6 +12,7 @@
 ############################################################
 
 import logging
+import math
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
@@ -20,6 +21,25 @@ logger = logging.getLogger(__name__)
 
 # Network and scoring never run on the GUI thread (see ARCHITECTURE).
 # Each worker emits a single "finished" signal with its payload.
+
+# How far from the plate's edge a comparison star may sit, in arcsec. The
+# night's drift and the pointing error move the field a little, and a comp
+# that walks off the plate on one frame breaks that frame's zero point (or
+# worse, is measured on the sky without saying so).
+_COMP_MARGIN_ARCSEC = 60.0
+
+# The target's magnitude is only used to pick comps of a similar
+# brightness, and the project usually knows it (its own card, or the
+# astrometry that measured the object). When nobody does, the shared
+# fallback in core/compstars.py is the starting point and the run SAYS the
+# sequence was proposed automatically: it is a guess, labelled as one.
+
+# A comp's window: it has to hold the aperture and its annulus, with room
+# for the radial profile to find its half-maximum and for a seeing-sized
+# aperture (r_out can reach ~33 px when the measured FWHM is large). Even
+# at 40 px of half side it is ~1 % of a 2048 frame, and that is where the
+# saving comes from: the whole star stack cost 74 s for the same number.
+_WINDOW_MIN_HALF = 40
 
 
 class _Cancelled(Exception):
@@ -598,112 +618,6 @@ class SurveyWorker(QThread):
         self.finished.emit(out)
 
 
-class SequenceWorker(QThread):
-    # Gathers the photometric sequence off the GUI thread (ADR-042):
-    # VizieR field, the background (user FITS solved with Astrometry.net
-    # when it lacks WCS, else the DSS2 cutout) and the automatic proposal.
-    # It writes NO files: the SeqChartDialog owns the exports, so the user
-    # can adjust the sequence before anything lands on disk.
-    # The payload is {"status": ok|error, "error", field, entries, image,
-    # wcs, ...}: a Path / Wcs / numpy image plus hundreds of star dicts.
-    # Signal(object) passes it through untouched; Signal(dict) would force
-    # a recursive QVariant conversion at emit — a var<->star reference
-    # cycle in the field once recursed that conversion into a C stack
-    # overflow (SIGSEGV on "Generate").
-    finished = Signal(object)
-    progress = Signal(str)      # stage message for the dialog's status line
-
-    def __init__(self, name, ra_deg, dec_deg, catalog, fov_arcmin,
-                 n_comps, target_mag, fits_path, lang):
-        super().__init__()
-        self._name = name
-        self._ra, self._dec = ra_deg, dec_deg
-        self._catalog = catalog
-        self._fov = fov_arcmin
-        self._n = n_comps
-        self._mag = target_mag
-        self._fits = fits_path
-        self._lang = lang
-
-    def run(self):
-        from ..core import compstars
-        try:
-            field = compstars.load_field(self._catalog, self._ra,
-                                         self._dec, self._fov)
-        except Exception as err:      # never crash the GUI
-            logger.warning("sequence field failed: %s", err)
-            field = None
-        if field is None:
-            self.finished.emit({
-                "status": "error",
-                "error": ("VizieR no respondió; inténtalo de nuevo en "
-                          "unos minutos") if self._lang != "en" else
-                         ("VizieR did not answer; try again in a few "
-                          "minutes")})
-            return
-        try:
-            self._build(field)
-        except Exception as err:      # render/disk problems warn, never
-            logger.exception("sequence worker failed: %s", err)  # crash
-            self.finished.emit({"status": "error", "error": str(err)})
-
-    def _build(self, field):
-        from ..core import blink, compstars
-        from ..core.sources import cutouts
-        from ..viz import blink_view
-        out = {"status": "ok", "field": field, "vsx_warning":
-               field["vsx_warning"]}
-        # img_label tells the truth about the background: the FITS name,
-        # the survey that actually served ("Legacy Survey DR10" / "DSS2
-        # color (CDS)"), or "" when no image could be fetched at all
-        image, wcs, img_label = None, None, ""
-        if self._fits:
-            self.progress.emit(
-                "Leyendo tu FITS…" if self._lang != "en"
-                else "Reading your FITS…")
-            try:
-                img = blink.load_user_image(
-                    self._fits,
-                    progress=lambda m: self.progress.emit(
-                        m["en"] if self._lang == "en" else m["es"]))
-                x, y = img["wcs"].sky_to_pixel(self._ra, self._dec)
-                if 0 <= x < img["wcs"].naxis1 and 0 <= y < img["wcs"].naxis2:
-                    image = blink_view.apply_stretch(
-                        img["data"], *blink_view.auto_limits(img["data"]))
-                    wcs = img["wcs"]
-                    img_label = self._fits.name
-                else:
-                    out["target_outside"] = True
-            except blink.BlinkError as err:
-                out["fits_error"] = err.messages.get(self._lang) or \
-                    err.messages["en"]
-        if wcs is None:
-            self.progress.emit(
-                "Descargando la imagen del campo…" if self._lang != "en"
-                else "Downloading the field image…")
-            image, src = cutouts.reference_cutout(self._ra, self._dec,
-                                                  size=1000,
-                                                  pixscale=self._fov * 60.0
-                                                  / 1000.0)
-            img_label = src or ""
-        self.progress.emit(
-            "Proponiendo la secuencia…" if self._lang != "en"
-            else "Proposing the sequence…")
-        mag = self._mag
-        if mag is None and field["stars"]:
-            mags = sorted(s["mag"] for s in field["stars"])
-            mag = mags[len(mags) // 2]
-        seq = compstars.propose_comps(field["stars"], mag, n=self._n)
-        entries = seq["comps"] + ([seq["check"]] if seq["check"] else [])
-        out.update(entries=entries, image=image, wcs=wcs,
-                   img_label=img_label, target_mag=mag,
-                   catalog=field["catalog"],
-                   catalog_name=field["catalog_name"],
-                   fov_arcmin=field["fov_arcmin"],
-                   n_variables=len(field["variables"]))
-        self.finished.emit(out)
-
-
 class SeriesWorker(QThread):
     # Measures a photometric series off the GUI thread (series plan,
     # phase 5): the same core/series_measure.measure_series the tests and
@@ -843,6 +757,38 @@ class PrepareExoticWorker(QThread):
         self.finished.emit(bool(ok), log or "")
 
 
+class FindOrbInstallWorker(QThread):
+    # Installs Find_Orb into a private environment (ADR-062, D31) off the
+    # GUI thread: a package manager download is minutes long, and the window
+    # has to stay alive and SHOW what it is doing, line by line, because
+    # that log is the only thing that explains a failure.
+
+    line = Signal(str)              # one line of the manager's own output
+    finished = Signal(object)       # {"ok", "path", "log"}
+    failed = Signal(str)            # an unexpected error, in English
+
+    def __init__(self, manager_path, target_dir):
+        super().__init__()
+        self._manager = manager_path
+        self._target = target_dir
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import findorb_install
+        try:
+            out = findorb_install.install(
+                self._manager, self._target,
+                on_log=self.line.emit, cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("find_orb install failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(out)
+
+
 class ProbeExoticWorker(QThread):
     # Detects and probes the EXOTIC interpreter off the GUI thread:
     # detect_python spawns subprocesses and the cold import of exotic
@@ -904,3 +850,1231 @@ class ExoticRunWorker(QThread):
             res = {"ok": False, "returncode": None, "log_path": None,
                    "out_dir": str(self._dir), "cancelled": False}
         self.finished.emit(res)
+
+
+class CalibrationWorker(QThread):
+    # Calibrates a visit's lights off the GUI thread (astrometry plan,
+    # phase 7 / ADR-061): the same core/calibration engine the CLI and the
+    # tests use, wrapped with progress and cancellation (SeriesWorker's
+    # pattern, ADR-048).
+    #
+    # MEMORY: calibrate_paths returns the calibrated ARRAY of every frame,
+    # and a visit is hundreds of them: holding all of them would keep
+    # gigabytes alive until the run ends (D32 is exactly about this). So
+    # the worker walks the visit frame by frame, exports the copy when
+    # asked (D6: writing calibrated FITS is explicit) and drops the pixels
+    # right away; what survives is the report, which is what the tab shows.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # {"status", "reports", "written"}
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, db, export_dir=None, cfg=None,
+                 pseudo_flat=False, flat_path=None):
+        super().__init__()
+        self._paths = list(paths)
+        self._db = db
+        # P5: build a flat from the frames themselves for the filters the
+        # library has no flat for. It is built ONCE for the whole visit
+        # (it needs every frame) and then applied to each one. `flat_path`
+        # is where the flat itself is written, so it can be LOOKED AT: it is
+        # a product of the visit (ADR-069).
+        self._pseudo_flat = bool(pseudo_flat)
+        self._flat_path = str(flat_path) if flat_path else None
+        self._export = str(export_dir) if export_dir else None
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the button doubles as Cancel): the engine stops
+        # between frames and the payload says "cancelled".
+        self._cancel = True
+
+    def run(self):
+        from ..core import calibration
+        reports, written = [], []
+        flat = None
+        flat_info = None
+        flat_file = None
+        try:
+            total = len(self._paths)
+            if self._export:
+                Path(self._export).mkdir(parents=True, exist_ok=True)
+            if self._pseudo_flat and self._paths:
+                # P5: the flat is a property of the VISIT (the train did not
+                # change in five minutes), so it is built once here and then
+                # applied to every frame. It needs all the frames at the same
+                # time, which is why it cannot live inside the per-frame loop.
+                # The db goes with it so the pedestal is removed from the
+                # frames before the statistic (ADR-069): without it the flat
+                # comes out compressed.
+                flat, flat_info = calibration.pseudo_flat(
+                    self._paths, db=self._db, cfg=self._cfg,
+                    cancel=lambda: self._cancel,
+                    progress=lambda d, t: self.progress.emit(0, total))
+                # The flat itself is written as a product of the visit, so
+                # the observer can open it and see that it has no star in it
+                # (ADR-069). A flat nobody can look at is a flat nobody can
+                # check.
+                if flat is not None and self._flat_path:
+                    try:
+                        header = calibration.read_header(self._paths[0])
+                    except Exception:                          # noqa: BLE001
+                        header = None
+                    flat_file = calibration.export_flat(
+                        flat, self._flat_path, info=flat_info, header=header)
+            for index, path in enumerate(self._paths, 1):
+                if self._cancel:
+                    break
+                # one frame at a time (see MEMORY above): same recipe the
+                # batch entry point resolves, per frame, from its header
+                out = calibration.calibrate_paths(
+                    [path], self._db, self._cfg,
+                    cancel=lambda: self._cancel, pseudo_flat=flat)
+                if not out:
+                    break
+                src, data, header, report = out[0]
+                reports.append((src, report))
+                if self._export:
+                    dest = Path(self._export) / (Path(src).stem + "_cal.fits")
+                    written.append(str(calibration.export_calibrated(
+                        data, header, dest, report)))
+                del data               # the pixels die with their frame
+                self.progress.emit(index, total)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("calibration worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit({"status": "cancelled" if self._cancel else "ok",
+                            "reports": reports, "written": written,
+                            "pseudo_flat": flat_info,
+                            "flat_file": flat_file})
+
+
+class TrackStackWorker(QThread):
+    # The whole track & stack pipeline off the GUI thread (astrometry plan,
+    # phases 2-6 wired by phase 7): solve the reference, register, stack the
+    # base sequence, detect (the 3.5 sigma gate, D10), sweep the velocity
+    # (D9), stack each observation (D22), measure the two ways (D7) and
+    # check against the published observations with Find_Orb (D25).
+    #
+    # Progress is per STAGE (a key plus done/total inside it): the tab maps
+    # the key to a literal self.tr() table, the way TonightWorker's phases
+    # do (CONTRIBUTING rule 5). The payload is a dict with numpy stacks
+    # inside, so it travels as Signal(object): a Signal(dict) would force
+    # the recursive QVariant conversion that once segfaulted the comparison
+    # chart's sequence worker (a var<->star reference cycle).
+
+    progress = Signal(str, int, int)  # (stage key, done, total)
+    finished = Signal(object)         # the result dict (below)
+    failed = Signal(str)              # an unexpected error, in English
+
+    def __init__(self, paths, name, n_obs, method="sigma", cfg=None,
+                 obs_code="", site="", final_size=0, margin=64,
+                 comps=None, band=None, target_mag=None, recipe=None,
+                 phot_enabled=True, save_star_stack=False, calibrate=False,
+                 manual_ref=None):
+        super().__init__()
+        self._paths = list(paths)
+        # ADR-061 applied where the faint object is: calibrate the frames AS
+        # THEY ARE READ (dark/bias and flat), because a stack of uncalibrated
+        # frames keeps the train's dust and the sensor's vignetting, and the
+        # object and the comparisons do not sit in the same place: measured
+        # on a real visit, the smooth vignetting alone is worth 0.087 mag of
+        # systematic error. When the library has no flat for the filter, one
+        # is built from the frames themselves (P5), and that is what the
+        # observer asked to be OPTIONAL: the tab's checkbox, off by default.
+        self._calibrate = bool(calibrate)
+        self._loader = None
+        self._pseudo_info = None
+        self._name = name
+        self._n_obs = max(1, int(n_obs))
+        self._method = method
+        self._cfg = cfg
+        self._obs_code = obs_code
+        self._site = site
+        # D11: the final stack's window (0 = the whole frame) and the
+        # detection/sweep cutout's margin, both from the tab's controls
+        self._final_size = int(final_size or 0)
+        self._margin = int(margin or 64)
+        # the NEO's brightness is measured on the stacks, against the
+        # project's comps (or an automatic proposal) and with the SAME
+        # recipe the Fotometria tab is holding: the apertures, the sky
+        # method, the centroid and the colour term are the observer's
+        self._comps = list(comps or [])
+        self._band = band
+        self._target_mag = target_mag
+        self._recipe = dict(recipe or {})
+        self._phot_enabled = bool(phot_enabled)
+        # the star stack, kept on demand: the observer wants to measure the
+        # brightness by hand in the Photometry tab later, and that needs the
+        # same frames aligned on the stars, saved next to the object's stack
+        self._save_star_stack = bool(save_star_stack)
+        # MANUAL MODE (faint object): the observer's mark on the base stack,
+        # in REFERENCE-GRID pixels. When it is here the detection gate is not
+        # asked (a human mark IS the detection), the object is centred on the
+        # mark instead of the ephemeris, and the velocity sweep is skipped:
+        # over a source below the gate the sweep scores noise.
+        self._manual_ref = (None if manual_ref is None
+                            else (float(manual_ref[0]), float(manual_ref[1])))
+        self._cancel = False
+        self._solve_cancel = None   # SolveCancel while the solver runs
+
+    def cancel(self):
+        # Every engine call takes the same callable: the run stops at the
+        # next boundary and the payload says "cancelled" (D18's spirit).
+        # The live SOLVE gets its own SolveCancel too, so Cancel kills
+        # ASTAP now instead of waiting for the next stage boundary.
+        self._cancel = True
+        if self._solve_cancel is not None:
+            self._solve_cancel.set()
+
+    # @return: cfg value by key with a fallback (cfg may be None in tests)
+    def _cfg_get(self, key, default):
+        if self._cfg is None:
+            return default
+        return self._cfg.get(key, default)
+
+    def _warp_order(self):
+        # The warp's interpolation order, from Settings (2026-10-07).
+        #
+        # The DEFAULT is the bilinear, and that is a measured decision: on the
+        # 2025 FG18 visit, orders 1 and 3 tie in depth (magnitude 18.20 against
+        # 18.21 by injection and recovery) while the pixel noise differs by
+        # 29 % (6.58 against 8.49 ADU/px). A bilinear smooths, and smoothing
+        # lowers the pixel noise WITHOUT adding information: it is a knob for
+        # the eye, not for the limit. The observer who wants the sharpest point
+        # spread (a crowded field) can ask for the cubic, at the price of a
+        # grainier image.
+        # @return: an order the engine can use, never anything else
+        from ..core import track_stack
+        try:
+            value = int(self._cfg_get("astrometry_warp_order",
+                                      track_stack.WARP_ORDER))
+        except (TypeError, ValueError):
+            value = track_stack.WARP_ORDER
+        return value if value in track_stack.WARP_ORDERS \
+            else track_stack.WARP_ORDER
+
+    # --------------------------------------------------------- brightness
+
+    def _photometry(self, frames, groups, boxes, qs, stacks, points, ref, w0,
+                    star_stacks=None):
+        # @args: frames - the sequence, groups - the observation split,
+        #        boxes - the output box per observation, qs - the object's
+        #        reference point per observation, stacks - the object's
+        #        stacks, points - [(sp, fp, flags)] per observation, ref -
+        #        the reference frame (its header carries the camera's
+        #        limits), w0 - the reference WCS
+        # @return: the run's brightness summary, or None when it cannot be
+        #          calibrated (no comps, no stacks, no measurable plate)
+        # The brightness is measured ON THE STACKS, never frame by frame:
+        # on a single frame a faint NEO has SNR 2 and its aperture ends up
+        # chasing noise. The object reads on ITS stack, where its light is
+        # concentrated, and the comparison stars read on a SECOND stack of
+        # the same frames aligned on the STARS, because on the object's
+        # stack they are streaks and a streak calibrates nothing.
+        # photometry.measure_plate already implements exactly that recipe
+        # (the comp_image hook, written for host subtraction): this is
+        # orchestration, not a second photometry.
+        import numpy as np
+        from ..core import astrometry as astrometry_mod
+        from ..core import compstars, photometry
+        from ..core import wcs as wcs_mod
+        recipe = dict(self._recipe or {})
+        entries = list(self._comps)
+        source = "project" if entries else "auto"
+        shape = (int(ref.header.get("NAXIS1", 0) or 0),
+                 int(ref.header.get("NAXIS2", 0) or 0))
+        if min(shape) < 1:
+            return None
+        if not entries:
+            # the field the comps are looked for in comes from the PLATE:
+            # the WCS says what a pixel is worth and the frame says how
+            # many there are, so there is no field size to guess
+            try:
+                ra, dec = w0.all_pix2world([[qs[0][0], qs[0][1]]], 0)[0]
+            except Exception:
+                return None
+            fov_arcmin = (astrometry_mod.pixel_scale_arcsec(w0)
+                          * max(shape) / 60.0)
+            margin = float(self._cfg_get(
+                "astrometry_phot_comp_margin_arcsec", _COMP_MARGIN_ARCSEC))
+            field = compstars.load_field("gaia", float(ra), float(dec),
+                                         float(fov_arcmin), naxis=shape,
+                                         margin_arcsec=margin)
+            if not field:
+                return None
+            proposal = compstars.propose_comps(
+                field["stars"],
+                float(self._target_mag
+                      or self._cfg_get("astrometry_phot_target_mag",
+                                       compstars.TARGET_MAG_FALLBACK)),
+                margin_arcsec=margin)
+            entries = list((proposal or {}).get("comps") or [])
+            # the check star travels WITH the sequence: it never enters the
+            # zero point, it is the monitor that says whether the night
+            # behaved (the plate recipe measures it and reports a verdict)
+            check = (proposal or {}).get("check")
+            if check:
+                entries.append(check)
+        if not entries:
+            return None
+        # The band comes from the COMPARISON CATALOG and not from a
+        # constant: the comps are Gaia's, so what this calibrates is a
+        # Gaia G. A Clear filter is white light, and white light against
+        # Gaia G is the honest description of what was measured.
+        band, _bands = photometry.pick_band(entries, recipe.get("band"), "G")
+        # --- the comps' WINDOWS: small stacks aligned on the stars -------
+        # A comp needs averaging as much as the object does (on ONE frame
+        # a mag-17.4 star peaks ~800 ADU over a sky whose noise is 261 ADU,
+        # measured on 2025 UR: SNR 2), but stacking the WHOLE frame a
+        # second time is 74 s for eight windows that are ~80 px wide. So
+        # each comp gets its own small star-aligned stack, and the zero
+        # point is the same number for a fraction of the time.
+        total = max(1, 2 * len(groups))
+        per_obs = []
+        # P3: the night's diagnosis is built from the SAME comps the zero
+        # point uses: their (magnitude, signal-to-noise) gives how faint this
+        # night went, and their position against the catalogue gives whether
+        # the plate solution is even. Nothing extra is measured.
+        diag_pairs, diag_points, diag_shape = [], [], None
+        for index, (stack, _rep) in enumerate(stacks):
+            self.progress.emit("photometry", len(groups) + index + 1, total)
+            if stack is None or index >= len(groups):
+                per_obs.append(None)
+                continue
+            box = boxes[index]
+            sp = points[index][0] if index < len(points) else None
+            centre = self._object_centre(sp, qs[index], box)
+            if centre is None:
+                per_obs.append(None)
+                continue
+            wcs_box = wcs_mod.Wcs.from_astropy(_shift_wcs(w0, box))
+            star_stack = (star_stacks[index][0]
+                          if star_stacks and index < len(star_stacks)
+                          else None)
+            if star_stack is not None:
+                # The observer asked for the star stack to be KEPT (to
+                # measure by hand later), so the full one is already here:
+                # the comps read on it and the small windows are not built.
+                # Nothing is built twice.
+                comp_entries = list(entries)
+                comp_images = None
+                fwhm = self._seeing_on_stack(star_stack, comp_entries,
+                                             wcs_box)
+            else:
+                windows = self._comp_windows(frames, groups[index], entries,
+                                             wcs_box, shape)
+                if not windows:
+                    per_obs.append(None)
+                    continue
+                comp_entries = [w[0] for w in windows]
+                comp_images = [w[1:] for w in windows]
+                star_stack = None
+                fwhm = self._seeing(windows)
+            radii = self._radii(recipe, fwhm)
+            cfg = photometry.PlateConfig(
+                target_xy=centre,
+                entries=comp_entries,
+                comp_images=comp_images,
+                comp_image=star_stack,
+                header=ref.header, wcs=wcs_box, band=band,
+                fallback_band=band, radii=radii,
+                fwhm=fwhm,
+                centroid_mode=("none" if recipe.get("manual_centre")
+                               else "gaussian"),
+                sigmaclip=bool(recipe.get("sigmaclip", True)),
+                # the method the recipe carries; and when it carries none
+                # (a plate saved before the key existed) the app's own
+                # setting, so Ajustes decides for those plates too
+                matched=bool(recipe.get(
+                    "matched", self._cfg_get("phot_matched", True))),
+                sky_mode=recipe.get("sky") or "median",
+                color=bool(recipe.get("color", False)),
+                target_bv=float(recipe.get("target_bv") or 0.0),
+                linear_adu=self._cfg_get("cam_linearity_adu", None),
+                site_gain=self._cfg_get("ccd_gain", None),
+                site_ron=self._cfg_get("ccd_read_noise", None),
+                site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,
+                site_saturate=self._cfg_get("ccd_saturate", None),
+                site_lon=self._cfg_get("lon", None),
+                site_lat=self._cfg_get("lat", None),
+                site_aperture_m=float(self._cfg_get("aperture_inches", 10.0)
+                                      or 10.0) * 0.0254,
+                site_height_m=float(self._cfg_get("height", 0) or 0.0),
+                site_dark=self._cfg_get("cam_dark_current_e_s", None),
+                stack_scale=self._stack_scale(groups[index]))
+            res = photometry.measure_plate(stack, cfg)
+            if not res.ok or res.mag is None:
+                per_obs.append(None)
+                continue
+            # P2: the object's SHAPE on its own stack, and what the matched
+            # filter reads there. The FWHM comes from the STARS (on this
+            # stack they are trails), and the filter is given the shape just
+            # measured, so a trailed object is filtered with the line it
+            # actually is instead of with a round PSF that is not there.
+            # Measured on the 2025 UR star stack: the matched filter reaches
+            # 1.55-1.63x the aperture's SNR, which is what sqrt(n_ap/n_eff)
+            # predicts. The name is `elong` and NOT `shape`: `shape` is the
+            # plate's (naxis1, naxis2) two lines above and it is still needed
+            # by the next observation's comp windows; clobbering it made the
+            # second observation index a dict.
+            elong = photometry.psf_elongation(stack, centre[0], centre[1],
+                                              fwhm_px=fwhm)
+            matched = None
+            if elong.get("ok"):
+                psf = photometry.gaussian_psf(
+                    elong.get("fwhm_px") or fwhm,
+                    ratio=elong.get("ratio") or 1.0,
+                    pa_deg=elong.get("pa_deg") or 0.0)
+                matched = photometry.measure_matched(
+                    stack, centre[0], centre[1], psf, r_ap=radii[0],
+                    r_ann_in=radii[1], r_ann_out=radii[2], fwhm=fwhm)
+                if not matched.get("ok"):
+                    matched = None
+            # WHAT THE APERTURE WOULD HAVE SAID, when the plate was
+            # measured with the filter: the run says which method it used and
+            # keeps the other value beside it, so nothing is published
+            # without the observer being able to compare. It is the same
+            # zero point and the two fluxes of the SAME measurement, so the
+            # difference between the two magnitudes is the difference
+            # between the two methods, exactly.
+            mag_ap = None
+            tgt = getattr(res, "target", None) or {}
+            if (tgt.get("flux_ap") or 0.0) > 0.0 \
+                    and (tgt.get("flux") or 0.0) > 0.0:
+                try:
+                    mag_ap = float(res.mag) + 2.5 * math.log10(
+                        float(tgt["flux"]) / float(tgt["flux_ap"]))
+                except (TypeError, ValueError):
+                    mag_ap = None
+            per_obs.append({"mag": float(res.mag),
+                            "err": float(res.err_total or 0.0),
+                            "mag_ap": mag_ap,
+                            "n_comps": len([1 for e, _r in (res.used or [])
+                                            if (e.get("kind") or "comp")
+                                            == "comp"]),
+                            "check": (res.check or {}).get("verdict"),
+                            # the check star's verdict as a yes/no/unknown:
+                            # the table colours the magnitude by it (a night
+                            # the check star says is off is not a night to
+                            # publish), and None means the sequence carried
+                            # no check star at all
+                            "check_ok": ((res.check or {}).get("ok")
+                                         if res.check else None),
+                            "shape": elong, "matched": matched,
+                            # what ACTUALLY measured, which is not what the
+                            # recipe asked for: with no seeing the filter is
+                            # skipped and the aperture measures (see
+                            # PlateResult.matched_used)
+                            "matched_used": bool(getattr(
+                                res, "matched_used", False))})
+            if diag_shape is None:
+                diag_shape = stack.shape
+            for entry, cres in (res.used or []):
+                if not cres.get("ok"):
+                    continue
+                star = entry.get("star") or {}
+                if star.get("mag") is not None and cres.get("snr"):
+                    diag_pairs.append((float(star["mag"]),
+                                       float(cres["snr"])))
+                if star.get("ra") is None or cres.get("x") is None:
+                    continue
+                try:
+                    ra, dec = wcs_box.pixel_to_sky(cres["x"], cres["y"])
+                except Exception:
+                    continue
+                # the small-angle separation: one arcsec of RA is
+                # cos(dec) arcsec on the sky, and at these fields the
+                # approximation is exact to well under the residuals being
+                # judged
+                dra = (float(ra) - float(star["ra"])) * math.cos(
+                    math.radians(float(star["dec"])))
+                ddec = float(dec) - float(star["dec"])
+                diag_points.append((float(cres["x"]), float(cres["y"]),
+                                    math.hypot(dra, ddec) * 3600.0))
+            if sp is not None:
+                # one magnitude per observation: it is what the MPC
+                # publishes, and the point is the observation
+                sp.mag = float(res.mag)
+                sp.band = band
+        good = [p for p in per_obs if p is not None]
+        if not good:
+            return None
+        mags = np.asarray([p["mag"] for p in good], dtype=float)
+        # the run's shape summary (P2): the trail of the observation that
+        # has one (the median over the ones that do), and the SNR the
+        # matched filter would reach against the aperture. Both are SAID,
+        # never used silently: the report keeps the aperture's magnitude,
+        # and the trail is advice for the next exposure.
+        trails = [float(p["shape"]["trail_px"]) for p in good
+                  if p.get("shape") and p["shape"].get("ok")
+                  and p["shape"].get("significant")]
+        pas = [float(p["shape"]["pa_deg"]) for p in good
+               if p.get("shape") and p["shape"].get("ok")
+               and p["shape"].get("significant")]
+        gains = [float(p["matched"]["snr"]) / float(p["matched"]["snr_ap"])
+                 for p in good
+                 if p.get("matched") and p["matched"].get("snr_ap")]
+        # P3: the night's own diagnosis, measured on the same comps
+        limit = photometry.limiting_magnitude(diag_pairs)
+        grid = (photometry.quality_grid(diag_points, diag_shape)
+                if diag_shape else {"ok": False})
+        ap_mags = [p["mag_ap"] for p in good if p.get("mag_ap") is not None]
+        # the object's own pair of signal-to-noise values, on the measurement
+        # that produced the magnitude (NOT the detection's: that one is the
+        # astrometry's own aperture and the filter does not change it). The
+        # run says both so the observer can see what the filter bought.
+        snr_ap = [float(p["matched"]["snr_ap"]) for p in good
+                  if p.get("matched") and p["matched"].get("snr_ap")]
+        snr_mf = [float(p["matched"]["snr"]) for p in good
+                  if p.get("matched") and p["matched"].get("snr")]
+        return {"mag": float(np.median(mags)),
+                "err": float(np.median([p["err"] for p in good])),
+                "band": band,
+                # which method measured (the truth, from the plate result),
+                # which one was ASKED for, and what the other would say
+                "matched": any(p.get("matched_used") for p in good),
+                "matched_requested": bool(
+                    (self._recipe or {}).get("matched", True)),
+                "mag_aperture": (float(np.median(ap_mags)) if ap_mags
+                                 else None),
+                "snr_ap": (float(np.median(snr_ap)) if snr_ap else None),
+                "snr_mf": (float(np.median(snr_mf)) if snr_mf else None),
+                "trail_px": (float(np.median(trails)) if trails else None),
+                "trail_pa_deg": (float(np.median(pas)) if pas else None),
+                "snr_gain": (float(np.median(gains)) if gains else None),
+                "limit": limit, "grid": grid,
+                "n_comps": max(p["n_comps"] for p in good),
+                "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
+                "n_obs": len(good), "source": source, "per_obs": per_obs,
+                # the comparison stars themselves, so the project can KEEP
+                # them: the Photometry tab then opens with the same sequence
+                # the run used instead of proposing a different one
+                "comps": entries, "catalog": "gaia"}
+
+    def _stack_scale(self, group):
+        # @args: group - the observation's (start, end) frames
+        # @return: how many frames this observation's stack ADDS, for the
+        #          photometry's ADU ceilings. "sum" adds them (so its level is
+        #          N times a frame's and the sensor's limits are MULTIPLIED by
+        #          N before the plate is compared against them); every other
+        #          method keeps the frame's level.
+        #          Measured on the author's own 2025 FG18 visit: with "sum"
+        #          the stack's own sky was 321 000 ADU against a camera
+        #          linearity of 53 000, so every comparison star was rejected
+        #          and the run reported no magnitude at all.
+        if str(self._method) != "sum":
+            return 1.0
+        try:
+            n = int(group[1]) - int(group[0])
+        except (TypeError, IndexError, ValueError):
+            n = 0
+        return float(n) if n > 0 else 1.0
+
+    def _object_centre(self, sp, q, box):
+        # @args: sp - the astrometric point of the observation (or None),
+        #        q - the object's reference point, box - the stack's box
+        # @return: (x, y) in the STACK's own pixels, or None
+        # The astrometric measurement already found the object on this
+        # very stack: reusing its centroid puts the aperture on the light
+        # instead of on the ephemeris, which can be a couple of pixels
+        # away. Without it (the position was not measured) the ephemeris
+        # is the honest fallback, and the flag on the point says so.
+        #
+        # The box origin comes off the EPHEMERIS and not off the centroid:
+        # the centroid was measured on the stack itself (measure_stack
+        # centres on the stack's own pixels), so it is already local, while
+        # q lives in the reference grid the frames were registered on. The
+        # old subtraction only worked while the final stack was the whole
+        # frame (box origin 0, 0): with a 512 px cutout the aperture landed
+        # box[0] pixels away, usually off the image, and the observation
+        # came back with no magnitude and no word about why.
+        import math
+        if sp is not None and sp.x is not None and sp.y is not None \
+                and math.isfinite(sp.x) and math.isfinite(sp.y):
+            return (float(sp.x), float(sp.y))
+        if q is None:
+            return None
+        return (float(q[0]) - box[0], float(q[1]) - box[1])
+
+    def _comp_windows(self, frames, group, entries, wcs_box, shape):
+        # @args: frames - the sequence, group - the observation's frames,
+        #        entries - the comps and the check star, wcs_box - the
+        #        reference WCS shifted to the stack, shape - the frame size
+        # @return: [(entry, image, x, y), ...] for the ones that landed on
+        #          the plate
+        # A comp needs averaging as much as the object does (on ONE frame
+        # a mag-17.4 star peaks ~800 ADU over a sky whose noise is 261 ADU,
+        # measured on 2025 UR: SNR 2), but only in the pixels it occupies.
+        # A window around each comp is ~1 % of the frame, and the whole
+        # star stack measured 74 s for the very same zero point.
+        from ..core import track_stack
+        half = self._window_half()
+        out = []
+        for e in entries:
+            star = e.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                cx, cy = wcs_box.sky_to_pixel(star["ra"], star["dec"])
+            except Exception:
+                continue
+            box = _window_box(cx, cy, half, shape)
+            if box is None:
+                continue
+            small, _rep = track_stack.stack_group(
+                frames, group, (cx, cy), self._method, box, shape,
+                cfg=self._cfg, track=False, loader=self._loader,
+                order=self._warp_order())
+            if small is None:
+                continue
+            out.append((e, small, cx - box[0], cy - box[1]))
+        return out
+
+    def _window_half(self):
+        # @return: the half side of a comp's window, in px
+        # The window has to hold the aperture AND its annulus, with room
+        # for the radial profile to find its half-maximum and for the
+        # seeing-sized aperture, which can reach r_out ~33 px when the
+        # measured FWHM is large. The floor is generous on purpose: even
+        # at 40 it is ~1 % of a 2048 frame, which is where the saving
+        # comes from.
+        from ..core import photometry
+        try:
+            rout = int(float((self._recipe or {}).get("rout") or 0))
+        except (TypeError, ValueError):
+            rout = 0
+        return max(int(photometry.R_ANN_OUT), rout, _WINDOW_MIN_HALF)
+
+    def _seeing_on_stack(self, star_stack, entries, wcs_box):
+        # @args: star_stack - the full stack aligned on the stars, entries -
+        #        the comps, wcs_box - the reference WCS shifted to it
+        # @return: the FWHM in px (the median over the comps), or None
+        # Same job as _seeing, on the whole star stack instead of on the
+        # per-comp windows: used when the observer asked to KEEP the star
+        # stack, so there is no reason to build the windows as well.
+        from ..core import photometry
+        spots = []
+        for e in entries:
+            star = e.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                spots.append(wcs_box.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if not spots:
+            return None
+        return photometry.estimate_fwhm(star_stack, spots)
+
+    def _seeing(self, windows):
+        # @args: windows - [(entry, image, x, y), ...] as built by
+        #        _comp_windows
+        # @return: the FWHM in px (the median over the comps), or None
+        # The seeing is measured on the comps' own windows and nowhere
+        # else: they are points there, and an aperture that follows the
+        # seeing must be sized by the same PSF the comps have (the object
+        # shares it: same frames, same grid).
+        #
+        # "auto" (the default) and not a fixed method: it asks the DATA
+        # which estimator it can afford. On a noisy plate the median-
+        # subtracted window keeps a noise pedestal, and the second moments
+        # integrate it into a FWHM three or four times too large (measured
+        # on 2025 UR, whose sky noise is 261 ADU: moments said 13 px,
+        # radial says 2.7); on a clean one the moments are the more
+        # accurate, and the estimator picks itself.
+        import numpy as np
+        from ..core import photometry
+        fwhms = []
+        for _entry, image, x, y in windows:
+            value = photometry.estimate_fwhm(image, [(x, y)])
+            if value:
+                fwhms.append(float(value))
+        if not fwhms:
+            return None
+        return float(np.median(fwhms))
+
+    def _radii(self, recipe, fwhm):
+        # @args: recipe - the project's photometry recipe, fwhm - the
+        #        seeing measured on the star stack
+        # @return: (rap, rin, rout) or None for the recipe's own defaults
+        # The rule is the Fotometria tab's, applied to a stack instead of
+        # to a plate: the observer's radii win, and only when they never
+        # touched them does the aperture follow the seeing.
+        from ..core import photometry
+        if recipe.get("seeing") and not recipe.get("radii_manual") and fwhm:
+            return photometry.aperture_for_fwhm(fwhm)
+        radii = (recipe.get("rap"), recipe.get("rin"), recipe.get("rout"))
+        if any(r is None for r in radii):
+            return None
+        return tuple(float(r) for r in radii)
+
+    def _build_calibrator(self):
+        # @return: a calibration.FrameCalibrator ready to be used as the
+        #          engine's loader, or None when it cannot be built
+        # The recipe is the Calibration tab's (the library of masters). When
+        # the library has NO flat for the visit's filter, a pseudo-flat is
+        # built from the frames themselves, and ONLY then: it is the
+        # fallback, opt-in (the setting), and a real flat always wins.
+        from ..core import calibration
+        from ..core.db import db
+        try:
+            header = calibration.read_header(self._paths[0])
+        except Exception as err:
+            logger.warning("calibration skipped: %s", err)
+            return None
+        meta = calibration.meta_from_header(header)
+        tol = None
+        if self._cfg is not None:
+            tol = self._cfg.get("calib_temp_tol_c", None)
+        recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        flat = None
+        want_pseudo = bool(self._cfg_get("calib_pseudo_flat", False))
+        if recipe.flat is None and want_pseudo:
+            self.progress.emit("pseudoflat", 0, len(self._paths))
+            # The pedestal goes with it: the pseudo-flat is built from the
+            # frames with the SAME offset removed as the light, or the
+            # division mixes two different things and the flat's shape comes
+            # out compressed (measured on 1 s twilight frames: 44 % of the
+            # correction). See calibration._OffsetSubtractor.
+            flat, info = calibration.pseudo_flat(
+                self._paths, db=db, cfg=self._cfg,
+                cancel=lambda: self._cancel,
+                progress=lambda d, t: self.progress.emit("pseudoflat", d, t))
+            self._pseudo_info = info
+        return calibration.FrameCalibrator(db, self._cfg, pseudo_flat=flat)
+
+    def run(self):
+        import math
+        from ..core import astrometry, findorb, mpc_astrometry, track_stack
+        out = {"status": "ok", "name": self._name, "method": self._method,
+               "n_obs": self._n_obs}
+        try:
+            # --- calibration, when the observer asked for it (ADR-061) ----
+            # The frames are calibrated AS THEY ARE READ, so the engine's
+            # many passes (the registration, the sweep's candidates, the
+            # comps' windows) all see calibrated pixels without writing a
+            # single calibrated copy to disk.
+            if self._calibrate:
+                self.progress.emit("calibrate", 0, 1)
+                self._loader = self._build_calibrator()
+                self.progress.emit("calibrate", 1, 1)
+
+            # --- solve: the grid every frame is registered on -------------
+            self.progress.emit("solve", 0, 1)
+            frames = track_stack.load_sequence(self._paths, self._cfg)
+            # a frame that could not be read is left out (and COUNTED: the
+            # run's note says it, because a hole in the stack is a fact)
+            out["n_unreadable"] = max(0, len(self._paths) - len(frames))
+            if len(frames) < 2:
+                out.update(status="error",
+                           error="the visit needs at least two frames")
+                self.finished.emit(out)
+                return
+            # the live solve gets a SolveCancel so Cancel kills ASTAP now
+            from ..core import solve as solve_mod
+            self._solve_cancel = solve_mod.SolveCancel()
+            if self._cancel:
+                self._solve_cancel.set()
+            ref, w0 = track_stack.solve_reference(
+                frames, self._cfg, cancel=self._solve_cancel,
+                progress=lambda d, t, _l: self.progress.emit("solve", d, t))
+            self._solve_cancel = None
+            if w0 is None:
+                out.update(status="error",
+                           error="no frame could be solved: no WCS, no sky")
+                self.finished.emit(out)
+                return
+            if self._cancel:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+            shape = (int(ref.header.get("NAXIS1", 1)),
+                     int(ref.header.get("NAXIS2", 1)))
+            out["shape"] = shape
+
+            # --- register: the frames vote their transform (D44) ----------
+            self.progress.emit("register", 0, len(frames))
+            track_stack.register_sequence(
+                frames,
+                progress=lambda d, t, _l: self.progress.emit("register", d, t),
+                cancel=lambda: self._cancel, loader=self._loader)
+            out["dither"] = track_stack.dither_check(frames)
+            out["n_failed"] = sum(1 for f in frames if f.failed_register)
+            # WHICH frames were left out, by path: the editor's preview list
+            # marks them (2026-10-06), so a bad frame is visible in the night
+            # without opening it
+            out["failed_frames"] = [str(f.path) for f in frames
+                                    if f.failed_register]
+            # the honest registration summary (P0): how many frames came
+            # back, how, and whether the visit is really two runs
+            out["register_report"] = track_stack.registration_report(frames)
+            if self._cancel:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+
+            # --- ephemeris over the visit's own window (D8) ---------------
+            # Not one service but a CASCADE: Horizons (with retries), then the
+            # SBDB elements propagated locally, then NEOfixer. A stack must
+            # not die because JPL is having a bad moment (503), which it does
+            # often.
+            # The ephemeris answers TWO questions: where the object is and how
+            # bright it should be. The magnitude is what the band shows when
+            # the run did not measure the brightness (a faint object, the box
+            # off): without it the plate says nothing about the object's
+            # light, and the observer is left guessing.
+            ephem = track_stack.sequence_ephemeris(
+                frames, self._name, site=self._site,
+                lat=self._cfg_get("lat", None),
+                lon=self._cfg_get("lon", None))
+            motion = ephem.get("motion")
+            ephem_source = ephem.get("source")
+            ephem_reason = ephem.get("reason")
+            out["ephem_source"] = ephem_source
+            out["ephem_mag"] = ephem.get("mag")
+            out["ephem_band"] = ephem.get("band")
+            out["ephem_mag_source"] = ephem.get("mag_source")
+            if motion is None:
+                out.update(status="error",
+                           error="no ephemeris for the object: JPL Horizons "
+                                 f"did not answer ({ephem_reason}) and no "
+                                 "local orbit could be propagated "
+                                 "(SBDB/NEOfixer)")
+                self.finished.emit(out)
+                return
+            track_stack.object_positions(frames, motion)
+            # Frames that registered but do NOT contain the object (a visit
+            # with two runs points the second one at a shifted field, and
+            # the object can fall off the sensor): they are left out of the
+            # stack and COUNTED, because a silent hole in the stack is worse
+            # than a number the observer can act on.
+            out["n_off_frame"] = sum(
+                1 for f in frames
+                if track_stack.usable(f) and not track_stack.inside_frame(f))
+            t_all, q_all = track_stack.group_q(frames, (0, len(frames)),
+                                               w0, motion)
+            if q_all is None or t_all is None:
+                out.update(status="error",
+                           error="the object does not fall on the plate at "
+                                 "the sequence's instant")
+                self.finished.emit(out)
+                return
+            # MANUAL MODE (faint object): the observer's mark on the base
+            # stack replaces the ephemeris position. The prediction's error
+            # is assumed constant over the visit, so the SAME offset is
+            # carried to every observation. The gate below is not asked: a
+            # human mark IS the detection.
+            manual = self._manual_ref is not None
+            q_all, manual_offset = track_stack.manual_reference(
+                q_all, self._manual_ref)
+            if manual:
+                out["manual"] = True
+            scale = astrometry.pixel_scale_arcsec(w0)
+            margin = int(self._margin or self._cfg_get(
+                "astrometry_cutout_margin_px", 64))
+            if ephem_source and ephem_source.startswith("kepler"):
+                # A LOCAL orbit is two-body and its Earth is coarse: a close
+                # NEO can sit a couple of arcminutes off, which at 1.5"/px is
+                # more than the normal margin. The cutout is widened so the
+                # object is surely inside; the reported position is still the
+                # centroid measured on the plate, not this prediction.
+                margin += int(self._cfg_get("astrometry_fallback_margin_px",
+                                            300))
+            box_all = track_stack.cutout_box(frames, (0, len(frames)), q_all,
+                                             margin_px=margin, shape=shape)
+
+            # --- base stack + the detection gate (D10) ---------------------
+            self.progress.emit("base", 0, 1)
+            base_stack, _rep = track_stack.stack_group(
+                frames, (0, len(frames)), q_all, self._method, box_all,
+                shape, cfg=self._cfg, loader=self._loader,
+                order=self._warp_order())
+            q_all_box = (q_all[0] - box_all[0], q_all[1] - box_all[1])
+            self.progress.emit("detect", 0, 1)
+            detection = track_stack.detect(base_stack, q_all_box, self._cfg)
+            out["detection"] = detection
+            # The BASE STACK travels in the payload ALWAYS, not only when the
+            # gate does not fire: it is the deepest image of the visit (the
+            # whole sequence, the object frozen), it is what the manual mode
+            # marks on, and it is saved with the run so reopening the visit
+            # shows it again (asked for). It is a cutout of the object's own
+            # trail, so keeping it costs a few MB at most.
+            out.update(base_stack=base_stack, box_all=box_all, q_all=q_all,
+                       w0=w0, shape=shape)
+            if not detection.detected and not manual:
+                # ADR-062 rev (D10 revisited): the gate still forbids the
+                # SWEEP (a noise maximum is how a false positive is
+                # manufactured), but it no longer throws the run away. The
+                # observer asked for the brightness to be measured ALWAYS and
+                # marked when it is not to be trusted: a number that says
+                # "this is below the gate, look at it" is worth more than no
+                # number at all, and the position is the ephemeris' own
+                # prediction, said as such. Every point carries the flag and
+                # the table paints the magnitude red.
+                out["below_gate"] = True
+            self.progress.emit("detect", 1, 1)
+
+            # --- velocity sweep, once for the whole sequence (D9/D22) -----
+            # NOT in manual mode: the mark fixes the position, and over a
+            # source below the gate the sweep's score is noise (D10's own
+            # reason). The velocity comes from the ephemeris.
+            base_rate, base_pa = _rate_pa(motion, t_all)
+            out["base_rate"], out["base_pa"] = base_rate, base_pa
+            if base_rate is not None and not manual \
+                    and not out.get("below_gate"):
+                # cfg stores the COMBINATION count (25 = D9's 5x5 grid);
+                # the engine wants the steps per axis
+                steps = max(2, int(round(math.sqrt(
+                    float(self._cfg_get("astrometry_sweep_steps", 25))))))
+                self.progress.emit("sweep", 0, steps * steps)
+                sweep = track_stack.sweep(
+                    frames, q_all, base_rate, base_pa, box_all, shape,
+                    pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
+                    steps=steps, method="median", cfg=self._cfg,
+                    loader=self._loader,
+                    progress=lambda d, t, _l: self.progress.emit(
+                        "sweep", d, t),
+                    cancel=lambda: self._cancel)
+                out["sweep"] = sweep
+                if self._cancel:
+                    out["status"] = "cancelled"
+                    self.finished.emit(out)
+                    return
+                if sweep.best is not None and sweep.significant:
+                    _apply_sweep(frames, base_rate, base_pa,
+                                 sweep.best["rate"], sweep.best["pa"],
+                                 t_all, scale)
+                elif sweep.best is not None:
+                    # NOT significant: the winner did not beat the ephemeris'
+                    # own prediction by more than the grid's scatter, so the
+                    # frames keep the ephemeris' motion and the run says it.
+                    # A noise maximum published as a measurement is what made
+                    # the app report PA 33 where the ephemeris said 41.8
+                    # (2025 HL5) and 37 where it said 46.2 (2025 FG18).
+                    out["sweep_not_significant"] = True
+
+            # --- WCS quality control: composed vs a direct solve ----------
+            out["wcs_qc"] = track_stack.verify_composed_wcs(
+                frames, cancel=lambda: self._cancel)
+
+            # --- one stack per observation (D22/D23) -----------------------
+            groups = track_stack.split_groups(frames, self._n_obs)
+            q_by_group, boxes, mids = [], [], []
+            for group in groups:
+                t_mid, q_g = track_stack.group_q(frames, group, w0, motion)
+                if q_g is None:
+                    # the ephemeris failed at this instant: fall back to
+                    # the sequence's point and let the flags speak
+                    q_g = q_all
+                elif manual_offset is not None:
+                    # manual mode: the mark's offset from the ephemeris is
+                    # carried to this observation's own instant
+                    q_g = (q_g[0] + manual_offset[0],
+                           q_g[1] + manual_offset[1])
+                q_by_group.append(q_g)
+                mids.append(t_mid)
+                # D11: the FINAL stack of an observation is a fixed window
+                # around the object (the whole frame by default), not the
+                # trail cutout the detection and the sweep use. The field
+                # is what the photometry and the eye need.
+                boxes.append(track_stack.box_around(q_g, self._final_size,
+                                                    shape))
+            self.progress.emit("groups", 0, len(groups))
+            # The per-observation WCS travels with the payload: each stack
+            # is a cutout of the reference grid, and writing its WCS into
+            # the file is what lets ANY tool read it without solving a
+            # plate whose stars are TRAILS (ASTAP finds no stars there and
+            # the solve fails, which is the symptom the observer sees when
+            # the stack is opened in the Photometry tab).
+            out["wcs_by_group"] = [_shift_wcs(w0, b) for b in boxes]
+            stacks = track_stack.stack_groups(
+                frames, groups, q_by_group, self._method, boxes, shape,
+                cfg=self._cfg, loader=self._loader,
+                order=self._warp_order(),
+                progress=lambda d, t, _l: self.progress.emit("groups", d, t),
+                cancel=lambda: self._cancel)
+            if self._cancel or len(stacks) < len(groups):
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
+
+            # --- measurement, the two ways per group (D7/D16) -------------
+            self.progress.emit("measure", 0, len(stacks))
+            points = []
+            for index, (stack, _srep) in enumerate(stacks):
+                if stack is None:
+                    # every frame of this observation failed to register:
+                    # nothing to measure (and saying so beats a bogus point)
+                    self.progress.emit("measure", index + 1, len(stacks))
+                    continue
+                box = boxes[index]
+                q_box = (q_by_group[index][0] - box[0],
+                         q_by_group[index][1] - box[1])
+                mjd = mids[index] - 2400000.5 if mids[index] else None
+                # each stack is a cutout of the reference grid, so it is
+                # measured with the reference WCS shifted by the box's
+                # origin (CRPIX moves, the sky does not)
+                res = astrometry.measure_groups(
+                    [stack], [q_box], _shift_wcs(w0, box),
+                    frames=frames, groups=[groups[index]], cfg=self._cfg,
+                    mjd_by_group=[mjd], loader=self._loader)
+                sp, fp, flags = res[0]
+                sp.group_index = index      # measure_groups counts from 0
+                if fp is not None:          # on every call: restore the
+                    fp.group_index = index  # group the point belongs to
+                points.append((sp, fp, flags))
+                self.progress.emit("measure", index + 1, len(stacks))
+            if manual:
+                _mark_as_manual(points)
+            if out.get("below_gate"):
+                # the flag travels with the figure: it is what colours the
+                # magnitude red in the table and what the report's audit says
+                _mark_below_gate(points)
+            out.update(points=points, groups=groups, stacks=stacks,
+                       boxes=boxes, qs=q_by_group, mids=mids, w0=w0,
+                       frames=frames)
+
+            # --- the NEO's brightness, measured on the stacks (D11/D7) ----
+            # The object reads on ITS stack, where its light is
+            # concentrated, and the comparison stars on a SECOND stack
+            # aligned on the stars, because on the object's stack they are
+            # streaks and a streak calibrates nothing. The recipe is the
+            # Fotometria tab's, so the apertures, the sky method, the
+            # centroid and the colour term are the observer's own.
+            if self._phot_enabled:
+                # --- the STAR stacks, when the observer wants to keep them
+                # The same frames, the same method, aligned on the stars:
+                # the only place the comps are POINTS, and what the
+                # Photometry tab needs to measure the pair by hand. They are
+                # built here, before the measurement, so the measurement can
+                # USE them and nothing is built twice.
+                star_stacks = []
+                if self._save_star_stack:
+                    self.progress.emit("starstack", 0, len(groups))
+                    star_stacks = track_stack.stack_groups(
+                        frames, groups, q_by_group, self._method, boxes,
+                        shape, cfg=self._cfg, track=False,
+                        loader=self._loader, order=self._warp_order(),
+                        progress=lambda d, t, _l: self.progress.emit(
+                            "starstack", d, t),
+                        cancel=lambda: self._cancel)
+                    if self._cancel or len(star_stacks) < len(groups):
+                        out["status"] = "cancelled"
+                        self.finished.emit(out)
+                        return
+                    out["star_stacks"] = star_stacks
+                self.progress.emit("photometry", 0, 1)
+                phot = self._photometry(frames, groups, boxes, q_by_group,
+                                        stacks, points, ref, w0,
+                                        star_stacks=star_stacks)
+                if phot is not None:
+                    out["photometry"] = phot
+                self.progress.emit("photometry", 1, 1)
+            else:
+                out["photometry"] = None
+                out["phot_skipped"] = True
+
+            # --- the check, delegated to Find_Orb (D25) -------------------
+            self.progress.emit("check", 0, 1)
+            check = None
+            if bool(self._cfg_get("astrometry_check_enabled", True)):
+                kept, _dropped, _notes = mpc_astrometry.submittable(
+                    [sp for sp, _fp, _fl in points], self._cfg)
+                if not kept:
+                    check = findorb.CheckReport(
+                        available=False,
+                        note="no observation clears the submission floor")
+                else:
+                    ours = mpc_astrometry.to_mpc80(kept, self._obs_code,
+                                                   self._name, self._cfg)
+                    check = findorb.check(ours.splitlines(), self._name,
+                                          self._cfg,
+                                          cancel=lambda: self._cancel)
+            else:
+                check = findorb.CheckReport(available=False,
+                                            note="disabled in the settings")
+            out["check"] = check
+            self.progress.emit("check", 1, 1)
+            # what the magnitude was measured with: the observer must never
+            # read a brightness without knowing whether the frames were
+            # calibrated and with which masters
+            if self._loader is not None:
+                summary = self._loader.summary()
+                summary["pseudo_flat"] = getattr(self, "_pseudo_info", None)
+                out["calibration"] = summary
+            self.finished.emit(out)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("track&stack worker failed: %s", err)
+            self.failed.emit(str(err))
+
+
+def _rate_pa(motion, t_mid_jd):
+    # @args: motion - callable(jd) -> (ra_deg, dec_deg), t_mid_jd - the
+    #        sequence's middle instant
+    # @return: (rate arcsec/min, PA degrees north-through-east) or (None,
+    #          None) when the ephemeris cannot be sampled
+    # The linear seed of the sweep (D9): the ephemeris' own motion measured
+    # over two minutes around the middle of the sequence. The PA convention
+    # is the one sweep/_rescore uses: 0 deg towards +dec (north), 90 deg
+    # towards +RA (east, which is -x on the usual CD1_1<0 grid).
+    import math
+    # +/- ONE minute (1/1440 of a day), so the baseline is two minutes and
+    # the /2 below is the arcsec PER MINUTE. The first version used
+    # 1/2880 (+/- 30 s) and still divided by 2, which returned exactly HALF
+    # the real rate (measured on 2025 UR: 15.25 instead of 30.6"/min, with
+    # the PA right because the direction does not change).
+    p0 = motion(t_mid_jd - 1.0 / 1440.0)
+    p1 = motion(t_mid_jd + 1.0 / 1440.0)
+    if not p0 or not p1:
+        return None, None
+    cosd = math.cos(math.radians(p0[1]))
+    dra = (p1[0] - p0[0]) * cosd * 3600.0     # arcsec of arc over 2 min
+    ddec = (p1[1] - p0[1]) * 3600.0
+    rate = math.hypot(dra, ddec) / 2.0
+    pa = math.degrees(math.atan2(dra, ddec)) % 360.0
+    return rate, pa
+
+
+def _apply_sweep(frames, base_rate, base_pa, rate, pa, t0_jd, scale):
+    # @args: frames - list[Frame] with object_xy, base_rate/base_pa - the
+    #        ephemeris seed, rate/pa - the sweep's winner, t0_jd - the
+    #        instant the sweep measured its offsets from, scale - arcsec/px
+    # @return: None (the frames' object_xy is shifted in place)
+    # The sweep runs ONCE and applies to every group (D22). stack_group
+    # re-derives its offsets from object_xy (track_offsets), so shifting
+    # each frame's predicted position by exactly the displacement
+    # sweep._rescore scored with makes the per-group stacks freeze the
+    # object with the corrected velocity, landing on the q group_q reports.
+    import math
+    d_rate = rate - base_rate
+    d_pa = math.radians(pa - base_pa)
+    for frame in frames:
+        if frame.transform is None or frame.object_xy is None \
+                or frame.t_mid_jd is None:
+            continue
+        dt_min = (frame.t_mid_jd - t0_jd) * 1440.0
+        dra = d_rate * dt_min * math.sin(d_pa) / max(scale, 1e-6)
+        ddec = d_rate * dt_min * math.cos(d_pa) / max(scale, 1e-6)
+        frame.object_xy = (frame.object_xy[0] - dra,
+                           frame.object_xy[1] + ddec)
+
+
+def _mark_as_manual(points):
+    # @args: points - the (stack_point, frames_point, flags) triples of a run
+    # @return: None. In a MANUAL run a human mark replaced the detection: the
+    #          position is still measured on the plate, but the decision that
+    #          there was something to measure was the observer's, and that has
+    #          to travel with the figure (the table, the persisted row and the
+    #          report's audit all read the flags).
+    for _sp, _fp, flags in points:
+        if flags is not None and "manual" not in flags:
+            flags.append("manual")
+
+
+def _mark_below_gate(points):
+    # @args: points - the (stack_point, frames_point, flags) triples of a run
+    # @return: None. ADR-062 rev: the brightness is measured even when the
+    #          object did not clear the detection gate, and the figure says
+    #          so. The flag is what colours the magnitude red and what the
+    #          report's audit reads: a number below the gate is a number to
+    #          look at, never one to publish.
+    for _sp, _fp, flags in points:
+        if flags is not None and "below_gate" not in flags:
+            flags.append("below_gate")
+
+
+def _shift_wcs(w0, box):
+    # @args: w0 - the reference astropy WCS, box - (x0, y0, x1, y1) cutout
+    # @return: a WCS for the cutout's own pixel grid
+    # A group's stack is a cutout: its pixel (0, 0) is the reference's
+    # (x0, y0), so CRPIX moves by the origin and all_pix2world stays true
+    # for the box coordinates the centroid measured in.
+    import copy
+    w = copy.deepcopy(w0)
+    w.wcs.crpix = [w0.wcs.crpix[0] - box[0], w0.wcs.crpix[1] - box[1]]
+    return w
+
+
+def _window_box(cx, cy, half, shape):
+    # @args: cx, cy - the comp's pixel, half - the window's half side,
+    #        shape - (naxis1, naxis2)
+    # @return: (x0, y0, x1, y1) inside the frame, or None when the frame
+    #          cannot hold the window at all
+    # The window is SHIFTED in, never shrunk: the comp's own pixel stays
+    # inside, which is what the measurement needs.
+    side = 2 * int(half)
+    if side < 8 or shape[0] < side or shape[1] < side:
+        return None
+    x0 = max(0, min(int(round(cx)) - int(half), shape[0] - side))
+    y0 = max(0, min(int(round(cy)) - int(half), shape[1] - side))
+    return (x0, y0, x0 + side, y0 + side)
+
+
+class FrameThumbWorker(QThread):
+    # Reads a SMALL sample of every frame of a visit, for the preview list of
+    # the editor's left panel (2026-10-06).
+    #
+    # One frame at a time and in order, so the list fills from the top and
+    # the observer can start looking before the last one lands. The read is
+    # SAMPLED (core/fits_io.read_sample: ~2 MB per 2048² frame instead of the
+    # 16 MB the whole frame takes), which is what makes a 200-frame visit a
+    # second of work instead of gigabytes. The sample is read at 320 px
+    # because the preview now takes the whole column (up to ~270 px): a
+    # sample smaller than the preview would be shown soft. A frame that
+    # cannot be read is
+    # NOT an error here: it comes back marked broken, because spotting it is
+    # exactly what the list is for.
+
+    sampled = Signal(int, object, dict)   # index, array or None, facts
+    done = Signal()
+
+    def __init__(self, paths, max_px=320):
+        super().__init__()
+        self._paths = list(paths or [])
+        self._max_px = int(max_px)
+        self._cancel = False
+
+    def cancel(self):
+        # @return: None. The list was rebuilt (another visit) or is going
+        #          away: the loop stops at the next frame.
+        self._cancel = True
+
+    def run(self):
+        import os
+        from ..core import fits_io
+        for index, path in enumerate(self._paths):
+            if self._cancel:
+                break
+            facts = {"path": str(path)}
+            sample = None
+            try:
+                header, sample = fits_io.read_sample(path, self._max_px)
+                facts["shape"] = (int(header.get("NAXIS1", 0)),
+                                  int(header.get("NAXIS2", 0)))
+                facts["has_wcs"] = bool(header.get("CRVAL1") is not None
+                                        and header.get("CTYPE1"))
+                facts["filter"] = header.get("FILTER")
+                facts["exptime_s"] = header.get("EXPTIME")
+                facts["date_obs"] = header.get("DATE-OBS")
+                try:
+                    facts["bytes"] = os.path.getsize(path)
+                except OSError:
+                    facts["bytes"] = None
+                # the sky of the SAMPLE: the number that says whether the
+                # frame is what it should be (a cloud, a moonlit night or a
+                # wrong exposure show up here before anybody opens it)
+                import numpy as _np
+                finite = sample[_np.isfinite(sample)]
+                if finite.size:
+                    facts["sky"] = float(_np.median(finite))
+            except Exception as err:      # a broken frame is DATA, not a crash
+                facts["broken"] = str(err)
+                logger.warning("frame preview: %s could not be read (%s)",
+                               path, err)
+            if self._cancel:
+                break
+            self.sampled.emit(index, sample, facts)
+        self.done.emit()

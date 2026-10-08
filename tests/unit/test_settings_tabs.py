@@ -61,17 +61,33 @@ def _tab_widgets(dlg, index):
 def test_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    # Interfaz 1.4 added the Interface tab (the Welcome motion switch), so
-    # the count went from four to five; it sits between Integrations and
-    # Development, which keep their order.
-    assert len(tabs) == 5
+    # Interfaz 1.4 added the Interface tab (the Welcome motion switch),
+    # ADR-061 the Calibration tab (the master library) and 2026-10-06 the
+    # Astrometry one (the gate, the MPC floor, the sweep, the check), so the
+    # count went from four to seven; Integrations, Interface and Development
+    # keep their order behind them.
+    assert len(tabs) == 7
     # the last tab is Development (the UFE default switch, ADR-044)
     assert tabs[-1] in ("Development", "Desarrollo")
     assert tabs[-2] in ("Interface", "Interfaz")
     assert tabs[-3] in ("Integrations", "Integraciones")
     # the first tab is the site page (language-aware)
     assert tabs[0] in ("Site & equipment", "Sitio y equipo")
+    # the master library sits right after Observing: it is equipment, not
+    # an external service, and it is what the editor's Calibration tab
+    # resolves its recipe against
+    assert tabs[1] in ("Observing", "Observación")
+    assert tabs[2] in ("Calibration", "Calibración")
     dlg.deleteLater()
+
+
+def _integrations_index(dlg):
+    # @return: the Integrations tab's index, whatever its position
+    names = _tab_names(dlg)
+    for i, name in enumerate(names):
+        if name in ("Integrations", "Integraciones"):
+            return i
+    raise AssertionError("no Integrations tab")
 
 
 def test_site_tab_widgets(qapp):
@@ -92,11 +108,12 @@ def test_chart_annotations_group_on_the_site_tab(qapp):
     names = set(_tab_widgets(dlg, 0))
     for w in ["grp_chartann", "edt_observer", "edt_measurer",
               "edt_telescope", "edt_camera_model", "cmb_marker_style",
-              "chk_chart_boxes"]:
+              "chk_chart_boxes", "chk_annot_visible", "cmb_mark_color"]:
         assert w in names, f"{w} expected on the Site & equipment tab"
     # every field keeps its help-below label (the dialog's layout rule)
     for w in ["lblH_observer", "lblH_measurer", "lblH_teldesc",
-              "lblH_cammodel", "lblH_marker_style", "lblH_chart_boxes"]:
+              "lblH_cammodel", "lblH_marker_style", "lblH_chart_boxes",
+              "lblH_mark_color"]:
         assert w in names, f"{w} expected on the Site & equipment tab"
     dlg.deleteLater()
 
@@ -140,7 +157,7 @@ def test_kinds_grid_includes_hads(qapp):
 
 def test_integrations_tab_widgets(qapp):
     dlg = _dlg()
-    names = set(_tab_widgets(dlg, 2))
+    names = set(_tab_widgets(dlg, _integrations_index(dlg)))
     for w in ["edt_neofixer_key", "edt_astrometry_key",
               "edt_tns_bot", "edt_tns_bot_key"]:
         assert w in names, f"{w} expected on the Integrations tab"
@@ -200,10 +217,10 @@ def _is_descendant(widget, ancestor):
 
 
 def test_integrations_tab_contains_ccdciel(qapp):
-    # CCDciel widgets (ADR-030) now live inside the Integrations tab
-    # (tab index 2), not on their own tab
+    # CCDciel widgets (ADR-030) live inside the Integrations tab, not on
+    # their own tab (found by name: the tab list grows)
     dlg = _dlg()
-    names = set(_tab_widgets(dlg, 2))
+    names = set(_tab_widgets(dlg, _integrations_index(dlg)))
     for w in ["edt_ccdciel_host", "spn_ccdciel_port", "chk_ccdciel_auto"]:
         assert w in names, f"{w} expected on the Integrations tab"
     dlg.deleteLater()
@@ -214,3 +231,44 @@ def _dlg():
     # @return: a loaded settings dialog (caller deletes it)
     from nightscribe.gui.main_window import _load_ui
     return _load_ui("settings_dialog")
+
+
+def test_the_astrometry_settings_are_editable_at_last(qapp):
+    # Asked for 2026-10-06: "¿dónde puedo ajustar la SNR para el MPC?".
+    # Answer then: nowhere in the interface. These settings lived only in the
+    # config file while the report's own message promised "Settings →
+    # Astrometry". The tab is here now, with the fields and the explanation,
+    # and on_open_settings maps every one of them to its key (the dialog is
+    # modal, so the source is what pins the wiring, the house's own pattern:
+    # see test_settings_storage.py).
+    import inspect
+    import nightscribe.gui.main_window as mw
+    dlg = _dlg()
+    names = _tab_names(dlg)
+    assert "Astrometry" in names or "Astrometría" in names
+    fields = {
+        "spn_astro_gate": "astrometry_snr_sigma",
+        "spn_astro_floor": "astrometry_submit_snr",
+        "spn_astro_sweep_pct": "astrometry_sweep_pct",
+        "spn_astro_steps": "astrometry_sweep_steps",
+        "spn_astro_margin": "astrometry_cutout_margin_px",
+        "chk_astro_check": "astrometry_check_enabled",
+        "spn_astro_check_sigma": "astrometry_check_sigma",
+        "spn_astro_check_floor": "astrometry_check_floor_arcsec",
+        "spn_astro_check_window": "astrometry_check_window_days",
+        "spn_astro_threads": "astrometry_threads",
+    }
+    widgets = set(_tab_widgets(dlg, names.index("Astrometry")
+                               if "Astrometry" in names
+                               else names.index("Astrometría")))
+    for widget, key in fields.items():
+        assert widget in widgets, widget
+        assert hasattr(dlg, widget), widget
+    src = inspect.getsource(mw.MainWindow.on_open_settings)
+    for widget, key in fields.items():
+        assert widget in src, f"on_open_settings must read {widget}"
+        assert key in src, f"on_open_settings must map {key}"
+    # the help of the floor says what the MPC recommends and what the app
+    # ships: it is the whole reason the tab exists
+    help_text = dlg.lblH_astro_floor.text()
+    assert "recommends 20" in help_text and "ships 10" in help_text

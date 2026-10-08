@@ -118,8 +118,11 @@ def _draw(p, kind, color, size=_BASE):
         p.drawPath(wave)
 
 
-def kind_glyph_pixmap(kind, size=28):
-    # @args: kind - object kind id ("neo", "sn", ...), size - edge in px
+def kind_glyph_pixmap(kind, size=28, color=None):
+    # @args: kind - object kind id ("neo", "sn", ...), size - edge in px,
+    #        color - a hex string for the glyph, or None for the kind's own
+    #        hue. The hero button draws it ON a surface of that same hue, so
+    #        there the glyph has to wear the button's text colour instead.
     # @return: a QPixmap with the kind's glyph on a transparent
     #          background; an unknown kind paints an empty pixmap (the
     #          caller decides whether a missing glyph matters)
@@ -129,7 +132,8 @@ def kind_glyph_pixmap(kind, size=28):
     p.setRenderHint(QPainter.Antialiasing)
     if size != int(_BASE):
         p.scale(size / _BASE, size / _BASE)
-    color = QColor(theme.KIND_COLORS.get(kind, "#888888"))
-    _draw(p, kind, color)
+    paint = QColor(color) if color else QColor(
+        theme.KIND_COLORS.get(kind, "#888888"))
+    _draw(p, kind, paint)
     p.end()
     return pix

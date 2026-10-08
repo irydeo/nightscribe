@@ -33,8 +33,6 @@ def make_window(monkeypatch):
     monkeypatch.setattr(config, "is_configured", lambda: False)
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     yield w
     w.close()
 

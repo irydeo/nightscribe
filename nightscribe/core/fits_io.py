@@ -185,3 +185,65 @@ def read_header(source):
     if header is None:
         raise FitsError("Empty FITS file")
     return header
+
+
+def read_sample(path, max_px=160):
+    # Reads a SMALL version of the first image HDU, without reading it all.
+    #
+    # A visit is hundreds of frames and each one is 8-16 MB: reading them
+    # whole to draw a 140 px thumbnail is gigabytes of disk for nothing.
+    # This walks the file and reads ONE row out of every `step`, keeping one
+    # column out of every `step` of it (a seek per sampled row). Measured on
+    # a 2048x2048 float32 frame with max_px=160: ~1 MB read instead of the
+    # 16 MB the whole frame costs, and the same BSCALE/BZERO/BLANK handling
+    # as read_fits, so the numbers a thumbnail shows are the frame's own.
+    #
+    # @args: path - FITS file path, max_px - the longest side of the sample
+    # @return: (header dict, 2D float32 numpy array). Raises FitsError on a
+    #          file that cannot be read at all (the caller marks it broken).
+    try:
+        with open(path, "rb") as fh:
+            while True:
+                header = _read_header(fh)
+                if header is None:
+                    raise FitsError("No image HDU found in the file")
+                if int(header.get("NAXIS", 0)) >= 2 \
+                        and int(header.get("NAXIS1", 0)) > 0 \
+                        and int(header.get("NAXIS2", 0)) > 0:
+                    return header, _sample_data(fh, header, max_px)
+                _skip_data(fh, header)
+    except OSError as err:
+        raise FitsError(f"Cannot read FITS file: {err}") from err
+
+
+def _sample_data(fh, header, max_px):
+    # @args: fh - positioned right after the header, header - header dict,
+    #        max_px - the longest side of the sample
+    # @return: the sampled 2D float32 array
+    bitpix = int(header.get("BITPIX", 8))
+    if bitpix not in _DTYPES:
+        raise FitsError(f"Unsupported BITPIX {bitpix}")
+    dtype = np.dtype(_DTYPES[bitpix])
+    naxis1 = int(header.get("NAXIS1", 0))
+    naxis2 = int(header.get("NAXIS2", 0))
+    step = max(1, int(np.ceil(max(naxis1, naxis2) / max(1, int(max_px)))))
+    start = fh.tell()
+    rows = []
+    row_bytes = naxis1 * dtype.itemsize
+    for y in range(0, naxis2, step):
+        fh.seek(start + y * row_bytes)
+        raw = fh.read(row_bytes)
+        if len(raw) < row_bytes:
+            break                     # a truncated frame: sample what there is
+        rows.append(np.frombuffer(raw, dtype=dtype)[::step])
+    if not rows:
+        raise FitsError("Truncated FITS data block")
+    data = np.vstack(rows).astype(np.float32, copy=False)
+    # the same physical-value handling as read_fits, applied to the sample
+    if bitpix > 0 and "BLANK" in header:
+        data = np.where(data == int(header["BLANK"]), np.nan, data)
+    bscale = float(header.get("BSCALE", 1.0))
+    bzero = float(header.get("BZERO", 0.0))
+    if bscale != 1.0 or bzero != 0.0:
+        data = data * bscale + bzero
+    return np.ascontiguousarray(data, dtype=np.float32)

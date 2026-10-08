@@ -18,6 +18,7 @@
    </item>
    <item><widget class="QCheckBox" name="chk_sigmaclip"><property name="text"><string>Sigma-clip the sky</string></property><property name="toolTip"><string>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</string></property><property name="checked"><bool>true</bool></property></widget></item>
    <item><widget class="QCheckBox" name="chk_seeing"><property name="text"><string>Aperture follows the seeing</string></property><property name="toolTip"><string>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</string></property><property name="checked"><bool>true</bool></property></widget></item>
+   
    <item>
     <layout class="QHBoxLayout" name="row_color">
      <item><widget class="QCheckBox" name="chk_color"><property name="text"><string>Colour term</string></property><property name="toolTip"><string>Fit the zero point AND its slope against the comps' B−V (H1); needs at least 6 comps with colour spread</string></property><property name="checked"><bool>true</bool></property></widget></item>

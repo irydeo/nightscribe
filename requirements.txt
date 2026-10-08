@@ -7,3 +7,6 @@ numpy>=1.26
 platformdirs>=4.0
 Pillow>=10.0
 imageio-ffmpeg>=0.5
+astropy>=6.0
+scipy>=1.11
+photutils>=1.10

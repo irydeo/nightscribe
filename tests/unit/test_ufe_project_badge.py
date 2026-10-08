@@ -83,7 +83,13 @@ def test_the_workbench_shows_the_project_in_its_bar():
     d.set_project_badge(_PAYLOAD)
     QApplication.processEvents()
     assert d.badge.isVisible()
-    assert d.badge.lbl_name.text() == "V0526 Per"
+    # The badge carries the project's name; whether it is ELIDED is the bar's
+    # business and depends on the font (the Windows one is wider, so even a
+    # short name elides there). What must hold is that the badge is fed and
+    # not collapsed, and that the whole name is one hover away (the
+    # whole-name-when-there-is-room case is its own test below).
+    assert d.badge.lbl_name.text() != "…"
+    assert "V0526 Per" in d.badge.toolTip()
     # it lives at the RIGHT end of the bar, after the trailing spacer
     bar = d._ui.topbar
     assert bar.itemAt(bar.count() - 1).widget() is d._ui.ph_badge or \
@@ -92,6 +98,86 @@ def test_the_workbench_shows_the_project_in_its_bar():
     d.set_project_badge(None)
     assert not d.badge.isVisible()
     d.close()
+
+
+_LONG = {
+    "kind_label": "Variable", "kind_color": "#46a758",
+    "name": "C/2025 A1 (ATLAS)",
+    "next_text": "Measure tonight — 12 d since the last visit",
+}
+
+
+def test_the_badge_elides_what_does_not_fit():
+    # Reported from a real session: on a tight bar the two labels ran over
+    # each other. What does not fit is elided and the full words stay one
+    # hover away, in the tooltip. It has to go through the BAR: that is the
+    # layout that squeezes the pill, and the badge elides on the resize it
+    # gets from it.
+    _app()
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(880, 700)
+    d.show()
+    d.set_project_badge(_LONG)
+    QApplication.processEvents()
+    assert d.badge.lbl_next.text().endswith("…")
+    assert "C/2025 A1 (ATLAS)" in d.badge.toolTip()
+    assert "12 d since the last visit" in d.badge.toolTip()
+    d.close()
+
+
+def test_the_badge_asks_for_the_full_width_even_when_it_elides():
+    # The elided (shorter) text must NOT shrink the hint: the bar would
+    # shrink the pill again and it would collapse to "…" in two passes.
+    _app()
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1600, 700)
+    d.show()
+    d.set_project_badge(_LONG)
+    QApplication.processEvents()
+    full = d.badge.sizeHint().width()
+    d.resize(880, 700)
+    QApplication.processEvents()
+    assert d.badge.width() < full            # the bar did squeeze it
+    assert d.badge.sizeHint().width() == full
+    d.close()
+
+
+def test_the_badge_keeps_the_whole_thing_when_there_is_room():
+    _app()
+    from nightscribe.gui.widgets.ufe_project_badge import UfeProjectBadge
+    badge = UfeProjectBadge()
+    badge.set_badge(_LONG)
+    badge.resize(badge.sizeHint().width(), 24)
+    badge.show()
+    QApplication.processEvents()
+    assert badge.lbl_name.text() == "C/2025 A1 (ATLAS)"
+    assert badge.lbl_next.text() == _LONG["next_text"]
+    badge.deleteLater()
+
+
+def test_the_two_labels_never_overlap_in_a_tight_bar():
+    # The end-to-end version of the report: whatever the window width, the
+    # name and the next action are two boxes that never run into each other,
+    # and the pill always says SOMETHING (the whole identity is in the
+    # tooltip). How much of the name survives is font-driven (the Windows
+    # font squeezes the pill earlier): the "kept whole when there is room"
+    # and "elided when there is not" cases have their own tests.
+    _app()
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    for width in (1400, 1100, 1000, 950, 900, 860):
+        d = UfeDialog()
+        d.resize(width, 700)
+        d.show()
+        d.set_project_badge(_LONG)
+        QApplication.processEvents()
+        name = d.badge.lbl_name.geometry()
+        nxt = d.badge.lbl_next.geometry()
+        assert name.right() <= nxt.x(), f"overlap at {width}"
+        assert d.badge.lbl_name.text() != "", f"empty at {width}"
+        assert "C/2025 A1 (ATLAS)" in d.badge.toolTip()
+        d.close()
 
 
 def test_the_next_action_can_stay_out():

@@ -277,6 +277,82 @@ def cmd_gui(args):
     return app.run()
 
 
+def cmd_inject(args):
+    # Injection and recovery: the only honest way to say how faint the
+    # pipeline reaches with THIS night's frames.
+    # @args: args - the parsed CLI arguments
+    # @return: exit code
+    # It puts a source of a known flux, at a known place, moving at a known
+    # rate, into COPIES of the frames (the originals are only ever read) and
+    # runs the real chain on them. What comes out is a completeness curve:
+    # for each flux, how many injections came back, with what
+    # signal-to-noise and with what position error.
+    #
+    # The magnitude in the table is an EQUIVALENCE, not a measurement: it
+    # uses the flux of the reference comparison star when the observer has
+    # one in the notes, and says so. What is measured is the flux, the
+    # detection and the position.
+    import glob
+    import numpy as np
+
+    from .core import exposure, injection
+    from .config import config
+
+    paths = sorted(glob.glob(str(Path(args.carpeta) / "*.fit*")))
+    if not paths:
+        print("no frames found in", args.carpeta)
+        return 1
+    paths = paths[:max(1, int(args.tomas))]
+    fluxes = [float(x) for x in str(args.flujos).split(",") if x.strip()]
+    # The reference WCS: the frames carry the mount's pointing in CRVAL and
+    # the observer's plate scale lives in the settings, so a TAN WCS with
+    # that scale is enough for the instrument (the injected motion is in
+    # PIXELS; the sky is only how the chain speaks).
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    from .core import calibration
+    header = calibration.read_header(paths[0])
+    nx = int(header.get("NAXIS1", 0))
+    ny = int(header.get("NAXIS2", 0))
+    scale = exposure.plate_scale(config.get("pixel_um"),
+                                 config.get("focal_mm"),
+                                 config.get("pixel_binning")) or 2.0
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [float(header.get("CRVAL1", 0.0)),
+                   float(header.get("CRVAL2", 0.0))]
+    w.wcs.crpix = [nx / 2.0 + 0.5, ny / 2.0 + 0.5]
+    w.wcs.cd = [[-scale / 3600.0, 0.0], [0.0, scale / 3600.0]]
+    w.pixel_shape = (nx, ny)
+
+    print(f"{len(paths)} frames from {args.carpeta}")
+    print(f"injected motion: {args.movimiento} px per frame at PA {args.pa} deg")
+    print(f"plate scale used: {scale:.2f} arcsec/px")
+    rows = injection.completeness(
+        paths, fluxes, w, trials=max(1, int(args.intentos)),
+        out_root=args.salida)
+    print(f"{'flux ADU':>10} {'rate':>7} {'SNR':>7} {'err px':>8} "
+          f"{'d mag':>8} {'d mag mf':>9}")
+    for row in rows:
+        snr = row["snr_median"]
+        err = row["err_px_median"]
+        # The brightness error is the RATIO of the measured flux to the
+        # injected one, in magnitudes: the zero point cancels, so it needs no
+        # catalogue and it says whether the pipeline biases the brightness
+        # (a systematic) or only scatters it (a random error). The second
+        # column is the same with the matched filter, which is what decides
+        # whether it is worth reporting the brightness that way.
+        d_mag = row.get("err_mag_median")
+        d_mf = row.get("err_mag_mf_median")
+        print(f"{row['flux']:10.0f} "
+              f"{row['detected']}/{row['trials']:>5} "
+              f"{(f'{snr:.1f}' if snr is not None else '-'):>7} "
+              f"{(f'{err:.2f}' if err is not None else '-'):>8} "
+              f"{(f'{d_mag:+.3f}' if d_mag is not None else '-'):>8} "
+              f"{(f'{d_mf:+.3f}' if d_mf is not None else '-'):>9}")
+    return 0
+
+
 def _resolve_target(name):
     # @args: name - object name (variable, star)
     # @return: (ra_deg, dec_deg, vsx_dict_or_None) or None when unknown
@@ -556,6 +632,24 @@ def main(argv=None):
                    help="sin imagen de fondo (solo anotaciones)")
     p.add_argument("--salida", help="directorio de salida")
     p.set_defaults(func=cmd_sequence)
+
+    p = sub.add_parser(
+        "inject",
+        help="inyección y recuperación: hasta dónde llega el pipeline")
+    p.add_argument("carpeta", help="carpeta con las tomas (no se tocan)")
+    p.add_argument("--flujos", default="2000,5000,12000",
+                   help="flujos a probar, en ADU sobre el cielo (coma)")
+    p.add_argument("--tomas", type=int, default=30,
+                   help="cuántas tomas usar (las primeras)")
+    p.add_argument("--movimiento", type=float, default=1.5,
+                   help="movimiento del objeto inyectado, px por toma")
+    p.add_argument("--pa", type=float, default=90.0,
+                   help="ángulo de posición del movimiento, grados")
+    p.add_argument("--intentos", type=int, default=1,
+                   help="inyecciones independientes por flujo")
+    p.add_argument("--salida", default=None,
+                   help="carpeta para las copias inyectadas")
+    p.set_defaults(func=cmd_inject)
 
     p = sub.add_parser("gui", help="aplicación de escritorio")
     p.set_defaults(func=cmd_gui)

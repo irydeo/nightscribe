@@ -103,6 +103,77 @@ DEFAULTS = {
     "ccd_read_noise": None,     # e-
     "ccd_saturate": None,       # ADU ceiling
     "flat_resid_mag": 0.007,    # flat-field residual floor in the error
+    # Image calibration (ADR-061): where the master frames live, how far
+    # the sensor temperature may drift and still accept a dark (+/-3 C by
+    # default), and whether the calibrated frames are written to disk (off
+    # by default: the stacking consumes them in memory).
+    "calib_root": "",           # empty -> the data dir's calib/ folder
+    "calib_temp_tol_c": 3.0,
+    "calib_export": False,
+    # P5: build a flat from the frames themselves for the filters the master
+    # library has no flat for. Off by default: a real flat always wins, and
+    # a pseudo-flat needs the sequence to be dithered.
+    "calib_pseudo_flat": False,
+    # The photometry METHOD a new plate starts with: the matched filter
+    # (weigh each pixel by the star's shape) or the plain aperture. It is a
+    # measured decision, not a taste (1.6x the signal-to-noise and no
+    # faint-star bias against a real catalogue), so it starts ON. This key is
+    # only the STARTING point: the recipe saved with a plate always wins, and
+    # the switch the observer touches lives in the Photometry tab, beside the
+    # measurement, with the numbers and the risks in its tooltip.
+    "phot_matched": True,
+    # The astrometry's own switch for ADR-061: calibrate the frames as they
+    # are read (dark/bias and flat) before stacking them. THREE-STATE on
+    # purpose (ADR-061 rev): None means nobody has chosen yet, and then the
+    # library decides (on when it has a dark or a flat that matches the
+    # visit, off when it has none); 0 and 1 are the observer's own word and
+    # are never overridden.
+    "calib_astrometry": None,
+    # Track & stack (ADR-062): the detection gate and the submission bar
+    # are DIFFERENT thresholds on purpose. The MPC recommends SNR >= 20 to
+    # submit and forbids marginal detections, but that is a recommendation:
+    # the author's Tycho submissions of 2025 UR ran at ~16 and were
+    # accepted, so the default is 10 (editable) and the interface says how
+    # far each observation is from the bar. The sweep walks a 5x5 grid
+    # around the theoretical velocity, and the cutout carries a margin
+    # over the object's own trail.
+    "astrometry_snr_sigma": 3.5,
+    "astrometry_submit_snr": 10.0,
+    "astrometry_sweep_pct": 5.0,
+    "astrometry_sweep_steps": 25,
+    "astrometry_method": "sigma",
+    # The warp's interpolation order (2026-10-07): 1 is the bilinear and the
+    # default, because it makes the stack visibly cleaner at NO cost in depth
+    # (measured on 2025 FG18: orders 1 and 3 tie at magnitude 18.20 against
+    # 18.21 by injection and recovery, while the pixel noise differs by 29 %).
+    # It is a knob for the eye, not for the limit. 3 or 5 give a sharper point
+    # spread and a grainier image.
+    "astrometry_warp_order": 1,
+    "astrometry_cutout_margin_px": 64,
+    # Extra margin added to the cutout when the ephemeris had to be
+    # propagated LOCALLY (Horizons down): two-body and a coarse Earth can
+    # put a close NEO a couple of arcminutes off, and the cutout has to
+    # still contain it. The reported position is unaffected.
+    "astrometry_fallback_margin_px": 300,
+    "astrometry_full_frame_final": True,
+    # Worker threads for the CPU-bound stages (register, warp, combine): 0 is
+    # AUTOMATIC, computed from the cores the process may use and capped by the
+    # memory one task needs (core/parallel.py). A positive value caps it by
+    # hand for a machine that is busy with something else.
+    "astrometry_threads": 0,
+    "astrometry_disagree_arcsec": 0.5,
+    "astrometry_disagree_sigma": 3.0,
+    "astrometry_astcat": "Gaia2",
+    # The check against other observers (ADR-062): Find_Orb is an external
+    # tool the user installs (never bundled); the residual is normalised by
+    # our own rms and the robust scatter of the others inside a window.
+    "findorb_path": "",
+    "findorb_run": False,
+    "astrometry_check_enabled": True,
+    "astrometry_check_sigma": 3.0,
+    "astrometry_check_floor_arcsec": 1.0,
+    "astrometry_check_window_days": 30,
+    "mpc_obs_ttl_h": 6,
     # Camera profile (core/cameras.py presets): the sensor template and the
     # photometric limits the preset fills (all editable; the linearity and
     # the working max exposure are per gain and must be measured/set by the
@@ -114,15 +185,19 @@ DEFAULTS = {
     "cam_dark_temp_c": None,
     "cam_max_exposure_s": None,     # working max exposure (per gain)
     "cam_regime": "normal",
-    # UFE (ADR-044): open Blink / comparison chart / annotated FITS in the
-    # unified editor by default; the classic dialogs stay reachable for
-    # the review period (Settings → Development)
-    "ufe_default": True,
+    # UFE (ADR-044): the unified editor is the only door to the FITS work
+    # (Blink, comparison chart, annotated FITS). The switch that chose
+    # between it and the classic dialogs retired with them (2026-10-07);
+    # the top bar's look is the only UFE preference left.
+    "ufe_bar_icons": True,
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.
     "ufe_bar_icons": True,
-    "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
+    # CCD | CMOS | DSLR. Two consumers: the EXOTIC inits.json handoff (its
+    # guide has CMOS entered as "CCD" plus a note) and the MPC report, whose
+    # ADES "mode" is CCD or CMO and whose 80-column column 15 is "C"/"B".
+    "camera_type": "CCD",
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none
     # Chart annotations (ADR-046): the identity stamped in the corner
@@ -133,6 +208,15 @@ DEFAULTS = {
     "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
     "camera_model": "",
     "marker_style": "ring",   # ring | cross (the object marker)
+    # The object's marks in the editor: the full-frame crosshair (the object
+    # mark), the cross the run measured with and the circle with the name.
+    # `annot_visible` is whether that circle shows when a plate opens (the
+    # editor's "A" toggle, live); `marker_color` is the colour of all three:
+    # "kind" = the object type's own colour (theme.KIND_COLORS), "common" =
+    # one colour for every mark (theme.C_OBJECT_MARK). ONE resolver reads it
+    # (theme.mark_color), so the three cannot disagree.
+    "annot_visible": False,
+    "marker_color": "kind",
     "chart_boxes": False,     # metadata corner boxes on the OTHER charts
                               # (the blink GIF/MP4 and the finder chart);
                               # the UFE's plate band is chart_data

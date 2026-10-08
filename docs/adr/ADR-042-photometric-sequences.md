@@ -150,3 +150,13 @@ coordinates; nobody types RA/Dec).
 - Attribution: field building and cross-match algorithms ported from SecFot
   (González Farfán & González Carballo 2026); polynomials from Riello et
   al. 2021. Each catalog's source note travels with the exports.
+
+**Nota (2026-10-06)**: la elección de comparsas y la medida que las usa obedecen
+la regla de la casa de **ADR-066**: ninguna candidata saturada ni por encima de
+la linealidad de la cámara llega a una secuencia ni a un cero punto, y los dos
+techos salen de un solo sitio (`photometry.star_ceilings`).
+
+**Note (2026-10-06)**: the choice of comparisons and the measurement that uses
+them obey the house rule of **ADR-066**: no candidate that is saturated or above
+the camera's linearity reaches a sequence or a zero point, and the two ceilings
+come from one home (`photometry.star_ceilings`).

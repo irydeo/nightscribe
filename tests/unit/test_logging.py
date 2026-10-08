@@ -99,8 +99,6 @@ def test_the_help_menu_can_open_the_log(log_dir, monkeypatch):
     config.is_configured = lambda: False
     w = MainWindow()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     try:
         from nightscribe import paths
         assert w._menus.action_log.text()          # the menu entry exists

@@ -43,7 +43,7 @@ from dataclasses import dataclass, field, replace
 
 import numpy as np
 
-from . import fits_io, fits_meta, photometry, variables
+from . import fits_io, fits_meta, outliers, photometry, variables
 
 logger = logging.getLogger(__name__)
 
@@ -121,6 +121,10 @@ class SeriesConfig:
     host_ref: object = None         # reserved (host subtraction, phase 3+)
     radii: tuple = None             # (rap, rin, rout) or None for defaults
     sigmaclip: bool = True
+    # the measurement itself: the matched filter is the app's DEFAULT (a
+    # measured decision, see PlateConfig), and a series can pin the aperture
+    # when it wants to reproduce the historical curve
+    matched: bool = True
     sky_mode: str = "median"
     color: bool = False
     target_bv: float = 0.0
@@ -314,7 +318,7 @@ def _combine_fluxes(fluxes, errs, k=_GROUP_SIGMA):
     mad = float(np.median(np.abs(arr - med)))
     kept, rejected = [], []
     for i, f, e in pairs:
-        if mad > 0.0 and abs(f - med) > k * 1.4826 * mad:
+        if mad > 0.0 and abs(f - med) > k * outliers.MAD_TO_SIGMA * mad:
             rejected.append(i)
         else:
             kept.append((i, f, e))
@@ -348,7 +352,7 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA, names=None):
     # the veto's scale has a floor: without it a synthetic (or a very
     # quiet) ensemble scatter of a few micro-magnitudes turns the veto
     # into a lottery and drops good comps at random
-    scale = max(1.4826 * mad, _MAD_FLOOR)
+    scale = max(outliers.MAD_TO_SIGMA * mad, _MAD_FLOOR)
     kept = [p for p in pairs if abs(p[0] - med) <= k * scale]
     rejected = len(pairs) - len(kept)
     if not kept:
@@ -361,9 +365,7 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA, names=None):
     n_kept = len(kept)
     if n_kept > 0:
         arr_kept = np.asarray([r for r, _e, _i in kept], dtype=np.float64)
-        med_kept = float(np.median(arr_kept))
-        mad_kept = float(np.median(np.abs(arr_kept - med_kept)))
-        scatter_err = 1.4826 * mad_kept / math.sqrt(n_kept)
+        scatter_err = outliers.median_error(arr_kept)
     else:
         scatter_err = None
     if formal_err is None:
@@ -460,8 +462,7 @@ def _sky_sigma(data, x, y, r_ap):
         return None
     diffs = np.concatenate([np.diff(sub, axis=1).ravel(),
                             np.diff(sub, axis=0).ravel()])
-    return 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    return float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
 
 
 def _cosmic_hit(data, x, y, r_ap, sky_pp, sigma_sky, k):
@@ -534,15 +535,23 @@ def _frame_fwhm(data, res):
     return photometry.estimate_fwhm(data, spots)
 
 
-def _frame_spots(cfg, wcs_ov=None, targets_ov=None):
-    # The targets and the comps on the frame about to be measured: what the
-    # seeing (and the centroid) is measured on.
-    # @args: targets_ov - the targets on THIS frame's grid, as
-    #        ((label, x, y, bv), ...); None means the one in cfg.target_xy
+def _frame_spots(cfg, wcs_ov=None):
+    # The comparison stars of the frame about to be measured: what the
+    # FRAME'S SEEING is measured on.
+    #
+    # The comps and NOT the targets, and that is not a detail: they are shared
+    # by every target of a pass by definition, so the seeing does not depend on
+    # how many objects the pass carries. Measuring it on the targets too broke
+    # the pass parity (a pass of two objects gave a different curve from the
+    # same object measured alone, because the median of a longer list of stars
+    # is a different number), and a saving paid in science is not a saving.
+    #
+    # Without comps there is no shared set and the frame keeps no seeing: the
+    # centroid then estimates it per star, which is what it always did.
+    # @args: cfg - SeriesConfig, wcs_ov - the frame's own WCS when it is being
+    #        measured on its native grid (registration), None otherwise
     # @return: [(x, y), ...]
-    spots = [(float(t[1]), float(t[2])) for t in (targets_ov or ())]
-    if not spots:
-        spots = [cfg.target_xy]
+    spots = []
     w = wcs_ov if wcs_ov is not None else cfg.wcs
     if w is not None:
         for e in cfg.comp_set:
@@ -581,10 +590,20 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         base = apertures[night].get("radii")
     if base is None:
         base = cfg.radii
-    fwhm = None
-    if cfg.seeing_aperture:
-        fwhm = photometry.estimate_fwhm(
-            data, _frame_spots(cfg, wcs_ov, targets_ov))
+    # THE FRAME'S OWN SEEING, measured ONCE for the whole frame.
+    #
+    # It used to be measured only when the aperture had to follow the seeing,
+    # and the centroid then estimated it PER STAR from a single cutout: on the
+    # real 2025 FG18 visit that gave 3.2 to 11.0 px where the session was
+    # 4.64, and it moved the centroid by up to 0.28 px (measured). Every star
+    # of a frame shares one atmosphere, so the recipe takes the frame's value:
+    # one measurement per frame instead of one per star, and a template that
+    # does not depend on how faint the star it is fitting happens to be.
+    #
+    # It is measured on the COMPS (see _frame_spots), which is what makes it
+    # the same number in a pass and in a solo run.
+    spots = _frame_spots(cfg, wcs_ov)
+    fwhm = photometry.estimate_fwhm(data, spots) if spots else None
     radii = base
     seen_scale = None
     if cfg.seeing_aperture and fwhm and fwhm_ref:
@@ -604,6 +623,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         band=cfg.band,
         fallback_band=cfg.fallback_band, radii=radii,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
+        matched=bool(getattr(cfg, "matched", True)),
         color=cfg.color, target_bv=cfg.target_bv,
         site_gain=cfg.site_gain, site_ron=cfg.site_ron,
         site_flat=cfg.site_flat, site_saturate=cfg.site_saturate,
@@ -1039,7 +1059,8 @@ def _flag_clouds(points, cfg):
         return
     for p in points:
         if p.zp is not None \
-                and abs(p.zp - med) > cfg.zp_outlier_sigma * 1.4826 * mad:
+                and abs(p.zp - med) > cfg.zp_outlier_sigma \
+                * outliers.MAD_TO_SIGMA * mad:
             if "seeing" in p.flags:
                 continue
             _add_flag(p, "cloud")
@@ -1073,7 +1094,8 @@ def _flag_seeing(points):
         # not news, a 1.5× step is.
         limit = med * _SEEING_FLAG_MIN
         if mad > 0.0:
-            limit = min(limit, med + _SEEING_FLAG_K * 1.4826 * mad)
+            limit = min(limit, med + _SEEING_FLAG_K * outliers.MAD_TO_SIGMA
+                        * mad)
         for i in ids:
             if points[i].fwhm > limit:
                 _add_flag(points[i], "seeing")
@@ -1129,7 +1151,7 @@ def _robust_std(values):
     if len(vals) < 2:
         return None
     arr = np.asarray(vals, dtype=np.float64)
-    return float(1.4826 * np.median(np.abs(arr - np.median(arr))))
+    return float(outliers.scaled_mad(arr))
 
 
 def _wls(y, cols, w):
@@ -1182,7 +1204,7 @@ def _fit_night(x, y, w, extra=None, sigma_clip=3.0):
     resid = y - yhat
     mad = float(np.median(np.abs(resid - np.median(resid))))
     if mad > 0.0:
-        keep = np.abs(resid) <= sigma_clip * 1.4826 * mad
+        keep = np.abs(resid) <= sigma_clip * outliers.MAD_TO_SIGMA * mad
         if max(3, len(y) // 2) <= int(keep.sum()) < len(y):
             cols, names = _columns(x[keep], a2, None if extra is None else
                                    {k: np.asarray(v)[keep]
@@ -1317,11 +1339,20 @@ def sweep_aperture(paths, cfg, ks=None):
             continue
         night = _night_of(fits_meta.meta_from_header(header).get("mjd"))
         fwhm = photometry.estimate_fwhm(data, positions)
+        # THE CEILINGS, from their one home (ADR-066): a star at or above the
+        # detector's saturation or the camera's linearity is NEVER used, and
+        # this path (tuning the aperture on the check star) used to measure
+        # without them, so a clipped star could tune the aperture that the
+        # whole night would then use.
+        sat_adu, lin_adu = photometry.star_ceilings(
+            header, None, linear_adu=cfg.site_linear,
+            saturate=cfg.site_saturate)
         slots = by_night.setdefault(night, {k: ([], []) for k in ks})
         for k in ks:
             r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm, k=k)
             r = photometry.measure_point(data, cx, cy, r_ap=r_ap,
-                                         r_ann_in=r_in, r_ann_out=r_out)
+                                         r_ann_in=r_in, r_ann_out=r_out,
+                                         sat_adu=sat_adu, linear_adu=lin_adu)
             if not r["ok"] or r["flux"] is None or r["flux"] <= 0:
                 continue
             mags, fwhms = slots[k]
@@ -2110,7 +2141,7 @@ def night_qc(points, zp_sigma=3.0):
         if mad > 0.0:
             for night, m in sorted(meds.items(),
                                    key=lambda kv: (kv[0] is None, kv[0])):
-                if abs(m - gm) > zp_sigma * 1.4826 * mad:
+                if abs(m - gm) > zp_sigma * outliers.MAD_TO_SIGMA * mad:
                     level = "warn"
                     msgs.append(_msg(
                         "la noche {} tiene el punto cero desplazado "

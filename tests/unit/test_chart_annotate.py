@@ -58,6 +58,23 @@ def test_format_exptime():
     assert ca.format_exptime(None) is None
 
 
+def test_format_exposure_says_how_many_frames_a_stack_combines():
+    # A stack is not "one 3 s frame": the N is the light it gathered, and a
+    # single frame keeps the bare exposure it always had.
+    assert ca.format_exposure(8, 3.0) == "8 × 3.0 s"
+    assert ca.format_exposure(1, 3.0) == "3.0 s"
+    assert ca.format_exposure(None, 3.0) == "3.0 s"
+    assert ca.format_exposure(8, None) is None
+
+
+def test_format_rate_and_pa_are_two_pieces():
+    # Two pieces on purpose: the band's renderer joins them with its own
+    # separator, so the rate and the PA get the same dot as every other
+    # datum instead of being glued into one run of text.
+    assert ca.format_rate(1.234) == "1.23″/min"
+    assert ca.format_pa(245.4) == "PA 245°"
+
+
 def test_format_pixel_scale_and_fov():
     assert ca.format_pixel_scale(1.0734) == "PSc: 1.07″/px"
     assert ca.format_fov((6.82, 6.78)) == "FOV: 6.8 × 6.8′"
@@ -191,7 +208,7 @@ def test_the_band_says_identity_then_context():
     assert _roles(first) == [
         ("V0526 Per", ca.ROLE_NAME),
         ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
-        ("12.34 ± 0.04 (V)", ca.ROLE_MAG)]
+        ("12.34 ± 0.04 (V) (measured)", ca.ROLE_MAG)]
     assert _roles(second) == [
         ("2023-12-19 18:42 UT", ca.ROLE_CONTEXT),
         ("40.0 s", ca.ROLE_CONTEXT),
@@ -204,6 +221,37 @@ def test_the_band_says_identity_then_context():
     assert [s["field"] for s in second] == [
         "date", "exp", "filter", "equip", "stn", "psc", "fov"]
     assert [s["field"] for s in first] == ["name", "pos", "mag"]
+
+
+def test_the_band_shows_the_predicted_magnitude_when_nothing_was_measured():
+    # Asked for: when the run did not measure the brightness (a faint object,
+    # the box off) the plate must still say how bright the object should be,
+    # and it must say WHO says so: the ephemeris' prediction, not a
+    # measurement of this plate.
+    band = ca.build_band(
+        name="2026 PY9", meta=_META, wcs_info=_WCS,
+        predicted_mag={"mag": 22.21, "band": "V"}, catalog_mag=21.5)
+    first = band["lines"][0]
+    assert _roles(first) == [
+        ("2026 PY9", ca.ROLE_NAME),
+        ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
+        ("22.21 V (eph)", ca.ROLE_MAG_EPH)]
+    # a measurement of this plate always wins over the prediction
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         measured=_GOOD_MAG,
+                         predicted_mag={"mag": 22.21, "band": "V"})
+    assert _roles(band["lines"][0])[2] == ("12.34 ± 0.04 (V) (measured)",
+                                           ca.ROLE_MAG)
+    # without a prediction the catalogue's value is still there, labelled
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         catalog_mag=21.5)
+    assert _roles(band["lines"][0])[2] == ("21.50 cat", ca.ROLE_MAG_CAT)
+    # an "n.a." prediction (Horizons cannot compute it) is not a figure: the
+    # band falls through to the catalogue instead of printing "n.a."
+    band = ca.build_band(name="2026 PY9", meta=_META, wcs_info=_WCS,
+                         predicted_mag={"mag": None, "band": "V"},
+                         catalog_mag=21.5)
+    assert _roles(band["lines"][0])[2] == ("21.50 cat", ca.ROLE_MAG_CAT)
 
 
 def test_a_plate_without_a_solution_says_what_it_cannot_say():
@@ -242,6 +290,13 @@ def test_the_magnitude_wears_the_colour_its_numbers_deserve():
         ca.ROLE_MAG_DOUBT
     assert ca.magnitude_role({**_GOOD_MAG, "clipped": True}) == \
         ca.ROLE_MAG_DOUBT
+    # ADR-062 rev: below the detection gate the brightness is measured
+    # anyway, and it is RED whatever else it says: the object was never
+    # detected, so the number comes from the ephemeris' position
+    assert ca.magnitude_role({**_GOOD_MAG, "below_gate": True}) == \
+        ca.ROLE_MAG_DOUBT
+    assert ca.magnitude_role({**_GOOD_MAG, "flags": ["below_gate"]}) == \
+        ca.ROLE_MAG_DOUBT
 
     # the light ones, which cost one step and not the measurement
     assert ca.magnitude_role({**_GOOD_MAG, "comps": 3}) == ca.ROLE_MAG_FAIR
@@ -264,9 +319,11 @@ def test_the_magnitude_wears_the_colour_its_numbers_deserve():
 
 def test_the_drop_order_goes_from_the_least_to_the_most_needed():
     # The renderer walks this list: the field of view first, the date last
-    # (a chart without a date is not a chart), and never half a field.
+    # (a chart without a date is not a chart), and never half a field. On
+    # the identity line the motion goes first (it is the story, not who the
+    # plate is), then the magnitude, and the position is the last to go.
     assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "date")
-    assert ca.DROP_ORDER_NAME == ("mag", "pos")
+    assert ca.DROP_ORDER_NAME == ("motion", "mag", "pos")
 
 
 def test_the_equipment_comes_from_the_plate_not_from_my_settings():
@@ -298,3 +355,47 @@ def test_a_band_with_nothing_to_say_is_an_empty_identity_line():
     # the band entirely), and the context line is simply empty.
     band = ca.build_band()
     assert band["lines"] == [[], []]
+
+
+def test_the_band_shows_the_measured_motion_and_position():
+    # The asteroid's heading: the position MEASURED on this plate (not the
+    # catalogue's placed by the solution), the brightness, and the velocity
+    # sweep's own rate and PA, in the ink that says "measured here".
+    band = ca.build_band(
+        name="2025 UR", meta={**_META, "n_frames": 8}, wcs_info=_WCS,
+        measured=_GOOD_MAG, measured_pos=(49.99038, 49.86875),
+        motion={"rate_arcsec_min": 1.234, "pa_deg": 245.4, "measured": True})
+    first, second = band["lines"]
+    assert _roles(first) == [
+        ("2025 UR", ca.ROLE_NAME),
+        ("RA 03 19 57.7 · Dec +49 52 07.5", ca.ROLE_POS),
+        ("12.34 ± 0.04 (V) (measured)", ca.ROLE_MAG),
+        ("1.23″/min", ca.ROLE_MOTION),
+        ("PA 245° (measured)", ca.ROLE_MOTION)]
+    # the measured position is this plate's, so it never wears the (cat)
+    assert "(cat)" not in first[1]["text"]
+    # and what was measured says so, the same way a prediction says (eph):
+    # an unlabelled figure would be the only one to be guessed (asked for)
+    assert "(measured)" in first[2]["text"]
+    assert "(measured)" in first[4]["text"]
+    # the rate and the PA are two segments: the renderer puts its separator
+    # between them, the same dot as between the other data
+    assert [s["field"] for s in first] == \
+        ["name", "pos", "mag", "motion", "motion"]
+    # a stack says how many frames it combines, not just the exposure
+    assert ("8 × 40.0 s", ca.ROLE_CONTEXT) in _roles(second)
+
+
+def test_the_band_marks_a_motion_that_was_only_predicted():
+    # Without a sweep the ephemeris still gives a rate and a PA, but they
+    # are a prediction: the word (eph) and the dimmed colour say so, the
+    # same way a catalogue position says (cat). The marker rides the last
+    # segment, the PA.
+    band = ca.build_band(
+        name="2025 UR",
+        motion={"rate_arcsec_min": 30.6, "pa_deg": 90.0, "measured": False})
+    first = band["lines"][0]
+    assert _roles(first) == [
+        ("2025 UR", ca.ROLE_NAME),
+        ("30.60″/min", ca.ROLE_MOTION_EPH),
+        ("PA 90° (eph)", ca.ROLE_MOTION_EPH)]

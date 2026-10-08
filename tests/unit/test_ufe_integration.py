@@ -73,9 +73,21 @@ def window(qapp):
     w.close()
 
 
-def test_ufe_default_is_on():
+def test_the_unified_editor_is_the_only_door():
+    # The classic dialogs (blink, annotate, comparison chart) and the switch
+    # that chose between them and the editor retired on 2026-10-07 (ADR-044
+    # rev.): the modules are gone and the config key with them, so nothing
+    # can quietly open them again.
+    import importlib
     from nightscribe.config import DEFAULTS
-    assert DEFAULTS["ufe_default"] is True
+    assert "ufe_default" not in DEFAULTS
+    for mod in ("nightscribe.gui.sn_annotate_dialog",
+                "nightscribe.gui.seqchart_dialog"):
+        try:
+            importlib.import_module(mod)
+        except ModuleNotFoundError:
+            continue
+        raise AssertionError(f"{mod} is back")
 
 
 def test_settings_has_the_development_tab(qapp):
@@ -88,12 +100,12 @@ def test_settings_has_the_development_tab(qapp):
     f.close()
     titles = [d.tabWidget.tabText(i) for i in range(d.tabWidget.count())]
     assert "Development" in titles
-    assert d.chk_ufe_default is not None
-    assert "Image Workbench" in d.lblH_ufe.text()
+    assert d.chk_ufe_bar_icons is not None
+    assert "unified editor" in d.lblH_ufe.text()
     from nightscribe.gui import main_window as mw
     src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert 'chk_ufe_default.setChecked' in src
-    assert 'ufe_default' in src and 'chk_ufe_default.isChecked()' in src
+    assert 'chk_ufe_bar_icons.setChecked' in src
+    assert 'ufe_bar_icons' in src and 'chk_ufe_bar_icons.isChecked()' in src
 
 
 def test_open_plate_and_show_tab(dlg, qapp):
@@ -142,18 +154,21 @@ def test_save_hook_fires_and_clears(dlg):
     assert seen == ["fits"]
 
 
-def test_routing_blink_tools_menu(window, monkeypatch):
-    calls = []
-    monkeypatch.setattr(window, "_ufe_open",
-                        lambda tab, hook_pid=None: calls.append(
-                            ("ufe", tab)))
-    monkeypatch.setattr(window, "_open_blink_dialog",
-                        lambda *a, **k: calls.append(("legacy",)))
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
-    window._tools_blink()
-    monkeypatch.setattr(window, "_use_ufe", lambda: False)
-    window._tools_blink()
-    assert calls == [("ufe", "blink"), ("legacy",)]
+def test_blink_has_no_ad_hoc_entry_in_the_tools_menu(window, monkeypatch):
+    # Asked for 2026-10-06: "quita Blink (ad hoc) del menú Herramientas". With
+    # the unified editor on (the default) that entry opened the editor's own
+    # Blink window, which is already its own button in the workbench, so it
+    # was redundant. The menu entry, its action and its handler are gone; the
+    # classic dialog itself retired too (2026-10-07), so the editor is the
+    # only door.
+    assert not hasattr(window._menus, "action_blink")
+    assert not hasattr(window, "_tools_blink")
+    assert not hasattr(window, "_open_blink_dialog")
+    # and the workbench's Blink tool is the door
+    dlg = window._ufe_build()
+    assert dlg._tools["blink"].panel is dlg.tab_blink
+    dlg.show_tab("blink")
+    assert dlg._tools["blink"].isVisible()
 
 
 def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
@@ -180,7 +195,6 @@ def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
                         session_id=None: (
                             seen.append((tab, hook_pid, obj, session_id))
                             or _Dlg()))
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     import nightscribe.gui.main_window as _mw
     monkeypatch.setattr(_mw.project, "get",
                         lambda db_, pid: dict(window._current_project))
@@ -199,7 +213,6 @@ def test_routing_sequence_and_annotate(window, monkeypatch):
     monkeypatch.setattr(window, "_fu_sequence_via_ufe",
                         lambda pid: calls.append(("seq", pid)))
     monkeypatch.setattr(mw.project, "get", lambda db_, pid: None)
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     window._fu_sequence_dialog(7)
     assert calls == [("seq", 7)]
 
@@ -450,7 +463,6 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def activateWindow(self):
             pass
     monkeypatch.setattr(window, "_ufe_build", lambda: _Dlg())
-    monkeypatch.setattr(window, "_use_ufe", lambda: True)
     window._fu_sequence_dialog(3)
     assert seen and seen[0]["mag"] == 11.25
 
@@ -473,6 +485,9 @@ def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
                            "fov_arcmin": 30.0, "target_mag": 11.25})
     assert ctx[0]["mag"] == 11.25          # it lives in the project now
     assert ctx[0]["sequence"]["target_mag"] == 11.25
+    # and it says WHOSE figure it is: the observer's, not a prediction and not
+    # a measurement of ours (2026-10-07)
+    assert ctx[0]["mag_origin"] == "manual"
 
 
 def test_set_object_fills_everything(dlg):
@@ -559,13 +574,15 @@ def test_files_window_opens_ufe_for_a_project_plate(window):
         # (tests/unit/test_tonight_table.py does the same).
         fd.tbl.itemDoubleClicked.emit(fd.tbl.item(0, 0))
 
-        # The editor opened on the plate, Annotate tab, object attached.
-        # Interfaz 1.0: "opened" means the shell is on the workbench view.
+        # The editor opened on the plate, with the Annotate window up (it is
+        # a tool window of its own since ADR-044 rev, not a tab). Interfaz
+        # 1.0: "opened" means the shell is on the workbench view.
         from nightscribe.gui.main_window import VIEW_UFE
         uf = window._ufe
         assert uf is not None
         assert window._shell_stack().currentIndex() == VIEW_UFE
-        assert uf.tabs.currentWidget() is uf.tab_annotate
+        assert uf._tools["annotate"].isVisible()
+        assert uf._active_tool == "annotate"
         assert uf.state.has_image
         assert uf.state.path == str(MONO)
         assert uf.object() == {"name": "SN 2110ff", "ra": 275.0,
@@ -611,8 +628,10 @@ def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
            "entries": [{"name": "A", "kind": "comp",
                         "star": {"ra": 1.0, "dec": 2.0}}]}
     monkeypatch.setattr(mw.project, "get",
-                        lambda db_, pid: {"context": {"sequence": seq}})
-    calls = {"applied": 0, "loaded": []}
+                        lambda db_, pid: {"context": {"sequence": seq,
+                                                      "mag": 17.9,
+                                                      "mag_origin": "measured"}})
+    calls = {"applied": 0, "loaded": [], "mag": []}
 
     class _D:
         def apply_plate_state(self, st):
@@ -621,9 +640,48 @@ def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
         def load_saved_sequence(self, s):
             calls["loaded"].append(s)
 
+        # THE SETTER IS HERE ON PURPOSE, and it takes the two arguments the
+        # host passes. This double used to have no setter at all, so the
+        # getattr returned None, the call was skipped and the host's arity was
+        # never exercised: that is how a facade taking one argument shipped
+        # while the host called it with two (reported: the "measure series"
+        # button of a visit died with a TypeError). A double that exists to
+        # tolerate an old host must not be the reason a new call goes
+        # unchecked.
+        def set_target_magnitude(self, mag, source=None):
+            calls["mag"].append((mag, source))
+            return True
+
     window._load_editor_sequence(_D(), 1, "/x.fits")
     assert calls["applied"] == 1
     assert calls["loaded"] == [seq]
+    # and the magnitude landed WITH its origin: the figure's provenance is
+    # what the Compare tab's proposal and tooltip are built on
+    assert calls["mag"] == [(17.9, "measured")]
+
+
+def test_the_editor_opens_from_a_project_with_a_measured_magnitude(
+        window, dlg, monkeypatch):
+    # REPORTED (2026-10-07): the "measure series" button of a visit died with
+    #   TypeError: UfeDialog.set_target_magnitude() takes 2 positional
+    #   arguments but 3 were given
+    # The host resolves the setter with getattr and calls it with the
+    # magnitude AND its origin, and the dialog's facade only took the
+    # magnitude. Every unit test missed it: the host's call was exercised only
+    # with a double that had no setter at all, so the line never ran. This one
+    # goes through the REAL dialog, which is the whole point of having it.
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "find_file",
+        lambda db_, pid, path: {"meta": {"ufe": {"stretch": {}}}})
+    monkeypatch.setattr(
+        mw.project, "get",
+        lambda db_, pid: {"context": {"mag": 18.28,
+                                      "mag_origin": "measured"}})
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    window._load_editor_sequence(dlg, 1, "/x.fits")     # must not raise
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(18.28)
+    assert dlg.tab_compare._mag_origin == "measured"
 
 
 # ---------------- the workbench is one session at a time (issue) ------

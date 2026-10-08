@@ -36,6 +36,7 @@ from PySide6.QtWidgets import (QFileDialog, QMessageBox,
 from ..core import fits_annotate, fits_io, wcs as wcs_mod
 from ..viz import palette
 from .ui_loader import adopt_ui
+from .ufe_host import host_of
 
 logger = logging.getLogger("nightscribe.gui.ufe_annotate_tab")
 
@@ -166,7 +167,7 @@ class UfeAnnotateTab(QWidget):
     def _notify_saved(self, paths):
         # Files written while a host watches (a project) get registered
         # there; with no host this is a no-op.
-        dlg = self.window()
+        dlg = host_of(self)
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify(paths, "fits")

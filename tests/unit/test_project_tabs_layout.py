@@ -73,8 +73,6 @@ def window(monkeypatch):
                      "fits", session_id=sid)
     w = MainWindow(snapshot=None)
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     w._project_id = p["id"]
     # SHOWN: the acceptance criterion is about real geometry, and a hidden
     # window has none (the scroll viewport measured 30 px)

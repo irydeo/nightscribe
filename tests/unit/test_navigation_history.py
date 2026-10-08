@@ -45,8 +45,6 @@ def window(monkeypatch):
     w.resize(1400, 900)
     w.show()
     w._now_timer.stop()
-    w._blink_timer.stop()
-    w._blink_render_timer.stop()
     for _ in range(6):
         app.processEvents()
 

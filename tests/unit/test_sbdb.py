@@ -75,3 +75,41 @@ def test_plain_name_never_retries(patched):
     body = sbdb.get("29P")
     assert body and body["des"] == "P/2020 G1"
     assert calls == ["29P"]
+
+
+def test_the_epoch_travels_with_the_elements():
+    # orbit.epoch is NOT one of the element rows. Dropping it made every
+    # local propagation freeze the mean anomaly at its value at the solution
+    # epoch (measured: 82 deg of error on 2026 PY9). It has to be carried.
+    body = sbdb.parse_sbdb({
+        "object": {"des": "2026 PY9", "fullname": "(2026 PY9)"},
+        "orbit": {"epoch": "2461200.5", "elements": [
+            {"name": "a", "value": "2.329264345717"},
+            {"name": "e", "value": ".5508738138610355"},
+            {"name": "ma", "value": "333.0"}]},
+        "phys_par": []})
+    assert body["elements"]["epoch"] == pytest.approx(2461200.5)
+    assert body["elements"]["a"] == pytest.approx(2.329264345717)
+
+
+def test_the_lookup_asks_for_full_precision_and_versions_the_key(monkeypatch):
+    # Without full-prec=1 SBDB answers "a": "2.33": three figures, useless to
+    # propagate. And the cache key carries the flag, so a body cached before
+    # it is never reused.
+    seen = {}
+    keys = []
+
+    class _Db:
+        def http_get(self, key, source, fetch_fn, **_kw):
+            keys.append(key)
+            return fetch_fn()
+
+    def fake_get(_url, params=None, timeout=None):
+        seen.update(params or {})
+        return _Resp()
+
+    monkeypatch.setattr(sbdb, "db", _Db())
+    monkeypatch.setattr(requests, "get", fake_get)
+    sbdb.get("2026 PY9")
+    assert seen.get("full-prec") == "1"
+    assert keys == ["sbdb:2026 PY9:fp"]

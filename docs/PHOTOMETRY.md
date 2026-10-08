@@ -184,7 +184,8 @@ disk is never modified.
   says so.
 * **"Suggest apertures"**: the button lives in the Measure section,
   right under the three apertures, in the daily flow (band, apertures,
-  suggest); the rest of the recipe knobs (sky, sigma-clip, seeing,
+  manual centre, **matched filter**, suggest); the rest of the recipe
+  knobs (sky, sigma-clip, seeing,
   colour term, host subtraction) open in the small non-modal "Advanced…"
   window, which lets measuring continue while it stays open, and the
   result log has its own scrolling for long reports. It proposes the
@@ -231,6 +232,13 @@ disk is never modified.
   on the difference image; the comps calibrate on the original plate.
   For SNe on cores this is the difference between "not measurable" and
   "0.03–0.05 mag".
+* **The matched filter deserves its sentence**: the box decides how the
+  light is measured (every pixel weighed by the star's shape, the target AND
+  the comparisons, so the zero point comes from the same arithmetic). It is
+  the default **by measurement**, and its numbers and its risks are in its
+  tooltip and in `docs/SNR.md`; the block's header says the method even
+  while the block is closed, and **Settings -> Photometry** decides what new
+  plates start with.
 
 **Formula 3: the differential magnitude**
 
@@ -515,8 +523,27 @@ saturated, so the app **excludes those comps/check** with the explicit reason
 On very sensitive sensors (GSENSE400) this is what keeps the brightest stars of
 the field out.
 
+**This is a rule of the house, not a nicety (ADR-066)**: no saturated star and
+no star above your camera's linearity is ever used, in **any** path that
+calibrates with a star (the single plate, the series, the astrometry run, the
+comparison proposal and the aperture tuning). The two ceilings come from one
+home (`photometry.star_ceilings`), so no path can forget them, and when the
+**linearity is not set** the app keeps measuring with the best ceiling it has
+(the SATURATE card or the plate's own clip) and **says so** in the panel and in
+the run's notes, with the place to set it: measuring with a ceiling that is not
+the one that rules, in silence, is how a wrong zero point looks right.
+
 Quick reference: `full well / gain` gives the saturation in ADU, and linearity
 usually sits below it. **If you change gain, measure it again.**
+
+The ceilings are the **sensor's**, in ADU of **one frame**. A stack that
+**adds** its frames (the astrometry run's `sum` method) has N times the level,
+so the ceilings are multiplied by the number of frames before the plate is
+compared against them (ADR-062 rev). Without that, a `sum` stack's own sky
+sits above the camera's linearity and **every** comparison star is rejected:
+measured on the author's own 2025 FG18 visit (sky 1552 ADU, 207 frames,
+linearity 53 000) the `sum`'s sky alone is 321 000 ADU and the run reported no
+magnitude at all.
 
 ---
 

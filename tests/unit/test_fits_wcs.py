@@ -243,3 +243,40 @@ def test_wcs_scaled():
     x2, y2 = w2.sky_to_pixel(ra, dec)
     assert x2 == pytest.approx(74.75, abs=1e-9)
     assert y2 == pytest.approx(34.75, abs=1e-9)
+
+
+def test_wcs_from_astropy_matches_the_astropy_mapping():
+    # The astrometry flow hands the series engine an astropy WCS, and the
+    # conversion must land on the SAME sky for the same pixel in both
+    # flavours astropy can hold (CD, or PC + CDELT). A silent axis or
+    # scale mix-up here would misplace every comparison star.
+    AstropyWCS = pytest.importorskip("astropy.wcs").WCS
+    w = AstropyWCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [187.705, 12.391]
+    w.wcs.crpix = [50.0, 40.0]
+    w.wcs.cd = [[-0.0005, 0.0], [0.0, 0.0005]]
+    w.pixel_shape = (100, 80)
+    mine = wcs.Wcs.from_astropy(w)
+    assert mine.crval1 == pytest.approx(187.705)
+    assert mine.crpix1 == pytest.approx(50.0)
+    assert mine.naxis1 == 100 and mine.naxis2 == 80
+    assert mine.pixel_scale() == pytest.approx(1.8)
+    ra, dec = mine.pixel_to_sky(30.0, 20.0)
+    ara, adec = w.all_pix2world([[30.0, 20.0]], 0)[0]
+    assert ra == pytest.approx(float(ara), abs=1e-9)
+    assert dec == pytest.approx(float(adec), abs=1e-9)
+    # PC + CDELT: the linear matrix is their product, and getting the
+    # order wrong would scale the wrong axis
+    w2 = AstropyWCS(naxis=2)
+    w2.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w2.wcs.crval = [187.705, 12.391]
+    w2.wcs.crpix = [50.0, 40.0]
+    w2.wcs.pc = [[1.0, 0.1], [-0.1, 1.0]]
+    w2.wcs.cdelt = [-0.0005, 0.0005]
+    w2.pixel_shape = (100, 80)
+    mine2 = wcs.Wcs.from_astropy(w2)
+    ra2, dec2 = mine2.pixel_to_sky(30.0, 20.0)
+    ara2, adec2 = w2.all_pix2world([[30.0, 20.0]], 0)[0]
+    assert ra2 == pytest.approx(float(ara2), abs=1e-9)
+    assert dec2 == pytest.approx(float(adec2), abs=1e-9)

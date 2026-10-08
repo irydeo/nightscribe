@@ -23,6 +23,8 @@ dict that maps 1-to-1 onto the keyword arguments of
 
 import numpy as np
 
+from . import outliers
+
 # The magnitude window's own constants (quality plan, phase A): the scale
 # is set by the CORE of the data (median +/- K robust sigmas), never by
 # min/max, so one anomalous frame or one badly calibrated night cannot
@@ -62,7 +64,7 @@ def mag_window(mags, y_range=None, robust=True, k=ROBUST_K,
         lo, hi = float(vals.min()), float(vals.max())
     else:
         med = float(np.median(vals))
-        mad = 1.4826 * float(np.median(np.abs(vals - med)))
+        mad = float(outliers.scaled_mad(vals, centre=med))
         if mad > 0.0:
             lo, hi = med - k * mad, med + k * mad
             # the core is intersected with the data: a robust window cannot

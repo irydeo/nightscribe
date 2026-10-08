@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>UfeCalibrationTab</class>
+ <widget class="QWidget" name="UfeCalibrationTab">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>406</width>
+    <height>340</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="vbox_calibration">
+   <property name="leftMargin"><number>9</number></property>
+   <property name="topMargin"><number>9</number></property>
+   <property name="rightMargin"><number>9</number></property>
+   <property name="bottomMargin"><number>9</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_recipe_title">
+     <property name="text"><string>Calibration recipe for this visit</string></property>
+     <property name="toolTip">
+      <string>Which master of the library each piece uses (a dark already includes the bias; the flat is per filter and normalised), resolved against the first frame's header</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_recipe">
+     <property name="text"><string>Open the editor from a visit to see its recipe.</string></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_masters">
+     <item>
+      <widget class="QLabel" name="lbl_master_add">
+       <property name="text"><string>Library:</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_master_kind">
+       <property name="toolTip">
+        <string>What the files you are about to index ARE: a bias (no exposure of its own), a dark (the light's exposure), a dark of the flats (the flat's exposure) or a flat (per filter, normalised). The kind decides the arithmetic, so it is asked here and not guessed</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_master_add">
+       <property name="text"><string>Add masters…</string></property>
+       <property name="toolTip">
+        <string>Index one or more FITS as masters of the kind above: the files are indexed, never copied or moved, and what makes them valid (camera, gain, temperature, exposure, filter) is read from their own headers. A flat does not have to share the lights' gain: a flat is normalised, so its shape does not depend on it</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_masters">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_master_status">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chk_pseudo_flat">
+     <property name="text"><string>Build a flat from the frames when the library has none</string></property>
+     <property name="toolTip">
+      <string>A pseudo-flat: the train's dust and the sensor's vignetting are fixed on the frame and survive a low percentile over the frames, while the stars move and do not. Where they do NOT move (a static field) the app MASKS them, drops the masked pixels and interpolates the flat there, so no star can end up in it; a hot pixel is left in on purpose, so the division removes it. It is smoothed and normalised, and it is used ONLY for the filters the library has no flat for (a real flat always wins). It is built from the frames with the SAME dark/bias removed as the light: without one the pedestal compresses its shape and it corrects only part of the vignetting, and the app says so. This is the calibration's own policy and this tab is its single home: every pipeline that applies the calibration reads this same switch, the stack included</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="chk_export">
+     <property name="text"><string>Export the calibrated frames (FITS copies)</string></property>
+     <property name="toolTip">
+      <string>Calibration works in memory; writing hundreds of calibrated FITS is optional and explicit. The copies land in the project's folder (a "calibrados" subfolder) and are registered to the visit</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_run">
+     <item>
+      <widget class="QPushButton" name="btn_calibrate">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>Calibrate the visit</string></property>
+       <property name="toolTip">
+        <string>Applies the recipe to every frame of the visit NOW (offset first, flat second), reports what each master did, and exports the copies only if the box above is checked. This is a one-off run, NOT the switch that calibrates the stack: every pipeline that applies the calibration has its own checkbox in its own tab. While it runs, this button is the Cancel</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QProgressBar" name="prg_calib">
+       <property name="visible"><bool>false</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_flat">
+       <property name="enabled"><bool>false</bool></property>
+       <property name="text"><string>See the flat</string></property>
+       <property name="toolTip">
+        <string>Opens the flat that was built from the frames in the editor's own viewer, so it can be looked at: a flat carrying a star is not a flat, and the way to know is to see it. The figures it was built with (how many sources were masked, how much was filled, how many hot pixels were kept, and how far it still deviates over the masked pixels) are in the note above and in the FITS header</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_status">
+     <property name="visible"><bool>false</bool></property>
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_warnings_title">
+     <property name="text"><string>Warnings</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_warnings">
+     <property name="text"><string/></property>
+     <property name="toolTip">
+      <string>What the recipe could not do and what stays in the frames: no dark, no bias, no flat for the filter, or a master out of tolerance</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="vspacer_calibration">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

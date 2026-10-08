@@ -24,108 +24,124 @@
     <number>9</number>
    </property>
    <item>
-    <layout class="QHBoxLayout" name="row_target">
-     <property name="layoutStretch" stdset="0">
-      <string notr="true">0,0,0,1</string>
-     </property>
-     <item>
-      <widget class="QLabel" name="lbl_target">
-       <property name="text">
-        <string>Target:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLineEdit" name="edt_target">
-       <property name="minimumSize">
-        <size>
-         <width>130</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="maximumSize">
-        <size>
-         <width>130</width>
-         <height>16777215</height>
-        </size>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="lbl_mag">
-       <property name="text">
-        <string>Mag:</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QDoubleSpinBox" name="spn_mag">
-       <property name="toolTip">
-        <string>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</string>
-       </property>
-       <property name="decimals">
-        <number>2</number>
-       </property>
-       <property name="minimum">
-        <double>0.000000000000000</double>
-       </property>
-       <property name="maximum">
-        <double>25.000000000000000</double>
-       </property>
-       <property name="value">
-        <double>12.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_catalog">
-     <item>
-      <widget class="QComboBox" name="cmb_catalog"/>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_auto">
-     <item>
-      <widget class="QPushButton" name="btn_auto">
-       <property name="toolTip">
-        <string>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</string>
-       </property>
-       <property name="text">
-        <string>Build the sequence…</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="btn_dss">
-       <property name="toolTip">
-        <string>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</string>
-       </property>
-       <property name="text">
-        <string>DSS2…</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_manual">
-     <item>
-      <widget class="QPushButton" name="btn_manual">
-       <property name="toolTip">
-        <string>Open the manual tweak window: while it is open clicking the plate picks your comparison and check stars (and the sequence actions live in it)</string>
-       </property>
-       <property name="text">
-        <string>Manual tweak…</string>
-       </property>
-       <property name="checkable">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-    </layout>
+    <widget class="QWidget" name="sec_seq_content" native="true">
+     <layout class="QVBoxLayout" name="vbox_seq">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+    <item>
+     <layout class="QHBoxLayout" name="row_target">
+      <property name="layoutStretch" stdset="0">
+       <string notr="true">0,0,0,1</string>
+      </property>
+      <item>
+       <widget class="QLabel" name="lbl_target">
+        <property name="text">
+         <string>Target:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLineEdit" name="edt_target">
+        <property name="minimumSize">
+         <size>
+          <width>130</width>
+          <height>0</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>130</width>
+          <height>16777215</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_mag">
+        <property name="text">
+         <string>Mag:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QDoubleSpinBox" name="spn_mag">
+        <property name="toolTip">
+         <string>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it. With no data the proposal starts from a declared guess and says so, instead of using a number nobody chose</string>
+        </property>
+        <property name="decimals">
+         <number>2</number>
+        </property>
+        <property name="minimum">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="maximum">
+         <double>25.000000000000000</double>
+        </property>
+        <property name="singleStep">
+         <double>0.100000000000000</double>
+        </property>
+        <property name="value">
+         <double>0.000000000000000</double>
+        </property>
+        <property name="specialValueText">
+         <string>No data</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="row_catalog">
+      <item>
+       <widget class="QComboBox" name="cmb_catalog"/>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="row_auto">
+      <item>
+       <widget class="QPushButton" name="btn_auto">
+        <property name="toolTip">
+         <string>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</string>
+        </property>
+        <property name="text">
+         <string>Build the sequence…</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_dss">
+        <property name="toolTip">
+         <string>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</string>
+        </property>
+        <property name="text">
+         <string>DSS2…</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="row_manual">
+      <item>
+       <widget class="QPushButton" name="btn_manual">
+        <property name="toolTip">
+         <string>Open the manual tweak window: while it is open clicking the plate picks your comparison and check stars (and the sequence actions live in it)</string>
+        </property>
+        <property name="text">
+         <string>Manual tweak…</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <widget class="QLabel" name="lbl_status"><property name="visible"><bool>false</bool></property>

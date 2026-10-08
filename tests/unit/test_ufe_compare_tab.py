@@ -14,7 +14,8 @@
 """Offscreen checks for gui/ufe_compare_tab.py: the comparison-sequence
 picker on the shared plate view. Field generation goes through a fake
 UfeFieldWorker (no network); stars come from a synthetic catalog mapped
-through the plate's real WCS. The legacy SeqChartDialog is untouched.
+through the plate's real WCS. The classic picker retired in 2026-10-07
+(ADR-044 rev.), so this tab is the only comparison-sequence picker.
 """
 
 import os
@@ -54,7 +55,7 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    d.tab_photometry.set_active(True)           # take the stage
     # the picking state: manual window open, clicks add stars
     d.tab_compare.btn_manual.click()
     qapp.processEvents()
@@ -129,7 +130,7 @@ class _HoldingFieldWorker(_FakeFieldWorker):
 
 def test_tab_is_real_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate"]
+    assert titles == ["Photometry", "Astrometry"]   # ADR-044 rev
     assert dlg.tab_compare.isEnabled()
     assert dlg.tab_compare.edt_target.text() == "sn2026zji_new_image"
 
@@ -435,14 +436,14 @@ def test_probe_star_info_and_pixel_fallback(dlg):
     assert hit and "DN" in lines[0]              # the state's pixel probe
 
 
-def test_leaving_the_tab_restores_the_pixel_probe(dlg):
+def test_leaving_the_panel_restores_the_pixel_probe(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
     assert dlg.view._hover_probe == tab._probe
-    dlg.tabs.setCurrentIndex(0)
+    dlg.tabs.setCurrentIndex(1)                     # the Astrometry panel
     assert dlg.view._hover_probe == dlg.state.probe_text
     assert tab._items == []
-    dlg.tabs.setCurrentWidget(dlg.tab_photometry)   # back: sequence resumes
+    dlg.tabs.setCurrentIndex(0)                     # back: sequence resumes
     assert len(tab._items) > 0
 
 
@@ -497,7 +498,7 @@ def test_sequence_overlays_survive_closing_the_manual_window(dlg, qapp):
     dlg.tab_photometry._apply()
     assert tab._active and not dlg.tab_measure._active
     assert len(tab._items) > 0
-    dlg.tabs.setCurrentWidget(dlg.tab_annotate)
+    dlg.tabs.setCurrentIndex(1)                 # leave for the other panel
     assert tab._items == []
 
 
@@ -512,7 +513,7 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
     d = UfeDialog()
     d.resize(1280, 860)
     d.show()
-    d.tabs.setCurrentWidget(d.tab_photometry)
+    d.tab_photometry.set_active(True)
     d.state.load(MONO)
     try:
         tab = d.tab_compare
@@ -1255,3 +1256,85 @@ def test_the_manual_window_fits_its_content(dlg):
     assert bottom > 0                          # and the content is inside
     # the width floor stays (the wide-font guard of the test above)
     assert w.minimumWidth() >= 760
+
+
+# ------------------------------------------------- the target's magnitude
+
+def test_the_target_magnitude_says_no_data_until_somebody_knows_it(dlg):
+    # The field carried 12.00 from the Designer file, and a number nobody
+    # chose ended up stored in the project (four projects in the real
+    # database carry it). Now it says "No data" until the project, or the
+    # astrometry that measured the object, knows the magnitude.
+    from nightscribe.core import compstars
+    cmp = dlg.tab_compare
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.spn_mag.text() == cmp.spn_mag.specialValueText()
+    # the proposal still has to start somewhere, and it is a DECLARED
+    # constant, not a silent default
+    assert cmp._proposal_mag() == pytest.approx(
+        compstars.TARGET_MAG_FALLBACK)
+    # and the sentinel never becomes the project's magnitude
+    assert cmp._sequence_payload()["target_mag"] is None
+
+
+def test_the_project_magnitude_fills_the_field_only_when_it_is_empty(dlg):
+    cmp = dlg.tab_compare
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.set_target_magnitude(17.92) is True
+    assert cmp.spn_mag.value() == pytest.approx(17.92)
+    assert cmp._proposal_mag() == pytest.approx(17.92)
+    # a plate that already landed one wins, exactly as its saved sequence
+    # does: a second landing must not stomp it
+    assert cmp.set_target_magnitude(11.0) is False
+    assert cmp.spn_mag.value() == pytest.approx(17.92)
+    # nothing known: nothing landed, and no crash
+    cmp.spn_mag.setValue(0.0)
+    assert cmp.set_target_magnitude(None) is False
+    assert cmp.set_target_magnitude(0.0) is False
+
+
+def test_the_editor_lands_the_magnitude_on_the_compare_tab(dlg):
+    # The host calls this when the editor opens from a project, so the
+    # proposal anchors on the object's real magnitude.
+    #
+    # AND IT CALLS IT WITH THE ORIGIN: this test used to call the facade with
+    # one argument, which is what the facade took, so it pinned the wrong
+    # signature and let the host's two-argument call crash (reported: the
+    # "measure series" button of a visit died with a TypeError). The facade
+    # has to be tested with the arity of the caller, not with its own.
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    assert dlg.set_target_magnitude(17.92, "measured") is True
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(17.92)
+    assert dlg.tab_compare._mag_origin == "measured"
+    # and without an origin, which is a project that never recorded one
+    dlg.tab_compare.spn_mag.setValue(0.0)
+    assert dlg.set_target_magnitude(18.30) is True
+    assert dlg.tab_compare.spn_mag.value() == pytest.approx(18.30)
+    assert dlg.tab_compare._mag_origin is None
+
+
+def test_the_magnitude_says_where_it_comes_from(dlg, qapp):
+    # 2026-10-07. The proposal anchors the comparison stars on the target's
+    # magnitude, and a figure MEASURED by a run is not the same thing as the
+    # planner's PREDICTION (an ephemeris, a catalogue, an alert). The same
+    # field in the project carries both over time, so the interface says which
+    # one it is holding, and typing in the field makes it yours.
+    tab = dlg.tab_compare
+    tab.spn_mag.setValue(0.0)
+    assert tab.set_target_magnitude(18.28, "measured") is True
+    assert tab.spn_mag.value() == pytest.approx(18.28)
+    assert tab._mag_origin == "measured"
+    # landing it from the project is NOT the observer typing it
+    assert tab._mag_origin_text() in tab.spn_mag.toolTip()
+    assert tab._mag_origin_text() in tab.primary_subtitle()
+    # and it does not overwrite a figure the plate already had
+    assert tab.set_target_magnitude(12.0, "predicted") is False
+    assert tab._mag_origin == "measured"
+    # the observer touches the field: from here on the figure is theirs
+    tab.spn_mag.setValue(18.5)
+    assert tab._mag_origin == "manual"
+    # a project that never recorded its origin says so instead of guessing
+    tab._set_mag_origin(None)
+    assert tab._mag_origin is None
+    assert tab.spn_mag.toolTip()
+    assert tab._mag_origin_text() == ""

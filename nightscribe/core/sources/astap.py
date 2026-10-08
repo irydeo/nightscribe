@@ -50,6 +50,7 @@ import time
 from pathlib import Path
 
 from ..db import db
+from ..exposure import binning_factor
 from ... import paths
 from .astrometry import WCS_KEYS
 
@@ -317,6 +318,10 @@ def _scale_arcsec(header, config):
     ux = _num(cfg.get("pixel_um"))
     fl = _num(cfg.get("focal_mm"))
     if ux and fl and fl > 0:
+        # the config's pixel is the SENSOR's, so the binning applies here too
+        # (the header's XPIXSZ path above is left alone: some drivers write it
+        # already binned and there is no way to tell)
+        ux = ux * binning_factor(cfg.get("pixel_binning"))
         return (ux / 1000.0) / fl * 206264.806
     return None
 
@@ -486,6 +491,19 @@ def _notable(line):
     return any(marker in low for marker in _NOTABLE)
 
 
+def _cancelled(cancel):
+    # @args: cancel - a core.solve.SolveCancel, a plain callable, or None
+    # @return: True when the run was asked to stop
+    # Both shapes are accepted on purpose: the GUI worker has always handed
+    # the engines a callable (lambda: self._cancel), while the solve dialog
+    # uses a SolveCancel with attach()/is_set(). Asking for .is_set()
+    # unconditionally is what made a plain callable blow up with
+    # "'function' object has no attribute 'attach'" the first time the
+    # track & stack solve ran. The knowledge lives in core.solve.
+    from .. import solve
+    return solve.is_cancelled(cancel)
+
+
 def _run_astap(cmd, progress, cancel, budget):
     # One ASTAP attempt: streams stdout to progress, honours the Cancel
     # flag and the time budget (a kill on either).
@@ -496,8 +514,11 @@ def _run_astap(cmd, progress, cancel, budget):
     except OSError as err:
         logger.warning("ASTAP run failed: %s", err)
         return [], False, False, None
-    if cancel is not None:
-        cancel.attach(proc)
+    attach = getattr(cancel, "attach", None)
+    if callable(attach):
+        # only a SolveCancel can kill the live process; a plain callable
+        # is polled below and stops the run at the next tick
+        attach(proc)
     lines = []
     deadline = time.monotonic() + max(budget, 1.0)
 
@@ -517,7 +538,7 @@ def _run_astap(cmd, progress, cancel, budget):
     reader.start()
     timed_out = False
     while proc.poll() is None:
-        if cancel is not None and cancel.is_set():
+        if _cancelled(cancel):
             _terminate(proc)
             break
         if time.monotonic() > deadline:
@@ -526,5 +547,4 @@ def _run_astap(cmd, progress, cancel, budget):
             break
         time.sleep(0.05)
     reader.join(timeout=2.0)
-    return lines, bool(cancel is not None and cancel.is_set()), \
-        timed_out, proc.returncode
+    return lines, _cancelled(cancel), timed_out, proc.returncode

@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import coords, photometry, phototrans
+from . import coords, outliers, photometry, phototrans
 from .sources import vizier
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,13 @@ logger = logging.getLogger(__name__)
 VSX_MATCH_ARCSEC = 5.0     # a catalog star this close to a VSX entry is
                            # considered the same object (SecFot's value)
 DEFAULT_MARGIN = 0.5       # comps should beat the target by this much
+
+# The target's magnitude anchors the proposal: comps brighter than it, and
+# close to it. When nobody knows it (a fresh NEO, a discovery), this is the
+# starting point, and the panel SAYS it is a guess: a silent default is how
+# a 12.00 nobody chose ended up stored as if it were data.
+TARGET_MAG_FALLBACK = 18.0
+
 # A comp needs this much clear around it at the field edges (arcsec): the
 # drift of a night moves the field across the sky, so a star at the very
 # edge is a star you will lose (quality plan, C2).
@@ -464,8 +471,7 @@ def local_sky_sigma(plate, x, y, r_ap):
         return None
     diffs = np.concatenate([np.diff(sub, axis=1).ravel(),
                             np.diff(sub, axis=0).ravel()])
-    return 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
-        / math.sqrt(2.0)
+    return float(outliers.scaled_mad(diffs)) / math.sqrt(2.0)
 
 
 def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,

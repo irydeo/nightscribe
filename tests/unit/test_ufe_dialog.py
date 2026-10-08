@@ -48,12 +48,16 @@ def dlg(qapp):
     d.deleteLater()
 
 
-def test_layout_three_placeholder_tabs(dlg):
-    assert dlg.tabs.count() == 3          # Blink, Photometry, Annotate
+def test_layout_two_panels_and_four_tool_windows(dlg):
+    # ADR-044 rev (2026-10-06): the column keeps the two panels an observer
+    # lives in (Photometry and Astrometry). Blink, Calibration, Annotate and
+    # the photometric series left it: each is a button in the top bar and a
+    # non-modal window over the plate, so they cost no permanent column.
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Photometry", "Annotate"]
+    assert titles == ["Photometry", "Astrometry"]
+    assert sorted(dlg._tools) == ["annotate", "blink", "calibrate", "series"]
     assert dlg.histogram is not None      # the phase-B histogram strip
-    # the image dominates: at 1280 px the view is wider than the tab column
+    # the image dominates: at 1280 px the view is wider than the panel column
     assert dlg.view.width() > dlg.tabs.width()
 
 
@@ -127,7 +131,7 @@ def test_export_png_via_dialog(dlg, monkeypatch, tmp_path):
 def test_add_feature_tab_is_the_whole_extension_api(dlg):
     from PySide6.QtWidgets import QLabel
     idx = dlg.add_feature_tab("Future", QLabel("soon"))
-    assert dlg.tabs.count() == 4
+    assert dlg.tabs.count() == 3      # the two panels plus this one
     assert dlg.tabs.tabText(idx) == "Future"
 
 
@@ -369,7 +373,7 @@ def test_the_band_provider_reads_the_live_state(dlg, monkeypatch):
     first = dlg._chart_band()["lines"][0]
     mag = next(seg for seg in first if seg["field"] == "mag")
     assert mag["role"] == "mag"
-    assert mag["text"] == "16.39 ± 0.04 (V)"
+    assert mag["text"] == "16.39 ± 0.04 (V) (measured)"
     # ... and the position now speaks from the measured centroid
     ra, dec = dlg.state.wcs.pixel_to_sky(100.0, 200.0)
     pos = next(seg for seg in first if seg["field"] == "pos")
@@ -388,6 +392,55 @@ def test_the_band_says_nothing_without_a_plate(dlg):
     assert dlg._chart_band() == {"lines": []}
 
 
+def test_the_band_says_the_motion_and_brightness_of_an_asteroid_stack(dlg):
+    # On one of the astrometry run's stacks the heading adds what the run
+    # measured: the motion (ink, because the sweep measured it), the
+    # brightness with its own colour and the position measured on the
+    # plate. It all comes from the stack's header, so a stack reopened
+    # later (with no run in memory) says the same.
+    dlg.state.load(MONO)
+    dlg.state.header.update({
+        "NS_STACK": "object", "NS_RUN": 7, "NS_NOBS": 1, "NS_NFRAM": 8,
+        "NS_RATE": 1.234, "NS_PA": 245.4, "NS_MOT": "sweep",
+        "NS_MAG": 18.05, "NS_MAGER": 0.04, "NS_MAGNC": 8, "NS_MAGOK": 1,
+        "NS_MAGB": "G", "NS_RA": 30.0, "NS_DEC": 10.0,
+    })
+    first, second = dlg._chart_band()["lines"]
+    # the rate and the PA are two segments (the renderer's own separator
+    # goes between them), both in the measured ink
+    motions = [seg for seg in first if seg["field"] == "motion"]
+    assert [seg["text"] for seg in motions] == \
+        ["1.23″/min", "PA 245° (measured)"]
+    assert all(seg["role"] == "motion" for seg in motions)
+    mag = next(seg for seg in first if seg["field"] == "mag")
+    assert mag["role"] == "mag" \
+        and mag["text"] == "18.05 ± 0.04 (G) (measured)"
+    pos = next(seg for seg in first if seg["field"] == "pos")
+    assert pos["role"] == "pos"
+    assert "RA 02 00 00.0" in pos["text"]
+    assert "Dec +10 00 00.0" in pos["text"]
+    # and the context says how many frames the stack combines
+    assert any(seg["text"] == "8 × 10.0 s" for seg in second)
+
+
+def test_a_stack_never_borrows_a_stale_measurement(dlg):
+    # The run measured positions only (the brightness box was off): the band
+    # must NOT colour the stack with a measurement the Photometry tab left
+    # from another plate. The motion still shows, because the run did
+    # measure that.
+    dlg.state.load(MONO)
+    dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
+                             "col": 100.0, "row": 200.0,
+                             "used": [1, 2, 3, 4, 5],
+                             "check": {"ok": True}}
+    dlg.state.header.update({
+        "NS_STACK": "object", "NS_RUN": 7, "NS_NOBS": 1, "NS_NFRAM": 8,
+        "NS_RATE": 1.234, "NS_PA": 245.4, "NS_MOT": "sweep"})
+    first = dlg._chart_band()["lines"][0]
+    assert not any(seg["field"] == "mag" for seg in first)
+    assert any(seg["field"] == "motion" for seg in first)
+
+
 def test_the_band_toggle_default_comes_from_config(dlg, monkeypatch):
     # The plate's band says what it says by default (chart_data): the
     # corner boxes' own switch (chart_boxes) belongs to the OTHER charts
@@ -403,6 +456,42 @@ def test_the_band_toggle_default_comes_from_config(dlg, monkeypatch):
     dlg.show()
     assert dlg.btn_boxes.isChecked()
     assert dlg.view.show_data
+
+
+def test_the_object_annotation_toggle_default_comes_from_config(dlg,
+                                                                monkeypatch):
+    # The circle + name the run writes on the stacks opens HIDDEN by default
+    # (the editor's job is the cross) and Settings sets that default; the
+    # "A" button is the session's choice from there on.
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "annot_visible", False)
+    dlg.hide()
+    dlg.show()                          # showEvent re-reads the default
+    assert not dlg.btn_annot.isChecked()
+    assert dlg.view._show_annotations is False
+    monkeypatch.setitem(config._data, "annot_visible", True)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_annot.isChecked()
+    assert dlg.view._show_annotations is True
+
+
+def test_the_object_mark_takes_the_kind_colour(dlg, monkeypatch):
+    # The full-frame crosshair of the object wears the object TYPE's colour
+    # (Settings), and the badge arrives AFTER set_object, so the mark has to
+    # be told again there: this pins that it is.
+    from nightscribe.config import config
+    from nightscribe.gui import theme
+    dlg.set_object({"name": "2026 QX", "ra": 30.0, "dec": 10.0})
+    assert dlg.view._object_mark_color == theme.C_OBJECT_MARK
+    dlg.set_project_badge({"kind": "neo", "kind_color": "#4484ef",
+                           "kind_label": "NEO"})
+    assert dlg.view._object_mark_color == "#4484ef"
+    # "one common colour" puts the same red on every mark
+    monkeypatch.setitem(config._data, "marker_color", "common")
+    dlg.set_project_badge({"kind": "neo", "kind_color": "#4484ef",
+                           "kind_label": "NEO"})
+    assert dlg.view._object_mark_color == theme.C_OBJECT_MARK
 
 
 # ------------------------------------- top-bar style (ADR-044 rev, 2026-09-24)
@@ -681,25 +770,45 @@ def test_frame_navigator_keeps_the_compare_state(dlg, tmp_path, monkeypatch):
     assert dlg.visit_panel.lbl_frame.text() == "Frame 2/2"
 
 
+def test_exotic_block_lives_in_the_series_window(dlg, tmp_path):
+    # Asked for 2026-10-06: the transit reduction is the series of a transit
+    # visit, so it lives in the series window and NOT in the visit panel of
+    # the left column (which keeps the navigator and the previews).
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    assert dlg.exotic is not None
+    assert not hasattr(dlg.visit_panel, "grp_exotic")
+    # the series window hosts it, under the series block
+    body = dlg._tools["series"].panel
+    assert dlg.exotic.parent() is body
+    dlg.set_exotic_hooks(lambda: None, lambda: None)
+    dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "transit"})
+    # the window is closed here, so isVisible() is False for everything
+    # inside it: what the code sets is the block's OWN flag
+    assert not dlg.exotic.grp_exotic.isHidden()
+
+
 def test_exotic_block_only_for_transit_with_a_sequence(dlg, tmp_path,
                                                        monkeypatch):
     from test_fits_annotate import _make_fits
     a = _make_fits(tmp_path / "a.fits")
     calls = []
     dlg.set_exotic_hooks(lambda: calls.append("r"), lambda: calls.append("e"))
-    assert not dlg.visit_panel.grp_exotic.isVisible()      # no visit yet
+    assert dlg.exotic.grp_exotic.isHidden()                # no visit yet
     dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "transit"})
-    assert dlg.visit_panel.grp_exotic.isVisible()
+    # the window is closed here, so isVisible() is False for everything
+    # inside it: what the code sets is the block's OWN flag
+    assert not dlg.exotic.grp_exotic.isHidden()
     # no sequence yet: the buttons wait and the line says why
-    assert not dlg.visit_panel.btn_exotic_reduce.isEnabled()
-    assert "sequence" in dlg.visit_panel.lbl_exotic_status.text().lower()
+    assert not dlg.exotic.btn_exotic_reduce.isEnabled()
+    assert "sequence" in dlg.exotic.lbl_exotic_status.text().lower()
     # a sequence lands: the block enables and the hooks fire
     monkeypatch.setattr(dlg.tab_compare, "entries",
                         lambda: [{"name": "A", "kind": "comp", "star": {}}])
     dlg.tab_compare.sequence_changed.emit()
-    assert dlg.visit_panel.btn_exotic_reduce.isEnabled()
-    dlg.visit_panel.btn_exotic_reduce.click()
-    dlg.visit_panel.btn_exotic_export.click()
+    assert dlg.exotic.btn_exotic_reduce.isEnabled()
+    dlg.exotic.btn_exotic_reduce.click()
+    dlg.exotic.btn_exotic_export.click()
     assert calls == ["r", "e"]
 
 
@@ -708,7 +817,7 @@ def test_exotic_block_hidden_off_transit(dlg, tmp_path):
     a = _make_fits(tmp_path / "a.fits")
     dlg.set_exotic_hooks(lambda: None, lambda: None)
     dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "variable"})
-    assert not dlg.visit_panel.grp_exotic.isVisible()
+    assert dlg.exotic.grp_exotic.isHidden()
 
 
 def test_exotic_block_shows_the_last_reduction_and_opens_it(dlg, tmp_path):
@@ -724,20 +833,20 @@ def test_exotic_block_shows_the_last_reduction_and_opens_it(dlg, tmp_path):
                          folder_fn=lambda: calls.append("folder"),
                          result_text="T_mid 2458107.7146 ± 0.0011")
     dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "transit"})
-    assert dlg.visit_panel.lbl_exotic_result.text() == \
+    assert dlg.exotic.lbl_exotic_result.text() == \
         "T_mid 2458107.7146 ± 0.0011"
-    assert dlg.visit_panel.btn_exotic_result.isEnabled()
-    assert dlg.visit_panel.btn_exotic_folder.isEnabled()
-    dlg.visit_panel.btn_exotic_result.click()
-    dlg.visit_panel.btn_exotic_folder.click()
+    assert dlg.exotic.btn_exotic_result.isEnabled()
+    assert dlg.exotic.btn_exotic_folder.isEnabled()
+    dlg.exotic.btn_exotic_result.click()
+    dlg.exotic.btn_exotic_folder.click()
     assert calls == ["result", "folder"]
     # an empty summary (no reduction yet) disables both doors
     dlg.set_exotic_hooks(lambda: None, lambda: None,
                          result_fn=lambda: calls.append("result"),
                          folder_fn=lambda: calls.append("folder"))
-    assert dlg.visit_panel.lbl_exotic_result.text() == ""
-    assert not dlg.visit_panel.btn_exotic_result.isEnabled()
-    assert not dlg.visit_panel.btn_exotic_folder.isEnabled()
+    assert dlg.exotic.lbl_exotic_result.text() == ""
+    assert not dlg.exotic.btn_exotic_result.isEnabled()
+    assert not dlg.exotic.btn_exotic_folder.isEnabled()
 
 
 def test_cancelled_solve_shows_no_failure_box(dlg, monkeypatch):

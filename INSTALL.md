@@ -97,6 +97,11 @@ admin rights needed) and a portable zip (`NightScribe-*-windows-x64.zip`:
 unzip and run `nightscribe.exe gui`). The binaries are unsigned, so Windows
 SmartScreen will warn: choose *More info → Run anyway*.
 
+Reinstalling upgrades **cleanly**: the installer uninstalls the previous
+version first, so no file from an older build is left behind. Your settings and
+data are kept: they live in `%APPDATA%`/`%LOCALAPPDATA%`, not in the install
+folder.
+
 To build your own instead:
 
 ```bash

@@ -98,6 +98,11 @@ por usuario, sin permisos de administrador) y un zip portable
 `nightscribe.exe gui`). Los binarios no están firmados, así que Windows
 SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
 
+Reinstalar actualiza **limpiamente**: el instalador desinstala antes la versión
+anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
+datos se conservan: viven en `%APPDATA%`/`%LOCALAPPDATA%`, no en la carpeta de
+instalación.
+
 Para generar el tuyo:
 
 ```bash

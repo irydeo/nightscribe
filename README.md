@@ -10,25 +10,6 @@ line. It was built by the manager of a real observatory (Irydeo, MPC Z41) who
 got tired of doing by hand, every single clear day, what a computer does
 better.
 
-## Sound familiar?
-
-- **The afternoon ritual.** Before dinner you open NEOfixer for the NEOs, the
-  MPC page for possible comets, COBS for comet magnitudes, Rochester for fresh
-  supernovae, ExoClock for tonight's transits, VSX for your variables; and by
-  the time you have the full picture, you have lost an hour of twilight.
-- **"What can I *actually* observe tonight?"**: not what is above the horizon
-  in general, but what is visible *from your site*, over *your horizon*, with
-  *your telescope* and *your camera*, in the hours *you* have.
-- **The fast-mover trap.** You planned 60-second exposures for an unconfirmed
-  NEO and it turns out it moves 5″/min: every frame trailed, the slot wasted.
-- **The night you forgot.** You captured something great last month and never
-  wrote it down anywhere; right now you couldn't say which night, how many
-  frames or which filter.
-- **The variable that flared while nobody looked.** T CrB can erupt any day;
-  R CrB fades without warning. Who checks them every single day?
-
-NightScribe exists to answer all of that from one window.
-
 ## What is NightScribe?
 
 Four missions, one loop:

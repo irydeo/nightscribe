@@ -10,28 +10,6 @@ comandos. La construyó el responsable de un observatorio real (Irydeo,
 MPC Z41), cansado de hacer a mano, cada día despejado, lo que un ordenador
 hace mejor.
 
-## ¿Te suena esto?
-
-- **El ritual de la tarde.** Antes de cenar abres NEOfixer para los NEOs, la
-  página del MPC para los posibles cometas, COBS para las magnitudes
-  cometarias, Rochester para las supernovas frescas, ExoClock para los
-  tránsitos de esta noche, el VSX para tus variables; y cuando por fin tienes
-  el cuadro completo, has perdido una hora de crepúsculo.
-- **«¿Qué puedo observar *de verdad* esta noche?»**: no qué hay sobre el
-  horizonte en general, sino qué es visible *desde tu sitio*, sobre *tu
-  horizonte*, con *tu telescopio* y *tu cámara*, en las horas de las que *tú*
-  dispones.
-- **La trampa del objeto rápido.** Planificaste exposiciones de 60 segundos
-  para un NEO sin confirmar y resulta que se mueve a 5″/min: todas las tomas
-  con traza, el hueco perdido.
-- **La noche que se te olvidó.** Capturaste algo grande el mes pasado y nunca
-  quedó escrito en ningún sitio; ahora mismo no sabrías decir qué noche fue,
-  cuántas tomas ni con qué filtro.
-- **La variable que saltó mientras nadie miraba.** T CrB puede estallar
-  cualquier día; R CrB se desploma sin avisar. ¿Quién las vigila cada día?
-
-NightScribe existe para responder a todo eso desde una sola ventana.
-
 ## ¿Qué es NightScribe?
 
 Cuatro misiones, un solo bucle:

@@ -178,14 +178,15 @@ def test_the_guide_index_lists_every_chapter():
         assert f'{chapter["stem"]}.es.html' in es
 
 
-def test_no_link_on_the_site_is_broken():
-    # Every local href must land on a file that exists: a renamed chapter
-    # would otherwise leave dead links behind, in two languages.
+def test_no_link_or_image_on_the_site_is_broken():
+    # Every local href AND every image must land on a file that exists: a
+    # renamed chapter would otherwise leave dead links behind, in two
+    # languages, and a capture that was never prepared would show a hole.
     broken = []
     for page in SITE.rglob("*.html"):
         html = page.read_text(encoding="utf-8")
-        for href in re.findall(r'href="([^"]+)"', html):
-            if href.startswith(("http", "#", "mailto:")):
+        for href in re.findall(r'(?:href|src)="([^"]+)"', html):
+            if href.startswith(("http", "#", "mailto:", "data:")):
                 continue
             target = (page.parent / href.split("#")[0]).resolve()
             if not target.is_file():

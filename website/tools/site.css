@@ -241,6 +241,29 @@ img { max-width: 100%; }
 .chapter-n { color: var(--accent); font-weight: 700; font-size: 13px; }
 .chapter-t { font-size: 14.5px; }
 
+/* --------------------------------------------------- the screenshots */
+
+/* Real captures of the application (ADR-070): the landing shows three in a
+   row under "The app", and a guide chapter shows its own right under the
+   title. The frame is the same in both places, lighter on the paper. */
+.shots {
+  display: grid; gap: 18px; margin-top: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.shot { margin: 0; }
+.shot img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+}
+.shot figcaption { color: var(--dim); font-size: 13px; margin-top: 9px; }
+.paper .shot { margin: 20px 0 26px; }
+.paper .shot img {
+  border-color: var(--paper-line);
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.16);
+}
+.paper .shot figcaption { color: var(--paper-dim); }
+
 /* ---------------------------------------------------------------- guide */
 
 .doc {

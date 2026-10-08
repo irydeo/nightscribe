@@ -25,6 +25,28 @@ stale page.
 **Edit `tools/site.css` and `tools/site.js`, never `assets/`**: those two are
 the generator's output.
 
+## The screenshots
+
+The site shows **real captures** of the application, taken by hand with the
+observer's own data: they are not mockups (ADR-070). The raw files live
+outside the repository (they are big, and they carry real data); the site's
+copies are prepared from them:
+
+```bash
+python3 website/tools/prepare_screens.py --from ~/ruta/a/las/capturas
+```
+
+It resizes them to 1400 px, converts them to WebP (a 2181 px PNG of the dark
+interface weighs 2.9 MB; the same at 1400 px and quality 92 weighs 240 KB,
+with no visible loss at the size the page shows them) and writes them as
+`website/assets/screens/<name>.webp`.
+
+The names the generator expects are in `SHOTS` (with the caption each one
+carries) and the chapters they belong to in `CHAPTER_SHOTS`, both in
+`build_site.py`. **A capture that is still missing simply leaves its figure
+out**, so they can arrive a few at a time and the page is never broken; the
+preparer prints which ones are still pending.
+
 ## Publish it
 
 `.github/workflows/pages.yml` builds the site and publishes it to GitHub Pages

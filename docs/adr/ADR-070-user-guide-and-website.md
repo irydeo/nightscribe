@@ -64,6 +64,16 @@ antigua, su taller de capturas y su paleta se retiran (el historial de git los
 conserva). El despliegue pide activar Pages una vez en el repositorio
 (*Source: GitHub Actions*).
 
+**Revisión (2026-10-08, las capturas).** La web muestra **capturas reales** de
+la aplicación, tomadas a mano con los datos del observador: no son maquetas. Se
+preparan con `website/tools/prepare_screens.py`, que las reduce a 1400 px y las
+pasa a WebP (una captura de la interfaz oscura de 2181 px pesa 2,9 MB; la misma
+a 1400 px y calidad 92 pesa 240 KB, sin pérdida visible al tamaño que la página
+las muestra) y las deja en `website/assets/screens/`. El generador dibuja la
+figura de un capítulo **solo si el fichero existe**, así que las capturas pueden
+llegar de una en una y la página nunca queda rota. La aplicación no se toca: su
+visor interno sigue sin imágenes.
+
 ## English
 
 **Context**: the user guide lives in `docs/user/` (an index and ten chapters,
@@ -121,3 +131,14 @@ adding its row to the guide's index, which is also what the app lists. The old
 website, its screenshot pipeline and its palette are removed (git's history
 keeps them). The deployment asks for enabling Pages once in the repository
 (*Source: GitHub Actions*).
+
+**Revision (2026-10-08, the screenshots).** The site shows **real captures** of
+the application, taken by hand with the observer's own data: they are not
+mockups. They are prepared with `website/tools/prepare_screens.py`, which
+resizes them to 1400 px and converts them to WebP (a 2181 px capture of the
+dark interface weighs 2.9 MB; the same at 1400 px and quality 92 weighs
+240 KB, with no visible loss at the size the page shows them) and leaves them
+in `website/assets/screens/`. The generator draws a chapter's figure **only
+when its file exists**, so the captures can arrive a few at a time and the page
+is never broken. The application is untouched: its in-app viewer still shows
+no images.

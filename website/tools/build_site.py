@@ -129,6 +129,64 @@ NAV_MAIN = {
            "Tus primeros cinco minutos"),
 }
 
+# The screenshots the site shows. They are REAL captures of the application,
+# taken with the observer's own data and prepared by tools/prepare_screens.py
+# into website/assets/screens/*.webp. A figure is drawn only when its file is
+# there, so a capture that is still missing leaves the page whole (and the run
+# says which ones are pending).
+SHOTS = {
+    # name: (English caption, Spanish caption)
+    "welcome": ("The Welcome screen: your observatory, your equipment, your "
+                "targets, your data",
+                "La pantalla de bienvenida: tu observatorio, tu equipo, tus "
+                "objetivos, tus datos"),
+    "tonight": ("Tonight: the targets ranked for your site and your gear",
+                "Esta noche: los objetivos ordenados para tu sitio y tu "
+                "equipo"),
+    "projects": ("A project, from the object card to publishing",
+                 "Un proyecto, de la ficha del objeto a la publicación"),
+    "project": ("The object card: what it is, how it moves, when to catch it",
+                "La ficha del objeto: qué es, cómo se mueve, cuándo cazarlo"),
+    "campaigns": ("Campaigns and vigils: what is due, what is happening",
+                  "Campañas y vigilias: lo que toca y lo que está pasando"),
+    "capture": ("Capture: the plan, the exposures and CCDciel",
+                "Captura: el plan, las exposiciones y CCDciel"),
+    "photometry": ("Photometry: the comparison sequence and its recipe",
+                   "Fotometría: la secuencia de comparación y su receta"),
+    "measure": ("Measuring on the plate, with the manual centre when the "
+                "object is faint",
+                "Midiendo en la placa, con el centro manual cuando el objeto "
+                "es débil"),
+    "curve": ("The light curve of the series, point by point",
+              "La curva de luz de la serie, punto a punto"),
+    "transit": ("An exoplanet transit, reduced and fitted",
+                "Un tránsito de exoplaneta, reducido y ajustado"),
+    "astrometry": ("The track & stack: the asteroid stands still while the "
+                   "stars crawl",
+                   "El track & stack: el asteroide se queda quieto mientras "
+                   "las estrellas se mueven"),
+    "posts": ("Publishing: the bilingual draft and the charts",
+              "Publicación: el borrador bilingüe y los gráficos"),
+    "settings": ("Settings: every section, with a sensible default",
+                 "Ajustes: cada sección, con un valor por defecto sensato"),
+}
+
+# The three the landing's strip shows, in order.
+LANDING_SHOTS = ("project", "astrometry", "photometry")
+
+# The captures of each guide chapter, by the chapter's stem.
+CHAPTER_SHOTS = {
+    "01-getting-started": ("welcome",),
+    "02-tonight": ("tonight",),
+    "03-projects": ("projects",),
+    "04-campaigns": ("campaigns",),
+    "05-capture": ("capture",),
+    "06-photometry": ("photometry", "measure", "curve", "transit"),
+    "07-astrometry": ("astrometry",),
+    "08-posts": ("posts",),
+    "10-settings": ("settings",),
+}
+
 # The hero's "at a glance" facts: the same promises the README makes a screen
 # below, in four words each.
 GLANCE = {
@@ -146,6 +204,9 @@ CHROME = {
            "read": "Read the guide", "chapters": "The guide, chapter by "
                                                  "chapter",
            "what": "What it is", "more": "See it in the guide",
+           "app": "The app", "app_lead": "Screenshots of the running program, "
+                                          "with real observations: not "
+                                          "mockups.",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -156,6 +217,9 @@ CHROME = {
            "github": "Verlo en GitHub", "read": "Leer la guía",
            "chapters": "La guía, capítulo a capítulo",
            "what": "Qué es", "more": "Verlo en la guía",
+           "app": "La aplicación",
+           "app_lead": "Capturas del programa en marcha, con observaciones "
+                       "reales: no son maquetas.",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -622,6 +686,29 @@ def _sections(body):
     return out
 
 
+def _figure(name, lang, root=""):
+    # @args: name - a shot's name (see SHOTS), lang - the page's language,
+    #        root - "" or "../" (how far the page is from website/)
+    # @return: the figure's HTML, or "" when the capture is not there yet.
+    #          The page is never broken by a missing shot: the run says which
+    #          ones are pending instead.
+    image = SITE / "assets" / "screens" / f"{name}.webp"
+    if not image.is_file():
+        return ""
+    caption = SHOTS.get(name, ("", ""))[0 if lang == "en" else 1]
+    return (f'<figure class="shot">'
+            f'<img src="{root}assets/screens/{name}.webp" '
+            f'alt="{html.escape(caption)}" loading="lazy">'
+            f'<figcaption>{html.escape(caption)}</figcaption></figure>')
+
+
+def _shots(names, lang, root=""):
+    # @args: names - the shots to draw, lang, root - the path prefix
+    # @return: the figures that exist, wrapped in their grid (or "" when none)
+    figures = "".join(_figure(n, lang, root) for n in names)
+    return f'<div class="shots">{figures}</div>' if figures else ""
+
+
 def _kinds_cards(lang):
     # @args: lang - "es" | "en"
     # @return: the target kinds as cards: the chip and the colour the app
@@ -717,6 +804,21 @@ def build_landing(lang):
 
     glance = "".join(f'<span class="glance">{html.escape(g)}</span>'
                      for g in GLANCE[lang])
+    # The README's sections, in order, with the captures' strip right after
+    # the target kinds: by then the visitor knows what the app does and can
+    # see it.
+    parts = []
+    for sec in sections:
+        parts.append(f'<section class="block" id="{sec["id"]}">'
+                     f'<h2>{sec["title"]}</h2>{sec["html"]}</section>')
+        if sec["text"] in KINDS_SECTION:
+            shots = _shots(LANDING_SHOTS, lang)
+            if shots:
+                parts.append(f'<section class="block" id="shots">'
+                             f'<h2>{chrome["app"]}</h2>'
+                             f'<p class="lead">{chrome["app_lead"]}</p>'
+                             f"{shots}</section>")
+    sections_html = "".join(parts)
     chapters = "".join(
         f'<a class="chapter" href="docs/{c["stem"]}{_suffix(lang)}.html">'
         f'<span class="chapter-n">{html.escape(c["num"])}</span>'
@@ -739,9 +841,7 @@ def build_landing(lang):
   </div>
 </div>
 
-""" + "".join(
-        f'<section class="block" id="{s["id"]}">'
-        f'<h2>{s["title"]}</h2>{s["html"]}</section>' for s in sections) + f"""
+""" + sections_html + f"""
 <section class="block" id="guide">
   <h2>{chrome["guide"]}</h2>
   <p class="lead">{chrome["chapters"]}</p>
@@ -842,7 +942,10 @@ def build_guide(out, lang):
             # the chapter's own h1 repeats the page title: the sidebar and the
             # tab already say it, so the article starts at the first h2
             body = re.sub(r"<h1[^>]*>.*?</h1>", "", body, count=1)
-            body = f"<h1>{html.escape(title)}</h1>{body}"
+            # its captures go right under the title, where they explain what
+            # the chapter is about before the first paragraph
+            shots = _shots(CHAPTER_SHOTS.get(page["stem"], ()), lang, "../")
+            body = f"<h1>{html.escape(title)}</h1>{shots}{body}"
         html_text = f"""<div class="doc">
   <aside class="side">
     <p class="side-title">{chrome["contents"]}</p>

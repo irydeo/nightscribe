@@ -563,6 +563,7 @@ Design, architecture, data sources, scoring, workflows and every decision
 
 ## Licence
 
-[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE).
-(c) 2026 Francisco José Calvo Fernández
-([Irydeo Observatory](https://www.irydeo.com), MPC Z41).
+NightScribe is free software, published under the
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE): you can use
+it, study it, change it and share it, and whatever you pass on stays free for
+the next person. There is no paid edition and no locked feature.

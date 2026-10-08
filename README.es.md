@@ -587,6 +587,7 @@ decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.
 
 ## Licencia
 
-[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE).
-(c) 2026 Francisco José Calvo Fernández
-([Observatorio Irydeo](https://www.irydeo.com), MPC Z41).
+NightScribe es software libre, publicado bajo la
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE): puedes
+usarlo, estudiarlo, modificarlo y compartirlo, y lo que transmitas sigue
+siendo libre para el siguiente. No hay edición de pago ni función bloqueada.

@@ -117,19 +117,16 @@ README_KIND_ORDER = ("neo", "comet", "pccp", "sn", "transit", "alert",
 KINDS_SECTION = ("What you can follow", "Qué puedes seguir")
 DETAIL_SECTION = ("What you can do: in detail", "Qué puedes hacer: en detalle")
 
-# The sections the top bar shows. It is a CURATED list, not every heading:
-# fourteen entries need a scroll, and a scrollbar in the header is the one
-# thing a landing must not have, while a navigation that lists everything
-# guides nobody. Each title has to exist in the README: the site's test says
-# so, so a rewording fails there instead of losing an entry in silence.
+# The sections the top bar shows. It is a CURATED list, not every heading: a
+# bar that lists everything (or that needs a scroll) guides nobody and looks
+# crowded, which is what the first attempt got wrong twice. These four plus
+# the guide fit on one line in both languages, with room to spare; each title
+# has to exist in the README, and the site's test says so.
 NAV_MAIN = {
     "en": ("What is NightScribe?", "What you can follow", "What you need",
-           "Your first five minutes", "A whole night (and the weeks after)",
-           "Where the data comes from"),
+           "Your first five minutes"),
     "es": ("¿Qué es NightScribe?", "Qué puedes seguir", "Qué necesitas",
-           "Tus primeros cinco minutos",
-           "Una noche completa (y las semanas siguientes)",
-           "De dónde salen los datos"),
+           "Tus primeros cinco minutos"),
 }
 
 # The hero's "at a glance" facts: the same promises the README makes a screen
@@ -543,6 +540,13 @@ def _shell(*, lang, title, description, root, body, page_class, switcher,
     if nav:
         bar_nav = "".join(f'<a href="{href}">{label}</a>'
                           for href, label in nav)
+    # The guide appears twice only where it is not already in the menu: on the
+    # landing the menu's last entry IS the guide, so a pill beside it was the
+    # duplicate that made the bar crowded. On the guide's own pages there is
+    # no menu, and the pill is the way back to its index.
+    guide_pill = "" if nav else (
+        f'<a class="ghost" href="{root}docs/index{_suffix(lang)}.html">'
+        f'{chrome["guide"]}</a>')
     return f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -562,7 +566,7 @@ def _shell(*, lang, title, description, root, body, page_class, switcher,
     </a>
     <nav class="bar-nav">{bar_nav}</nav>
     <div class="bar-end">
-      <a class="ghost" href="{root}docs/index{_suffix(lang)}.html">{chrome["guide"]}</a>
+      {guide_pill}
       <a class="lang" href="{switcher}">{LANG_LABEL[_other(lang)]}</a>
     </div>
   </div>

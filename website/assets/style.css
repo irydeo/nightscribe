@@ -169,13 +169,18 @@ img { max-width: 100%; }
 .block code {
   background: var(--base); border: 1px solid var(--line); border-radius: 5px;
   padding: 1px 6px; font-size: 0.92em;
+  /* a long identifier or URL breaks instead of pushing the page sideways */
+  overflow-wrap: anywhere;
 }
 .block strong { color: var(--text); }
 
 /* the four missions and the project loop */
+/* The grids never force a horizontal scroll: `min(100%, X)` lets a column be
+   narrower than X when the screen is (the old plain `minmax(X, 1fr)` overflowed
+   on a 320 px phone, where only 280 are left). */
 .missions {
   display: grid; gap: 14px; margin: 22px 0 26px;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
 }
 .mission {
   background: var(--base); border: 1px solid var(--line);
@@ -199,7 +204,7 @@ img { max-width: 100%; }
 /* the target kinds: the app's own chips and colours */
 .kinds {
   display: grid; gap: 14px; margin-top: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
 }
 .kind {
   background: var(--base); border: 1px solid var(--line);
@@ -237,7 +242,7 @@ img { max-width: 100%; }
 /* the guide's chapters, as cards */
 .chapters {
   display: grid; gap: 10px; margin-top: 18px;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
 }
 .chapter {
   display: flex; align-items: baseline; gap: 12px;
@@ -255,7 +260,7 @@ img { max-width: 100%; }
    title. The frame is the same in both places, lighter on the paper. */
 .shots {
   display: grid; gap: 18px; margin-top: 24px;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
 }
 .shot { margin: 0; }
 .shot .zoom { display: block; cursor: zoom-in; }
@@ -314,7 +319,10 @@ img { max-width: 100%; }
   display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 26px;
   align-items: start;
 }
-.side { position: sticky; top: calc(var(--bar-h) + 16px); }
+.side { position: sticky; top: calc(var(--bar-h) + 16px); min-width: 0; }
+.doc-main { min-width: 0; }
+.side-fold > summary { list-style: none; cursor: pointer; }
+.side-fold > summary::-webkit-details-marker { display: none; }
 .side-title {
   margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: 1.6px;
   text-transform: uppercase; color: var(--dim);
@@ -347,13 +355,16 @@ img { max-width: 100%; }
 .paper a { color: var(--paper-link); }
 .paper code {
   background: #eef1f8; border: 1px solid var(--paper-line); border-radius: 5px;
-  padding: 1px 6px; font-size: 0.92em;
+  padding: 1px 6px; font-size: 0.92em; overflow-wrap: anywhere;
 }
-.paper .code {
+/* The code block scrolls on its own, wherever it is: the landing used to have
+   no rule for it (only the paper did) and its long lines dragged the whole
+   document to 754 px on a phone. */
+.code {
   background: #12141f; color: #dfe4f0; border-radius: 10px;
   padding: 14px 16px; overflow-x: auto; font-size: 13.5px; line-height: 1.55;
 }
-.paper .code code { background: none; border: 0; padding: 0; color: inherit; }
+.code code { background: none; border: 0; padding: 0; color: inherit; }
 .table-wrap { overflow-x: auto; margin: 16px 0; }
 .paper table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
 .paper th, .paper td {
@@ -395,7 +406,10 @@ img { max-width: 100%; }
 /* ------------------------------------------------------------ responsive */
 
 @media (max-width: 900px) {
-  .doc { grid-template-columns: 1fr; }
+  /* `minmax(0, 1fr)`, not `1fr`: a plain 1fr cannot shrink below its content,
+     and the contents' links are nowrap, so the whole guide was dragged to
+     1764 px wide on a phone (measured 2026-10-08). */
+  .doc { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; }
   .toc {
     flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 6px;
@@ -403,6 +417,15 @@ img { max-width: 100%; }
   .toc-link { white-space: nowrap; background: var(--base); }
   .paper { padding: 24px 20px 30px; }
   .bar-nav { display: none; }
+  /* the fold says it can be opened, and the reader can see it is closed */
+  .side-fold > summary::after { content: " ▸"; color: var(--accent); }
+  .side-fold[open] > summary::after { content: " ▾"; }
+}
+
+@media (max-width: 420px) {
+  /* the mark, the guide's link and the language did not fit together: the
+     name steps aside and the icon keeps the identity */
+  .wordmark { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

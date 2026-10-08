@@ -263,6 +263,7 @@ CHROME = {
                                           "reduced by EXOTIC, a light curve "
                                           "and a measurement. Click any of "
                                           "them to see it larger.",
+           "report": "Report a bug",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -279,6 +280,7 @@ CHROME = {
                        "& stack, la fotometría, un tránsito reducido por "
                        "EXOTIC, una curva de luz y una medida. Pincha "
                        "cualquiera para verla más grande.",
+           "report": "Informar de un fallo",
            "on_github": "GitHub",
            "licence": f'<a href="{LICENSE_URL}">GPL v3</a> · '
                       "Francisco José Calvo Fernández, "
@@ -699,7 +701,8 @@ def _shell(*, lang, title, description, root, body, page_class, switcher,
 </main>
 <footer class="foot">
   <p>{chrome["licence"]}</p>
-  <p><a href="{REPO_URL}" rel="noopener">{REPO_URL}</a></p>
+  <p><a href="{REPO_URL}" rel="noopener">{REPO_URL}</a>
+     · <a href="{REPO_URL}/issues" rel="noopener">{chrome["report"]}</a></p>
 </footer>
 <script src="{root}assets/main.js"></script>
 </body>
@@ -967,7 +970,9 @@ def _sidebar(lang, chapters, current):
                    f'href="{_page_name(chapter["stem"], lang)}">'
                    f'<span>{html.escape(chapter["num"])}</span>'
                    f'{html.escape(chapter["title"][lang])}</a>')
-    return f'<nav class="toc">{"".join(out)}</nav>'
+    return (f'<details class="side-fold" open>'
+            f'<summary class="side-title">{chrome["contents"]}</summary>'
+            f'<nav class="toc">{"".join(out)}</nav></details>')
 
 
 def _prev_next(lang, pages, pos):
@@ -1011,7 +1016,6 @@ def build_guide(out, lang):
             body = f"<h1>{html.escape(title)}</h1>{shots}{body}"
         html_text = f"""<div class="doc">
   <aside class="side">
-    <p class="side-title">{chrome["contents"]}</p>
     {_sidebar(lang, chapters, page["stem"])}
     <p class="side-back"><a href="../index{_suffix(lang)}.html">
       {chrome["home"]}</a></p>

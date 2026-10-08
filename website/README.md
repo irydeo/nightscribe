@@ -47,6 +47,24 @@ carries) and the chapters they belong to in `CHAPTER_SHOTS`, both in
 out**, so they can arrive a few at a time and the page is never broken; the
 preparer prints which ones are still pending.
 
+## Check it on a phone
+
+A page that scrolls sideways on a phone is broken, not "desktop-only". The
+audit of 2026-10-08 measured the guide at 1764 px on a 390 px screen (the
+contents' links are nowrap and the grid could not shrink) and the landing at
+754 (a code block without its own scroll); neither was visible on a desktop.
+
+```bash
+python3 website/tools/check_mobile.py --shots /tmp/mobile
+```
+
+The widths are the real ones (320, 360, 390, 430) and they are tested through
+an **iframe**, because headless Chrome refuses to lay out a viewport narrower
+than 500 px: the iframe is the viewport. It exits non-zero when a page
+overflows and leaves a screenshot of each combination, which is what a person
+actually looks at. The unit suite carries the cheap half (the three CSS rules
+that make it true), so the regression is caught without a browser.
+
 ## Publish it
 
 `.github/workflows/pages.yml` builds the site and publishes it to GitHub Pages

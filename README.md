@@ -561,6 +561,8 @@ chapters with the "why" of each option. It also ships inside the app
 Design, architecture, data sources, scoring, workflows and every decision
 (ADRs) live in [`docs/`](docs/), in Spanish and English.
 
+Something missing, wrong or unclear? [Open an issue](https://github.com/irydeo/nightscribe/issues).
+
 ## Licence
 
 NightScribe is free software, published under the

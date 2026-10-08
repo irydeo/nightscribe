@@ -258,6 +258,32 @@ def test_every_screenshot_opens_larger_and_can_be_closed():
     assert figures, "the site shows no screenshots"
 
 
+def test_the_pages_fit_a_phone():
+    # A page that scrolls sideways on a phone is broken, not "desktop-only":
+    # the audit of 2026-10-08 measured the guide at 1764 px on a 390 px screen
+    # (the contents' links are nowrap and the grid could not shrink) and the
+    # landing at 754 (a code block without its own scroll). The full check
+    # needs a browser (tools/check_mobile.py); this is the cheap half that
+    # runs everywhere: the three rules that make it true.
+    css = (SITE / "assets" / "style.css").read_text(encoding="utf-8")
+    for grid in re.findall(r"grid-template-columns:\s*repeat\([^;]+;", css):
+        assert "min(100%" in grid, grid
+    # the guide's columns can shrink (its contents are a long nowrap list)
+    assert "grid-template-columns: minmax(0, 1fr)" in css
+    # a code block scrolls on its own wherever it is, not only in the paper
+    assert re.search(r"\.code\s*\{[^}]*overflow-x:\s*auto", css)
+
+
+def test_the_footer_offers_to_report_a_bug():
+    # The way to say "this is wrong" is one click away, in both languages and
+    # on every page (the footer is shared).
+    for page in (SITE / "index.html", SITE / "index.es.html",
+                 SITE / "docs" / "06-photometry.es.html"):
+        html = page.read_text(encoding="utf-8")
+        foot = html[html.index('<footer class="foot">'):]
+        assert "github.com/irydeo/nightscribe/issues" in foot, page.name
+
+
 def test_the_landing_and_the_guide_are_the_readme_and_the_chapters():
     # The point of the whole thing: the prose is not written twice. The
     # landing's definition is the README's own opening and the guide's pages

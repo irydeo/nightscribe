@@ -585,6 +585,8 @@ Guía de usuario (web)**).
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
 decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.
 
+¿Falta algo, algo está mal o no se entiende? [Abre una incidencia](https://github.com/irydeo/nightscribe/issues).
+
 ## Licencia
 
 NightScribe es software libre, publicado bajo la

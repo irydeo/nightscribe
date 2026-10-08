@@ -74,6 +74,22 @@ figura de un capítulo **solo si el fichero existe**, así que las capturas pued
 llegar de una en una y la página nunca queda rota. La aplicación no se toca: su
 visor interno sigue sin imágenes.
 
+**Revisión (2026-10-08, el móvil).** La web se midió a 320, 360, 390 y 430 px
+con Chrome headless (dentro de un iframe, porque headless no maqueta por debajo
+de 500) y salieron dos desbordes que en escritorio no se ven: la guía medía
+**1764 px** en una pantalla de 390 (los enlaces del índice son `nowrap` y la
+rejilla no podía encogerse por debajo de su contenido) y la portada **754** (un
+bloque de código sin scroll propio). Ahora la rejilla de la guía usa
+`minmax(0, 1fr)`, las cuatro rejillas `minmax(min(100%, X), 1fr)`, los bloques
+de código llevan su propio scroll en cualquier sitio, el índice se pliega en
+móvil (un `<details>` nativo) y el nombre de la marca cede por debajo de 420 px.
+`website/tools/check_mobile.py` repite la medición y falla si una página
+desborda; la suite vigila las reglas del CSS que lo hacen verdad.
+
+**Revisión (2026-10-08, el reporte de fallos).** El pie de la web (todas las
+páginas) enlaza la página de incidencias del repositorio, en el idioma de la
+página, y el README lleva la misma línea en su sección de documentación.
+
 ## English
 
 **Context**: the user guide lives in `docs/user/` (an index and ten chapters,
@@ -142,3 +158,19 @@ in `website/assets/screens/`. The generator draws a chapter's figure **only
 when its file exists**, so the captures can arrive a few at a time and the page
 is never broken. The application is untouched: its in-app viewer still shows
 no images.
+
+**Revision (2026-10-08, the phone).** The site was measured at 320, 360, 390
+and 430 px with headless Chrome (inside an iframe, because headless will not
+lay out a viewport narrower than 500) and two overflows came out that are
+invisible on a desktop: the guide measured **1764 px** on a 390 px screen (the
+contents' links are `nowrap` and the grid could not shrink below its content)
+and the landing **754** (a code block without its own scroll). The guide's grid
+now uses `minmax(0, 1fr)`, the four grids `minmax(min(100%, X), 1fr)`, the code
+blocks carry their own scroll wherever they are, the contents fold away on a
+phone (a native `<details>`) and the brand's name steps aside below 420 px.
+`website/tools/check_mobile.py` repeats the measurement and fails when a page
+overflows; the suite watches the CSS rules that make it true.
+
+**Revision (2026-10-08, reporting a bug).** The site's footer (every page)
+links the repository's issue tracker, in the page's language, and the README
+carries the same line in its documentation section.

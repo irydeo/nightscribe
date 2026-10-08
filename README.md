@@ -4,11 +4,10 @@
 
 **Plan your night, understand every object, tell your science.**
 
-NightScribe is a free (GPL v3) desktop application for amateur astronomical
-observatories, with a graphical interface (Qt6, dark theme) and a command
-line. It was built by the manager of a real observatory (Irydeo, MPC Z41) who
-got tired of doing by hand, every single clear day, what a computer does
-better.
+NightScribe is the working tool of an amateur astronomical observatory: it
+gathers the whole cycle of an observation in one place, from choosing what to
+look at tonight with your sky and your equipment, to understanding the object,
+capturing and reducing the images and telling what you have found.
 
 ## What is NightScribe?
 

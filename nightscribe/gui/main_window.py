@@ -328,6 +328,11 @@ TAB_PROJECTS = VIEW_HOME
 TAB_TONIGHT = VIEW_TONIGHT
 TAB_CAMPAIGNS = VIEW_CAMPAIGNS
 
+# The published user guide (ADR-070). The site is generated from the very same
+# docs/user the in-app browser reads, so this link and Help > Technical
+# Documentation cannot tell different stories; the language is appended.
+GUIDE_WEB_URL = "https://irydeo.github.io/nightscribe/docs/index"
+
 # The projects list: how wide it opens, and the range the splitter allows.
 # It is the observer's to choose and it is remembered between runs. The
 # default is measured, not guessed: at ~500 px the row fits the curve AND
@@ -1491,6 +1496,7 @@ class MainWindow(QMainWindow):
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_docs.triggered.connect(self.on_docs)
+        self._menus.action_guide_web.triggered.connect(self.on_guide_web)
         self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_welcome.triggered.connect(
             lambda: self.navigate(VIEW_WELCOME))
@@ -2694,6 +2700,16 @@ class MainWindow(QMainWindow):
         ]
         start = next((c for c in candidates if c.exists()), None)
         open_browser(root, self, start=start)
+
+    def on_guide_web(self):
+        # Opens the published user guide in the OS browser (ADR-070). The
+        # in-app browser above is the offline door, built from the same
+        # markdown; this is the one you can read on a phone or send to
+        # somebody. The site's own pages pick the language from the suffix.
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        suffix = ".es" if self._lang() == "es" else ""
+        QDesktopServices.openUrl(QUrl(f"{GUIDE_WEB_URL}{suffix}.html"))
 
     # ---------------- Tonight: suggestion grid ----------------
 

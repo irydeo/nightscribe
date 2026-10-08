@@ -1237,3 +1237,25 @@ classic dialogs and their switch stayed in the code "just in case".
 `gui/main_window.py`, `gui/workers.py` and `gui/ui/settings_dialog.ui`; tests in
 `test_welcome_setup.py`, `test_wizard_site.py`, `test_exposure.py` and
 `test_ufe_integration.py`.
+
+### 7duodetricies. The guide and the website: one source, two renderings (2026-10-08, ADR-070)
+
+Motivation: the user guide lived only in `docs/user` (inside the app) and the
+`website/` folder was a hand-written landing, with another palette and a
+screenshot pipeline for the retired shell: it told a different story from the
+guide's. A clear website was asked for, in the application's style, explaining
+what the software is and what it lets you do, and being the guide as well.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The generator | `website/tools/build_site.py`: turns the README and `docs/user` into HTML, injects the theme's palette and the catalogue's chips, and is idempotent | **Done** |
+| The landing | One page per language with the hero (the app's sky), the README's definition, the kinds as cards, the long chapter folded into an accordion and the chapter index | **Done** |
+| The guide | One page per chapter per language, with a sidebar, previous/next, heading anchors and the "Why …?" boxes as callouts | **Done** |
+| The guard | `tests/unit/test_site_build.py`: the converter, the byte-for-byte regeneration, the internal links and that the palette comes from the theme | **Done** |
+| In the program | Help → User guide (web), in the OS browser; the in-app viewer stays the offline door | **Done** |
+| Publishing | `.github/workflows/pages.yml` builds the site and publishes it to GitHub Pages (push to `main` or `release/v0.1`, and manual) | **Done** |
+
+**Entry point**: `website/tools/build_site.py`, `website/tools/site.css`,
+`website/tools/site.js`, `website/README.md`; in the app,
+`gui/main_window.py` (`on_guide_web`) and `gui/ui/main_window.ui`; test in
+`tests/unit/test_site_build.py`.

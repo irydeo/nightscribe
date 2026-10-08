@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The command line · NightScribe</title>
+<meta name="description" content="The command line">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.html">User guide</a>
+      <a class="lang" href="09-cli.es.html">ES</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Contents</p>
+    <nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link on" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a></nav>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>The command line</h1><p>Everything that matters in NightScribe can be done without opening the window, with <code>python -m nightscribe &lt;command&gt;</code> (or <code>nightscribe &lt;command&gt;</code> if you installed the package). Useful for scripts, cron jobs and hurried nights.</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Command</th><th style="text-align:left">What it does</th></tr></thead><tbody><tr><td style="text-align:left"><code>gui</code></td><td style="text-align:left">Starts the desktop application</td></tr><tr><td style="text-align:left"><code>tonight</code></td><td style="text-align:left">Tonight's best targets, with score and reasons</td></tr><tr><td style="text-align:left"><code>explore &lt;object&gt;</code></td><td style="text-align:left">The explained object card (orbit, physics, visibility)</td></tr><tr><td style="text-align:left"><code>post &lt;object&gt;</code></td><td style="text-align:left">The ES/EN drafts and the tweet</td></tr><tr><td style="text-align:left"><code>solar</code></td><td style="text-align:left">The Sun's state (spots, flares, wind)</td></tr><tr><td style="text-align:left"><code>blink &lt;object&gt; &lt;fits&gt;</code></td><td style="text-align:left">Blink your FITS against the PanSTARRS reference (supernovae)</td></tr><tr><td style="text-align:left"><code>history</code></td><td style="text-align:left">Your observing history</td></tr><tr><td style="text-align:left"><code>sequence &lt;object&gt;</code></td><td style="text-align:left">Proposed photometric sequence and comparison chart</td></tr><tr><td style="text-align:left"><code>inject</code></td><td style="text-align:left">Injection/recovery: measures how deep your pipeline truly reaches</td></tr><tr><td style="text-align:left"><code>project …</code></td><td style="text-align:left">Project management: <code>list</code>, <code>create</code>, <code>show</code>, <code>advance</code>, <code>close</code>, <code>reopen</code>, <code>files</code></td></tr></tbody></table></div><p>Examples:</p><pre class="code"><code>python -m nightscribe tonight            # tonight's plan in the terminal
+python -m nightscribe explore 2021EQ3    # a NEO's card
+python -m nightscribe project list       # your active projects
+python -m nightscribe project show "T CrB"</code></pre><blockquote class="quote"><strong>Why does <code>inject</code> deserve its own command?</strong> Because "my telescope reaches magnitude 20" is a sentence to be measured, not believed. <code>inject</code> seeds sources of known brightness into your own frames and checks which ones the pipeline recovers: the result is your <em>real</em> limit, with your sky, your camera and your reduction. It is the honest number you should put in the limiting magnitude in Settings.</blockquote><p>The GUI and the CLI share database, cache and settings: whatever you do in one is visible to the other.</p></article>
+    <nav class="pn"><a class="pn-prev" href="08-posts.html"><span>Previous</span>Reporting it</a><a class="pn-next" href="10-settings.html"><span>Next</span>Settings</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

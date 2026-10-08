@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Projects · NightScribe</title>
+<meta name="description" content="Projects">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.html">User guide</a>
+      <a class="lang" href="03-projects.es.html">ES</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Contents</p>
+    <nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link on" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a></nav>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Projects</h1><p>A <strong>project</strong> is NightScribe's unit of work: one specific object you want to observe, with its own folder, visits, measurements and outcome. Everything you do with it (captures, light curves, reports, posts) hangs from the project, so weeks later you can pick it up without rebuilding anything.</p><h2 id="creating-a-project">Creating a project</h2><p>Three paths, and all of them lead to the <strong>Tonight</strong> view (chapter 02):</p><ul><li><p><strong>+ NEW PROJECT</strong>, in the window header.</p></li><li><p><strong>Create a project from tonight's targets</strong>, in the night panel of <strong>My projects</strong>.</p></li><li><p><strong>+ New project…</strong>, in the project list.</p></li></ul><p>From the Tonight view you pick the target (a suggested card, a table row, or the search bar with <strong>Create by hand…</strong> for what is not in any catalogue, such as a variable from your own programme). The project is born with everything the app already knows: coordinates, visibility window, magnitude and exposure plan.</p><h2 id="the-four-steps">The four steps</h2><p>Every project walks through four guided steps; the app tells you which one is due and the <strong>Go →</strong> button takes you to the exact tool:</p><ol><li><p><strong>Card</strong>: what the object is and why it matters. Orbital and physical parameters translated into plain language, visibility from your site and observing recommendations (maximum exposure before a NEO trails, for instance).</p></li><li><p><strong>Capture</strong>: launch the frames (straight onto CCDciel, chapter 05) or register the ones you already took.</p></li><li><p><strong>Analysis</strong>: this is where <strong>visits</strong> live (each observing night is a visit) along with their resources: the FITS plates, photometry, astrometry, the comparison chart. Chapters 06 and 07 go into detail.</p></li><li><p><strong>Publishing</strong>: the bilingual post draft and the charts (chapter 08).</p></li></ol><p>When a step is complete, <strong>✔ Mark done</strong> marks it and the project moves on.</p><blockquote class="why"><strong>Why steps and not a tool drawer?</strong> Because order matters: measuring photometry before calibrating produces pretty, false numbers. The steps do not lock you in (you can open any tool at any time), but they make it hard to skip the physics by accident.</blockquote><h2 id="the-project-list">The project list</h2><p>In <strong>My projects</strong> you have search, filters by type/tag/campaign and three views: <strong>Active</strong>, <strong>Done</strong> and <strong>Archived</strong>. Two details you will use daily:</p><ul><li><p><strong>☆ Favourites first</strong>: pins to the top what you are following closely.</p></li><li><p><strong>"Needs you"</strong>: the landing panel summarises which projects need you and why ("5 days without measuring this variable and its period is 0.3 days", "this SN is fading: last useful shot this week").</p></li></ul><blockquote class="why"><strong>Why an "attention" panel?</strong> Because scientific follow-up is a cadence problem, not a memory problem: a light curve with gaps in the wrong places loses the period or the maximum. The panel computes locally, with no network, which project loses value with each passing day, and puts it in front of you before you plan the night.</blockquote><h2 id="the-target-kinds-in-one-sentence-each">The target kinds, in one sentence each</h2><ul><li><p><strong>NEO</strong>: an asteroid or comet near Earth; the value lies in the astrometry for its orbit (chapter 07).</p></li><li><p><strong>PCCP</strong>: a candidate on the MPC confirmation page; your measurement may be the one that confirms it.</p></li><li><p><strong>Comet</strong>: activity tracking and real magnitude versus the predicted one.</p></li><li><p><strong>Supernova</strong>: light curve against the templates of its type and a confirmation blink against the reference image.</p></li><li><p><strong>Exoplanet transit</strong>: the transit curve; NightScribe prepares the EXOTIC handoff and the ExoClock submission.</p></li><li><p><strong>Variable</strong> (including <strong>HADS</strong>, high-amplitude δ Scuti stars): photometric series, period search and folded curve.</p></li><li><p><strong>Alert</strong>: one-off targets (outbursts, AAVSO calls).</p></li></ul><h2 id="the-observing-journal">The observing journal</h2><p><strong>Tools → Observing journal</strong> shows your history by night: what you observed, how many frames, with which filter, and what came out of it. It builds itself from your projects and visits: the night you captured something great stays written down even if you forgot to log it.</p><p>Next: <a href="04-campaigns.html">04. Campaigns and vigils</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="02-tonight.html"><span>Previous</span>Planning the night</a><a class="pn-next" href="04-campaigns.html"><span>Next</span>Campaigns and vigils</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

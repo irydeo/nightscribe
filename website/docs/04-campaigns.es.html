@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>04. Campañas y vigilias · NightScribe</title>
+<meta name="description" content="04. Campañas y vigilias">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="lang" href="04-campaigns.html">EN</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Índice</p>
+    <nav class="toc"><a class="toc-link" href="index.es.html">Guía de usuario</a><a class="toc-link" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link on" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a></nav>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>04. Campañas y vigilias</h1><p>Hay dos formas de compromiso a largo plazo en NightScribe, y conviene no confundirlas: las <strong>campañas</strong> (un compromiso de grupo, con protocolo) y las <strong>vigilias</strong> (un ojo permanente sobre una estrella concreta).</p><h2 id="campañas">Campañas</h2><p>Una campaña es el compromiso <em>compartido</em> de un grupo de observatorios: un objetivo científico («medir la erupción completa de T CrB»), un protocolo (cadencia en noches, filtros, estrellas de comparación) y los enlaces donde se informa y se depositan los datos. Muchos proyectos cuelgan de una campaña; borrar la campaña no borra los proyectos, solo los libera.</p><p>La pestaña <strong>Campañas</strong> muestra la salud de cada campaña de un vistazo: cuántos proyectos tiene, cuántos van <em>vencidos</em> respecto a la cadencia, y un ⚡ cuando algún miembro muestra un evento. Los botones hacen lo que dicen:</p><ul><li><p><strong>Nuevo proyecto…</strong>: crea un proyecto nuevo ya vinculado (resuelve el nombre contra VSX y SIMBAD; si no está, lo introduces a mano).</p></li><li><p><strong>Vincular proyecto…</strong>: vincula un proyecto que ya existía.</p></li><li><p><strong>Quitar proyecto…</strong>: lo desvincula sin borrar nada.</p></li></ul><blockquote class="why"><strong>¿Por qué la cadencia es lo único que NightScribe «lee» del protocolo?</strong> Porque es lo único que puede comprobar. Si tu campaña pide una medida cada 3 noches y un miembro lleva 5 sin observarse, la app lo saca a la lista de esta noche (calculado en local, sin red). El resto del protocolo (filtros, comparaciones, notas) se guarda como referencia, pero la física de cada grupo es demasiado variada para modelarla: tú la lees, la app la recuerda.</blockquote><h2 id="vigilias">Vigilias</h2><p>Una vigilia es una alarma sobre una estrella que puede cambiar <em>cualquier día</em>: la lista curada la editas tú en Configuración, y el ejemplo canónico es <strong>T CrB</strong> (una nova recurrente que puede estallar en cualquier momento) o <strong>R CrB</strong> (que se desvanece sin avisar).</p><p>NightScribe consulta periódicamente la fotometría reciente (ZTF, y la AAVSO si le diste tu token) y la compara con el nivel basal de cada estrella. Si algo se sale de lo normal, te avisa.</p><blockquote class="why"><strong>¿Por qué comparar con el basal y no con «la magnitud de catálogo»?</strong> Porque estas estrellas no tienen un brillo «de catálogo»: tienen un nivel de reposo alrededor del cual oscilan. Lo anómalo no es que T CrB esté en magnitud 10; lo anómalo es que se separe de su basal de ~10,5. Una erupción se detecta contra la historia de la estrella, no contra una tabla.</blockquote><blockquote class="why"><strong>¿Por qué piden el token de AAVSO para las brillantes?</strong> Por debajo de ~11,5 mag, ZTF deja de ser fiable por saturación, así que la vigilancia de las brillantes depende de la fotometría de la comunidad AAVSO, cuya API exige identificarse. Sin token, esas vigilias se quedan en silencio en vez de darte datos dudosos.</blockquote><p>Siguiente: <a href="05-capture.es.html">05. Captura</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="03-projects.es.html"><span>Anterior</span>03. Proyectos</a><a class="pn-next" href="05-capture.es.html"><span>Siguiente</span>05. Captura</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

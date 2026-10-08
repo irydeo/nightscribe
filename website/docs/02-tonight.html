@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Planning the night · NightScribe</title>
+<meta name="description" content="Planning the night">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.html">User guide</a>
+      <a class="lang" href="02-tonight.es.html">ES</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Contents</p>
+    <nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link on" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a></nav>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Planning the night</h1><p>Planning the night in NightScribe is not a separate tab: it is the natural first step of a project's life cycle. The app opens on <strong>My projects</strong> and, until you select one, the right-hand panel greets you with <strong>TONIGHT FROM YOUR OBSERVATORY</strong>: the date, the darkness window, the Moon and tonight's planets, over a sky painted with its real phase.</p><p>From there, any of these three paths opens the <strong>Tonight</strong> view:</p><ul><li><p><strong>+ NEW PROJECT</strong>, in the header;</p></li><li><p><strong>Create a project from tonight's targets</strong>, in the night panel;</p></li><li><p><strong>+ New project…</strong>, in the project list.</p></li></ul><p>The view answers one concrete question: <em>what is most worth observing tonight, from your site, with your equipment</em>. At the top you have a search bar (<strong>Find an object by name (VSX / SIMBAD)…</strong>, with <strong>Create by hand…</strong> for what is not in any catalogue) and, below it, the suggestions.</p><h2 id="tonights-best-targets">Tonight's best targets</h2><p>First, <strong>Tonight's best targets</strong>: one per kind (a NEO, a comet, a supernova, a transit...) and then the next best, because a varied night is worth more than three identical NEOs. Each card shows:</p><ul><li><p>the <strong>score</strong>, from 0 to 100;</p></li><li><p>the <strong>"why tonight" sentence</strong>: the concrete reason for the suggestion ("On the MPC confirmation page: every measurement counts", "Passes 3.2 lunar distances away on Thursday");</p></li><li><p>magnitude, maximum altitude and its time (or the transit window), and the estimated cost in telescope minutes when known.</p></li></ul><p><strong>▾ Show all targets</strong> expands the full sortable table, with two useful shortcuts: <strong>Show covered</strong> includes what you already observed or published, and the kind <strong>Filter</strong> narrows the list to one family. The <strong>↻</strong> button recomputes the targets (in case the sky or your settings changed). Double-click any row to open the object card. Choosing a target, by any of these paths, creates the project and takes you to its card (chapter 03).</p><blockquote class="why"><strong>Why a score instead of an alphabetical list?</strong> Because "visible" is not the same as "valuable". The score blends four things: **scientific priority<strong> (how much is your measurement needed?), </strong>observability** (altitude, available hours, Moon, your limiting magnitude), <strong>urgency</strong> (an unconfirmed NEOCP candidate cannot wait until tomorrow) and **outreach hook** (a supernova in M51 is also a good story). A target can be perfectly observable and still score low: there are simply better uses of your twilight hour.</blockquote><h2 id="what-is-never-hidden">What is never hidden</h2><p>Supernovae, comets and transits beyond your reach drop straight off the list; NEOs and PCCP candidates that are too faint are <strong>shown dimmed, never hidden</strong>. The difference is deliberate: the magnitude of a freshly discovered NEO is a prediction with large uncertainty, and sometimes the object is a couple of magnitudes brighter than announced. Planning means knowing what is up there, even when tonight you cannot reach it.</p><blockquote class="why"><strong>Why does the Moon weigh so much?</strong> Moonlight does not just raise the sky background: it multiplies the noise of your frames right in the magnitude range of faint targets. A magnitude 20 NEO 30° from the full Moon can be unrecoverable, and the same object, under a new Moon, routine. That is why the score penalises lunar interference instead of pretending it does not exist.</blockquote><h2 id="the-sky-of-the-coming-days">The sky of the coming days</h2><p>In the header you will see <strong>chips with upcoming events</strong> (an opposition, a meteor shower, a probable eclipse). Click any of them and the <strong>sky calendar</strong> opens (also under <strong>Tools → Sky calendar…</strong>): sixty days of lunar phases, conjunctions, oppositions, meteor showers and Galilean satellite transits over Jupiter, all computed locally for your site.</p><blockquote class="why"><strong>Why "probable eclipse" and not just "eclipse"?</strong> Predicting whether an eclipse will be visible from your site requires fine geometry (contacts, Sun and Moon altitude at each phase). NightScribe computes the orbital geometry and labels honestly: "probable" means the geometry fits and it is worth checking against a detailed ephemeris.</blockquote><h2 id="the-sun-as-context">The Sun, as context</h2><p>The <strong>Sky calendar</strong> and the <code>solar</code> command summarise current solar activity (spots, flares, wind). It is not decoration: if you do outreach, a large sunspot is a daytime target with the proper filters; and an incoming coronal mass ejection explains (and announces) auroras.</p><p>Once you have picked a target, the next step is its project: <a href="03-projects.html">03. Projects</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="01-getting-started.html"><span>Previous</span>First steps</a><a class="pn-next" href="03-projects.html"><span>Next</span>Projects</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

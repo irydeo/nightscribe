@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01. Primeros pasos · NightScribe</title>
+<meta name="description" content="01. Primeros pasos">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="lang" href="01-getting-started.html">EN</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Índice</p>
+    <nav class="toc"><a class="toc-link" href="index.es.html">Guía de usuario</a><a class="toc-link on" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a></nav>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>01. Primeros pasos</h1><h2 id="instalación">Instalación</h2><p>Tres caminos, según lo cómodo que te sientas con un terminal:</p><ul><li><p><strong>Instalador Windows</strong> (sin Python): descarga <code>NightScribeSetup-*.exe</code> de la <a href="https://github.com/irydeo/nightscribe/releases">página de releases</a> y ejecútalo. Windows SmartScreen avisará porque el binario no está firmado: <em>Más información → Ejecutar de todas formas</em>.</p></li><li><p><strong>pip</strong>: <code>pip install nightscribe</code> dentro de un entorno virtual, y luego <code>nightscribe gui</code>.</p></li><li><p><strong>Desde el código fuente</strong> (si piensas contribuir): clona el repositorio, crea el entorno y ejecuta <code>.venv/bin/python -m nightscribe gui</code>.</p></li></ul><p>Los pasos detallados, sistema por sistema, están en <a href="https://github.com/irydeo/nightscribe/blob/main/INSTALL.es.html">INSTALL.es.md</a>.</p><p>En cualquier caso necesitas conexión a internet: las efemérides y catálogos se descargan al vuelo (y se guardan en caché local, así que la segunda consulta del mismo objeto ya no toca la red).</p><h2 id="la-primera-ejecución-la-pantalla-de-bienvenida">La primera ejecución: la pantalla de bienvenida</h2><p>La primera vez que arrancas, NightScribe te pide lo mínimo para poder trabajar. Todo lo que respondas aquí se puede cambiar después en <strong>Herramientas → Configuración…</strong>.</p><h3 id="tu-observatorio">Tu observatorio</h3><p>Tres formas de decirle dónde estás; elige una:</p><ol><li><p><strong>Tu código MPC</strong> (por ejemplo <code>Z41</code>): las coordenadas se resuelven solas desde la lista oficial del Minor Planet Center. Es la opción más precisa si vas a enviar astrometría, porque usa exactamente el mismo punto que verá el MPC en tus reportes.</p></li><li><p><strong>«Buscar mi ubicación»</strong>: resuelve tu ciudad a partir de la IP pública. Bien para empezar, pero revisa las coordenadas: una IP no sabe en qué azotea está tu telescopio.</p></li><li><p><strong>«Elegir en el mapa…»</strong> o escribir latitud, longitud y altura a mano.</p></li></ol><blockquote class="why"><strong>¿Por qué tanta insistencia en las coordenadas?</strong> Todo lo demás se deriva de ellas: qué es visible esta noche, a qué altura, cuándo empieza y acaba el crepúsculo. Y en astrometría de cuerpos menores, un error de 100 m en tu posición se traduce en un error medible en la posición del asteroide, porque la paralaje topocéntrica de un NEO cercano puede superar el segundo de arco.</blockquote><h3 id="tu-equipo">Tu equipo</h3><ul><li><p><strong>Apertura</strong> del telescopio y <strong>magnitud límite</strong> realista de tu sitio: NightScribe las usa para no proponerte objetos que no puedes alcanzar.</p></li><li><p><strong>Escala de placa</strong>: tamaño de píxel de la cámara y focal del telescopio. Si tu cámara está en la lista de <strong>preajustes</strong>, al elegirla se rellenan el píxel y un perfil fotométrico de partida (ruido de lectura, pozo de electrones, exposición de trabajo).</p></li></ul><blockquote class="why"><strong>¿Por qué importa la escala de placa?</strong> De píxel y focal salen los segundos de arco por píxel, y de ahí cuánto se mueve un NEO en una exposición o qué apertura fotométrica cabe entre dos estrellas. Un valor mal puesto no rompe nada, pero degrada los consejos.</blockquote><h3 id="qué-quieres-seguir">Qué quieres seguir</h3><p>Una tarjeta por tipo de objetivo (NEOs, cometas, supernovas, variables, tránsitos...). Desmarca lo que no te interese: la lista de esta noche será más corta y más útil. Los tipos nuevos que traiga una actualización vienen activados, para que no te los pierdas.</p><h3 id="tus-datos">Tus datos</h3><p>NightScribe guarda todo (proyectos, observaciones, caché) en una base de datos local. En cada actualización hace primero una copia de seguridad verificada y te lo cuenta en esta misma pantalla; si algo no cuadra, lo verás aquí antes de tocar nada.</p><h2 id="configuración-lo-que-cambiarás-alguna-vez">Configuración: lo que cambiarás alguna vez</h2><p>En <strong>Herramientas → Configuración…</strong> vive lo que no cabía en la bienvenida. El capítulo <a href="10-settings.es.html">10. Configuración</a> la recorre entera; aquí, lo que merece una visita pronto:</p><ul><li><p><strong>Idioma de la interfaz</strong>: español, inglés o el del sistema. Se aplica al reiniciar.</p></li><li><p><strong>Perfil de cámara fotométrica</strong>: ganancia (e⁻/ADU), ruido de lectura y linealidad. Son los números que convierten la barra de error de tus medidas en algo honesto; el preset da valores de partida, pero la ganancia y la linealidad dependen de <em>tu</em> unidad y <em>tu</em> ganancia, y NightScribe puede medirlas en tus propias tomas (capítulo 06).</p></li><li><p><strong>Horizonte local</strong>: si tu observatorio tiene obstáculos (edificios, árboles, montañas), puedes cargar un fichero de horizonte. La planificación dejará de proponerte objetos detrás del vecino.</p></li><li><p><strong>Solver de placa</strong>: ASTAP local si lo tienes instalado, con nova.astrometry.net como respaldo. Necesario para la astrometría (capítulo 07).</p></li><li><p><strong>Integraciones opcionales</strong>: CCDciel (captura, capítulo 05), claves de NEOfixer, Astrometry.net, TNS y AAVSO. Ninguna es obligatoria: sin ellas la función correspondiente simplemente se queda callada.</p></li></ul><blockquote class="why"><strong>¿Por qué piden un token de AAVSO?</strong> Las vigilias de estrellas brillantes (T CrB, R CrB) comparan el estado actual con la fotometría que la comunidad sube a la AAVSO, y esa API exige identificarse. Sin token, las vigilias no molestan; con token, te avisan el día que T CrB estalle.</blockquote><p>Siguiente: <a href="02-tonight.es.html">02. Planificar la noche</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="index.es.html"><span>Anterior</span>Guía de usuario</a><a class="pn-next" href="02-tonight.es.html"><span>Siguiente</span>02. Planificar la noche</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

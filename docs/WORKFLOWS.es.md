@@ -1491,3 +1491,25 @@ diálogos clásicos y su interruptor seguían en el código «por si acaso».
 `gui/main_window.py`, `gui/workers.py` y `gui/ui/settings_dialog.ui`; tests en
 `test_welcome_setup.py`, `test_wizard_site.py`, `test_exposure.py` y
 `test_ufe_integration.py`.
+
+### 7duodetricies. La guía y la web: una fuente, dos renderizados (2026-10-08, ADR-070)
+
+Motivación: la guía de usuario vivía solo en `docs/user` (dentro de la app) y
+la carpeta `website/` era una landing escrita a mano, con otra paleta y un
+taller de capturas del shell retirado: contaba una historia distinta de la de
+la guía. Se pidió una web clara, en el estilo de la aplicación, que explique
+qué es el software y qué permite hacer, y que sea además la guía.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| El generador | `website/tools/build_site.py`: convierte el README y `docs/user` en HTML, inyecta la paleta del tema y los chips del catálogo, y es idempotente | **Hecho** |
+| La landing | Una página por idioma con el héroe (el cielo de la app), la definición del README, los tipos como tarjetas, el detalle en acordeón y el índice de capítulos | **Hecho** |
+| La guía | Una página por capítulo y idioma, con barra lateral, anterior/siguiente, anclas por encabezado y las cajas «Why …?» como callouts | **Hecho** |
+| El guardián | `tests/unit/test_site_build.py`: el conversor, la regeneración byte a byte, los enlaces internos y que la paleta salga del tema | **Hecho** |
+| En el programa | Ayuda → Guía de usuario (web), en el navegador del sistema; el visor interno sigue siendo la puerta sin red | **Hecho** |
+| La publicación | `.github/workflows/pages.yml` construye la web y la publica en GitHub Pages (push a `main` o `release/v0.1`, y manual) | **Hecho** |
+
+**Punto de entrada**: `website/tools/build_site.py`, `website/tools/site.css`,
+`website/tools/site.js`, `website/README.md`; en la app,
+`gui/main_window.py` (`on_guide_web`) y `gui/ui/main_window.ui`; test en
+`tests/unit/test_site_build.py`.

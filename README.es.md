@@ -34,13 +34,17 @@ NightScribe existe para responder a todo eso desde una sola ventana.
 
 ## ¿Qué es NightScribe?
 
-Tres misiones, un solo bucle:
+Cuatro misiones, un solo bucle:
 
 1. **Planificar la noche**: los mejores objetivos visibles desde *tu*
    observatorio, bajo *tus* restricciones reales, ordenados y explicados.
 2. **Entender cada objeto**: parámetros orbitales y físicos traducidos a
    explicaciones precisas y divulgativas, en español e inglés.
-3. **Contarlo**: un borrador bilingüe (ES/EN) y los gráficos de la noche,
+3. **Capturar y reducir**: maneja tu montura y tu cámara por CCDciel, y
+   calibra, apila y mide tus propias tomas: fotometría (variables,
+   exoplanetas, supernovas) y astrometría de cuerpos menores lista para el
+   MPC, sin salir de la ventana.
+4. **Contarlo**: un borrador bilingüe (ES/EN) y los gráficos de la noche,
    redactados con los datos reales de tu sesión.
 
 Y la pieza que las une: cada objetivo elegido se convierte en un
@@ -621,7 +625,9 @@ sistema operativo, el paquete pip y el instalador autónomo, y
 **La [guía de usuario](docs/user/README.es.md)**
 ([English](docs/user/README.md)) recorre el ciclo completo, del primer
 arranque al reporte MPC, en capítulos cortos con el «por qué» de cada
-opción. También viaja dentro de la app (**Ayuda → Documentación técnica**).
+opción. También viaja dentro de la app (**Ayuda → Documentación técnica**) y
+se publica como web: **<https://irydeo.github.io/nightscribe/>** (**Ayuda →
+Guía de usuario (web)**).
 
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
 decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.

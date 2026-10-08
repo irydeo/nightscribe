@@ -31,13 +31,17 @@ NightScribe exists to answer all of that from one window.
 
 ## What is NightScribe?
 
-Three missions, one loop:
+Four missions, one loop:
 
 1. **Plan the night**: the best targets visible from *your* observatory,
    under *your* real constraints, ranked and explained.
 2. **Understand every object**: orbital and physical parameters translated
    into accurate, engaging explanations, in Spanish and English.
-3. **Tell it**: a bilingual (ES/EN) draft and the night's charts, written
+3. **Capture and reduce**: it drives your mount and camera through CCDciel,
+   and it calibrates, stacks and measures your own frames: photometry
+   (variables, exoplanets, supernovae) and MPC-ready astrometry of minor
+   bodies, without leaving the window.
+4. **Tell it**: a bilingual (ES/EN) draft and the night's charts, written
    with the real data of your session.
 
 And the piece that ties them together: every chosen target becomes a
@@ -594,7 +598,8 @@ it.
 **The [user guide](docs/user/README.md)** ([español](docs/user/README.es.md))
 walks the whole cycle, from the first run to the MPC report, in short
 chapters with the "why" of each option. It also ships inside the app
-(**Help → Technical Documentation**).
+(**Help → Technical Documentation**) and it is published as a website:
+**<https://irydeo.github.io/nightscribe/>** (**Help → User guide (web)**).
 
 Design, architecture, data sources, scoring, workflows and every decision
 (ADRs) live in [`docs/`](docs/), in Spanish and English.

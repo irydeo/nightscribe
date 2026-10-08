@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Settings · NightScribe</title>
+<meta name="description" content="Settings">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.html">User guide</a>
+      <a class="lang" href="10-settings.es.html">ES</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Contents</p>
+    <nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link on" href="10-settings.html"><span>10</span>Settings</a></nav>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Settings</h1><p>Everything configurable in NightScribe lives under <strong>Tools → Settings…</strong>. This chapter walks each section: what it decides and when it is worth touching. Nothing here is mandatory except the site; each missing integration simply leaves its feature quiet.</p><h2 id="site-equipment">Site &amp; equipment</h2><ul><li><p><strong>MPC code</strong>, name, coordinates and height of the observatory (<strong>Resolve coordinates</strong> from the code, <strong>Pick on the map…</strong>, or by hand). This is the identity of your MPC reports: if you submit astrometry, use the code.</p></li><li><p><strong>AAVSO code</strong>: your observer code; it is written into the EXOTIC handoff of transit projects.</p></li><li><p><strong>Interface language</strong>: Spanish, English or system default; applies on restart.</p></li></ul><h2 id="equipment-and-limits">Equipment and limits</h2><ul><li><p><strong>Aperture (inches)</strong> and <strong>limiting magnitude</strong>: the Tonight scoring reads them to avoid suggesting the unreachable. Be honest with the limiting magnitude; the <code>inject</code> command (chapter 09) gives you the measured number.</p></li></ul><blockquote class="why"><strong>Why measure the limiting magnitude instead of trusting the datasheet?</strong> Because the real limit depends on your sky, your camera, your exposures and your reduction. An optimistic figure fills the list with impossible targets; a pessimistic one hides good nights from you.</blockquote><h2 id="camera-plate-scale">Camera (plate scale)</h2><p><strong>Pixel size</strong>, <strong>focal length</strong>, <strong>camera type</strong> (CCD/CMOS/DSLR) and <strong>pixel binning</strong>. Pixel and focal give the arcseconds-per-pixel scale: it feeds the NEO exposure advice, the photometry and the MPC report (the camera type is written into it).</p><h2 id="photometric-camera-profile">Photometric camera profile</h2><p><strong>Preset</strong> (fills the pixel size and a starting profile), <strong>full well</strong>, <strong>linearity (ADU)</strong>, <strong>system gain (e⁻/ADU)</strong>, <strong>read noise (e⁻)</strong>, <strong>dark current</strong> and <strong>working max exposure</strong>.</p><blockquote class="why"><strong>Why "per unit and per gain"?</strong> Because linearity and maximum exposure are not properties of the camera model, but of your specific unit at the gain setting you use. The preset provides the datasheet value as a starting point; the true value is measured on your own frames (the app does it, chapter 06), and 0 means "unknown": the app says so instead of making something up.</blockquote><h2 id="photometry">Photometry</h2><ul><li><p><strong>Measure with the matched filter by default</strong>: what a <em>new</em> plate starts with. An already measured plate keeps its own recipe; the plate's switch lives in the Photometry tab, beside the measurement (chapter 06).</p></li></ul><h2 id="chart-annotations">Chart annotations</h2><p>Your name (<strong>Observer</strong>), who measured the plate (<strong>Measurer</strong>; empty = the observer) and the <strong>telescope</strong> line as they should read in the boxes of the charts you export.</p><h2 id="observing">Observing</h2><ul><li><p><strong>Local horizon</strong>: a horizon file (TheSkyX <code>.hrz</code> or "az alt" pairs) with a safety margin. With it, the planner stops suggesting what hides behind your obstacles.</p></li><li><p><strong>Object kinds</strong> shown in Tonight, <strong>Moon constraint</strong>, default <strong>session values</strong>, the variable <strong>vigils list</strong> and the <strong>projects folder</strong>.</p></li></ul><h2 id="plate-solver">Plate solver</h2><p><strong>Solver</strong>: <em>Auto</em> tries local ASTAP and falls back to nova.astrometry.net; you can also force one. <strong>ASTAP binary</strong>: path to the executable (empty = look for <code>astap</code> on the PATH), with <strong>Test</strong> to check it. <strong>Save the solved WCS into the FITS header</strong> (on by default) leaves the plate solved for any program, without touching the pixels.</p><h2 id="find-orb-orbit-check">Find_Orb (orbit check)</h2><p>The <strong>Find_Orb binary</strong> (the non-interactive <code>fo</code>) cross-checks your measurements against the orbit before the MPC report. <strong>Install…</strong> sorts it out for you: if <code>fo</code> is already on the PATH it uses it, and if not, it creates a private conda-forge environment without touching anything on your system. Without it, the check is not available, and the app says so.</p><h2 id="exotic-transit-reduction">EXOTIC (transit reduction)</h2><p>Path to a <strong>Python ≤ 3.10</strong> and to the <strong>EXOTIC environment</strong>. <strong>Prepare environment</strong> builds a private one and installs EXOTIC into it (needs network the first time); <strong>Test</strong> checks that it imports and reports its version. Without this, the EXOTIC block of transits (chapter 06) does not run, although the rest of the flow keeps working.</p><h2 id="integrations">Integrations</h2><ul><li><p><strong>CCDciel</strong>: host, port (3277 by default) and auto-connect. Control only works while CCDciel is open (chapter 05).</p></li><li><p><strong>NEOfixer</strong>, <strong>Astrometry.net</strong>, <strong>TNS bot</strong>, <strong>AAVSO API token</strong>: optional keys for, respectively, community reporting, blind-solving plates without WCS, transient discovery images and the community photometry that feeds the bright-star vigils (chapter 04).</p></li></ul><h2 id="interface">Interface</h2><ul><li><p><strong>Animated sky on Welcome</strong>: a few stars twinkle and the screen fades in; the Moon is drawn at tonight's real phase either way. Applies at once.</p></li><li><p><strong>Icons-only top bar</strong> (FITS editor): the action buttons show compact glyphs instead of their labels. Applies at once.</p></li></ul><blockquote class="why"><strong>Why is so much "optional", with no account required anywhere?</strong> Because the observatory is yours and so is the data: NightScribe works fully without a single key, and each missing integration degrades gracefully (the feature stays quiet) instead of blocking you. Keys open doors; they do not raise walls.</blockquote></article>
+    <nav class="pn"><a class="pn-prev" href="09-cli.html"><span>Previous</span>The command line</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

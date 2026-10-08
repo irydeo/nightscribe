@@ -308,11 +308,18 @@ benchmarks/          # bancos de medida (track & stack, cero punto contra el
 tools/bench/         #   catálogo, inyección/recuperación, combinación, flat):
                      #   de aquí salen las cifras de los comentarios y los ADR,
                      #   y no se envían con la app
-website/             # la página de presentación (contenido y capturas)
+website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
+                     #   README y el manual es docs/user, los mismos ficheros
+                     #   que pinta la app; tools/build_site.py los convierte y
+                     #   inyecta la paleta y los chips del tema; el HTML se
+                     #   commitea y un test lo regenera y lo compara
 installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
 .github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
                      #   PyInstaller, zip portable + instalador Inno, pre-release
-                     #   rodante preview-<rama>; push a dev/v0.1 o manual)
+                     #   rodante preview-<rama>; push a main o manual)
+                     # windows-tests.yml: la suite unitaria en Windows, en cada PR
+                     # pages.yml: construye la web y la publica en GitHub Pages
+                     #   (push a main o release/v0.1, y manual)
 ```
 
 ### Cómo trabajar

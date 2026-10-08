@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Campaigns and vigils · NightScribe</title>
+<meta name="description" content="Campaigns and vigils">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost" href="../docs/index.html">User guide</a>
+      <a class="lang" href="04-campaigns.es.html">ES</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-title">Contents</p>
+    <nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link on" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a></nav>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Campaigns and vigils</h1><p>There are two kinds of long-term commitment in NightScribe, and they should not be confused: <strong>campaigns</strong> (a shared group commitment, with a protocol) and <strong>vigils</strong> (a permanent eye on one specific star).</p><h2 id="campaigns">Campaigns</h2><p>A campaign is the <em>shared</em> commitment of a group of observatories: a scientific goal ("measure the full T CrB eruption"), a protocol (cadence in nights, filters, comparison stars) and the links where results are reported and data deposited. Many projects hang from one campaign; deleting the campaign does not delete the projects, it just releases them.</p><p>The <strong>Campaigns</strong> tab shows each campaign's health at a glance: how many projects it has, how many are <em>due</em> against the cadence, and a ⚡ when any member shows an event. The buttons do what they say:</p><ul><li><p><strong>New project…</strong>: creates a new project already linked (it resolves the name against VSX and SIMBAD; if not found, you enter it by hand).</p></li><li><p><strong>Attach project…</strong>: links an already existing project.</p></li><li><p><strong>Detach…</strong>: unlinks it without deleting anything.</p></li></ul><blockquote class="why"><strong>Why is cadence the only thing NightScribe "reads" from the protocol?</strong> Because it is the only thing it can check. If your campaign asks for one measurement every 3 nights and a member has gone 5 without being observed, the app pushes it onto tonight's list (computed locally, no network). The rest of the protocol (filters, comparisons, notes) is stored as reference, but each group's physics is too varied to model: you read it, the app remembers it.</blockquote><h2 id="vigils">Vigils</h2><p>A vigil is an alarm over a star that can change <em>any day</em>: you edit the curated list yourself in Settings, and the canonical examples are <strong>T CrB</strong> (a recurrent nova that can erupt at any moment) and <strong>R CrB</strong> (which fades without warning).</p><p>NightScribe periodically checks the recent photometry (ZTF, and the AAVSO if you gave it your token) and compares it with each star's baseline. If something strays from normal, it warns you.</p><blockquote class="why"><strong>Why compare against the baseline and not "the catalogue magnitude"?</strong> Because these stars have no "catalogue" brightness: they have a quiescent level around which they wander. The anomaly is not T CrB sitting at magnitude 10; the anomaly is it departing from its ~10.5 baseline. An eruption is detected against the star's own history, not against a table.</blockquote><blockquote class="why"><strong>Why the AAVSO token for the bright ones?</strong> Below ~11.5 mag, ZTF stops being reliable because of saturation, so watching the bright stars depends on AAVSO community photometry, whose API requires identification. Without a token, those vigils stay silent rather than feed you dubious data.</blockquote><p>Next: <a href="05-capture.html">05. Capture</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="03-projects.html"><span>Previous</span>Projects</a><a class="pn-next" href="05-capture.html"><span>Next</span>Capture</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p>GPL v3 · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

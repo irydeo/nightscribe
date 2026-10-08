@@ -135,6 +135,7 @@
      <property name="title"><string>Help</string></property>
      <addaction name="action_welcome"/>
      <addaction name="action_docs"/>
+     <addaction name="action_guide_web"/>
      <addaction name="separator_help"/>
      <addaction name="action_about"/>
      <addaction name="action_sources"/>
@@ -177,6 +178,10 @@
   </action>
   <action name="action_docs">
     <property name="text"><string>Technical Documentation</string></property>
+  </action>
+  <action name="action_guide_web">
+    <property name="text"><string>User guide (web)</string></property>
+    <property name="toolTip"><string>The same guide as a web page, in your browser: handy to read on a phone or to send to somebody</string></property>
   </action>
   <action name="action_log">
     <property name="text"><string>Open the log…</string></property>

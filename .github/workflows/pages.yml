@@ -49,6 +49,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Enables Pages on the repository the first time (Settings > Pages >
+      # Source: GitHub Actions) instead of asking for that click by hand.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
       - name: Build the site from its sources
         run: python website/tools/build_site.py --out _site
 

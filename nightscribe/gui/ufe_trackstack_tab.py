@@ -80,6 +80,24 @@ def _shift_frame(arr, drow, dcol):
     return padded[r0:r0 + h, c0:c0 + w]
 
 
+def _qimage_to_pil(qimg):
+    # @args: qimg - a QImage (any format)
+    # @return: a PIL RGB image. The frame the editor paints is RGB (the plate
+    #          is grey, but the band and the watermark are not), which is what
+    #          the GIF and MP4 writers both want. Rows are padded to 4 bytes,
+    #          so the buffer is read with its own stride and never as w*h*3:
+    #          a plate whose width is not a multiple of 4 would otherwise
+    #          come out sheared.
+    import numpy as np
+    from PIL import Image
+    from PySide6.QtGui import QImage
+    qimg = qimg.convertToFormat(QImage.Format_RGB888)
+    w, h = qimg.width(), qimg.height()
+    buf = np.frombuffer(qimg.constBits(), dtype=np.uint8)
+    buf = buf.reshape(h, qimg.bytesPerLine())
+    return Image.fromarray(buf[:, :w * 3].reshape(h, w, 3).copy(), "RGB")
+
+
 class UfeTrackStackTab(QWidget):
     # @args: state - the shared UfeImageState (the group's stack is loaded
     #        into it, so the histogram, stretch and marks work on it),
@@ -107,6 +125,7 @@ class UfeTrackStackTab(QWidget):
         self._anim_q = []          # the object's pixel in each stack
         self._anim_headers = []    # each stack's own header (the band reads it)
         self._anim_timer = None    # the swap timer (built with the UI)
+        self._anim_export_workers = []  # SequenceExportWorker while it writes
         self._hue = theme.C_ACCENT  # the object's hue (the hero button)
         self._accent = None        # {"hue", "kind", "label"} or None
         self._build_ui()
@@ -190,6 +209,11 @@ class UfeTrackStackTab(QWidget):
         # in whether a file is written.
         self.btn_animate = self._ui.btn_animate
         self.btn_animate.toggled.connect(self._on_animate_toggled)
+        # The save door next to it: the same evidence, written to disk. A
+        # button of its own (not behind the ⋯ door) because it belongs with
+        # the loop it exports, and it is armed by the same gate.
+        self.btn_export_anim = self._ui.btn_export_anim
+        self.btn_export_anim.clicked.connect(self._on_export_anim)
         # the brightness is measured with the recipe the Fotometria tab is
         # holding: one editor in the app, read live, shown before the run
         self.chk_brightness = self._ui.chk_brightness
@@ -3049,10 +3073,14 @@ class UfeTrackStackTab(QWidget):
     def _sync_animate_button(self):
         # @return: None. The door follows its evidence, like btn_blink: no
         #          run (or a single observation) means no animation, and the
-        #          tooltip already says what it would need.
-        if getattr(self, "btn_animate", None) is None:
-            return
-        self.btn_animate.setEnabled(self._anim_ready())
+        #          tooltip already says what it would need. The save button
+        #          shares the gate: with nothing to animate there is nothing
+        #          to export.
+        ready = self._anim_ready()
+        if getattr(self, "btn_animate", None) is not None:
+            self.btn_animate.setEnabled(ready)
+        if getattr(self, "btn_export_anim", None) is not None:
+            self.btn_export_anim.setEnabled(ready)
 
     def _on_animate_toggled(self, on):
         # @args: on - the button's new state
@@ -3071,16 +3099,32 @@ class UfeTrackStackTab(QWidget):
         self._anim_start()
 
     def _anim_start(self):
-        # @return: None. The tab owns the view's frame while it animates,
-        #          exactly like the Blink tab: the plate in the state is the
-        #          first observation's stack (so the frame's shape, its WCS
-        #          and its measured marks are its own) and every observation
-        #          is painted over it by set_frame_override, ALIGNED on the
-        #          object. So what moves is the star field and the asteroid
-        #          stays put, with the cross and the object mark sitting on
-        #          it: the same reading as the GIF, in the editor, with
-        #          nothing written and no other tab disturbed (no plate is
-        #          reloaded, so no image_loaded storm).
+        # @return: None. Starts the live loop: _anim_begin owns the stage and
+        #          this only turns the swap timer on and says so.
+        if not self._anim_begin():
+            return
+        self._anim_timer.start(_ANIM_INTERVAL_MS)
+        stacks = (self._result or {}).get("stacks") or []
+        self._say(self.tr(
+            "Animating %1 observations, centred on the object; the stars "
+            "crawl and the object must not. Click again to stop.").replace(
+                "%1", str(len(stacks))))
+
+    def _anim_begin(self):
+        # @return: True when the loop owns the stage (the override frame is
+        #          set, the headers are read and _anim_on is up), False when
+        #          there is nothing to show. The live loop and the export
+        #          (capture, no timer) share it: both need the same
+        #          alignment, the same headers and the same stretch.
+        # The tab owns the view's frame while it animates, exactly like the
+        # Blink tab: the plate in the state is the first observation's stack
+        # (so the frame's shape, its WCS and its measured marks are its own)
+        # and every observation is painted over it by set_frame_override,
+        # ALIGNED on the object. So what moves is the star field and the
+        # asteroid stays put, with the cross and the object mark sitting on
+        # it: the same reading as the GIF, in the editor, with nothing
+        # written and no other tab disturbed (no plate is reloaded, so no
+        # image_loaded storm).
         result = self._result or {}
         stacks = result.get("stacks") or []
         qs = result.get("qs") or []
@@ -3106,12 +3150,12 @@ class UfeTrackStackTab(QWidget):
                       if s is not None), None)
         if first is None:
             self._anim_abort()
-            return
+            return False
         state = self._state if self._view is not None else self._stack_state
         view = self._view if self._view is not None else self._stack_view
         if state is None or view is None:
             self._anim_abort()
-            return
+            return False
         # THE LEVELS THE OBSERVER APPLIED STAY. Loading the first stack used
         # to reset the stretch to the auto percentiles, so the verification
         # started with a different histogram than the plate it was read on;
@@ -3125,7 +3169,7 @@ class UfeTrackStackTab(QWidget):
             state.keep_stretch = keep
         if not state.has_image:
             self._anim_abort()
-            return
+            return False
         # The band says what is SHOWN, and what is shown is not the loaded
         # plate: each observation's own header is read once here (the files
         # the run wrote, the same source band_facts reads), so the heading
@@ -3150,11 +3194,7 @@ class UfeTrackStackTab(QWidget):
         self._anim_zoom()
         view.set_frame_override(self._display_frame)
         view.refresh_frame()
-        self._anim_timer.start(_ANIM_INTERVAL_MS)
-        self._say(self.tr(
-            "Animating %1 observations, centred on the object; the stars "
-            "crawl and the object must not. Click again to stop.").replace(
-                "%1", str(len(stacks))))
+        return True
 
     def _anim_abort(self):
         # @return: None. The animation could not own the stage (no stack on
@@ -3304,6 +3344,110 @@ class UfeTrackStackTab(QWidget):
             self.btn_animate.blockSignals(True)
             self.btn_animate.setChecked(False)
             self.btn_animate.blockSignals(False)
+
+    # -------------------------------------------------- the saved animation
+
+    def _on_export_anim(self):
+        # @return: None. Asks where and in which format, then captures and
+        #          writes. The button shares the loop's gate, so by the time
+        #          it is pressed there is a sequence to show.
+        if not self._anim_ready():
+            return
+        base = self._stack_name(0).rsplit("_obs", 1)[0] + "_animation"
+        folder = None
+        ask = getattr(host_of(self), "export_folder", None)
+        if callable(ask):
+            try:
+                folder = ask()
+            except Exception:
+                folder = None
+        import tempfile
+        default_dir = Path(folder) if folder else Path(tempfile.gettempdir())
+        from PySide6.QtWidgets import QFileDialog
+        out, sel = QFileDialog.getSaveFileName(
+            self, self.tr("Save animation"),
+            str(default_dir / f"{base}.gif"),
+            "GIF (*.gif);;MP4 video (*.mp4)")
+        if not out:
+            return
+        # The format is the extension; a name typed without one takes the
+        # filter the observer left selected, and the GIF default otherwise.
+        low = out.lower()
+        if low.endswith(".mp4"):
+            fmt = "mp4"
+        elif low.endswith(".gif"):
+            fmt = "gif"
+        else:
+            fmt = "mp4" if "mp4" in (sel or "").lower() else "gif"
+            out = out + "." + fmt
+        self._export_anim(fmt, out)
+
+    def _export_anim(self, fmt, out):
+        # @args: fmt - "gif" | "mp4", out - where to write
+        # @return: the worker started, or None. The frames come from the
+        #          editor's OWN render (the same view, the same band and the
+        #          same marks the loop shows), so they are captured HERE, on
+        #          the GUI thread: Qt cannot paint off it. Only the encoding
+        #          goes to the worker, which is what keeps a slow MP4 from
+        #          freezing the window.
+        view = self._view if self._view is not None else self._stack_view
+        if view is None:
+            return None
+        # a clean stage for the capture: the loop is restarted without its
+        # timer (same alignment, same headers, same stretch), so the export
+        # never depends on whether the observer was watching it
+        self._anim_stop()
+        if not self._anim_begin():
+            return None
+        try:
+            frames = self._capture_anim_frames(view)
+        finally:
+            self._anim_stop()
+        if not frames:
+            self._say(self.tr("Nothing to save: the observations produced no "
+                              "frame to animate."))
+            return None
+        from .workers import SequenceExportWorker
+        self._say(self.tr("Rendering the animation…"))
+        worker = SequenceExportWorker(frames, out, fmt,
+                                      duration_ms=_ANIM_INTERVAL_MS)
+        worker.finished.connect(self._on_anim_exported)
+        self._anim_export_workers.append(worker)
+        worker.start()
+        return worker
+
+    def _capture_anim_frames(self, view):
+        # @args: view - the UfeImageView the loop paints on
+        # @return: a list of PIL RGB frames, one per observation with a
+        #          usable stack, in order. The index is moved so the band
+        #          (which reads band_header) describes the frame being
+        #          captured, and the view is re-rendered before each grab.
+        frames = []
+        stacks = (self._result or {}).get("stacks") or []
+        for i in range(len(stacks)):
+            if i >= len(self._anim_q) or self._anim_q[i] is None:
+                continue
+            self._anim_index = i
+            view.refresh_frame()
+            frames.append(_qimage_to_pil(view.render_image()))
+        return frames
+
+    def _on_anim_exported(self, out, err):
+        # @args: out - written path ("" on failure), err - error text
+        if out:
+            self._say(self.tr("Animation written:") + f" {Path(out).name}")
+            notify = getattr(host_of(self), "notify_saved", None)
+            if callable(notify):
+                notify([out], "animation")
+            from PySide6.QtCore import QUrl
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl.fromLocalFile(out))
+        else:
+            self._say(self.tr("The animation could not be written:")
+                      + f" {err}")
+        # prune finished workers (they hold the captured frames)
+        self._anim_export_workers = [w for w in self._anim_export_workers
+                                     if w.isRunning()]
 
     # ------------------------------------------------------ measurement
 

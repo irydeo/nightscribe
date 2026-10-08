@@ -594,6 +594,21 @@ QHeaderView::section {{
 }}
 QTableCornerButton::section {{ background: {C_PANEL}; border: none; }}
 
+/* ---- Settings rail (ADR-071) -------------------------------------------- */
+/* An icon-only rail reads as a rail, not as a boxed list: no border, a
+   transparent ground, and a soft accent bar marking the active section
+   (the icon itself brightens through its QIcon::Selected mode). */
+QListWidget#lst_categories {{
+    background: transparent; border: none; outline: none; padding: 2px;
+}}
+QListWidget#lst_categories::item {{
+    border-radius: 8px; border-left: 3px solid transparent;
+}}
+QListWidget#lst_categories::item:hover {{ background: {C_PANEL}; }}
+QListWidget#lst_categories::item:selected {{
+    background: {C_PANEL}; border-left: 3px solid {C_ACCENT};
+}}
+
 /* ---- groups, toolbars, status ------------------------------------------------ */
 QGroupBox {{
     border: 1px solid {C_LINE}; border-radius: 6px;

@@ -90,22 +90,22 @@ def test_the_unified_editor_is_the_only_door():
         raise AssertionError(f"{mod} is back")
 
 
-def test_settings_has_the_development_tab(qapp):
+def test_settings_has_the_editor_switch_on_interface(qapp):
+    # the Development tab is gone (ADR-071): its only switch, the UFE top
+    # bar, lives with the Interface preferences, and the field table maps
+    # it to its key
     import inspect
-    from PySide6.QtCore import QFile
-    from PySide6.QtUiTools import QUiLoader
-    f = QFile("nightscribe/gui/ui/settings_dialog.ui")
-    f.open(QFile.ReadOnly)
-    d = QUiLoader().load(f)
-    f.close()
-    titles = [d.tabWidget.tabText(i) for i in range(d.tabWidget.count())]
-    assert "Development" in titles
-    assert d.chk_ufe_bar_icons is not None
-    assert "unified editor" in d.lblH_ufe.text()
+    from nightscribe.gui import settings_spec
+    from nightscribe.gui.main_window import _load_ui
+    dlg = _load_ui("settings_dialog")
+    assert dlg.chk_ufe_bar_icons is not None
+    assert "unified editor" in dlg.lblH_ufe.text()
+    table = {f.widget: f.key for f in settings_spec.FIELDS}
+    assert table.get("chk_ufe_bar_icons") == "ufe_bar_icons"
     from nightscribe.gui import main_window as mw
     src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert 'chk_ufe_bar_icons.setChecked' in src
-    assert 'ufe_bar_icons' in src and 'chk_ufe_bar_icons.isChecked()' in src
+    assert "settings_spec" in src
+    dlg.deleteLater()
 
 
 def test_open_plate_and_show_tab(dlg, qapp):

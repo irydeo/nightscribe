@@ -299,11 +299,12 @@ def test_settings_dialog_has_the_aavso_checkbox(qapp):
 
 
 def test_on_open_settings_maps_aavso_and_vigils(qapp):
-    # the dialog is modal; assert the wiring exists in the source (the
-    # pattern of test_settings_storage.py)
+    # the dialog is modal; the simple fields are pinned through the field
+    # table (ADR-071) and the parsed vigils list through the source
     import inspect
     from nightscribe.gui import main_window as mw
+    from nightscribe.gui import settings_spec
+    table = {f.widget: f.key for f in settings_spec.FIELDS}
+    assert table.get("chk_aavso") == "aavso_feed"
     src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert 'config.get("aavso_feed"' in src
-    assert 'config.set("aavso_feed", dlg.chk_aavso.isChecked())' in src
     assert 'config.set("vigil_list"' in src

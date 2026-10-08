@@ -8,10 +8,10 @@ work FITS images (ADR-044). In the interface it is called the
 now, not just an editor) and opens from **Tools → NightScribe Image
 Workbench…**; "UFE" stays as the internal codename in code and docs.
 
-**Coexistence and the default setting**: the classic dialogs (blink,
-comparison chart, annotated FITS) still exist for comparison and review,
-but by default the flows open the UFE: under **Settings → Development**
-you can switch the classic ones back as the default (`ufe_default`).
+**The editor is the only door**: the classic dialogs (blink, comparison
+chart, annotated FITS) retired once the UFE became the default, so there is
+nothing to switch back to. The only editor preference left is the look of
+its top bar, under **Settings → Interface**.
 Opened from a project, the UFE comes with the plate loaded, the right
 tab on stage and **everything the project knows about the object already
 in place**: name, coordinates and magnitude on the line under the top
@@ -259,7 +259,9 @@ differential aperture photometry):
   the sky (two 2.5-sigma passes), the **seeing-following aperture**
   (FWHM of the comps on your plate, aperture at 1.35 times), the
   **colour term** fitted with the comps' and the target's B-V,
-  **host-galaxy subtraction** with the aligned PS1 reference (for SNe
+  **host-galaxy subtraction** with the PS1 reference registered on the
+  frame's stars (scale included), its point spread matched to yours and its
+  masked pixels excluded (for SNe
   on cores, one download per field), and the **Suggest** button that
   proposes the radii with the target's growth curve and its
   neighbourhood, with the reasons in plain words.
@@ -362,7 +364,7 @@ usable but not clean, red doubtful, white for a catalogue value. See
 The band never cuts a word: when the window is narrow it drops whole
 fields (the FOV first, the date last) and, in the extreme, the context
 line goes and only the plate's name is left. The top bar's **"Data"**
-button turns it off (Settings → Site & equipment → "Plate band" sets the
+button turns it off (Settings → Interface → "Plate band" sets the
 default), and the compass and the scale bar keep their classic corners.
 The **blink GIF/MP4** and the **sequence chart** keep their own metadata
 boxes, with their own switch ("Other charts" in the same Settings group).

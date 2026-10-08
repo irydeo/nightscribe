@@ -358,6 +358,29 @@ partida y que `inject` mide la real.
 `core/exposure.py` (la escala, el binning y el veredicto), `core/cameras.py`
 (el perfil del preset).
 
+**Revisión (2026-10-08, Interfaz 1.10: Explorar, a la vista).** Explorar es la
+puerta a los objetos que la lista de esta noche no sugiere, y vivía en
+Herramientas detrás de un `QInputDialog` que pedía el nombre sin decir para
+qué. Ahora tiene dos puertas:
+
+- **Un buscador en la barra de navegación** (`edt_nav_explore`): escribe un
+  nombre y pulsa Enter, y se abre su ficha. Está en la barra, así que se
+  alcanza desde TODAS las vistas; va anclado a la derecha (tras el
+  espaciador) para que una miga larga no lo desplace, y el campo se vacía
+  tras usarlo para no leerse como un filtro viejo.
+- **El diálogo de Herramientas** (`explore_dialog.ui` + `gui/explore_dialog.py`)
+  explica en una línea para qué sirve y pide el nombre, con Enter y el botón
+  como el mismo gesto; un nombre vacío no se acepta (no hay nada que buscar).
+
+La búsqueda en sí no cambia: las dos puertas entregan el nombre al mismo
+`_open_explore_dialog` (`core/enrich`, `ExploreWorker` y `ObjectPanel`
+intactos). El buscador de «nuevo proyecto» de Tonight sigue igual: aquel crea
+un proyecto, este abre la ficha.
+
+**Punto de entrada**: `gui/ui/main_window.ui` (el buscador en la barra),
+`gui/ui/explore_dialog.ui` + `gui/explore_dialog.py` (el diálogo),
+`gui/main_window.py` (`_nav_explore`, `_tools_explore`).
+
 ## English
 
 **Context.** The app was born with "Tonight" as the root screen: on open it
@@ -696,3 +719,27 @@ measures the real one.
 `gui/widgets/welcome_setup.py` (the hook), `gui/wizard.py` (the helpers),
 `core/exposure.py` (the scale, the binning and the verdict), `core/cameras.py`
 (the preset's profile).
+
+**Revision (2026-10-08, Interface 1.10: Explore, in sight).** Explore is the
+door to the objects tonight's list does not suggest, and it lived in Tools
+behind a `QInputDialog` that asked for the name without saying what for. It
+has two doors now:
+
+- **A search box in the navigation row** (`edt_nav_explore`): type a name and
+  press Enter, and its card opens. It lives in the row, so it is reachable
+  from EVERY view; it is anchored to the right (after the spacer) so a long
+  breadcrumb never pushes it, and the field clears after use so it does not
+  read as a stale filter.
+- **The Tools dialog** (`explore_dialog.ui` + `gui/explore_dialog.py`)
+  explains in one line what it is for and asks for the name, with Enter and
+  the button as the same gesture; an empty name is not accepted (there is
+  nothing to look up).
+
+The lookup itself does not change: both doors hand the name to the same
+`_open_explore_dialog` (`core/enrich`, `ExploreWorker` and `ObjectPanel`
+untouched). Tonight's "new project" search stays as it is: that one creates a
+project, this one opens the card.
+
+**Entry point**: `gui/ui/main_window.ui` (the box in the navigation row),
+`gui/ui/explore_dialog.ui` + `gui/explore_dialog.py` (the dialog),
+`gui/main_window.py` (`_nav_explore`, `_tools_explore`).

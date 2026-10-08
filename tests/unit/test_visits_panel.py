@@ -398,10 +398,10 @@ def test_save_and_close_reverts_an_invalid_date(panel, qapp):
     assert vp._win is None
 
 
-def test_visit_window_measure_series_action(qapp, tmp_path):
-    # ADR-048 (D8/D36): the visit window carries a "Measure the sequence"
-    # action that hands the visit id to the host (which opens the editor's
-    # series block). The action exists only with a callback armed.
+def test_visit_window_analysis_action_follows_the_kind(qapp, tmp_path):
+    # ADR-045 review: ONE analysis action, chosen by the object's kind. The
+    # series for the objects that vary (a transit), the track & stack for the
+    # ones that move (a NEO); the observer does not pick between them.
     from nightscribe.core.db import Database
     from nightscribe.core import project, followup as fu
     from nightscribe.gui.widgets.visits_panel import VisitWindow
@@ -410,10 +410,21 @@ def test_visit_window_measure_series_action(qapp, tmp_path):
     sid = fu.create_session(db, p["id"], obs_date="2026-09-20")
     seen = []
     w = VisitWindow(db, p["id"], sid, lang="en", kind="transit",
-                    measure_series=lambda s: seen.append(s))
-    w._ui.vp_btn_series.click()
-    assert seen == [sid]
+                    measure_series=lambda s: seen.append(("series", s)))
+    w.btn_analyze.click()
+    assert seen == [("series", sid)]
+    # the resource actions live behind one door (a way in, not a copy)
+    assert [a.data() for a in w.btn_resources.menu().actions()] == [
+        "vp_btn_attach", "vp_btn_open", "vp_btn_remove"]
     w.close()
+    p2 = project.create(db, "neo", "2026 AB")
+    sid2 = fu.create_session(db, p2["id"], obs_date="2026-09-21")
+    seen2 = []
+    w2 = VisitWindow(db, p2["id"], sid2, lang="en", kind="neo",
+                     astrometry=lambda s: seen2.append(("astro", s)))
+    w2.btn_analyze.click()
+    assert seen2 == [("astro", sid2)]
+    w2.close()
     db.close()
 
 

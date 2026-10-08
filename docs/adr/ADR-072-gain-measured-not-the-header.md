@@ -78,9 +78,10 @@ recordarla**:
 3. **Todos los caminos recuerdan**: la pestaña Medir, la serie y el track & stack
    piden `recall` antes de resolver y guardan con `remember` cuando la fuente ha
    sido `frames`. Así el almacén se llena solo cada vez que la app lee un par.
-4. **«Medir mi ganancia…»** (pestaña Medir): la acción de una vez para el que
-   solo tiene imágenes. Apunta a una carpeta con dos tomas de la misma
-   exposición, mide, enseña `g ± err` + ruido de lectura + cajas y lo guarda.
+4. **«Medir ganancia…»** (**Ajustes → Cámara**, bajo el campo de la
+   ganancia): la acción de una vez para el que solo tiene imágenes. Apunta a una
+   carpeta con dos tomas de la misma exposición, mide, enseña `g ± err` + ruido
+   de lectura + cajas y lo guarda.
 
 **Consecuencias de la revisión**: el caso de una sola imagen se resuelve en
 cuanto el observador tenga un par (las tomas de su visita, o la acción de una
@@ -164,9 +165,10 @@ frame count), but to **measure it when possible and remember it**:
 3. **Every path remembers**: the Measure tab, the series and the track & stack
    call `recall` before resolving and store with `remember` when the source was
    `frames`. The store fills itself every time the app reads a pair.
-4. **"Measure my gain…"** (Measure tab): the one-time action for whoever only has
-   images. Point at a folder with two frames of the same exposure, measure, show
-   `g ± err` + read noise + boxes and store it.
+4. **"Measure gain…"** (**Settings → Camera**, under the gain field): the
+   one-time action for whoever only has images. Point at a folder with two
+   frames of the same exposure, measure, show `g ± err` + read noise + boxes
+   and store it.
 
 **Consequences of the revision**: the single-image case is solved as soon as the
 observer has a pair (their visit's frames, or the one-time action); from then on

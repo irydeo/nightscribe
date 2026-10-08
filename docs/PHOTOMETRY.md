@@ -235,7 +235,8 @@ disk is never modified.
   star cannot warn because its semaphore is measured with that same error.
   The **remembered** gain solves the single-image case: on an SN you usually
   bring one stack, and one image cannot measure the gain, so the app measures
-  it when it can (the visit's frames, or the **"Measure my gain…"** action)
+  it when it can (the visit's frames, or the **"Measure gain…"** action in
+  **Settings → Camera**)
   and remembers it per camera and setting. The panel says which way the gain
   came; the measured case and its figures are in ADR-072.
 * **The check star as a traffic light**: when the sequence has one, it

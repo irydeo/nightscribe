@@ -1,5 +1,21 @@
 # ADR-028: Settings as four tabs — el diálogo deja de crecer en vertical
 
+> **Actualización (2026-10-08) / Update (2026-10-08)**: **ADR-071** sustituye
+> el `QTabWidget` por un **raíl de seis categorías**, un buscador y páginas
+> desplazables, y retira `_settings_two_columns`. La agrupación pasa del
+> origen del ajuste a la **tarea del observador** (Observatory / Equipment /
+> Observing / Measurement / Integrations / Interface), la cámara se unifica
+> en una caja y la carga y el guardado se hacen desde **una sola tabla de
+> campos** (`gui/settings_spec.py`). Este ADR queda como historia del primer
+> reflow; la vigencia la fija ADR-071. / **ADR-071** replaces the
+> `QTabWidget` with a **six-category rail**, a search and scrollable pages,
+> and retires `_settings_two_columns`. Grouping moves from the origin of the
+> setting to the **observer's task** (Observatory / Equipment / Observing /
+> Measurement / Integrations / Interface), the camera is unified into one
+> box, and load and save run from **one field table**
+> (`gui/settings_spec.py`). This ADR stays as the history of the first
+> reflow; ADR-071 sets the current state.
+
 **Estado / Status**: Accepted (actualizado 2026-10-05) · **Fecha / Date**: 2026-08-29
 
 > **Actualización (2026-10-05)**: ADR-061 añade la pestaña **Calibración**

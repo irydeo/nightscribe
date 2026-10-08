@@ -527,6 +527,81 @@ def test_leaving_the_tab_stops_the_animation(qapp, tmp_path):
     assert tab.btn_animate.isChecked() is False
 
 
+class _FakeSequenceWorker:
+    # Synchronous SequenceExportWorker double: records the call and writes a
+    # byte, so the tab's wiring (capture, register, say) is proven without
+    # encoding a real GIF.
+    seen = None
+
+    def __init__(self, frames, out, fmt, duration_ms=700, **kw):
+        from PySide6.QtCore import QObject, Signal
+        _FakeSequenceWorker.seen = {"n": len(frames), "out": out, "fmt": fmt,
+                                    "duration_ms": duration_ms}
+        self._out = out
+
+        class _Sig(QObject):
+            finished = Signal(str, str)
+        self._sig = _Sig()
+        self.finished = self._sig.finished
+
+    def start(self):
+        Path(self._out).write_bytes(b"x")
+        self.finished.emit(self._out, "")
+
+    def isRunning(self):
+        return False
+
+
+def test_the_animation_can_be_saved_as_gif_or_mp4(qapp, tmp_path, monkeypatch):
+    # The live verification can be written: the frames come from the editor's
+    # own render (same stretch, same band, same marks the loop shows), one
+    # per observation, and the file is registered on the visit as an
+    # animation. The format follows the file name.
+    from PySide6.QtWidgets import QFileDialog
+    tab, host, _view = _anim_tab(qapp, tmp_path, n=2)
+    saved = []
+    host.notify_saved = lambda paths, kind: saved.append((list(paths), kind))
+    assert tab.btn_export_anim.isEnabled()
+    out = tmp_path / "2026QX_animation.gif"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "GIF (*.gif)")))
+    monkeypatch.setattr("nightscribe.gui.workers.SequenceExportWorker",
+                        _FakeSequenceWorker)
+    tab._on_export_anim()
+    seen = _FakeSequenceWorker.seen
+    assert seen is not None
+    assert seen["fmt"] == "gif" and seen["n"] == 2
+    assert seen["duration_ms"] == 700
+    assert out.exists()
+    assert saved and saved[0][1] == "animation"
+    assert "Animation written" in tab._status_text
+    assert tab._anim_on is False            # the loop was handed back
+    assert tab._anim_export_workers == []   # finished workers pruned
+
+
+def test_the_animation_export_follows_the_file_name(qapp, tmp_path,
+                                                    monkeypatch):
+    # An MP4 is written when the name (or the filter) says so, and the
+    # observations are captured with the loop's own stretch.
+    from PySide6.QtWidgets import QFileDialog
+    tab, host, _view = _anim_tab(qapp, tmp_path, n=2)
+    host.notify_saved = lambda paths, kind: None
+    out = tmp_path / "2026QX_animation.mp4"
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName",
+        staticmethod(lambda *a, **k: (str(out), "MP4 video (*.mp4)")))
+    monkeypatch.setattr("nightscribe.gui.workers.SequenceExportWorker",
+                        _FakeSequenceWorker)
+    tab._show_group(0)
+    tab._state.set_stretch(black=5.0, white=40.0, gamma=0.7)
+    tab._on_export_anim()
+    assert _FakeSequenceWorker.seen["fmt"] == "mp4"
+    assert out.exists()
+    # the observer's levels survived the capture (the loop reloads the first
+    # stack, and keep_stretch is what keeps them)
+    assert tab._state.black == 5.0 and tab._state.white == 40.0
+
+
 def test_a_fresh_run_keeps_its_stack_paths(qapp, tmp_path):
     # Looking at an observation must not write it again: the run stores the
     # paths it wrote, so the strip, the viewer and the animation reuse them

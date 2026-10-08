@@ -429,9 +429,11 @@ EXOTIC o tus propios scripts siguen exactamente donde ella lo deja.
 
 ### Entender cualquier objeto
 
-**Herramientas → Explorar objeto…** (o clic en cualquier objetivo): identidad
-y datos físicos cruzados desde JPL SBDB, Horizons y CAD, SIMBAD, TNS y el NASA
-Exoplanet Archive, presentados como una tarjeta de visita:
+**El buscador «Explorar un objeto…» de la barra superior** (escribe un nombre
+y pulsa Enter) o **Herramientas → Explorar objeto…** (o clic en cualquier
+objetivo): identidad y datos físicos cruzados desde JPL SBDB, Horizons y CAD,
+SIMBAD, TNS y el NASA Exoplanet Archive, presentados como una tarjeta de
+visita:
 
 - Una **frase gancho** y bullets divulgativos, en español e inglés.
 - Una **tabla de parámetros donde cada fila está explicada** en lenguaje

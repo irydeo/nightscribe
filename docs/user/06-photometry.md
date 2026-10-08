@@ -51,8 +51,9 @@ measurement beats the header because the card can carry the camera's
 than it is. On an SN you usually bring **a single image**, and one image cannot
 measure the gain: the app measures it when it can (your visit's frames) and
 **remembers** it, so a later single plate reuses it. If you never have a pair,
-the **"Measure gain…"** button measures your camera on two frames you point it
-at and stores it. The panel says where the gain came from.
+the **"Measure gain…"** button in **Settings → Camera** measures your camera on
+two frames you point it at and stores it. The panel says where the gain came
+from.
 
 **Advanced…** opens the rest of the recipe (sky model, sigma-clip, colour
 term, host-galaxy subtraction). Each plate keeps its own recipe: changing it

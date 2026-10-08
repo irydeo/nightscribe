@@ -190,6 +190,9 @@ DEFAULTS = {
     # between it and the classic dialogs retired with them (2026-10-07);
     # the top bar's look is the only UFE preference left.
     "ufe_bar_icons": True,
+    # Interfaz 1.4: the Welcome sky breathes and the view fades in unless
+    # this is off. Motion is opt-out, never imposed; applies live.
+    "ui_animations": True,
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.

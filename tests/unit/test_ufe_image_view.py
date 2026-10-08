@@ -115,6 +115,20 @@ def test_export_png_writes_a_file(view, tmp_path):
     assert out.exists() and out.stat().st_size > 0
 
 
+def test_render_image_is_the_export_without_the_file(view, tmp_path):
+    # The animation export grabs the view once per observation through
+    # render_image; it has to be the SAME picture export_png writes (band
+    # and watermark included), or the GIF would show something else.
+    from PySide6.QtGui import QImage
+    view._state.load(MONO)
+    view.set_band_provider(_band_sample)
+    img = view.render_image()
+    assert isinstance(img, QImage) and not img.isNull()
+    saved = QImage(str(view.export_png(tmp_path / "x.png")))
+    assert (img.width(), img.height()) == (saved.width(), saved.height())
+    assert img.size().width() > 0
+
+
 def test_zoom_changed_signal_reports_absolute_scale(view):
     seen = []
     view.zoom_changed.connect(seen.append)

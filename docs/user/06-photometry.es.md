@@ -51,8 +51,9 @@ cámara o un valor de relleno, y con uno de esos el error sale más corto de lo
 que es. En una SN sueles traer **una sola imagen**, y una imagen no puede medir
 la ganancia: la app la mide cuando puede (los frames de tu visita) y la
 **recuerda**, así que a partir de ahí una placa suelta la reutiliza. Si nunca
-tienes un par, el botón **«Medir ganancia…»** mide tu cámara con dos tomas que
-le indiques y la guarda. El panel dice de dónde salió la ganancia.
+tienes un par, el botón **«Medir ganancia…»** de **Ajustes → Cámara** mide tu
+cámara con dos tomas que le indiques y la guarda. El panel dice de dónde salió
+la ganancia.
 
 **Avanzado…** abre el resto de la receta (modelo de cielo, sigma-clip,
 término de color, sustracción de galaxia anfitriona). Cada placa guarda su

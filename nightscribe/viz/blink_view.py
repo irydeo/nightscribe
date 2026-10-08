@@ -366,37 +366,17 @@ def make_blink_video(ref8, obs8, sn_xy, out, effect="blink", name="",
     #        at least this long (videos do not auto-loop like GIFs),
     #        and the ADR-046 boxes / marker_style / compass
     # @return: output Path
-    import imageio_ffmpeg
+    # The H.264 encoder and its quirks (even dimensions, minimum duration)
+    # live in one place now (core/viz/video.py): this render and the
+    # evolution one shared the same block twice.
+    from ..core.viz import video
     frames, duration = _blink_frames(
         ref8, obs8, sn_xy, effect, name, ref_label, watermark, lang,
         observatory, zoom, marker_scale, interval_ms, boxes=boxes,
         marker_style=marker_style, compass=compass)
-    cycle_ms = duration * len(frames)
-    loops = max(1, -(-int(min_seconds * 1000) // cycle_ms))  # ceil
-    frames = frames * loops
-    w, h = frames[0].size
-    if w % 2 or h % 2:
-        # H.264 yuv420p needs even dimensions: pad with a 1 px black edge
-        even = (w + w % 2, h + h % 2)
-        padded = []
-        for frame in frames:
-            canvas = Image.new("RGB", even)
-            canvas.paste(frame, (0, 0))
-            padded.append(canvas)
-        frames = padded
-        w, h = even
-    per_frame = max(1, round(fps * duration / 1000))
-    writer = imageio_ffmpeg.write_frames(
-        str(out), (w, h), fps=fps, codec="libx264", pix_fmt_in="rgb24",
-        quality=7, macro_block_size=1, ffmpeg_log_level="error",
-        output_params=["-movflags", "+faststart"])
-    writer.send(None)
-    for frame in frames:
-        arr = np.asarray(frame)
-        for _ in range(per_frame):
-            writer.send(arr)
-    writer.close()
-    logger.info("blink video (%s, %d loops) written to %s", effect, loops, out)
+    video.write_mp4(frames, out, duration_ms=duration, fps=fps,
+                    min_seconds=min_seconds)
+    logger.info("blink video (%s) written to %s", effect, out)
     return out
 
 

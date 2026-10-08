@@ -45,9 +45,10 @@ escribir código nuevo.
 Ficha del proyecto : Captura : Análisis (visita) : Publicación
 ```
 
-En la ventana de la visita están sus ficheros (tomas FITS) y la acción
-**«Medir la secuencia…»**, que abre el editor en la primera toma con el bloque
-de serie armado. No hay diálogo de carpeta suelta: sin visita no hay serie, ni
+En la ventana de la visita están sus ficheros (tomas FITS) y **una sola acción
+de análisis, elegida por el tipo del objeto** (la serie para los que varían, el
+track & stack para los que se mueven), que abre el editor en la primera toma
+con el bloque que toca armado. No hay diálogo de carpeta suelta: sin visita no hay serie, ni
 Undo, ni análisis, ni agregación. El panel **a la izquierda de la imagen**
 (visible solo con la visita armada) lleva el **navegador de tomas** (anterior /
 siguiente, `toma i/N`, «primera toma»: la toma abierta es la referencia), el
@@ -313,10 +314,10 @@ el motor de serie solo arranca con dos o más tomas.
 ## 9. El período: buscarlo, plegarlo y contar lo que no se sabe
 
 Cuando la curva ya está medida, el siguiente paso es saber **cuál es su período**.
-Se abre desde dos sitios: el botón **«Período y fase…»** de la ventana de la visita
-(pestaña Análisis) y el del bloque de la serie en la pestaña Medir del editor. La
-ventana trabaja sobre la curva del **proyecto** (todas las visitas, venga de donde
-venga cada punto).
+Se abre desde dos sitios: el botón **«Período y fase…»** del bloque de la curva
+del proyecto (pestaña Análisis, con «Todas las noches» y puntos suficientes) y el
+del bloque de la serie en la pestaña Medir del editor. Los dos trabajan sobre la
+curva del **proyecto** (todas las visitas, venga de donde venga cada punto).
 
 - **Métodos**: Lomb-Scargle generalizado (con media flotante: no hay que centrar
   nada y pondera por el error de cada punto) y **PDM** (minimización de la

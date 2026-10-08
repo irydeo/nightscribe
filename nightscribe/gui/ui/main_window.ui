@@ -80,6 +80,31 @@
         </spacer>
        </item>
        <item>
+        <!-- Interfaz 1.0 (2026-10-08): the always-visible door to Explore.
+             Type a name and press Enter to open that object's card, even
+             when tonight's list does not suggest it. Anchored to the RIGHT
+             (after the spacer) so a long breadcrumb never pushes it: it is
+             reachable from EVERY view; the Tools menu keeps its own,
+             self-explaining dialog for whoever does not know the feature
+             yet. -->
+        <widget class="QLineEdit" name="edt_nav_explore">
+         <property name="minimumSize"><size><width>200</width><height>0</height></size></property>
+         <property name="maximumSize"><size><width>280</width><height>16777215</height></size></property>
+         <property name="placeholderText"><string>Explore an object…</string></property>
+         <property name="clearButtonEnabled"><bool>true</bool></property>
+         <property name="toolTip"><string>Look up any object by name, even if it is not in tonight's list</string></property>
+        </widget>
+       </item>
+       <item>
+        <!-- a fixed 12 px breath between the search box and the sky bar:
+             without it the two read as one run of text -->
+        <spacer name="hsp_nav_explore">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>12</width><height>0</height></size></property>
+        </spacer>
+       </item>
+       <item>
         <!-- Interfaz 1.6: the night, always in sight. The real widget
              (gui/widgets/sky_bar.py) replaces this placeholder: the Moon
              at tonight's phase, the darkness window, the planets at dusk

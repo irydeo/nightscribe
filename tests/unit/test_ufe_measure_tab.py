@@ -426,6 +426,28 @@ def test_the_tab_reuses_the_remembered_gain(dlg, tmp_path, monkeypatch):
     assert "Gain 0.42 e-/ADU" in tab.lbl_result.toPlainText()
 
 
+def test_the_series_phase_door_opens_the_project_curve(dlg):
+    # ADR-045 rev: the period search's door from the editor's series block
+    # works on the project's curve; the host arms the hook with the pid (it
+    # used to live in the visit window).
+    seen = []
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": ["/tmp/a.fits"]})
+    dlg.set_phase_hook(lambda pid: seen.append(pid))
+    dlg.tab_measure._on_series_phase()
+    assert seen == [7]
+
+
+def test_the_series_phase_door_says_so_without_a_project(dlg):
+    # Without the host's hook (an ad-hoc open) the door explains itself
+    # instead of opening nothing.
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": []})
+    dlg.set_phase_hook(None)
+    dlg.tab_measure._on_series_phase()
+    assert "project" in dlg.tab_measure.lbl_status.text().lower()
+
+
 def test_new_plate_invalidates_the_measurement(dlg, tmp_path):
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)

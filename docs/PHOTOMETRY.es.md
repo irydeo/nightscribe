@@ -233,7 +233,7 @@ nunca se modifica.
   se mide con ese mismo error. La **recordada** resuelve el caso de una sola
   imagen: en una SN sueles traer un único apilado, y una imagen no puede medir la
   ganancia, así que la app la mide cuando puede (los frames de la visita, o la
-  acción **«Medir mi ganancia…»**) y la recuerda por cámara y ajuste. El panel
+  acción **«Medir ganancia…»** de **Ajustes → Cámara**) y la recuerda por cámara y ajuste. El panel
   dice de qué vía salió; el caso medido y sus cifras están en ADR-072.
 * **La estrella check como semáforo**: si la secuencia tiene una, se
   mide y se compara con su catálogo; si se desvía más de 2,5σ_total, la

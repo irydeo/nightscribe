@@ -18,6 +18,11 @@ diálogo flotante a página de la ventana principal, así que la ventana de
 visita se aparta mientras el taller está en pantalla y vuelve al salir;
 el taller trae su propio navegador de tomas, así que no se pierde nada)
 
+**Enmendado / Amended**: 2026-10-08 (la ventana de visita se simplifica:
+una sola acción de análisis elegida por el tipo del objeto, «Periodo y fase»
+se muda al bloque de la curva del proyecto y las acciones de recurso pasan a
+una puerta «Recursos ▾»)
+
 **Ver / See**: ADR-019 (la UX v3 centrada en proyectos; revisado aquí) ·
 ADR-041 (la barra de pestañas del proyecto; enmendado aquí) · ADR-043 (la
 pestaña Observatory plegada en Captura; enmendado aquí) · ADR-044 (el UFE;
@@ -130,6 +135,21 @@ tomas de la visita en su panel izquierdo (`ufe_visit_panel.ui`), que es
 justo para lo que se usaría la ventana mientras se mide, y las notas de la
 visita se guardan a cada tecla (`update_session_notes`).
 
+**Enmendado (2026-10-08, la ventana de visita se simplifica).** La fila de
+recursos de la ventana de visita tenía seis botones y tres de ellos abrían el
+mismo editor en pestañas distintas («Medir la secuencia…», «Astrometría…»,
+«Periodo y fase…»), así que el observador tenía que saber cuál le tocaba. La
+revisión deja **una sola acción de análisis**, elegida por el tipo del objeto
+(`core/kinds.py::analysis_of`): los que se mueven (NEO, PCCP, cometa, alerta)
+van al track & stack («Medir la posición…») y los que varían (SN, HADS,
+variable, tránsito) a la serie («Medir la serie…»); el blink de la SN vive en
+el editor y no necesita botón. «Periodo y fase…» se muda al bloque de la curva
+del proyecto, que es donde está la curva (y solo aparece con «Todas las
+noches» y puntos suficientes). Las acciones de recurso («Adjuntar ficheros…»,
+«Abrir», «Quitar de la visita») pasan a una puerta **«Recursos ▾»**, con sus
+textos y tooltips en el Designer (ADR-005) y el mecanismo de puertas del UFE
+(`build_door`). La cabecera (fecha, pin, borrar, guardar y cerrar) no cambia.
+
 ## English
 
 **Context.** The project flow carried three real frictions, all
@@ -214,6 +234,21 @@ migration tests seed old databases and verify both. The manager has its
 own battery (`tests/unit/test_visits_panel.py`). The duplicated hint
 label bug in the products block was fixed on the way. The workflow and
 UI guides document the change; AGENTS.md follows the map.
+
+**Amended (2026-10-08, the visit window is simplified).** The visit window's
+resource row carried six buttons and three of them opened the same editor in
+different tabs ("Measure the sequence…", "Astrometry…", "Period and phase…"), so
+the observer had to know which one applied. The revision leaves **a single
+analysis action**, chosen by the object's kind (`core/kinds.py::analysis_of`):
+the objects that move (NEO, PCCP, comet, alert) go to the track & stack
+("Measure the position…") and the ones that vary (SN, HADS, variable, transit)
+to the series ("Measure the series…"); the SN blink lives in the editor and
+needs no button. "Period and phase…" moves to the project's curve block, which
+is where the curve is (and only shows with "All the nights" and enough points).
+The resource actions ("Attach files…", "Open", "Remove from visit") move into a
+**"Resources ▾"** door, with their texts and tooltips in Designer (ADR-005) and
+the UFE's door mechanism (`build_door`). The head (date, pin, delete, save and
+close) does not change.
 
 **Fix (2026-10-02).** The visit window is a non-modal `QDialog` **with a
 parent**, so the window manager keeps it above the main window. While the

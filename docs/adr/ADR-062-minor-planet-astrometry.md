@@ -746,3 +746,31 @@ the **star stacks** of the pair are loaded with the object's; and the **whole-se
 stack** carries the run id in its name (`<object>_base_r<id>.fits`), because it used to be
 one per project and every pass overwrote it, so an old run's manual mode marked on the
 newest pass's stack.
+
+**Nota (2026-10-08): la verificación se puede guardar.** «Animar o verificar» se
+podía mirar pero no compartir: el GIF del punto 7 era otra figura, con su propio
+estirado. La pestaña gana **«Guardar animación…»**, un botón junto al bucle, con
+diálogo y formato por extensión (GIF o MP4). Los fotogramas salen del **propio
+render del editor** (`UfeImageView.render_image`, el mismo que «Export PNG…»),
+así que llevan **los niveles que hayas aplicado, la banda de la observación y las
+marcas** (la cruz medida y la marca del proyecto): exactamente lo que enseña el
+bucle. La captura va en el hilo de GUI (Qt no pinta fuera de él) y sólo la
+codificación va a un worker (`SequenceExportWorker`), de modo que un MP4 no
+congela la ventana. El GIF se escribe con Pillow y el MP4 con `imageio-ffmpeg`;
+el codificador H.264 y sus reglas (dimensiones pares, duración mínima) viven ahora
+en un solo sitio, `core/viz/video.py`, que el blink y la evolución comparten. El
+fichero se registra en la visita como `animation`.
+
+**Note (2026-10-08): the verification can be saved.** "Animate / verify" could be
+watched but not shared: the GIF of item 7 was another figure, with its own
+stretch. The tab gains **"Save animation…"**, a button next to the loop, with a
+dialog and the format from the file name (GIF or MP4). The frames come from the
+**editor's own render** (`UfeImageView.render_image`, the same one "Export PNG…"
+uses), so they carry **the levels you applied, the observation's band and the
+marks** (the measured cross and the project mark): exactly what the loop shows.
+The capture runs on the GUI thread (Qt cannot paint off it) and only the encoding
+goes to a worker (`SequenceExportWorker`), so an MP4 does not freeze the window.
+The GIF is written with Pillow and the MP4 with `imageio-ffmpeg`; the H.264
+encoder and its rules (even dimensions, minimum duration) now live in one place,
+`core/viz/video.py`, shared by the blink and the evolution renders. The file is
+registered on the visit as `animation`.

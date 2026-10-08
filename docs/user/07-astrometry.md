@@ -7,7 +7,7 @@ frames **following the object's motion**, not the stars'.
 ## First of all: solving the plate
 
 Everything astrometric needs a **plate solution** (the WCS: which point of
-the sky each pixel is). Under **Settings → Plate solver** you choose:
+the sky each pixel is). Under **Settings → Measurement → Plate solver** you choose:
 
 - **Auto** (recommended): tries local **ASTAP** first (fast, offline, free)
   and falls back to **nova.astrometry.net** if you do not have it or it
@@ -88,7 +88,9 @@ it is never resolved silently.
 
 **Animate / verify** plays the observation stacks centred on the object with
 one shared stretch: the object must stay put in the middle while the stars
-crawl. That is the acid test that the detection is real. **Blink /
+crawl. That is the acid test that the detection is real. **Save animation…**
+writes that very loop as a GIF or an MP4, with the levels you applied and the
+plate's heading on every frame, so the proof can be shared. **Blink /
 montage…** writes the figure (GIF or montage) with the same stretch on every
 panel, so a faint one does not look as bright as a real one.
 

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Explore object: the entry dialog that collects a name for the Explore
+  card. It replaces the bare QInputDialog that asked for the name with no
+  context at all (2026-10-08).
+
+  Why a dialog AND the top-bar search: the top-bar field is the quick door
+  for whoever already knows what to type, and this one explains what
+  Explore is for (reaching the objects tonight's list does not suggest) to
+  whoever opens it from the Tools menu. Both hand a name to the unchanged
+  _open_explore_dialog lookup.
+
+  ADR-005: the structure lives here; gui/explore_dialog.py only dresses
+  the window, wires the buttons and exposes the widgets. The class tag
+  matches the Python class so the i18n context carries over.
+-->
+<ui version="4.0">
+ <class>ExploreDialog</class>
+ <widget class="QWidget" name="ExploreDialog">
+  <layout class="QVBoxLayout" name="vbox_explore">
+   <property name="leftMargin"><number>14</number></property>
+   <property name="topMargin"><number>14</number></property>
+   <property name="rightMargin"><number>14</number></property>
+   <property name="bottomMargin"><number>14</number></property>
+   <property name="spacing"><number>10</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_intro">
+     <property name="text">
+      <string>Look up any object by name or designation, even if it is not in tonight's list.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLineEdit" name="edt_name">
+     <property name="placeholderText"><string>Name, designation or catalogue id</string></property>
+     <property name="clearButtonEnabled"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_buttons">
+     <property name="spacing"><number>8</number></property>
+     <item>
+      <spacer name="hsp_buttons">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_cancel">
+       <property name="text"><string>Cancel</string></property>
+       <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_explore">
+       <property name="text"><string>Explore</string></property>
+       <property name="default"><bool>true</bool></property>
+       <property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

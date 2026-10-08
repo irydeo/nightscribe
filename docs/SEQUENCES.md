@@ -43,9 +43,10 @@ checklist, not writing new code.
 Project sheet : Capture : Analysis (visit) : Publication
 ```
 
-The visit window holds its files (FITS frames) and the **"Measure the
-sequence..."** action, which opens the editor on the first frame with the series
-block armed. There is no loose-folder dialog: no visit means no series, no
+The visit window holds its files (FITS frames) and **a single analysis action,
+chosen by the object's kind** (the series for the ones that vary, the track &
+stack for the ones that move), which opens the editor on the first frame with the
+block it needs armed. There is no loose-folder dialog: no visit means no series, no
 Undo, no analysis, no aggregation. The panel **at the left of the image**
 (visible only with the visit armed) carries the **frame navigator** (previous /
 next, `frame i/N`, "first frame": the open frame is the reference), the
@@ -307,9 +308,10 @@ the series engine only starts with two or more frames.
 ## 9. The period: find it, fold it, and say what cannot be known
 
 Once the curve is measured, the next question is **what its period is**. There are
-two doors: the **"Period and phase…"** button in the visit window (Analysis tab) and
-the one in the series block of the editor's Measure tab. The window works on the
-**project's** curve (every visit, whatever measured each point).
+two doors: the **"Period and phase…"** button in the project's curve block (Analysis
+tab, with "All the nights" and enough points) and the one in the series block of the
+editor's Measure tab. Both work on the **project's** curve (every visit, whatever
+measured each point).
 
 - **Methods**: the generalised Lomb-Scargle (with a floating mean: nothing has to be
   centred and every point is weighted by its own error) and the **PDM** (phase

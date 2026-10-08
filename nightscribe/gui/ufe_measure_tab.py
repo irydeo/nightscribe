@@ -320,12 +320,6 @@ class UfeMeasureTab(QWidget):
         # its observation (see _sync_manual_button).
         self.btn_manual_mag = self._ui.btn_manual_mag
         self.btn_manual_mag.clicked.connect(self._on_manual_magnitude)
-        # ADR-072: the one-time gain measurement, for an observer who only
-        # has single images (a single image cannot measure the gain, and the
-        # header can lie). It lives with the result, where the gain line is
-        # what tells the observer that it is missing.
-        self.btn_measure_gain = self._ui.btn_measure_gain
-        self.btn_measure_gain.clicked.connect(self._on_measure_gain)
         self.btn_reset_more = self._ui.btn_reset_more
         self._door(self.btn_export_more, (self.btn_csv, self.btn_eff))
         self._door(self.btn_reset_more, (self.btn_reset_state,
@@ -1459,68 +1453,6 @@ class UfeMeasureTab(QWidget):
                 logger.warning("gain remember failed: %s", err)
         return resolved
 
-    def _on_measure_gain(self):
-        # ADR-072: the one-time action for an observer who only has single
-        # images. Point at a folder with two frames of the same exposure,
-        # measure the conversion gain and remember it for this camera; the
-        # next plate reuses it instead of trusting the header.
-        from ..core import fits_io
-        from ..core import gain as gain_mod
-        from ..core import gain_store
-        from ..core.db import db
-        start = str(Path(self._state.path).parent) if self._state.path else ""
-        folder = QFileDialog.getExistingDirectory(
-            self, self.tr("Measure my gain"), start)
-        if not folder:
-            return
-        paths = sorted(str(p) for p in Path(folder).iterdir()
-                       if p.suffix.lower() in (".fit", ".fits", ".fts"))
-        if len(paths) < 2:
-            self._say(self.tr("That folder has fewer than two FITS frames: "
-                              "the gain needs a pair of the same exposure."))
-            return
-        try:
-            estimate = gain_mod.estimate_from_paths(paths)
-        except Exception as err:                # never fatal
-            logger.warning("gain estimate failed: %s", err)
-            estimate = None
-        gain = (estimate or {}).get("gain")
-        if gain is None:
-            notes = (estimate or {}).get("notes") or []
-            said = notes[-1].get(self._lang) if notes else None
-            self._say(said or self.tr(
-                "The gain could not be measured there: it needs two frames "
-                "of the same exposure with a usable sky."))
-            return
-        try:
-            header = fits_io.read_header(paths[0])
-        except Exception as err:                # never fatal
-            logger.warning("gain header failed: %s", err)
-            header = None
-        if header is not None:
-            try:
-                gain_store.remember(db, header, estimate)
-            except Exception as err:            # never fatal
-                logger.warning("gain remember failed: %s", err)
-        parts = [self.tr("Gain {0} e-/ADU")
-                 .format("{:.4g}".format(float(gain)))]
-        ron = estimate.get("ron")
-        if ron is not None:
-            parts.append(self.tr("read noise {0} e-")
-                         .format("{:.3g}".format(float(ron))))
-        if estimate.get("n_kept"):
-            parts.append(self.tr("{0} sky boxes")
-                         .format(int(estimate["n_kept"])))
-        self._say("")
-        QMessageBox.information(
-            self, self.tr("Measure my gain"),
-            self.tr("Measured on your own frames: {0}. It is remembered for "
-                    "this camera, so a single image reuses it."
-                    ).format(" · ".join(parts)))
-        # the live measurement re-resolves the gain, so its line follows
-        if self._last is not None:
-            self._remeasure()
-
     def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
@@ -2158,13 +2090,13 @@ class UfeMeasureTab(QWidget):
     def _on_series_phase(self):
         # Quality plan (C): the period search opens from where the series
         # was measured too, on the PROJECT's curve (every visit), so the
-        # observer does not have to hunt for the other door.
+        # observer does not have to hunt for the other door. The host arms
+        # the hook when the editor came from a visit (ADR-045 rev).
         ctx = self._series_context() or {}
         pid = ctx.get("pid")
         dlg = host_of(self)
-        hook = getattr(dlg, "_open_phase_dialog", None)
-        if pid and callable(hook):
-            hook(pid)
+        opener = getattr(dlg, "open_phase", None)
+        if pid and callable(opener) and opener(pid):
             return
         self._say(self.tr(
             "The period search works on a project's curve: open the "

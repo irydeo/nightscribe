@@ -407,6 +407,7 @@ scripts pick up exactly where it leaves off.
 
 ### Understand any object
 
+**The "Explore an object…" box in the top bar** (type a name, press Enter) or
 **Tools → Explore object…** (or click any target): identity and physical data
 cross-matched from JPL SBDB, Horizons and CAD, SIMBAD, TNS and the NASA
 Exoplanet Archive, rendered as a calling card:

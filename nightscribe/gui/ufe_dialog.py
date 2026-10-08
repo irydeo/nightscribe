@@ -137,6 +137,10 @@ class UfeDialog(QWidget):
         self._points_hook = None
         self._run_undo_hook = None
         self._exoclock_hook = None
+        # the period search works on the PROJECT's curve, so its door needs
+        # the project id: the host arms this when the editor came from a
+        # visit, and the Measure tab's series block opens it (ADR-045 rev)
+        self._phase_hook = None
         # astrometry hooks (astrometry plan, phase 7): the visit context
         # for the Calibration and Track & Stack tabs (D15: without a visit
         # there is no sequence) and the way a generated report reaches the
@@ -1355,6 +1359,22 @@ class UfeDialog(QWidget):
         except Exception as err:
             logger.warning("series hook failed: %s", err)
             return None
+
+    def set_phase_hook(self, fn):
+        # @args: fn - callable(pid) opening the period/phase report on the
+        #        project's curve. The host arms it when the editor was opened
+        #        from a visit: the period works on the PROJECT's curve, and
+        #        the series block is where the observer already is (ADR-045
+        #        rev: the door moved off the visit window, not away).
+        self._phase_hook = fn if callable(fn) else None
+
+    def open_phase(self, pid):
+        # @args: pid - the project whose curve is folded
+        # @return: True when the host's hook opened the report
+        if self._phase_hook is None:
+            return False
+        self._phase_hook(pid)
+        return True
 
     # ------------------------------------------------- visit astrometry
 

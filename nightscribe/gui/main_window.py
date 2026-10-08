@@ -165,64 +165,6 @@ _CAM_PRESET_SPINS = {
 }
 
 
-def _settings_two_columns(dlg):
-    # @args: dlg - the settings dialog (holds QTabWidget > pages > QGroupBox)
-    # @return: re-lays every tab page into two side-by-side columns. The
-    #          page keeps its original QVBoxLayout; a nested QHBoxLayout
-    #          of two placeholder widgets is appended to it, and the
-    #          QGroupBox children (original order) are reparented into
-    #          the lighter column. Keeps .ui flat (single column of
-    #          groups) so Qt Designer stays friendly; only visual height
-    #          changes here.
-    from PySide6.QtWidgets import (QTabWidget, QGroupBox, QWidget,
-                                   QHBoxLayout, QVBoxLayout)
-    tw = dlg.findChild(QTabWidget)
-    if tw is None:
-        return
-    for i in range(tw.count()):
-        page = tw.widget(i)
-        groups = [w for w in page.findChildren(QGroupBox)
-                  if w.parent() is page]
-        if len(groups) < 2:
-            continue
-        old = page.layout()          # the page's original QVBoxLayout
-        if old is None:
-            continue
-        # empty the page's vbox (widgets go back to a plain parent state)
-        while old.count():
-            old.takeAt(0)
-        cols = QHBoxLayout()
-        cols.setContentsMargins(0, 0, 0, 0)
-        cols.setSpacing(14)
-        cols.setStretch(0, 1)
-        cols.setStretch(1, 1)
-        c = [QWidget(page), QWidget(page)]
-        v = [QVBoxLayout(c[k]) for k in range(2)]
-        for k in range(2):
-            v[k].setContentsMargins(0, 0, 0, 0)
-            v[k].setSpacing(10)
-        col_h = [0, 0]
-        col_w = [0, 0]
-        for g in groups:
-            k = 0 if col_h[0] <= col_h[1] else 1
-            g.setParent(c[k])
-            v[k].addWidget(g)
-            col_h[k] += max(g.sizeHint().height(), 1)
-            # a group's natural width is the width at which its widest field
-            # row (label + field + button) fits; recording the max per column
-            # lets us floor it below so the wide rows are never squeezed.
-            col_w[k] = max(col_w[k], g.sizeHint().width())
-        cols.addWidget(c[0])
-        cols.addWidget(c[1])
-        # Floor each column's width at its content's natural width so the
-        # wide field rows are not clipped and the help labels wrap to fewer
-        # (non-overlapping) lines; equal stretch still lets the dialog grow
-        # and share the leftover space between the two.
-        c[0].setMinimumWidth(col_w[0])
-        c[1].setMinimumWidth(col_w[1])
-        old.addLayout(cols)
-
-
 def _master_num(value, fmt="{:.3g}"):
     # @args: value - a master's gain, temperature or exposure (maybe None),
     #        fmt - how a number is shown
@@ -1503,6 +1445,8 @@ class MainWindow(QMainWindow):
         self._menus.action_welcome.triggered.connect(
             lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
+        # the navigation row's own door to Explore (always visible)
+        self._menus.edt_nav_explore.returnPressed.connect(self._nav_explore)
         self._menus.action_campaigns.triggered.connect(
             self._tools_campaigns)
 
@@ -1884,11 +1828,21 @@ class MainWindow(QMainWindow):
         self._cam_ref_update(dlg)
 
     def _cam_ref_update(self, dlg):
-        # The full-well-in-ADU cross-check plus the sensor facts, so the
-        # linearity suggestion can be sanity-checked at a glance.
+        # The plate scale FIRST (what the pixel size and the focal length
+        # mean together, and the number the NEO advice and the report read),
+        # then the sensor facts the preset brought, so the suggested
+        # linearity can be sanity-checked at a glance. It is rebuilt live
+        # whenever pixel, focal, gain or read noise change.
         from ..core import cameras
-        p = cameras.preset(dlg.cmb_cam_preset.currentData())
+        pixel = dlg.spn_pixel_um.value()
+        focal = dlg.spn_focal_mm.value()
         bits = []
+        if pixel > 0 and focal > 0:
+            # 206265 is the arcseconds in a radian: the small-angle scale
+            # of a pixel of this size behind this focal length.
+            scale = 206.264806 * pixel / focal
+            bits.append(self.tr("Plate scale: {0:.2f}″/pixel").format(scale))
+        p = cameras.preset(dlg.cmb_cam_preset.currentData())
         if p is not None:
             bits.append(self.tr("Sensor: {0}").replace("{0}", p["sensor"]))
             if p.get("dark_current_e_s") is not None \
@@ -1899,7 +1853,7 @@ class MainWindow(QMainWindow):
             bits.append(self.tr("regime: {0}").replace(
                 "{0}", self.tr("short (group frames)")
                 if p["regime"] == "short" else self.tr("normal")))
-            fw = cameras.full_well_adu(p, config.get("ccd_gain"))
+            fw = cameras.full_well_adu(p, dlg.spn_cam_gain.value() or None)
             if fw:
                 bits.append(self.tr("full well ≈ {0:.0f} ADU at your gain")
                             .format(fw))
@@ -1927,6 +1881,70 @@ class MainWindow(QMainWindow):
                 "No gain: the error bar of every point is the scatter of "
                 "the comparison stars, not the CCD equation. Measure it on "
                 "your own frames, or set it here."))
+
+    def _measure_gain_into(self, dlg):
+        # ADR-072: the one-time gain measurement, from Settings -> Camera.
+        # Point at a folder with two frames of the same exposure, measure the
+        # conversion gain and remember it for this camera; the field is filled
+        # so the observer sees the value and the note stops saying it is
+        # missing.
+        # @args: dlg - the settings dialog
+        # @return: None
+        from ..core import fits_io, gain as gain_mod, gain_store
+        from ..core.db import db
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Measure my gain"), "")
+        if not folder:
+            return
+        paths = sorted(str(p) for p in Path(folder).iterdir()
+                       if p.suffix.lower() in (".fit", ".fits", ".fts"))
+        if len(paths) < 2:
+            QMessageBox.information(dlg, self.tr("Measure my gain"),
+                                    self.tr("That folder has fewer than two "
+                                            "FITS frames: the gain needs a "
+                                            "pair of the same exposure."))
+            return
+        try:
+            estimate = gain_mod.estimate_from_paths(paths)
+        except Exception as err:                # never fatal
+            logger.warning("gain estimate failed: %s", err)
+            estimate = None
+        gain = (estimate or {}).get("gain")
+        if gain is None:
+            notes = (estimate or {}).get("notes") or []
+            lang = self._lang()
+            said = notes[-1].get(lang) or notes[-1].get("en") if notes else None
+            QMessageBox.information(
+                dlg, self.tr("Measure my gain"),
+                said or self.tr("The gain could not be measured there: it "
+                                "needs two frames of the same exposure with a "
+                                "usable sky."))
+            return
+        try:
+            header = fits_io.read_header(paths[0])
+        except Exception as err:                # never fatal
+            logger.warning("gain header failed: %s", err)
+            header = None
+        if header is not None:
+            try:
+                gain_store.remember(db, header, estimate)
+            except Exception as err:            # never fatal
+                logger.warning("gain remember failed: %s", err)
+        dlg.spn_cam_gain.setValue(float(gain))
+        parts = [self.tr("Gain {0} e-/ADU")
+                 .format("{:.4g}".format(float(gain)))]
+        ron = estimate.get("ron")
+        if ron is not None:
+            parts.append(self.tr("read noise {0} e-")
+                         .format("{:.3g}".format(float(ron))))
+        if estimate.get("n_kept"):
+            parts.append(self.tr("{0} sky boxes")
+                         .format(int(estimate["n_kept"])))
+        QMessageBox.information(
+            dlg, self.tr("Measure my gain"),
+            self.tr("Measured on your own frames: {0}. It is remembered for "
+                    "this camera, so a single image reuses it."
+                    ).format(" · ".join(parts)))
 
     def _exotic_python(self, dlg):
         # @return: the interpreter to use (configured, else detected)
@@ -2023,97 +2041,101 @@ class MainWindow(QMainWindow):
                 "Could not prepare EXOTIC:\n{0}").format(log[-600:]))
 
     def on_open_settings(self):
+        # ADR-071: the dialog is a rail of six categories (Observatory,
+        # Equipment, Observing, Measurement, Integrations, Interface), a
+        # search box and scrollable pages. The .ui carries the structure;
+        # the simple fields are filled and saved from ONE table
+        # (settings_spec.FIELDS), so a field cannot be loaded and forgotten
+        # on the way out. The combos whose items are built at runtime (the
+        # camera preset, the solver, the marker, the language) and the
+        # parsed lists (kinds, vigils) stay hand-wired here, where their
+        # index or data mapping is visible.
+        from . import settings_spec
+        from . import settings_view
+        from ..core import cameras
+        from ..core import vigils
+
         dlg = _load_ui("settings_dialog")
-        # 3-tab layout with per-field help labels BELOW each widget —
-        # see ADR-028. The .ui carries structure + text; the 11 px dim
-        # styling for the lblH_* labels is applied here so the .ui stays
-        # tool-friendly and theme.py untouched.
-        # style every help-below-field label: 11 px, dim.
-        # The .ui sets wordWrap=true + top-aligned; the label wraps to the
-        # width of its group (~half the dialog after the two-column reflow)
-        # so long texts stay readable.
-        from PySide6.QtWidgets import QLabel
-        for w in dlg.findChildren(QLabel):
-            if w.objectName().startswith("lblH_"):
-                w.setStyleSheet("font-size: 11px; color: #8a90a6;")
-                w.setWordWrap(True)
-        # two-column grid per tab: stack the flat QGroupBox children
-        # side by side (balanced by cumulative height) so the dialog
-        # stays short instead of a tall single stack. Each column is
-        # floored at its content's natural width so wide groups (site,
-        # horizon, storage) keep their label+field+button rows unclipped.
-        _settings_two_columns(dlg)
-        # fit the widest tab's two content-floored columns: the dialog's
-        # sizeHint grows with the column minimums, and each column is
-        # already floored at its groups' natural width so the label+field+
-        # button rows are never clipped and the help text wraps to a couple
-        # of non-overlapping lines.
-        dlg.resize(max(820, dlg.sizeHint().width()), dlg.sizeHint().height())
-        dlg.edt_mpc_code.setText(config.get("mpc_code", ""))
-        dlg.edt_obs_name.setText(config.get("observatory_name", ""))
-        dlg.spn_lat.setValue(float(config.get("lat", 0)))
-        dlg.spn_lon.setValue(float(config.get("lon", 0)))
-        dlg.spn_height.setValue(int(config.get("height", 0)))
-        dlg.spn_aperture.setValue(float(config.get("aperture_inches", 10)))
-        dlg.chk_transit_scope_filter.setChecked(
-            bool(config.get("transit_scope_filter", True)))
-        dlg.spn_limit_mag.setValue(float(config.get("limit_mag", 20)))
-        dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
-        dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
-        dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
-        # The astrometry's own settings (ADR-062). They lived ONLY in the
-        # config file until 2026-10-06: the report said "Settings →
-        # Astrometry" and there was no such place, so the submission floor
-        # (the one that decides whether a report has lines at all) could not
-        # be changed from the app.
-        dlg.spn_astro_gate.setValue(float(config.get("astrometry_snr_sigma",
-                                                     3.5)))
-        dlg.spn_astro_floor.setValue(float(config.get(
-            "astrometry_submit_snr", 10.0)))
-        dlg.spn_astro_sweep_pct.setValue(float(config.get(
-            "astrometry_sweep_pct", 5.0)))
-        dlg.spn_astro_steps.setValue(int(config.get(
-            "astrometry_sweep_steps", 25)))
-        dlg.spn_astro_margin.setValue(int(config.get(
-            "astrometry_cutout_margin_px", 64)))
-        dlg.chk_astro_check.setChecked(bool(config.get(
-            "astrometry_check_enabled", True)))
-        dlg.spn_astro_check_sigma.setValue(float(config.get(
-            "astrometry_check_sigma", 3.0)))
-        dlg.spn_astro_check_floor.setValue(float(config.get(
-            "astrometry_check_floor_arcsec", 1.0)))
-        dlg.spn_astro_check_window.setValue(int(config.get(
-            "astrometry_check_window_days", 30)))
-        dlg.spn_astro_threads.setValue(int(config.get(
-            "astrometry_threads", 0)))
-        # plate solver (ADR-051): auto | astap | astrometry
+        settings_view.style_help_labels(dlg)
+        settings_view.build_rail(dlg, settings_spec.CATEGORIES, self.tr)
+        for name in settings_spec.ADVANCED_GROUPS:
+            group = getattr(dlg, name, None)
+            if group is not None:
+                settings_view.make_collapsible(group, collapsed=True)
+        settings_view.wire_search(
+            dlg, self.tr("No setting matches that search."))
+        dlg.resize(max(900, dlg.sizeHint().width()),
+                   max(640, dlg.sizeHint().height()))
+
+        # combos whose items are built here, before the table fills them
+        dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
+        dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
         dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
-        _si = dlg.cmb_solver.findData(config.get("solver", "auto"))
-        dlg.cmb_solver.setCurrentIndex(_si if _si >= 0 else 0)
-        dlg.edt_astap_path.setText(config.get("astap_path", ""))
-        dlg.chk_solve_save.setChecked(
-            bool(config.get("solve_save", True)))
-        dlg.chk_phot_matched.setChecked(
-            bool(config.get("phot_matched", True)))
-        dlg.btn_astap_browse.clicked.connect(
-            lambda: self._pick_astap(dlg))
+        dlg.cmb_cam_preset.addItem(self.tr("None"), "")
+        for preset in cameras.PRESETS:
+            dlg.cmb_cam_preset.addItem(cameras.label(preset), preset["key"])
+        dlg.cmb_marker_style.addItem(self.tr("Ring with ticks (classic)"),
+                                     "ring")
+        dlg.cmb_marker_style.addItem(self.tr("Full-frame cross with box"),
+                                     "cross")
+        dlg.cmb_mark_color.addItem(self.tr("The object type's colour"), "kind")
+        dlg.cmb_mark_color.addItem(self.tr("One common colour"), "common")
+        dlg.cmb_language.addItems([self.tr("System"), self.tr("Spanish"),
+                                   self.tr("English")])
+
+        # every simple field, one table both ways (ADR-071)
+        settings_spec.load(dlg, config)
+
+        # combos with an index or a data mapping of their own
+        dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
+        dlg.cmb_binning.setCurrentText(config.get("pixel_binning", "1x1"))
+        idx = dlg.cmb_solver.findData(config.get("solver", "auto"))
+        dlg.cmb_solver.setCurrentIndex(idx if idx >= 0 else 0)
+        idx = dlg.cmb_cam_preset.findData(config.get("cam_preset", ""))
+        dlg.cmb_cam_preset.setCurrentIndex(idx if idx >= 0 else 0)
+        idx = dlg.cmb_marker_style.findData(config.get("marker_style", "ring"))
+        dlg.cmb_marker_style.setCurrentIndex(idx if idx >= 0 else 0)
+        idx = dlg.cmb_mark_color.findData(config.get("marker_color", "kind"))
+        dlg.cmb_mark_color.setCurrentIndex(idx if idx >= 0 else 0)
+        lang = config.get("language", "system")
+        dlg.cmb_language.setCurrentIndex(
+            {"system": 0, "es": 1, "en": 2}.get(lang, 0))
+
+        # the vigils list is parsed, not a plain string
+        dlg.edt_vigils.setPlainText(
+            vigils.vigils_to_text(vigils.vigils_from_config(config)))
+
+        # Tonight object kinds: the whitelist mirrors the checkboxes
+        enabled = self._enabled_kinds()
+        for kind in KIND_ORDER:
+            box = getattr(dlg, f"chk_kind_{kind}", None)
+            if box is not None:
+                box.setChecked(kind in enabled)
+
+        # the camera profile note (sensor facts + the live plate scale):
+        # recompute it whenever any number it reads changes
+        dlg.cmb_cam_preset.currentIndexChanged.connect(
+            lambda _i: self._cam_preset_selected(dlg))
+        for spin in (dlg.spn_cam_gain, dlg.spn_cam_ron, dlg.spn_pixel_um,
+                     dlg.spn_focal_mm):
+            spin.valueChanged.connect(lambda _v: self._cam_ref_update(dlg))
+        self._cam_ref_update(dlg)
+        # ADR-072: measure the gain on two of the observer's own frames and
+        # remember it, so a single image can reuse it (the FITS header often
+        # carries the camera's setting or a placeholder).
+        dlg.btn_measure_gain.clicked.connect(
+            lambda: self._measure_gain_into(dlg))
+
+        # buttons
+        dlg.btn_astap_browse.clicked.connect(lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
-        # Find_Orb (astrometry plan, D31): the NON-interactive `fo` that
-        # checks our measurements against the published observations
-        dlg.edt_findorb_path.setText(config.get("findorb_path", ""))
         dlg.btn_findorb_browse.clicked.connect(
             lambda: self._pick_findorb(dlg))
         dlg.btn_findorb_test.clicked.connect(lambda: self._test_findorb(dlg))
-        # the guided install (D31): the observer does not have to live in a
-        # terminal to get Find_Orb
         dlg.btn_findorb_install.clicked.connect(
             lambda: self._install_findorb(dlg))
-        # EXOTIC orchestration (plan phase A): the external Python <=3.10
-        # and its private environment
-        dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))
-        dlg.edt_exotic_install.setText(config.get("exotic_install_dir", ""))
         dlg.btn_exotic_py_browse.clicked.connect(
             lambda: self._pick_exotic_python(dlg))
         dlg.btn_exotic_dir_browse.clicked.connect(
@@ -2121,125 +2143,6 @@ class MainWindow(QMainWindow):
         dlg.btn_exotic_prepare.clicked.connect(
             lambda: self._prepare_exotic(dlg))
         dlg.btn_exotic_test.clicked.connect(lambda: self._test_exotic(dlg))
-        # photometric camera profile (core/cameras.py presets)
-        from ..core import cameras
-        dlg.cmb_cam_preset.addItem(self.tr("None"), "")
-        for _p in cameras.PRESETS:
-            dlg.cmb_cam_preset.addItem(cameras.label(_p), _p["key"])
-        _ci = dlg.cmb_cam_preset.findData(config.get("cam_preset", ""))
-        dlg.cmb_cam_preset.setCurrentIndex(_ci if _ci >= 0 else 0)
-        dlg.spn_cam_full_well.setValue(
-            float(config.get("cam_full_well_e") or 0))
-        dlg.spn_cam_linearity.setValue(
-            float(config.get("cam_linearity_adu") or 0))
-        # the system gain and the read noise: the two numbers the CCD
-        # equation needs and that nothing used to be able to set (quality
-        # plan, phase G). 0 in the spins means "unknown".
-        dlg.spn_cam_gain.setValue(float(config.get("ccd_gain") or 0))
-        dlg.spn_cam_ron.setValue(float(config.get("ccd_read_noise") or 0))
-        dlg.spn_cam_gain.valueChanged.connect(
-            lambda _v: self._cam_ref_update(dlg))
-        dlg.spn_cam_ron.valueChanged.connect(
-            lambda _v: self._cam_ref_update(dlg))
-        dlg.spn_cam_dark.setValue(
-            float(config.get("cam_dark_current_e_s") or 0))
-        dlg.spn_cam_max_exp.setValue(
-            float(config.get("cam_max_exposure_s") or 0))
-        dlg.cmb_cam_preset.currentIndexChanged.connect(
-            lambda _i: self._cam_preset_selected(dlg))
-        self._cam_ref_update(dlg)
-        dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
-        dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
-        # Track D (EXOTIC handoff): AAVSO code, camera type and binning
-        dlg.edt_aavso_code.setText(config.get("aavso_code", ""))
-        dlg.edt_aavso_token.setText(config.get("aavso_api_token", ""))
-        dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
-        dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
-        dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
-        dlg.cmb_binning.setCurrentText(config.get("pixel_binning", "1x1"))
-        # Chart annotations (ADR-046): the identity stamped in the corner
-        # boxes and the two style switches
-        dlg.edt_observer.setText(config.get("observer_name", ""))
-        dlg.edt_measurer.setText(config.get("measurer_name", ""))
-        dlg.edt_telescope.setText(config.get("telescope_desc", ""))
-        dlg.edt_camera_model.setText(config.get("camera_model", ""))
-        dlg.cmb_marker_style.addItem(self.tr("Ring with ticks (classic)"),
-                                     "ring")
-        dlg.cmb_marker_style.addItem(self.tr("Full-frame cross with box"),
-                                     "cross")
-        dlg.cmb_marker_style.setCurrentIndex(
-            1 if config.get("marker_style", "ring") == "cross" else 0)
-        dlg.chk_chart_data.setChecked(
-            bool(config.get("chart_data", True)))
-        dlg.chk_chart_boxes.setChecked(
-            bool(config.get("chart_boxes", False)))
-        # the object's marks in the editor (the crosshair, the run's measured
-        # cross and the circle with the name): whether that circle opens
-        # shown, and the colour of all three
-        dlg.chk_annot_visible.setChecked(
-            bool(config.get("annot_visible", False)))
-        dlg.cmb_mark_color.addItem(
-            self.tr("The object type's colour"), "kind")
-        dlg.cmb_mark_color.addItem(self.tr("One common colour"), "common")
-        _mark = dlg.cmb_mark_color.findData(
-            config.get("marker_color", "kind"))
-        dlg.cmb_mark_color.setCurrentIndex(_mark if _mark >= 0 else 0)
-        dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
-        dlg.spn_horizon_margin.setValue(
-            float(config.get("horizon_margin_deg", 0)))
-        dlg.chk_moon_enabled.setChecked(bool(config.get("moon_limit_enabled",
-                                                        True)))
-        dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
-        dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
-        dlg.chk_moons_all.setChecked(bool(
-            config.get("show_sat_moons_unobserved", False)))
-        dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
-        dlg.spn_sn_cadence.setValue(int(config.get("sn_cadence_days", 3)))
-        dlg.spn_event_mag.setValue(
-            float(config.get("event_mag_threshold", 0.5)))
-        dlg.spn_extremum_days.setValue(
-            int(config.get("campaign_extremum_days", 3)))
-        # ADR-037 SC4a: the vigil watch list, as editable text (one star
-        # per line); the curated defaults show when nothing is stored
-        from ..core import vigils
-        dlg.edt_vigils.setPlainText(
-            vigils.vigils_to_text(vigils.vigils_from_config(config)))
-        dlg.chk_aavso.setChecked(bool(config.get("aavso_feed", True)))
-        # ADR-044 rev (2026-09-24): icons-only top bar in the UFE
-        dlg.chk_ufe_bar_icons.setChecked(
-            bool(config.get("ufe_bar_icons", True)))
-        # Interfaz 1.4: motion is opt-out, never imposed. The Welcome sky
-        # breathes and the view fades in only while this is on.
-        dlg.chk_animations.setChecked(bool(config.get("ui_animations", True)))
-        dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
-                                                     "127.0.0.1")))
-        dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
-        dlg.chk_ccdciel_auto.setChecked(
-            bool(config.get("ccdciel_auto_connect", False)))
-        dlg.edt_tns_bot.setText(config.get("tns_bot_name", ""))
-        dlg.edt_tns_bot_key.setText(config.get("tns_bot_key", ""))
-        # Tonight object kinds (WORKFLOWS 7quater): the whitelist mirrors the
-        # settings checkboxes; default (missing/legacy) is every kind.
-        enabled = self._enabled_kinds()
-        for k in KIND_ORDER:
-            box = getattr(dlg, f"chk_kind_{k}", None)
-            if box is not None:
-                box.setChecked(k in enabled)
-        # K3: the per-kind cap for the Tonight grid (default 5)
-        dlg.spn_best_pk.setValue(int(config.get("best_per_kind_n", 5)))
-        # Projects container root (ADR-032): empty = the app data folder
-        dlg.edt_projects_root.setText(config.get("projects_root", ""))
-        # interface language: system | es | en (applies on restart)
-        dlg.cmb_language.addItems([self.tr("System"), self.tr("Spanish"),
-                                   self.tr("English")])
-        lang = config.get("language", "system")
-        dlg.cmb_language.setCurrentIndex(
-            {"system": 0, "es": 1, "en": 2}.get(lang, 0))
-        # horizon preview + the min_alt precedence rule (ADR-020): a usable
-        # file turns the flat minimum altitude off because the file decides
-        dlg.edt_horizon_file.textChanged.connect(
-            lambda _t: self._horizon_file_preview(dlg))
-        self._horizon_file_preview(dlg)
         dlg.btn_resolve.clicked.connect(lambda: self._resolve_into(dlg))
         dlg.btn_map_pick.clicked.connect(lambda: self._map_pick_into(dlg))
         dlg.btn_horizon_browse.clicked.connect(
@@ -2248,110 +2151,38 @@ class MainWindow(QMainWindow):
             lambda: self._projects_browse_into(dlg))
         dlg.btn_projects_reset.clicked.connect(
             lambda: dlg.edt_projects_root.setText(""))
-        # the master library (ADR-061): the editor's Calibration tab
-        # resolves a recipe against it and names the master it uses, so
-        # the place that fills the library belongs in Settings. The
-        # pseudo-flat policy lives WITH the recipe, in that tab: it used to
-        # be duplicated here, and the copy that the stack read was not the
-        # one the observer saw.
+        dlg.edt_horizon_file.textChanged.connect(
+            lambda _t: self._horizon_file_preview(dlg))
+        self._horizon_file_preview(dlg)
         self._settings_masters_init(dlg)
+
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
             return
-        config.set("mpc_code", dlg.edt_mpc_code.text().strip().upper())
-        config.set("observatory_name", dlg.edt_obs_name.text().strip())
-        config.set("lat", dlg.spn_lat.value())
-        config.set("lon", dlg.spn_lon.value())
-        config.set("height", dlg.spn_height.value())
-        config.set("aperture_inches", dlg.spn_aperture.value())
-        config.set("transit_scope_filter",
-                   dlg.chk_transit_scope_filter.isChecked())
-        config.set("limit_mag", dlg.spn_limit_mag.value())
-        config.set("min_alt", dlg.spn_min_alt.value())
-        config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())
-        config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
-        config.set("astrometry_snr_sigma", dlg.spn_astro_gate.value())
-        config.set("astrometry_submit_snr", dlg.spn_astro_floor.value())
-        config.set("astrometry_sweep_pct", dlg.spn_astro_sweep_pct.value())
-        config.set("astrometry_sweep_steps", dlg.spn_astro_steps.value())
-        config.set("astrometry_cutout_margin_px", dlg.spn_astro_margin.value())
-        config.set("astrometry_check_enabled",
-                   dlg.chk_astro_check.isChecked())
-        config.set("astrometry_check_sigma",
-                   dlg.spn_astro_check_sigma.value())
-        config.set("astrometry_check_floor_arcsec",
-                   dlg.spn_astro_check_floor.value())
-        config.set("astrometry_check_window_days",
-                   dlg.spn_astro_check_window.value())
-        config.set("astrometry_threads", dlg.spn_astro_threads.value())
-        config.set("solver", dlg.cmb_solver.currentData() or "auto")
-        config.set("astap_path", dlg.edt_astap_path.text().strip())
-        config.set("findorb_path", dlg.edt_findorb_path.text().strip())
-        config.set("solve_save", dlg.chk_solve_save.isChecked())
-        config.set("phot_matched", dlg.chk_phot_matched.isChecked())
-        config.set("exotic_python_path",
-                   dlg.edt_exotic_python.text().strip())
-        config.set("exotic_install_dir",
-                   dlg.edt_exotic_install.text().strip())
-        config.set("ccd_gain", dlg.spn_cam_gain.value() or None)
-        config.set("ccd_read_noise", dlg.spn_cam_ron.value() or None)
-        config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
-        config.set("cam_full_well_e", dlg.spn_cam_full_well.value() or None)
-        config.set("cam_linearity_adu",
-                   dlg.spn_cam_linearity.value() or None)
-        config.set("cam_dark_current_e_s", dlg.spn_cam_dark.value() or None)
-        config.set("cam_max_exposure_s",
-                   dlg.spn_cam_max_exp.value() or None)
-        _cp = cameras.preset(dlg.cmb_cam_preset.currentData())
-        config.set("cam_regime", _cp["regime"] if _cp else "normal")
-        config.set("pixel_um", dlg.spn_pixel_um.value())
-        config.set("focal_mm", dlg.spn_focal_mm.value())
-        config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())
-        config.set("aavso_api_token", dlg.edt_aavso_token.text().strip())
+
+        # save: the same table, one direction (ADR-071)
+        settings_spec.save(dlg, config)
+
+        # combos with their own mapping
         config.set("camera_type", dlg.cmb_camera_type.currentText())
         config.set("pixel_binning", dlg.cmb_binning.currentText().strip()
                    or "1x1")
-        # Chart annotations (ADR-046)
-        config.set("observer_name", dlg.edt_observer.text().strip())
-        config.set("measurer_name", dlg.edt_measurer.text().strip())
-        config.set("telescope_desc", dlg.edt_telescope.text().strip())
-        config.set("camera_model", dlg.edt_camera_model.text().strip())
+        config.set("solver", dlg.cmb_solver.currentData() or "auto")
+        config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
+        _cp = cameras.preset(dlg.cmb_cam_preset.currentData())
+        config.set("cam_regime", _cp["regime"] if _cp else "normal")
         config.set("marker_style",
                    dlg.cmb_marker_style.currentData() or "ring")
-        config.set("chart_data", dlg.chk_chart_data.isChecked())
-        config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
-        config.set("annot_visible", dlg.chk_annot_visible.isChecked())
         config.set("marker_color",
                    dlg.cmb_mark_color.currentData() or "kind")
-        config.set("horizon_file", dlg.edt_horizon_file.text().strip())
-        config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
-        config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
-        config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
-        config.set("moon_max_illum", dlg.spn_moon_illum.value())
-        config.set("show_sat_moons_unobserved", dlg.chk_moons_all.isChecked())
-        config.set("overhead_s", dlg.spn_overhead.value())
-        config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
-        config.set("event_mag_threshold", dlg.spn_event_mag.value())
-        config.set("campaign_extremum_days", dlg.spn_extremum_days.value())
-        from ..core import vigils
         config.set("vigil_list",
                    vigils.vigils_from_text(dlg.edt_vigils.toPlainText()))
-        config.set("aavso_feed", dlg.chk_aavso.isChecked())
-        # Interface tab (Interfaz 1.4): the Welcome motion, applied live so
-        # the observer sees the effect without restarting the app
-        config.set("ui_animations", dlg.chk_animations.isChecked())
+
+        # Interface: the Welcome motion applies live, no restart needed
         if self._welcome is not None:
             self._welcome.refresh_animations()
-        # Development tab (ADR-044): the UFE's top bar, the only switch left
-        # there since the classic dialogs retired (2026-10-07)
-        config.set("ufe_bar_icons", dlg.chk_ufe_bar_icons.isChecked())
-        config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
-        config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
-        config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
-        config.set("tns_bot_name", dlg.edt_tns_bot.text().strip())
-        config.set("tns_bot_key", dlg.edt_tns_bot_key.text().strip())
-        config.set("projects_root", dlg.edt_projects_root.text().strip())
+
         # Tonight object kinds: keep at least one, else refuse to save
         enabled = [k for k in KIND_ORDER
                    if getattr(dlg, f"chk_kind_{k}", None) is not None
@@ -2363,7 +2194,6 @@ class MainWindow(QMainWindow):
                 box.setText(self.tr("Enable at least one object kind."))
             return
         config.set("enabled_kinds", enabled)
-        config.set("best_per_kind_n", dlg.spn_best_pk.value())
         # if the header filter points at a kind that just got removed,
         # fall back to "All" so nothing is left dangling
         current = self.tonight.cmb_filter.currentData()
@@ -2372,16 +2202,13 @@ class MainWindow(QMainWindow):
             self.tonight.cmb_filter.setCurrentIndex(0)  # "All"
             self.tonight.cmb_filter.blockSignals(False)
             config.set("tonight_kind", "")
-        # re-apply the filter: this re-populates the combo with the new
-        # whitelist and refreshes both views (the whitelist may have grown
-        # too, so we always re-apply, not only when the selection dropped)
+        # re-apply the filter and rebuild the grid with the new whitelist
+        # and the new per-kind cap
         if self._tonight_all:
             self._apply_kind_filter()
+            self._build_suggestion_grid()
         # interface language: "system" (index 0) | "es" | "en"; a change
         # only applies after a restart
-        # K3: the per-kind cap changed AND the grid is live? Rebuild it.
-        if self._tonight_all:
-            self._build_suggestion_grid()
         prev_lang = config.get("language", "system")
         new_lang = ("system", "es", "en")[dlg.cmb_language.currentIndex()]
         lang_changed = new_lang != prev_lang
@@ -5940,9 +5767,6 @@ class MainWindow(QMainWindow):
             # the observer looks for, next to the series one.
             astrometry=lambda sid:
                 self._visit_astrometry(pid, sid),
-            # quality plan (C): the period search works on the project's
-            # curve, from the visit window where the observer already is
-            phase=lambda pid_: self._open_phase_dialog(pid_),
             on_change=lambda: self._visit_data_changed(pid),
             # the curve below is the one of the visit you are looking at
             # (reported), so the list has to say which one that is
@@ -6389,6 +6213,17 @@ class MainWindow(QMainWindow):
         chk_tpl = QCheckBox(self.tr("Show template"))
         chk_tpl.setChecked(True)
         row.addWidget(chk_tpl)
+        # the period search works on the PROJECT's curve (every night, one
+        # pass each), so it lives with the curve and not in a visit's window
+        # (ADR-045 review). It needs «All the nights» and enough points; the
+        # refresh below decides when it shows.
+        btn_phase = QPushButton(self.tr("Period and phase…"))
+        btn_phase.setToolTip(self.tr(
+            "Search the project's curve for its period (Lomb-Scargle and PDM) "
+            "and fold it into the two-panel report, with what the baseline "
+            "can and cannot say. It works on «All the nights»"))
+        btn_phase.clicked.connect(lambda: self._open_phase_dialog(pid))
+        row.addWidget(btn_phase)
         glc.addLayout(row)
         chart = LightCurveChart()
         chart.setMinimumHeight(190)
@@ -6399,6 +6234,7 @@ class MainWindow(QMainWindow):
         w["fu_curve_scope"] = cmb
         w["fu_curve_what"] = lbl_what
         w["fu_curve_tpl"] = chk_tpl
+        w["fu_curve_phase"] = btn_phase
         cmb.currentIndexChanged.connect(
             lambda _i: self._fu_curve_refresh(pid))
         self._fu_curve_refresh(pid)
@@ -6469,6 +6305,13 @@ class MainWindow(QMainWindow):
             has_overlay = bool(payload.get("sn_type")
                                or payload.get("schematic"))
             chk.setVisible(has_overlay)
+        # the period search needs the whole project's curve and enough
+        # points to say anything
+        btn = w.get("fu_curve_phase")
+        if btn is not None:
+            cmb = w.get("fu_curve_scope")
+            scope = cmb.currentData() if cmb is not None else "visit"
+            btn.setVisible(scope == "project" and len(pts) >= 4)
 
     # ------------- the per-kind analysis blocks (ADR-045; absorbed from
     # the retired Process tab; the SN FITS-import/blink block is gone for
@@ -9506,10 +9349,26 @@ class MainWindow(QMainWindow):
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 
     def _tools_explore(self):
-        name, ok = QInputDialog.getText(self, self.tr("Explore object"),
-                                        self.tr("Object:"))
-        if ok and name.strip():
-            self._open_explore_dialog(name.strip())
+        # Tools > Explore object: the entry dialog that explains, in one
+        # line, what the feature is for (the top-bar search is the quick
+        # door for whoever already knows the name). The lookup itself is
+        # untouched: the dialog only collects the name and hands it over.
+        from .explore_dialog import ExploreDialog
+        dlg = ExploreDialog(self)
+        if dlg.exec() == QDialog.Accepted and dlg.name():
+            self._open_explore_dialog(dlg.name())
+
+    def _nav_explore(self):
+        # The top-bar search: type a name, Enter, straight to the object's
+        # card. It is the always-visible door to objects tonight's list does
+        # not suggest. The field is cleared afterwards so it does not read
+        # as a stale filter once the card is up.
+        edt = self._menus.edt_nav_explore
+        name = edt.text().strip()
+        if not name:
+            return
+        edt.clear()
+        self._open_explore_dialog(name)
 
     def _tools_campaigns(self):
         # Campaigns live in their own top-level tab (UX-a; supersedes
@@ -10250,6 +10109,12 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(self._ufe_run_undo)
             dlg.set_exoclock_hook(
                 lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # ADR-045 rev: the period search's door from the editor's series
+            # block, on the project's curve (it used to live in the visit
+            # window; the editor is where the series was measured)
+            phase_hook = getattr(dlg, "set_phase_hook", None)
+            if callable(phase_hook):
+                phase_hook(lambda pid_: self._open_phase_dialog(pid_))
             # astrometry plan, phase 7: the visit context for the
             # Calibration and Track & Stack tabs (their frames and the
             # project's object, D15) and the way a generated report

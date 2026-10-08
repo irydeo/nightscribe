@@ -507,6 +507,52 @@ def _fit_rigid(ref_xy, src_xy, shape):
             "scale": scale, "rms_px": rms, "n": int(n)}
 
 
+def _fit_similarity(ref_xy, src_xy, shape):
+    # Similarity least squares (scale + rotation about the frame centre +
+    # translation) mapping the reference stars onto the frame stars.
+    #
+    # Why a separate fit from _fit_rigid: the rigid fit computes a scale
+    # from the SVD but never applies it, so it cannot explain a frame
+    # whose PIXEL SCALE differs from the reference's. That is exactly the
+    # host-subtraction case: the survey cutout is requested at the frame
+    # WCS's scale, and the WCS scale is off by a fraction of a percent, so
+    # the stars pair but land further and further off with distance from
+    # the centre (measured on a real frame: 0.15 %, i.e. ~1.5 px at the
+    # edge, which a rigid fit leaves as a dipole at every star).
+    #
+    # The Umeyama estimate gives the rotation R and the scale s of
+    # `src = s R ref + delta`; the module's convention then returns
+    # angle = -phi and a translation in the ROTATED frame so that
+    # apply_transform(src, angle, dx, dy, scale) lands src on the ref grid.
+    # @args: ref_xy, src_xy - (N,2) matched positions, shape - frame (h, w)
+    # @return: {"angle", "dx", "dy", "scale", "rms_px", "n"} or None
+    n = len(ref_xy)
+    if n < 2:
+        return None
+    pc = ref_xy.mean(axis=0)
+    qc = src_xy.mean(axis=0)
+    p = ref_xy - pc
+    q = src_xy - qc
+    norms = float(np.sum(np.square(p)))
+    u, s, vt = np.linalg.svd(p.T @ q)
+    rot = vt.T @ u.T
+    if np.linalg.det(rot) < 0.0:
+        vt[-1, :] *= -1.0
+        rot = vt.T @ u.T
+    scale = float(np.sum(s)) / norms if norms > 0.0 else 1.0
+    phi = math.atan2(rot[1, 0], rot[0, 0])
+    # the translation must carry the scale, or the warped frame lands a
+    # couple of pixels off (that was the first, wrong version: t = qc - R pc)
+    delta = qc - scale * (rot @ pc)
+    centre = np.asarray([shape[1] / 2.0, shape[0] / 2.0], dtype=float)
+    d = delta + scale * (rot @ centre) - centre
+    y = scale * (ref_xy @ rot.T) + delta
+    resid = np.hypot(y[:, 0] - src_xy[:, 0], y[:, 1] - src_xy[:, 1])
+    rms = float(np.sqrt(np.mean(np.square(resid))))
+    return {"angle": -phi, "dx": float(d[0]), "dy": float(d[1]),
+            "scale": scale, "rms_px": rms, "n": int(n)}
+
+
 def _fit_translation(ref_xy, src_xy, dx, dy):
     # @return: the same shape as _fit_rigid with the rotation pinned to 0
     #          (the shift is the mean of the paired displacements)
@@ -522,7 +568,8 @@ def _fit_translation(ref_xy, src_xy, dx, dy):
 
 
 def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
-                       tol=3.0, allow_rotation=True, ref_src=None):
+                       tol=3.0, allow_rotation=True, ref_src=None,
+                       allow_scale=False):
     # Estimate the transform that maps `src` onto `ref` (rotation about
     # the frame centre plus subpixel translation), in the module's
     # convention: {"angle", "dx", "dy"} so that apply_transform(src,
@@ -545,7 +592,11 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
     #        for "translation only"), ref_src - the reference's source image
     #        when the caller already built it (the sequence keeps ONE and
     #        passes it to every frame: rebuilding it per frame was ~140 ms
-    #        of pure waste on a 2048^2 frame, ~20 s over a 140-frame visit)
+    #        of pure waste on a 2048^2 frame, ~20 s over a 140-frame visit),
+    #        allow_scale - also fit a pixel SCALE (a similarity). Off for
+    #        a series (same instrument, same scale); ON for the host
+    #        subtraction, where the survey cutout's scale is not the
+    #        frame's (see _fit_similarity).
     # @return: {"angle", "dx", "dy", "quality", "rms_px", "n",
     #          "scale", "angle_deg", "shift_px", "stars", "rotated"}
     ref_src = source_image(ref) if ref_src is None else ref_src
@@ -569,7 +620,8 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
         # first guess and it costs one pairing
         if guess is not None and guess.get("n"):
             seed = _pair_fit(ref_xy, src_xy, guess["dx"], guess["dy"],
-                             guess["angle"], tol, shape)
+                             guess["angle"], tol, shape,
+                             similarity=allow_scale)
             if seed is not None and seed["n"] >= MIN_MATCH \
                     and seed["rms_px"] <= _ROTATE_TRIGGER_PX \
                     and seed.get("spread", 0.0) >= _MIN_SPREAD:
@@ -585,8 +637,21 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
                               tol, shape, rigid=False)
             if trans is not None:
                 out.update(_from_fit(trans, len(ref_xy), len(src_xy)))
-                if trans["rms_px"] <= _ROTATE_TRIGGER_PX \
-                        and trans.get("spread", 0.0) >= _MIN_SPREAD:
+                if allow_scale:
+                    # A scale mismatch is invisible to the translation: the
+                    # stars pair but land further and further off with
+                    # distance from the centre. Refit the same pairs as a
+                    # similarity and keep it only when it really removes
+                    # residual (the host-subtraction case; see
+                    # _fit_similarity).
+                    sim = _pair_fit(ref_xy, src_xy, trans["dx"], trans["dy"],
+                                    0.0, max(tol, trans["rms_px"] * 3.0),
+                                    shape, similarity=True)
+                    if sim is not None and sim["n"] >= MIN_MATCH \
+                            and sim["rms_px"] <= trans["rms_px"]:
+                        out.update(_from_fit(sim, len(ref_xy), len(src_xy)))
+                if out["rms_px"] <= _ROTATE_TRIGGER_PX \
+                        and out.get("spread", 0.0) >= _MIN_SPREAD:
                     return out
         # H1: a rotation is only worth looking for when H0 could not
         # explain the stars; then the vote scans the circle on a coarse
@@ -604,7 +669,7 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
             if vote2 is not None and vote2[3] > vote[3]:
                 vote = vote2
             rig = _pair_fit(ref_xy, src_xy, vote[1], vote[2], vote[0],
-                            tol, shape)
+                            tol, shape, similarity=allow_scale)
             if rig is not None:
                 if out["rms_px"] is None or out["n"] < MIN_MATCH \
                         or rig["rms_px"] <= (1.0 - _RIGID_IMPROVE) * \
@@ -648,18 +713,24 @@ def _spread(xy, shape):
         diag, 1e-9)
 
 
-def _pair_fit(ref_xy, src_xy, dx, dy, angle, tol, shape, rigid=True):
+def _pair_fit(ref_xy, src_xy, dx, dy, angle, tol, shape, rigid=True,
+              similarity=False):
     # Pair under a seeded transform and refine it by least squares,
     # widening the tolerance while the pair count grows (a rotation moves
     # the corner stars much further than the centre ones).
     # @args: ref_xy/src_xy - star lists, dx/dy/angle - the seed, tol -
     #        pairing tolerance (px), shape - frame (h, w), rigid - True
-    #        fits a rotation, False pins the translation alone
+    #        fits a rotation, False pins the translation alone, similarity -
+    #        with rigid, fit a scale too (see _fit_similarity)
     # @return: a _fit_rigid dict, or None when nothing pairs
+    def _rigid(ri, si):
+        return _fit_similarity(ref_xy[ri], src_xy[si], shape) if similarity \
+            else _fit_rigid(ref_xy[ri], src_xy[si], shape)
+
     ri, si = _pair(ref_xy, src_xy, dx, dy, tol, angle=angle, shape=shape)
     if len(ri) < 2:
         return None
-    fit = _fit_rigid(ref_xy[ri], src_xy[si], shape) if rigid \
+    fit = _rigid(ri, si) if rigid \
         else _fit_translation(ref_xy[ri], src_xy[si], dx, dy)
     prev_n = len(ri)
     for _round in range(3):
@@ -670,7 +741,7 @@ def _pair_fit(ref_xy, src_xy, dx, dy, angle, tol, shape, rigid=True):
                          angle=fit["angle"], shape=shape)
         if len(ri2) < 2:
             break
-        fit2 = _fit_rigid(ref_xy[ri2], src_xy[si2], shape) if rigid \
+        fit2 = _rigid(ri2, si2) if rigid \
             else _fit_translation(ref_xy[ri2], src_xy[si2], fit["dx"],
                                   fit["dy"])
         if fit2 is None or len(ri2) < prev_n:
@@ -732,12 +803,19 @@ def apply_rotation(data, angle):
     return apply_transform(data, angle, 0.0, 0.0)
 
 
-def apply_transform(data, angle, dx, dy):
+def apply_transform(data, angle, dx, dy, scale=1.0):
     # Resample `data` onto the reference grid: the output pixel (x, y) is
-    # read from the source at R(-angle) applied about the centre and then
-    # shifted by (dx, dy).
+    # read from the source at `scale * R(-angle)` applied about the centre
+    # and then shifted by (dx, dy).
+    #
+    # `scale` is the similarity's scale (1.0 for a plain rigid transform):
+    # the host subtraction needs it because the survey cutout's pixel scale
+    # is not the frame's (see _fit_similarity). The parameter defaults to
+    # 1.0, so every existing caller (the series, the astrometry) is
+    # untouched.
     # @args: data - the frame to warp, angle - rotation applied to the
-    #        source before the shift, dx/dy - the shift (px)
+    #        source before the shift, dx/dy - the shift (px), scale - the
+    #        similarity scale about the centre
     # @return: the warped frame (same shape)
     h, w = data.shape
     cx, cy = w / 2.0, h / 2.0
@@ -745,17 +823,17 @@ def apply_transform(data, angle, dx, dy):
     px = xs - cx
     py = ys - cy
     ca, sa = math.cos(-angle), math.sin(-angle)
-    sx = ca * px - sa * py + cx + dx
-    sy = sa * px + ca * py + cy + dy
+    sx = (ca * px - sa * py) * scale + cx + dx
+    sy = (sa * px + ca * py) * scale + cy + dy
     return _bilinear(data, sx, sy)
 
 
-def warp_mask(shape, angle, dx, dy):
+def warp_mask(shape, angle, dx, dy, scale=1.0):
     # Validity mask of a warp: True where the warped pixel reads a real
     # source pixel, False where the warp fills with zeros (the aperture
     # flux there is inflated when the sky is near zero).
     # @args: shape - (h, w) of the warped frame, angle/dx/dy - the
-    #        apply_transform parameters
+    #        apply_transform parameters, scale - its similarity scale
     # @return: boolean numpy array of `shape`
     h, w = shape
     cx, cy = w / 2.0, h / 2.0
@@ -763,8 +841,8 @@ def warp_mask(shape, angle, dx, dy):
     px = xs - cx
     py = ys - cy
     ca, sa = math.cos(-angle), math.sin(-angle)
-    sx = ca * px - sa * py + cx + dx
-    sy = sa * px + ca * py + cy + dy
+    sx = (ca * px - sa * py) * scale + cx + dx
+    sy = (sa * px + ca * py) * scale + cy + dy
     return (sx >= 0) & (sx <= w - 1) & (sy >= 0) & (sy <= h - 1)
 
 

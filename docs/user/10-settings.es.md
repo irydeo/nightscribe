@@ -1,117 +1,125 @@
-# 10. Configuración
+# 10. Ajustes
 
-Todo lo configurable de NightScribe vive en **Herramientas →
-Configuración…**. Este capítulo recorre cada sección: qué decide y cuándo
-merece tocarla. Nada aquí es obligatorio salvo el sitio; cada integración
-ausente simplemente deja su función en silencio.
+Todo lo configurable en NightScribe vive en **Herramientas → Ajustes…**.
+El diálogo es un raíl de seis categorías a la izquierda (un icono en cada
+una: pasa el ratón para leer el nombre), una página a la derecha y un
+**buscador** arriba: escribe una palabra (el nombre de un
+campo o la primera línea de su ayuda) y solo queda en pantalla lo que
+coincide, en todas las páginas. Cada campo lleva su ayuda justo debajo, y
+los mandos raros se esconden tras una sección **avanzada** que se abre con
+un clic, para que el camino común sea corto.
 
-## Sitio y equipo
+Nada de aquí es obligatorio salvo el sitio; cada integración que falte
+simplemente deja su función en silencio.
 
-- **Código MPC**, nombre, coordenadas y altura del observatorio
-  (**Resolver coordenadas** desde el código, **Elegir en el mapa…**, o a
-  mano). Es la identidad de tus reportes MPC: si envías astrometría, usa el
-  código.
-- **Código AAVSO**: tu código de observador; se escribe en el pase a EXOTIC
-  de los proyectos de tránsito.
-- **Idioma de la interfaz**: español, inglés o el del sistema; se aplica al
-  reiniciar.
+## Observatorio
 
-## Equipo y límites
+Dónde y quién eres.
 
-- **Apertura (pulgadas)** y **magnitud límite**: las lee la puntuación de
-  Esta noche para no proponerte lo inalcanzable. Sé honesto con la magnitud
-  límite; el comando `inject` (capítulo 09) te da el número medido.
+- **Código MPC**, nombre, coordenadas y altura del observatorio (**Resolver
+  coordenadas** desde el código, **Elegir en el mapa…**, o a mano). Es la
+  identidad de tus informes MPC: si envías astrometría, usa el código.
+- **Código AAVSO**: tu código de observador; se escribe en el traspaso a
+  EXOTIC de los proyectos de tránsito.
 
-> **¿Por qué medir la magnitud límite en vez de creerse la ficha técnica?**
-> Porque el límite real depende de tu cielo, tu cámara, tus exposiciones y tu
+## Equipo
+
+Con qué observas.
+
+- **Telescopio y límites**: la **apertura** y la **magnitud límite**. El
+  puntaje de Tonight los lee para no sugerir lo inalcanzable. Sé honesto
+  con la magnitud límite; el comando `inject` (capítulo 09) te da el número
+  medido.
+- **Cámara**: manda el **preset**, que rellena el tamaño de píxel y un
+  perfil de partida de una vez. El tamaño de píxel y la focal se devuelven
+  como la **escala de placa** (arcosegundos por píxel), que es lo que usan
+  de verdad el consejo de exposición de NEOs, la fotometría y el informe
+  MPC. El perfil medido (full well, ganancia del sistema, ruido de lectura,
+  corriente de oscuridad, linealidad, exposición máxima de trabajo) está a
+  un clic.
+
+> **¿Por qué medir la magnitud límite en vez de fiarse de la ficha?** Porque
+> el límite real depende de tu cielo, tu cámara, tus exposiciones y tu
 > reducción. Una cifra optimista llena la lista de objetivos imposibles; una
-> pesimista te esconde noches buenas.
+> pesimista te esconde buenas noches.
 
-## Cámara (escala de placa)
-
-**Tamaño de píxel**, **distancia focal**, **tipo de cámara** (CCD/CMOS/DSLR)
-y **binning**. De píxel y focal sale la escala en segundos de arco por
-píxel: la usan el consejo de exposición de los NEO, la fotometría y el
-reporte MPC (el tipo de cámara se escribe en él).
-
-## Perfil de cámara fotométrica
-
-**Preset** (rellena el píxel y un perfil de partida), **pozo de
-electrones**, **linealidad (ADU)**, **ganancia (e⁻/ADU)**, **ruido de
-lectura (e⁻)**, **corriente de oscuridad** y **exposición máxima de
-trabajo**.
-
-> **¿Por qué «por unidad y por ganancia»?** Porque la linealidad y la
+> **¿Por qué "por unidad y por ganancia"?** Porque la linealidad y la
 > exposición máxima no son propiedades del modelo de cámara, sino de tu
-> unidad concreta al ajuste de ganancia que uses. El preset da el valor de
-> hoja de características como punto de partida; el valor de verdad se mide
-> en tus propias tomas (la app lo hace, capítulo 06), y 0 significa
-> «desconocido»: la app lo dice en vez de inventárselo.
-
-## Fotometría
-
-- **Medir con el filtro adaptado por defecto**: con qué empieza una placa
-  *nueva*. Una placa ya medida guarda su propia receta; el interruptor de la
-  placa vive en la pestaña Fotometría, junto a la medida (capítulo 06).
-
-## Anotación de cartas
-
-Tu nombre (**Observador**), quién midió la placa (**Medidor**; vacío = el
-observador) y la línea de **telescopio** tal como deben leerse en las cajas
-de las cartas que exportes.
+> unidad concreta con la ganancia que usas. El preset da el valor de la
+> ficha como punto de partida; el valor verdadero se mide en tus propias
+> tomas (la app lo hace, capítulo 06), y 0 significa "desconocido": la app
+> lo dice en vez de inventarse algo.
 
 ## Observación
 
-- **Horizonte local**: fichero de horizonte (TheSkyX `.hrz` o pares «az
-  alt») con margen de seguridad. Con él, la planificación deja de proponer
-  lo que está detrás de tus obstáculos.
-- **Tipos de objeto** visibles en Esta noche, **restricción lunar**,
-  **valores de sesión** por defecto, la **lista de vigilias** de variables y
-  la **carpeta de proyectos**.
+Cómo se planifica y filtra la noche.
 
-## Solver de placa
+- **Horizonte local**: un fichero de horizonte (TheSkyX `.hrz` o pares
+  "az alt") con un margen de seguridad. Con él, el planificador deja de
+  sugerir lo que se esconde tras tus obstáculos.
+- Los **tipos de objeto** que salen en Tonight, el filtro de **tránsitos**,
+  la restricción de **Luna**, los valores por defecto de la **sesión** (con
+  la **lista de vigilias** de variables y el interruptor del **canal
+  AAVSO**) y la **carpeta de proyectos**.
 
-**Solver**: *Auto* prueba ASTAP local y cae a nova.astrometry.net; también
-puedes forzar uno. **Binario ASTAP**: ruta al ejecutable (vacío = buscar
-`astap` en el PATH), con **Test** para comprobarlo. **Guardar la WCS
-resuelta en la cabecera del FITS** (activado por defecto) deja la placa
-resuelta para cualquier programa, sin tocar los píxeles.
+## Medida
 
-## Find_Orb (chequeo de órbita)
+Todo lo que convierte una noche de tomas en números: fotometría,
+calibración y astrometría juntas, para que quien mide no salte de página.
 
-El **Binario de Find_Orb** (el `fo` no interactivo) cruza tus medidas contra
-la órbita antes del reporte MPC. **Instalar…** lo resuelve por ti: si `fo` ya
-está en el PATH lo usa, y si no, crea un entorno privado con conda-forge sin
-tocar nada de tu sistema. Sin él, el chequeo no está disponible y la app lo
-dice.
-
-## EXOTIC (reducción de tránsitos)
-
-Ruta a un **Python ≤ 3.10** y al **entorno EXOTIC**. **Preparar entorno**
-crea uno privado e instala EXOTIC en él (necesita red la primera vez);
-**Test** comprueba que importa y dice su versión. Sin esto, el bloque EXOTIC
-de los tránsitos (capítulo 06) no ejecuta, aunque el resto del flujo sigue.
+- **Fotometría**: el método con el que arranca una placa *nueva* (el filtro
+  adaptado). Una placa ya medida conserva su receta; el interruptor de la
+  placa vive en la pestaña Fotometría, junto a la medida (capítulo 06).
+- **Masters de calibración**: la biblioteca de bias, dark y flat contra la
+  que la pestaña Calibración del editor resuelve su receta. Los ficheros se
+  enlazan, nunca se copian ni se mueven.
+- **Astrometría**: la compuerta de detección, el listón de envío al MPC, el
+  barrido de velocidades, el chequeo contra otras estaciones (con
+  **Find_Orb**) y los hilos de trabajo.
+- **Solver de placa**: *Auto* prueba ASTAP local y cae a
+  nova.astrometry.net; también puedes forzar uno. **Binario ASTAP**: ruta
+  al ejecutable (vacío = buscar `astap` en el PATH), con **Test** para
+  comprobarlo. **Guardar la WCS resuelta en la cabecera FITS** (activado
+  por defecto) deja la placa resuelta para cualquier programa, sin tocar
+  los píxeles.
+- **EXOTIC (reducción de tránsitos)**: ruta a un **Python ≤ 3.10** y al
+  **entorno EXOTIC**. **Preparar entorno** crea uno privado e instala
+  EXOTIC dentro (necesita red la primera vez); **Test** comprueba que
+  importa y dice su versión.
+- **Avanzado**: el techo de saturación, el residual del flat y las
+  tolerancias de astrometría. Tienen valores por defecto sensatos; tócalos
+  solo si sabes por qué.
 
 ## Integraciones
 
-- **CCDciel**: host, puerto (3277 por defecto) y autoconexión. El control
-  solo funciona con CCDciel abierto (capítulo 05).
-- **NEOfixer**, **Astrometry.net**, **bot TNS**, **token de API AAVSO**:
-  claves opcionales para, respectivamente, los reportes de la comunidad, la
-  resolución ciega de placas sin WCS, las imágenes de descubrimiento de
+El mundo exterior: un servidor de captura y las claves opcionales.
+
+- **CCDciel**: host, puerto (3277 por defecto) y auto-conexión. El control
+  solo funciona mientras CCDciel está abierto (capítulo 05).
+- **NEOfixer**, **Astrometry.net**, **bot TNS**, **token de API de AAVSO**:
+  claves opcionales para, respectivamente, el reporte a la comunidad, la
+  resolución a ciegas de placas sin WCS, las imágenes de descubrimiento de
   transitorios y la fotometría de la comunidad que alimenta las vigilias de
-  brillantes (capítulo 04).
+  estrellas brillantes (capítulo 04).
 
 ## Interfaz
 
-- **Cielo animado en Bienvenida**: unas estrellas parpadean y la pantalla
-  entra con un fundido; la Luna se dibuja con su fase real de esta noche de
-  todas formas. Se aplica al momento.
-- **Barra superior solo con iconos** (Editor FITS): los botones de acción
-  muestran glifos compactos en vez de su texto. Se aplica al momento.
+Cómo se ve y cómo habla la app.
 
-> **¿Por qué tantas cosas son «opcionales» y no piden cuenta en ningún
-> sitio?** Porque el observatorio es tuyo y los datos también: NightScribe
-> funciona completo sin una sola clave, y cada integración que falta se
-> degrada con elegancia (la función se calla) en vez de bloquearte. Las
-> claves abren puertas, no levantan muros.
+- **Idioma**: español, inglés o el del sistema; se aplica al reiniciar.
+- **Cielo animado en la Bienvenida**: unas estrellas titilan y la pantalla
+  se funde una vez; la Luna se dibuja con su fase real de esta noche en
+  cualquier caso. Se aplica al momento.
+- **Barra superior solo con iconos** (editor FITS): los botones de acción
+  muestran glifos compactos en vez de sus etiquetas. Se aplica al momento.
+- **Cartas y anotaciones**: tu nombre (**Observador**), quién midió la placa
+  (**Medidor**; vacío = el observador), las líneas de **telescopio** y
+  **cámara**, la forma y el color de la marca del objeto, y las dos capas
+  de metadatos (la banda de la placa en el editor, las cajas de esquina de
+  las demás cartas).
+
+> **¿Por qué hay tanto "opcional", sin pedir cuenta en ningún sitio?** Porque
+> el observatorio es tuyo y los datos también: NightScribe funciona del todo
+> sin una sola clave, y cada integración que falta degrada con elegancia (la
+> función se queda callada) en vez de bloquearte. Las claves abren puertas;
+> no levantan muros.

@@ -275,6 +275,20 @@ def test_the_analysis_tab_is_visits_beside_curve(window):
     assert ribbon.y() < panel.y()
 
 
+def test_the_period_search_lives_with_the_curve(window):
+    # ADR-045 review: the period works on the PROJECT's curve, so its button
+    # lives in the curve block (and shows only with «All the nights» and
+    # enough points). The visit window no longer carries it.
+    _open(window, "analysis")
+    btn = window._project_widgets.get("fu_curve_phase")
+    assert btn is not None
+    chart = window._project_widgets["fu_curve"]
+    assert btn.parentWidget() is chart.parentWidget()   # the curve's block
+    cmb = window._project_widgets["fu_curve_scope"]
+    cmb.setCurrentIndex(cmb.findData("visit"))
+    assert not btn.isVisibleTo(window)
+
+
 def test_a_chart_asks_for_a_sane_size(window):
     # a QGraphicsView with no sizeHint of its own answers with the SCENE's,
     # which is whatever the data spans (a light curve asked for 520 px)

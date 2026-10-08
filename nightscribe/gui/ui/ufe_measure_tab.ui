@@ -281,16 +281,6 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
          </widget>
         </item>
        <item>
-        <widget class="QPushButton" name="btn_measure_gain">
-         <property name="toolTip">
-          <string>Measure the gain of your camera on two of your own frames of the same exposure and remember it, so a single image can reuse it. The gain is the conversion factor (e-/ADU) the error bar hangs on; the FITS header often carries the camera's setting or a placeholder instead</string>
-         </property>
-         <property name="text">
-          <string>Measure gain…</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QToolButton" name="btn_export_more">
          <property name="toolTip">
           <string>What leaves this measurement: the CSV of the measured points and the AAVSO EFF report. They are the same two buttons as always, one click away</string>

@@ -8,7 +8,7 @@ estrellas.
 ## Antes de nada: resolver la placa
 
 Todo lo astrométrico necesita una **solución de placa** (la WCS: qué punto
-del cielo es cada píxel). En **Configuración… → Solver de placa** eliges:
+del cielo es cada píxel). En **Configuración… → Medida → Solver de placa** eliges:
 
 - **Auto** (recomendado): prueba primero **ASTAP** local (rápido, sin red,
   gratis) y cae a **nova.astrometry.net** si no lo tienes o no resuelve.
@@ -89,9 +89,11 @@ se marca; nunca se resuelve en silencio.
 **Animar o verificar** reproduce los stacks de las observaciones centrados en
 el objeto y con un solo estirado: el objeto debe quedarse quieto en el
 centro mientras las estrellas se arrastran. Es la prueba de fuego de que la
-detección es real. **Parpadeo / montaje…** escribe la figura (GIF o montaje) con
-el mismo estirado en todos los paneles, para que uno débil no parezca tan
-brillante como uno real.
+detección es real. **Guardar animación…** escribe ese mismo bucle como GIF o
+MP4, con los niveles que hayas aplicado y la banda de la placa en cada
+fotograma, para poder compartir la prueba. **Parpadeo / montaje…** escribe la
+figura (GIF o montaje) con el mismo estirado en todos los paneles, para que uno
+débil no parezca tan brillante como uno real.
 
 Si el objeto está por debajo del umbral de detección, **Modo manual (objeto
 débil)…** te deja marcarlo a mano sobre el stack de toda la secuencia: la

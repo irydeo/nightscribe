@@ -181,22 +181,63 @@ def test_equipment_continue_stores_and_never_blocks(make_window, monkeypatch):
     from nightscribe.config import config
     # pin the keys this test writes: config is a live singleton and the rest
     # of the suite reads the real values
-    for key in ("aperture_inches", "pixel_um", "focal_mm", "camera_type",
-                "cam_preset"):
+    for key in ("aperture_inches", "limit_mag", "pixel_um", "focal_mm",
+                "camera_type", "cam_preset"):
         monkeypatch.setitem(config._data, key, config.get(key))
     w = make_window(snapshot=None)
     ws = w._welcome
     u = ws.ui
     u.spn_aperture.setValue(12.0)
+    u.spn_limit_mag.setValue(19.4)
     u.spn_pixel_um.setValue(4.63)
     u.spn_focal_mm.setValue(1200.0)
     u.cmb_camera_type.setCurrentText("CMOS")
     ws._equip_next()
     assert u.setup_stack.currentIndex() == 2          # landed on targets
     assert config.get("aperture_inches") == 12.0
+    assert config.get("limit_mag") == 19.4
     assert config.get("pixel_um") == 4.63
     assert config.get("focal_mm") == 1200.0
     assert config.get("camera_type") == "CMOS"
+
+
+def test_the_equipment_step_starts_the_limit_from_the_aperture(make_window,
+                                                              monkeypatch):
+    # The user guide promised this field (chapter 01) and the wizard did not
+    # have it. On a first run (no site yet) it starts from the aperture; a
+    # bigger telescope reaches deeper, so the field follows it until the
+    # observer edits it.
+    from nightscribe.config import config
+    from nightscribe.core import exposure
+    monkeypatch.setattr(config, "is_configured", lambda: False)
+    monkeypatch.setitem(config._data, "aperture_inches", 10.0)
+    w = make_window(snapshot=None)
+    u = w._welcome.ui
+    assert hasattr(u, "spn_limit_mag")
+    assert u.spn_limit_mag.value() == pytest.approx(
+        round(exposure.limit_from_aperture(10.0), 1))
+    u.spn_aperture.setValue(16.0)
+    assert u.spn_limit_mag.value() == pytest.approx(
+        round(exposure.limit_from_aperture(16.0), 1))
+    # once the observer sets it, the aperture stops moving it
+    u.spn_limit_mag.setValue(19.5)
+    u.spn_aperture.setValue(8.0)
+    assert u.spn_limit_mag.value() == 19.5
+
+
+def test_the_kind_chips_explain_what_they_are(make_window):
+    # The "What can you observe?" chips carry the same dossier as the step-3
+    # cards: the kind's own paragraph and its source (core/kinds.py, the one
+    # home of that knowledge, ADR-058), so a hover answers "what is this".
+    from PySide6.QtWidgets import QLabel
+    from nightscribe.core import kinds as core_kinds
+    w = make_window(snapshot=None)
+    chips = w._welcome.ui.card1Chips.findChildren(QLabel)
+    assert len(chips) == len(core_kinds.KINDS)
+    for chip, kind in zip(chips, core_kinds.KINDS):
+        tip = chip.toolTip()
+        assert core_kinds.tr_text(kind["blurb"]) in tip, kind["id"]
+        assert core_kinds.tr_text(kind["source"]) in tip, kind["id"]
 
 
 def test_hero_paints_tonight_moon(make_window):

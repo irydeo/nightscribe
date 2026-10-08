@@ -1047,7 +1047,11 @@ class MainWindow(QMainWindow):
         # "Explore first": a first run is not a gate, so the observer may
         # walk away from the setup and land on the projects (Interfaz 1.4)
         self._welcome.skip.connect(self._welcome_skip)
-        self._welcome.open_guide.connect(self.on_docs)
+        # "See the full guide" opens the PUBLISHED guide (the HTML site,
+        # ADR-070), the same page as Help > User guide (web), in the app's
+        # language: the in-app markdown browser stays under Help > Technical
+        # Documentation.
+        self._welcome.open_guide.connect(self.on_guide_web)
         self._welcome.open_skycal.connect(self._tools_skycal)
         lay = QVBoxLayout(self._welcome_page)
         lay.setContentsMargins(0, 0, 0, 0)

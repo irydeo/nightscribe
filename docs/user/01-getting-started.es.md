@@ -47,7 +47,9 @@ Tres formas de decirle dónde estás; elige una:
 ### Tu equipo
 
 - **Apertura** del telescopio y **magnitud límite** realista de tu sitio:
-  NightScribe las usa para no proponerte objetos que no puedes alcanzar.
+  NightScribe las usa para no proponerte objetos que no puedes alcanzar. La
+  magnitud límite llega pre-rellenada a partir de la apertura, como punto de
+  partida; el comando `inject` (capítulo 09) mide la de verdad.
 - **Escala de placa**: tamaño de píxel de la cámara y focal del telescopio.
   Si tu cámara está en la lista de **preajustes**, al elegirla se rellenan el
   píxel y un perfil fotométrico de partida (ruido de lectura, pozo de

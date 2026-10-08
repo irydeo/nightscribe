@@ -79,3 +79,24 @@ def test_the_web_guide_opens_in_the_app_language(window, monkeypatch):
     monkeypatch.setattr(window, "_lang", lambda: "en")
     window.on_guide_web()
     assert opened == ["https://example.test/g/index.html"]
+
+
+def test_the_welcome_guide_button_opens_the_web_guide(window, monkeypatch):
+    # "See the full guide" on the Welcome screen opens the PUBLISHED guide
+    # (the HTML site), the same page as Help > User guide (web), and not the
+    # in-app markdown browser: that one stays under Help > Technical
+    # Documentation.
+    from nightscribe.gui import main_window as mw
+    opened = []
+
+    class _Browser:
+        @staticmethod
+        def openUrl(url):
+            opened.append(url.toString())
+
+    monkeypatch.setattr("PySide6.QtGui.QDesktopServices", _Browser)
+    monkeypatch.setattr(mw, "GUIDE_WEB_URL", "https://example.test/g/index")
+    monkeypatch.setattr(window, "_lang", lambda: "en")
+    assert window._welcome is not None
+    window._welcome.ui.btn_card2_guide.click()
+    assert opened == ["https://example.test/g/index.html"]

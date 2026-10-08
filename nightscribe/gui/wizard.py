@@ -468,6 +468,7 @@ def _apply_equipment(wizard):
     # @args: wizard - the loaded Welcome husk
     from ..core import cameras
     config.set("aperture_inches", wizard.spn_aperture.value())
+    config.set("limit_mag", wizard.spn_limit_mag.value())
     config.set("pixel_um", wizard.spn_pixel_um.value())
     config.set("focal_mm", wizard.spn_focal_mm.value())
     config.set("camera_type", wizard.cmb_camera_type.currentText())

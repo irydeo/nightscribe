@@ -95,6 +95,12 @@ incidencias del repositorio está **arriba y abajo**: en la barra, junto al
 idioma, y en el pie de todas las páginas, en el idioma de la página; el README
 lleva la misma línea en su sección de documentación.
 
+**Revisión (2026-10-08, la puerta de la guía en la Bienvenida).** El botón «Ver
+la guía completa» de la Bienvenida abría el visor interno de markdown; ahora
+abre la guía **HTML** publicada (la misma página que Ayuda → Guía (web), en el
+idioma de la app). El visor interno sigue siendo la puerta offline, en Ayuda →
+Documentación técnica.
+
 ## English
 
 **Context**: the user guide lives in `docs/user/` (an index and ten chapters,
@@ -184,3 +190,9 @@ make it true.
 tracker sits **at the top and at the bottom**: in the bar, next to the
 language, and in the footer of every page, in the page's language; the README
 carries the same line in its documentation section.
+
+**Revision (2026-10-08, the guide's door on Welcome).** Welcome's "See the full
+guide" button opened the in-app markdown viewer; it now opens the published
+**HTML** guide (the same page as Help > User guide (web), in the app's
+language). The in-app viewer stays the offline door, under Help > Technical
+Documentation.

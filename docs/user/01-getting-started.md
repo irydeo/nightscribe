@@ -48,7 +48,8 @@ Three ways to tell it where you are; pick one:
 
 - **Aperture** of the telescope and a realistic **limiting magnitude** for
   your site: NightScribe uses them to avoid suggesting targets you cannot
-  reach.
+  reach. The limiting magnitude comes pre-filled from the aperture as a
+  starting point; the `inject` command (chapter 09) measures the real one.
 - **Plate scale**: camera pixel size and telescope focal length. If your
   camera is in the **preset** list, choosing it fills in the pixel size and a
   starting photometric profile (read noise, full well, working exposure).

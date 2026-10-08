@@ -343,6 +343,16 @@ objetivos → Tus datos**.
   asistente a la vista. Los ayudantes que sí se usan (detección, resolución del
   MPC, kinds, datos y ahora equipo) se quedan en `gui/wizard.py`, compartidos.
 
+**Revisión (2026-10-08, la magnitud límite en el paso del equipo).** El paso 2
+pedía la apertura pero no la magnitud límite, aunque el manual (capítulo 01) ya
+la anunciaba: la clave `limit_mag` solo se tocaba en Ajustes. Ahora el paso la
+pide, sembrada a partir de la apertura con `core/exposure.limit_from_aperture`
+(una estimación honesta: la señal de una fuente puntual va con el área, D², y
+la magnitud alcanzada con 5·log10(D), anclada en que 8" llegan a ~18.5 en una
+imagen apilada). Mientras el observador no la edite a mano, el campo sigue a la
+apertura; en cuanto la toca, manda su número. La ayuda dice que es un punto de
+partida y que `inject` mide la real.
+
 **Punto de entrada**: `gui/ui/welcome_tab.ui` (el panel y la tira),
 `gui/widgets/welcome_setup.py` (el gancho), `gui/wizard.py` (los ayudantes),
 `core/exposure.py` (la escala, el binning y el veredicto), `core/cameras.py`
@@ -670,6 +680,17 @@ Your targets -> Your data**.
   gone: it was the dead code Interfaz 1.0 itself left behind when the setup
   moved into the view. The helpers that are used (detection, MPC resolve, kinds,
   data and now equipment) stay in `gui/wizard.py`, shared.
+
+**Revision (2026-10-08, the limiting magnitude in the equipment step).** Step 2
+asked for the aperture but not the limiting magnitude, although the manual
+(chapter 01) already announced it: the `limit_mag` key was only touched in
+Settings. The step asks for it now, seeded from the aperture with
+`core/exposure.limit_from_aperture` (an honest estimate: a point source's signal
+goes with the area, D^2, and the magnitude reached with 5*log10(D), anchored on
+8-inch telescopes reaching about 18.5 in a stacked image). While the observer
+does not edit it by hand the field follows the aperture; once it is edited,
+their number wins. The help says it is a starting point and that `inject`
+measures the real one.
 
 **Entry point**: `gui/ui/welcome_tab.ui` (the panel and the strip),
 `gui/widgets/welcome_setup.py` (the hook), `gui/wizard.py` (the helpers),

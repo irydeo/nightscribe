@@ -96,6 +96,9 @@ class WelcomeSetup(QWidget):
         # Motion is a preference, not a default we impose: Settings >
         # Interface turns it off and nothing here moves.
         self._animations = bool(config.get("ui_animations", True))
+        # The limiting magnitude follows the aperture until the observer sets
+        # it by hand (see _aperture_changed).
+        self._limit_auto = True
         self._brand()
         self._wire()
         self._fill_from_config()
@@ -192,6 +195,11 @@ class WelcomeSetup(QWidget):
         # so it arrives here through this very signal.
         for w in (u.spn_pixel_um, u.spn_focal_mm):
             w.valueChanged.connect(lambda _v: self._fill_scale())
+        # The limiting magnitude follows the aperture while the observer has
+        # not set it by hand: a bigger telescope reaches deeper, and the field
+        # says so. Once it is edited, it is the observer's number.
+        u.spn_aperture.valueChanged.connect(lambda _v: self._aperture_changed())
+        u.spn_limit_mag.valueChanged.connect(lambda _v: self._limit_edited())
 
     def _fill_from_config(self):
         # Seeds the form from the current settings so a re-visit shows what
@@ -205,7 +213,21 @@ class WelcomeSetup(QWidget):
         u.edt_site_mpc.setText(config.get("mpc_code") or "")
         # the equipment: the same keys the Settings dialog writes, so the two
         # screens are two views of one setup and never disagree
-        u.spn_aperture.setValue(float(config.get("aperture_inches", 10)))
+        aperture = float(config.get("aperture_inches", 10))
+        u.spn_aperture.setValue(aperture)
+        # The limiting magnitude: on a first run (no site yet) it starts from
+        # the aperture, so the field is never a blank to fill from nothing;
+        # afterwards the saved value is the observer's word and stays.
+        limit = float(config.get("limit_mag", 20.0))
+        if not config.is_configured():
+            from ...core import exposure
+            est = exposure.limit_from_aperture(aperture)
+            if est is not None:
+                limit = round(est, 1)
+        u.spn_limit_mag.blockSignals(True)
+        u.spn_limit_mag.setValue(limit)
+        u.spn_limit_mag.blockSignals(False)
+        self._limit_auto = True
         u.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         u.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         u.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
@@ -226,9 +248,16 @@ class WelcomeSetup(QWidget):
         # four across: eight kinds in two short rows keeps the door the same
         # height as its two neighbours instead of a tall column of chips
         cols = 4
+        from .. import wizard as wz
         for i, kind in enumerate(core_kinds.KINDS):
             chip = theme.KIND_LABELS.get(kind["id"], kind["id"].upper())
             lbl = self._chip(chip, theme.KIND_COLORS.get(kind["id"]))
+            # The chip is the glance; the hover is the dossier, the same one
+            # the step-3 cards carry: what the kind is (core/kinds.py, the
+            # single source, ADR-058) and where its data comes from.
+            lbl.setToolTip("%s\n\n%s" % (
+                core_kinds.tr_text(kind["blurb"]),
+                wz.tr(wz.S_SOURCE, source=core_kinds.tr_text(kind["source"]))))
             grid.addWidget(lbl, i // cols, i % cols)
         for c in range(cols):
             grid.setColumnStretch(c, 1)
@@ -374,6 +403,29 @@ class WelcomeSetup(QWidget):
                 "field and bright targets, but the image loses resolution "
                 "and the faint stars' light lands on too few pixels."),
         }.get(exposure.sampling(scale), ""))
+
+    def _aperture_changed(self):
+        # The limiting magnitude follows the aperture until the observer sets
+        # it by hand: a bigger telescope reaches deeper, and the field shows
+        # the estimate so the number is never a blank to fill from nothing.
+        # It is an estimate on purpose (core/exposure explains the physics):
+        # the real limit also depends on the sky, the camera and the
+        # reduction, and the inject command measures it.
+        if not self._limit_auto:
+            return
+        from ...core import exposure
+        est = exposure.limit_from_aperture(self.ui.spn_aperture.value())
+        if est is None:
+            return
+        u = self.ui
+        u.spn_limit_mag.blockSignals(True)
+        u.spn_limit_mag.setValue(round(est, 1))
+        u.spn_limit_mag.blockSignals(False)
+
+    def _limit_edited(self):
+        # From here on the number is the observer's, not the aperture's: a
+        # typed limit is never overwritten by the next aperture change.
+        self._limit_auto = False
 
     # -------------------------------------------------------------- actions
 

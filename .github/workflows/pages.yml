@@ -49,12 +49,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      # Enables Pages on the repository the first time (Settings > Pages >
-      # Source: GitHub Actions) instead of asking for that click by hand.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-
+      # The repository must have Pages enabled once by hand (Settings >
+      # Pages > Source: GitHub Actions): the workflow's own token is not
+      # allowed to create the site ("Resource not accessible by
+      # integration"), so until that click the deploy step fails and the
+      # build step is still useful as a check.
       - name: Build the site from its sources
         run: python website/tools/build_site.py --out _site
 

@@ -74,6 +74,10 @@ _MAX_REJECT = 0.02
 _MIN_LEVEL_SPREAD = 0.15
 # Exposures closer than this (relative) are the same exposure.
 _SAME_EXPOSURE = 1e-3
+# Two gains "agree" when neither is more than this factor times the other
+# (used only to decide whether the header's claim and the measurement of
+# the very frames are the same number, or the header is a placeholder).
+_AGREE_FACTOR = 1.5
 
 
 def _finite(data):
@@ -321,15 +325,53 @@ def estimate_from_paths(paths, box=64, max_scan=8, level_max=None):
     return None
 
 
+def gains_agree(a, b, factor=_AGREE_FACTOR):
+    # @args: a, b - two gains in e-/ADU, factor - how far apart they may be
+    # @return: True when neither is more than `factor` times the other
+    # A measurement carries its own few-percent bias, so an exact match
+    # would cry wolf; a placeholder that is off by a factor is caught.
+    if a is None or b is None or a <= 0.0 or b <= 0.0:
+        return False
+    return max(a, b) / min(a, b) <= factor
+
+
+def _disagreement_note(head_gain, est_gain):
+    # @return: the bilingual note for a header that does not match the
+    #          measurement of the very frames being measured
+    return {
+        "es": ("La cabecera del FITS dice una ganancia de {:.3g} e-/ADU y "
+               "tus tomas dicen {:.3g} e-/ADU: uso la de tus tomas. La "
+               "tarjeta suele ser el ajuste de la cámara o un valor de "
+               "relleno, y con ella el error de la medida sale mal."
+               ).format(float(head_gain), float(est_gain)),
+        "en": ("The FITS header claims a gain of {:.3g} e-/ADU and your "
+               "frames say {:.3g} e-/ADU: I use the one from your frames. "
+               "The card is usually the camera setting or a placeholder, "
+               "and with it the measurement's error comes out wrong."
+               ).format(float(head_gain), float(est_gain))}
+
+
 def resolve(settings_gain=None, settings_ron=None, header=None,
             points=None, estimate=None):
     # The priority chain of the working gain, resolved one number at a
     # time: what the observer set in Ajustes wins (it is a decision), then
-    # what the frame header carries (a fact of the camera), then what the
-    # frames themselves say (a measurement). When the gain comes from the
-    # frames, the read noise of the same fit rides along with it.
-    # If none of the three exists the answer is "there is no gain", and the
-    # caller says so instead of guessing.
+    # WHAT THE FRAMES THEMSELVES SAY (a measurement of the data in hand),
+    # and only then what the frame header carries.
+    #
+    # THE MEASUREMENT BEATS THE HEADER (revision, 2026-10-08). The header
+    # used to win, on the reasoning that it is "a fact of the camera". It
+    # is not: it can carry the camera's gain SETTING (a small integer, not
+    # an e-/ADU figure) or a placeholder the capture software writes when
+    # it does not really know. Measured on the author's own QHY42Pro
+    # frames: GAIN = 5, EGAIN = 1.0, and the real conversion gain was
+    # 0.11 e-/ADU. Trusting the card under-reported every error bar by a
+    # factor of three, and the check star's semaphore (2.5 sigma) was
+    # never told. When the header and the measurement disagree, the note
+    # says so.
+    #
+    # When the gain comes from the frames, the read noise of the same fit
+    # rides along with it. If none of the three exists the answer is
+    # "there is no gain", and the caller says so instead of guessing.
     # @args: settings_gain/settings_ron - the Ajustes values (e-/ADU, e-),
     #        header - the header of the reference frame, points - boxes
     #        from frame_boxes (fitted here), estimate - an already computed
@@ -343,19 +385,22 @@ def resolve(settings_gain=None, settings_ron=None, header=None,
     head = header_numbers(header) if header is not None else {}
     if settings_gain is not None:
         out["gain"], out["source"] = float(settings_gain), "settings"
-    elif head.get("gain") is not None:
-        out["gain"], out["source"] = float(head["gain"]), "header"
     elif est_gain is not None:
         out["gain"], out["source"] = float(est_gain), "frames"
         out["gain_err"] = estimate.get("gain_err")
         out["notes"] = list(estimate.get("notes") or [])
+        if head.get("gain") is not None \
+                and not gains_agree(float(head["gain"]), float(est_gain)):
+            out["notes"].append(_disagreement_note(head["gain"], est_gain))
+    elif head.get("gain") is not None:
+        out["gain"], out["source"] = float(head["gain"]), "header"
     if settings_ron is not None:
         out["ron"] = float(settings_ron)
-    elif head.get("ron") is not None:
-        out["ron"] = float(head["ron"])
-    elif est_gain is not None and out["gain"] == float(est_gain):
+    elif out["source"] == "frames" and estimate.get("ron") is not None:
         out["ron"] = estimate.get("ron")
         out["ron_err"] = estimate.get("ron_err")
+    elif head.get("ron") is not None:
+        out["ron"] = float(head["ron"])
     return out
 
 

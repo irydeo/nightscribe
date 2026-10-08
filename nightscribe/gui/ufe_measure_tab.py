@@ -40,8 +40,8 @@ from PySide6.QtGui import QColor, QPen
 from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
 
-from ..core import chart_annotate, coords, fits_meta, photometry, \
-    photometry_export, \
+from ..core import chart_annotate, coords, fits_meta, host_subtract, \
+    photometry, photometry_export, \
     series_measure, stretch
 from ..config import config
 from ..viz import palette
@@ -135,6 +135,8 @@ class UfeMeasureTab(QWidget):
         self._pair_obs = None        # the work-frame observed frame
                                      # (comps calibrate on it while
                                      # subtracting: never mix scales)
+        self._sub_report = None      # host_subtract.subtract's report
+                                     # (alignment quality, for the panel)
         self._last_suggestions = []  # the Suggest button's reasons
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
@@ -1379,6 +1381,46 @@ class UfeMeasureTab(QWidget):
             logger.warning("the pair %s could not be read: %s", partner, err)
             return None
 
+    def _gain_estimate(self):
+        # @return: the gain measured on the visit's own frames, or None
+        # The same measurement the series engine makes (core/gain.py): two
+        # frames of the same exposure say the conversion gain of the data
+        # in hand. It costs two frame reads, so it is cached per visit and
+        # only attempted when Ajustes carries no gain (the observer's
+        # decision always wins, see core/gain.resolve).
+        from ..core import gain as gain_mod
+        ctx = self._series_context() or {}
+        sid = ctx.get("session_id")
+        paths = ctx.get("paths") or []
+        if sid is None or not paths:
+            return None
+        cache = getattr(self, "_gain_est", None)
+        if cache is None:
+            cache = self._gain_est = {}
+        if sid not in cache:
+            try:
+                cache[sid] = gain_mod.estimate_from_paths(
+                    paths, level_max=config.get("ccd_saturate"))
+            except Exception as err:            # never fatal
+                logger.warning("gain estimate failed: %s", err)
+                cache[sid] = None
+        return cache[sid]
+
+    def _resolve_gain(self):
+        # @return: the resolved working gain {"gain", "ron", "source", ...}
+        # The same chain the series walks (2026-10-08): Ajustes -> the
+        # gain measured on the visit's frames -> the header. The header is
+        # the LAST word and not the first, because it can carry the
+        # camera's gain SETTING or a placeholder (measured on the author's
+        # own frames: GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU).
+        from ..core import gain as gain_mod
+        estimate = None if config.get("ccd_gain") is not None \
+            else self._gain_estimate()
+        return gain_mod.resolve(
+            settings_gain=config.get("ccd_gain"),
+            settings_ron=config.get("ccd_read_noise"),
+            header=self._state.header, estimate=estimate)
+
     def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
@@ -1400,6 +1442,7 @@ class UfeMeasureTab(QWidget):
                 "same frames: on this plate they are trails."))
         else:
             image, comp_image, comp_scale = self._state.data, None, 1.0
+        gain_report = self._resolve_gain()
         cfg = photometry.PlateConfig(
             target_xy=(col, row), entries=entries,
             header=self._state.header, wcs=self._state.wcs,
@@ -1413,6 +1456,10 @@ class UfeMeasureTab(QWidget):
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
             target_bv=self.spn_target_bv.value(),
+            # the working gain: Ajustes -> measured on the visit's frames ->
+            # header (2026-10-08); the header can lie, so it goes last
+            gain=gain_report.get("gain"), ron=gain_report.get("ron"),
+            gain_source=gain_report.get("source"),
             site_gain=config.get("ccd_gain"),
             site_ron=config.get("ccd_read_noise"),
             site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
@@ -1457,6 +1504,7 @@ class UfeMeasureTab(QWidget):
             "bands_avail": res.bands_avail,
             "match": self._field_match(res.col, res.row),
             "sky_mode": res.sky_mode, "sigma_clip": res.sigma_clip,
+            "gain_source": res.gain_source,
         }
         self._fill_panel(res.band, len(entries), len(res.used),
                          res.skipped, res.derived, res.gain)
@@ -3221,16 +3269,35 @@ class UfeMeasureTab(QWidget):
                     "enter its real B−V").format(k, abs(k) * 1.5))
         if gain is None:
             notes.append(self.tr(
-                "No gain in the header or settings: the photon noise is "
-                "not in the error"))
+                "No gain anywhere (settings, your own frames or the "
+                "header): the photon noise is not in the error"))
+        else:
+            from ..core import gain as gain_mod
+            src = gain_mod.source_label(last.get("gain_source"), self._lang)
+            if src:
+                notes.append(self.tr("Gain {0} e-/ADU ({1})")
+                             .format("{:.3g}".format(float(gain)), src))
         if last["scint"] is not None:
             notes.append(self.tr(
                 "Scintillation included ({0:.3f} mag)")
                 .format(last["scint"]))
         if self._diff is not None:
             notes.append(self.tr(
-                "Host galaxy subtracted (PS1 reference scaled by the "
-                "comps)"))
+                "Host galaxy subtracted (PS1 reference aligned on the "
+                "frame's stars and scaled by the comps)"))
+            rep = self._sub_report or {}
+            if not rep.get("trusted", True):
+                n = rep.get("n_stars") or 0
+                rms = rep.get("rms_px")
+                if rms is not None:
+                    notes.append(self.tr(
+                        "⚠ Reference alignment uncertain ({0} stars, "
+                        "{1:.1f} px): the subtraction may leave star "
+                        "residuals").format(n, rms))
+                else:
+                    notes.append(self.tr(
+                        "⚠ Reference alignment uncertain: the subtraction "
+                        "may leave star residuals"))
         if last["err"] is not None and last["err_internal"] is not None:
             notes.append(self.tr(
                 "Error: {0:.3f} internal · {1:.3f} total")
@@ -3388,9 +3455,12 @@ class UfeMeasureTab(QWidget):
             "image; comps calibrate on the original plate."))
 
     def _build_difference(self, pair, entries):
-        # Scales the reference so the comparison stars vanish (least
-        # squares through the origin on their net fluxes) and subtracts.
-        # Mirrored pairs are un-flipped first (the editor's orientation).
+        # Registers the survey reference to the frame, masks its holes and
+        # subtracts it, scaled so the comparison stars vanish (H2b). The
+        # alignment is done on the IMAGES (core/host_subtract), not trusted
+        # to the WCS: the ignored SIP terms leave a dipole at every star,
+        # which is the black dots the observer sees. Mirrored pairs are
+        # un-flipped first (the editor's orientation).
         # @return: the difference image (work frame), or None
         obs = pair["obs"]
         ref = pair["ref"]
@@ -3400,36 +3470,39 @@ class UfeMeasureTab(QWidget):
         plate_w, plate_h = self._state.plate_shape
         fx = plate_w / obs.shape[1]
         fy = plate_h / obs.shape[0]
-        num = den = 0.0
-        used = 0
+        comp_xy = []
         for e in entries:
             try:
                 col, row = self._state.wcs.sky_to_pixel(e["star"]["ra"],
                                                         e["star"]["dec"])
             except Exception:
                 continue
-            wx, wy = col / fx, row / fy
-            ro = photometry.measure_point(obs, wx, wy)
-            rr = photometry.measure_point(ref, wx, wy)
-            if not ro["ok"] or not rr["ok"] or rr["flux"] <= 0:
-                continue
-            num += ro["flux"] * rr["flux"]
-            den += rr["flux"] ** 2
-            used += 1
-        if used < 2 or den <= 0:
-            return None
-        gain = num / den
-        return obs - gain * ref
+            comp_xy.append((col / fx, row / fy))
+        # the seeing lives on the plate scale; the registration gate wants it
+        # on the work frame the difference is built in
+        fwhm = (self._last or {}).get("fwhm")
+        result = host_subtract.subtract(
+            obs, ref, comp_xy,
+            fwhm_px=(fwhm / fx if fwhm else None))
+        self._sub_report = result
+        return result["diff"]
 
     def _display_diff(self):
         # The difference image as the view's frame (screen orientation).
         # Its sky sits at ~0, so the plate's black/white would show a
         # black screen: the difference gets its own auto percentiles
-        # (gamma and invert stay shared).
+        # (gamma and invert stay shared). The survey's masked pixels arrive
+        # as NaN and to_uint8 would paint them black: they are shown at the
+        # difference's own sky instead, so the holes are not black dots.
         if self._diff is None:
             return None
-        black, white = stretch.auto_limits(self._diff)
-        img = stretch.apply_stretch(self._diff, black, white,
+        data = self._diff
+        finite = np.isfinite(data)
+        if not finite.all():
+            sky = float(np.median(data[finite])) if finite.any() else 0.0
+            data = np.where(finite, data, sky)
+        black, white = stretch.auto_limits(data)
+        img = stretch.apply_stretch(data, black, white,
                                     self._state.gamma)
         if self._state.inverted:
             img = stretch.invert(img)
@@ -3438,6 +3511,8 @@ class UfeMeasureTab(QWidget):
     def _drop_subtraction(self):
         # Back to the plain plate: no difference image, no override.
         self._diff = None
+        self._pair_obs = None
+        self._sub_report = None
         self._sub_worker = None
         if self._view is not None:
             self._view.set_frame_override(None)

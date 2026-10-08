@@ -129,9 +129,32 @@ def test_the_settings_win_over_everything():
     assert out["source"] == "settings"
 
 
-def test_the_header_wins_over_the_measurement():
-    est = {"gain": 0.5, "ron": 9.0, "notes": []}
+def test_the_measurement_wins_over_a_header_that_disagrees():
+    # The header used to win, on the reasoning that it is "a fact of the
+    # camera". It is not a fact: it can carry the camera's gain SETTING or
+    # a placeholder (the author's own QHY42Pro frames: GAIN = 5,
+    # EGAIN = 1.0, real gain 0.11 e-/ADU). When the measurement of the
+    # very frames disagrees, the measurement wins and the note says so.
+    est = {"gain": 0.5, "ron": 9.0, "gain_err": 0.01, "notes": []}
+    out = gn.resolve(header={"EGAIN": 1.0, "READNOIS": 6.5}, estimate=est)
+    assert out["gain"] == 0.5 and out["source"] == "frames"
+    assert out["ron"] == 9.0
+    assert any("cabecera" in n["es"] for n in out["notes"])
+
+
+def test_a_header_that_agrees_is_not_called_a_liar():
+    # When the card and the measurement are the same number, there is
+    # nothing to warn about: the note stays silent.
+    est = {"gain": 0.72, "ron": 9.0, "gain_err": 0.01, "notes": []}
     out = gn.resolve(header={"EGAIN": 0.75, "READNOIS": 6.5}, estimate=est)
+    assert out["gain"] == 0.72 and out["source"] == "frames"
+    assert not any("cabecera" in n["es"] for n in out["notes"])
+
+
+def test_the_header_is_used_when_there_is_no_measurement():
+    # No estimate (no pair of frames to measure): the header is the only
+    # word, and the read noise rides with it.
+    out = gn.resolve(header={"EGAIN": 0.75, "READNOIS": 6.5})
     assert out["gain"] == 0.75 and out["ron"] == 6.5
     assert out["source"] == "header"
 

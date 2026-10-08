@@ -222,6 +222,15 @@ nunca se modifica.
   ganancia) de «total» (más dispersión del ZP, centelleo de Young con tu
   apertura y altura de Ajustes, término de color y un suelo de flat de
   0,007 mag configurable como `flat_resid_mag`).
+* **De dónde sale la ganancia** (2026-10-08): la ecuación CCD cuelga entera de
+  la ganancia (e-/ADU), así que la app la resuelve en un orden fijo: Ajustes,
+  después la **medida en tus propias tomas** (dos tomas de la misma exposición
+  la dicen) y solo entonces la cabecera. La medida gana a la cabecera porque la
+  tarjeta puede llevar el **ajuste** de la cámara (`GAIN`, un número pequeño
+  que no son e-/ADU) o un valor de relleno (`EGAIN = 1.0`): con uno de esos el
+  error sale varias veces más corto de lo que es, y la estrella check no puede
+  avisar porque su semáforo se mide con ese mismo error. El panel dice de qué
+  vía salió la ganancia; el caso medido y sus cifras están en ADR-072.
 * **La estrella check como semáforo**: si la secuencia tiene una, se
   mide y se compara con su catálogo; si se desvía más de 2,5σ_total, la
   medida se marca como NO fiable antes de que te fíes de ella.

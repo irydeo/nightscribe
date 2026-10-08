@@ -57,6 +57,7 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 | Apertura que sigue al seeing de la noche | pestaña Fotometría (H3) | SNR óptima y consistencia noche a noche |
 | Cielo bien estimado (mediana robusta o plano) | pestaña Fotometría (H2a) | la SN deja de medirse «con galaxia incluida» |
 | Nivel de saturación real de tu cámara | pestaña Fotometría (H4: tarjeta SATURATE o ajuste `ccd_saturate`) | ninguna estrella cortada se cuela como buena |
+| **Ganancia real** de tu cámara (medida en tus propias tomas) | pestaña Fotometría + Ajustes (2026-10-08, ADR-072) | el término de fotones de la barra de error: sin ella, el error se queda en la dispersión de las comparadas |
 | Término de color ajustado con las comps | pestaña Fotometría (H1) | la respuesta de tu equipo deja de sesgar el cero |
 | Sustracción de la galaxia huésped (SNe) | pestaña Fotometría (H2b) | en núcleos galácticos: de 0,05–0,15 a 0,03–0,05 mag |
 | Normalización por frame + detrending (series) | en curso (ADR-015 rev. + ADR-048; plan `docs/PLANS/series-photometry.md`) | el requisito de los tránsitos: 0,001–0,005 mag relativo |
@@ -216,13 +217,15 @@ Las piezas, en orden de impacto por esfuerzo:
 * **H4. Saturación real**: techo desde tarjeta `SATURATE` o clave de
   ajustes `ccd_saturate`; fallback al estimador actual con aviso. Test:
   una estrella al 95 % del techo se marca y no se mide.
-* **H5. Error total honesto**: ecuación CCD (ganancia/RON por cabecera o
-  ajustes, ver D2 del plan G) + centelleo (Young 1967:
+* **H5. Error total honesto**: ecuación CCD (ganancia/RON resueltos en el
+  orden de ADR-072: Ajustes → medida en los frames → cabecera) + centelleo
+  (Young 1967:
   `σ ∝ D^(−2/3) · X^1.75 · t^(−1/2) · e^(−h/8 km)`; parámetros del sitio
   en Ajustes con defaults razonables) + covarianza del ajuste ZP+color +
   suelo de flat configurable (`flat_resid_mag`, default 0.007). El panel
-  distingue «error interno» de «error total». Test: el total nunca es
-  menor que el interno; sin ganancia, se degrada con aviso.
+  distingue «error interno» de «error total» y dice de dónde salió la
+  ganancia. Test: el total nunca es menor que el interno; sin ganancia, se
+  degrada con aviso.
 * **H6. Semáforo check**: medir la check en la misma placa y comparar
   con catálogo; |Δ| > 2,5·σ_total marca la medida como «no fiable» con
   explicación en lenguaje llano. Test: una placa con la nube simulada

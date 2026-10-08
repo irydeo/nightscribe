@@ -533,6 +533,44 @@ class BlinkExportWorker(QThread):
             self.finished.emit("", str(err))
 
 
+class SequenceExportWorker(QThread):
+    # Encodes the astrometry tab's captured animation frames (GIF or MP4)
+    # off the GUI thread. Unlike BlinkExportWorker it does NOT render: the
+    # frames come from the editor's own view, which can only be painted on
+    # the GUI thread, so the tab captures them first and hands them here to
+    # be written while the window stays alive.
+    finished = Signal(str, str)     # output path, error message
+
+    def __init__(self, frames, out, fmt, duration_ms=700, fps=None,
+                 min_seconds=None):
+        super().__init__()
+        self._frames = frames       # list of PIL RGB images (same size)
+        self._out = out
+        self._fmt = fmt             # "gif" | "mp4"
+        self._duration_ms = duration_ms
+        self._fps = fps
+        self._min_seconds = min_seconds
+
+    def run(self):
+        from ..core.viz import video
+        try:
+            if self._fmt == "mp4":
+                kw = {}
+                if self._fps is not None:
+                    kw["fps"] = self._fps
+                if self._min_seconds is not None:
+                    kw["min_seconds"] = self._min_seconds
+                video.write_mp4(self._frames, self._out,
+                                duration_ms=self._duration_ms, **kw)
+            else:
+                video.write_gif(self._frames, self._out,
+                                duration_ms=self._duration_ms)
+            self.finished.emit(str(self._out), "")
+        except Exception as err:  # never crash the GUI on render problems
+            logger.exception("sequence export failed: %s", err)
+            self.finished.emit("", str(err))
+
+
 class CcdcielWorker(QThread):
     # Runs a single CCDciel JSON-RPC action off the GUI thread and reports
     # the result. The action receives the Client; anything network-shaped
@@ -1080,7 +1118,24 @@ class TrackStackWorker(QThread):
         import numpy as np
         from ..core import astrometry as astrometry_mod
         from ..core import compstars, photometry
+        from ..core import gain as gain_mod
         from ..core import wcs as wcs_mod
+        # THE WORKING GAIN (2026-10-08): Ajustes -> measured on the visit's
+        # frames -> header. The header can carry the camera's gain SETTING
+        # or a placeholder (measured on the author's own QHY42Pro frames:
+        # GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU), so it is the last
+        # word and not the first: see core/gain.resolve.
+        estimate = None
+        if self._cfg_get("ccd_gain", None) is None and frames:
+            try:
+                estimate = gain_mod.estimate_from_paths(
+                    frames, level_max=self._cfg_get("ccd_saturate", None))
+            except Exception as err:            # never fatal
+                logger.warning("gain estimate failed: %s", err)
+        gain_report = gain_mod.resolve(
+            settings_gain=self._cfg_get("ccd_gain", None),
+            settings_ron=self._cfg_get("ccd_read_noise", None),
+            header=ref.header, estimate=estimate)
         recipe = dict(self._recipe or {})
         entries = list(self._comps)
         source = "project" if entries else "auto"
@@ -1194,6 +1249,8 @@ class TrackStackWorker(QThread):
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),
                 linear_adu=self._cfg_get("cam_linearity_adu", None),
+                gain=gain_report.get("gain"), ron=gain_report.get("ron"),
+                gain_source=gain_report.get("source"),
                 site_gain=self._cfg_get("ccd_gain", None),
                 site_ron=self._cfg_get("ccd_read_noise", None),
                 site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,

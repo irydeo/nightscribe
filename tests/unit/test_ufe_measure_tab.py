@@ -330,6 +330,52 @@ def test_without_gain_the_error_is_comps_scatter_only(dlg, tmp_path):
     assert dlg.tab_measure._last["mag"] is not None
 
 
+def test_the_tab_measures_the_gain_on_the_visit_frames(
+        dlg, tmp_path, monkeypatch):
+    # The header can lie: the author's own QHY42Pro frames carried
+    # GAIN = 5 and EGAIN = 1.0 while the real conversion gain was
+    # 0.11 e-/ADU. With no Ajustes value the tab measures the gain on the
+    # visit's own frames and lets it win, and the panel says where it came
+    # from (2026-10-08).
+    from nightscribe.core import gain as gn
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "ccd_gain", None)
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "liar.fits", data, instrument=False,
+                         extra=[_card("GAIN", "5"), _card("EGAIN", "1.0"),
+                                _card("RDNOISE", "1.7"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 9,
+                                 "paths": [str(plate)]})
+    monkeypatch.setattr(gn, "estimate_from_paths",
+                        lambda ps, **kw: {"gain": 0.11, "ron": None,
+                                          "gain_err": 0.001, "notes": [],
+                                          "n_boxes": 10, "n_kept": 9})
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["gain_source"] == "frames"
+    assert tab._last["err_internal"] is not None
+    assert "Gain 0.11 e-/ADU" in tab.lbl_result.toPlainText()
+
+
+def test_a_header_gain_is_used_when_there_is_nothing_to_measure(dlg, tmp_path):
+    # No visit frames to measure and no Ajustes value: the header's EGAIN
+    # is the only word, and the panel says the gain came from the card.
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "card.fits", data, instrument=False,
+                         extra=[_card("EGAIN", "0.75"),
+                                _card("RDNOISE", "1.7"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["gain_source"] == "header"
+    assert "Gain 0.75 e-/ADU" in tab.lbl_result.toPlainText()
+
+
 def test_new_plate_invalidates_the_measurement(dlg, tmp_path):
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)

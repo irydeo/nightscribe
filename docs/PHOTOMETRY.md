@@ -224,6 +224,16 @@ disk is never modified.
   scintillation with your aperture and site height from Settings, the
   colour term and a 0.007 mag flat floor configurable as
   `flat_resid_mag`).
+* **Where the gain comes from** (2026-10-08): the CCD equation hangs
+  entirely on the gain (e-/ADU), so the app resolves it in one fixed
+  order: Settings, then the **measurement on your own frames** (two frames
+  of the same exposure tell it), and only then the header. The measurement
+  beats the header because the card can carry the camera's **setting**
+  (`GAIN`, a small number that is not e-/ADU) or a placeholder
+  (`EGAIN = 1.0`): with one of those the error comes out several times
+  shorter than it is, and the check star cannot warn because its semaphore
+  is measured with that same error. The panel says which way the gain
+  came; the measured case and its figures are in ADR-072.
 * **The check star as a traffic light**: when the sequence has one, it
   is measured and compared with its catalog value; beyond 2.5σ_total
   the measurement is flagged NOT reliable before you trust it.

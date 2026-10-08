@@ -41,6 +41,14 @@ The measurement recipe has three decisions worth understanding:
 > dominates). If your plate has bad pixels or an odd PSF, untick it and go
 > back to the aperture: physics rules over habit.
 
+**The gain and your error.** A measurement's error bar comes from the CCD
+equation, which hangs on your camera's **gain** (e-/ADU). The app resolves it
+in one fixed order: what you set in **Settings**, then the **measurement on
+your own frames** (two frames of the same exposure tell it), and only then the
+FITS header. The measurement beats the header because the card can carry the
+camera's **setting** or a placeholder, and with one of those the error comes
+out shorter than it is. The panel says where the gain came from.
+
 **Advanced…** opens the rest of the recipe (sky model, sigma-clip, colour
 term, host-galaxy subtraction). Each plate keeps its own recipe: changing it
 on one does not touch the others.

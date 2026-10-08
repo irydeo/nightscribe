@@ -959,6 +959,14 @@ def header_instrument(header):
     # None instead of guessing. Keywords are matched case-insensitively,
     # and the gain/read noise accept the names real cameras write (GAIN,
     # EGAIN, CCDGAIN, GAIN1; RDNOISE, READNOIS, RON, ENF? no).
+    #
+    # THE CONVERSION GAIN IS READ BEFORE THE CAMERA'S GAIN SETTING
+    # (2026-10-08). EGAIN and CCDGAIN are electrons per ADU by definition;
+    # a bare GAIN is usually the camera's own gain SETTING (a small
+    # integer, not an e-/ADU figure). Reading GAIN first took the setting
+    # for the conversion gain: on the author's own QHY42Pro frames the
+    # header carried GAIN = 5 AND EGAIN = 1, and the code used 5. The
+    # order matters because the two numbers are not even in the same unit.
     # @args: header - the header dict from core/fits_io (or None)
     # @return: {"gain", "ron", "exptime"} with None for every absent or
     #          non-numeric key
@@ -983,7 +991,7 @@ def header_instrument(header):
                 continue
         return None
 
-    out["gain"] = _num("GAIN", "EGAIN", "CCDGAIN", "GAIN1", "GAINX")
+    out["gain"] = _num("EGAIN", "CCDGAIN", "GAIN", "GAIN1", "GAINX")
     out["ron"] = _num("RDNOISE", "READNOIS", "RON", "READNOISE")
     out["exptime"] = _num("EXPTIME", "EXP0TIME")
     return out
@@ -2191,6 +2199,15 @@ class PlateConfig:
                                     # linearity, so every comparison star was
                                     # rejected and the run reported no
                                     # magnitude at all.
+    # THE WORKING GAIN, resolved by the caller when it can (2026-10-08):
+    # Ajustes -> the gain measured on the very frames -> the header. The
+    # callers that walk that chain (the series engine, the Measure tab)
+    # hand the result in here; a caller that hands in nothing falls back
+    # to `site_gain` and only then to the header. `gain_source` is
+    # "settings" | "frames" | "header" and is what the panel prints.
+    gain: float = None
+    ron: float = None
+    gain_source: str = None
     # site (Ajustes, ADR-028): the same values the panel has always used
     site_gain: float = None
     site_ron: float = None
@@ -2247,6 +2264,7 @@ class PlateResult:
     sky_mode: str = "median"
     sigma_clip: bool = True
     gain: float = None
+    gain_source: str = None         # "settings" | "frames" | "header" | None
     # WHAT ACTUALLY MEASURED, and not what the recipe asked for: the filter
     # needs a seeing, and with no FWHM (the comps could not be measured on
     # this stack) the aperture measures instead. A caller that reported the
@@ -2500,11 +2518,26 @@ def measure_plate(image, cfg):
     # the zero point is fitted per target only because the colour term
     # hangs from the target's own B-V.
     inst_header = header_instrument(cfg.header)
-    gain = (inst_header["gain"] if inst_header["gain"] is not None
-            else cfg.site_gain)
-    ron = (inst_header["ron"] if inst_header["ron"] is not None
-           else cfg.site_ron)
+    # THE WORKING GAIN, in the order the observer approved (2026-10-08):
+    # what the caller resolved wins (it already walked Ajustes -> measured
+    # on the frames -> header); a caller that resolved nothing falls back
+    # to its Ajustes value and only then to the header, because the header
+    # can carry the camera's gain SETTING or a placeholder. Measured on
+    # the author's own QHY42Pro frames: SharpCap wrote EGAIN = 1.0 while
+    # the real conversion gain was 0.11 e-/ADU, and trusting the card
+    # under-reported every error bar by a factor of three.
+    if cfg.gain is not None:
+        gain, gain_source = cfg.gain, cfg.gain_source
+    elif cfg.site_gain is not None:
+        gain, gain_source = cfg.site_gain, "settings"
+    elif inst_header["gain"] is not None:
+        gain, gain_source = inst_header["gain"], "header"
+    else:
+        gain, gain_source = None, None
+    ron = cfg.ron if cfg.ron is not None else (
+        cfg.site_ron if cfg.site_ron is not None else inst_header["ron"])
     res.gain = gain
+    res.gain_source = gain_source
     for m in measured:
         if not m["ok"]:
             continue

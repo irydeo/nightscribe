@@ -41,6 +41,14 @@ secuencia. La receta de medida tiene tres decisiones que conviene entender:
 > fondo domina). Si tu placa tiene píxeles malos o una PSF muy rara, desmárcalo
 > y vuelve a la apertura: la física manda sobre la costumbre.
 
+**La ganancia y tu error.** La barra de error de una medida sale de la
+ecuación CCD, que cuelga de la **ganancia** de tu cámara (e-/ADU). La app la
+resuelve en un orden fijo: lo que pongas en **Ajustes**, después la **medida
+en tus propias tomas** (dos tomas de la misma exposición la dicen) y solo
+entonces la cabecera del FITS. La medida gana a la cabecera porque la tarjeta
+puede traer el **ajuste** de la cámara o un valor de relleno, y con uno de esos
+el error sale más corto de lo que es. El panel dice de dónde salió la ganancia.
+
 **Avanzado…** abre el resto de la receta (modelo de cielo, sigma-clip,
 término de color, sustracción de galaxia anfitriona). Cada placa guarda su
 propia receta: cambiarla en una no toca las demás.

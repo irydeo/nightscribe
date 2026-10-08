@@ -578,9 +578,8 @@ sistema operativo, el paquete pip y el instalador autónomo, y
 **La [guía de usuario](docs/user/README.es.md)**
 ([English](docs/user/README.md)) recorre el ciclo completo, del primer
 arranque al reporte MPC, en capítulos cortos con el «por qué» de cada
-opción. También viaja dentro de la app (**Ayuda → Documentación técnica**) y
-se publica como web: **<https://irydeo.github.io/nightscribe/>** (**Ayuda →
-Guía de usuario (web)**).
+opción. Se publica como web: **<https://irydeo.github.io/nightscribe/>**
+(**Ayuda → Guía de usuario (web)**).
 
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
 decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.

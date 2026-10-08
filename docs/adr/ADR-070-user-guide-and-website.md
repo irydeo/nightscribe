@@ -98,8 +98,9 @@ lleva la misma línea en su sección de documentación.
 **Revisión (2026-10-08, la puerta de la guía en la Bienvenida).** El botón «Ver
 la guía completa» de la Bienvenida abría el visor interno de markdown; ahora
 abre la guía **HTML** publicada (la misma página que Ayuda → Guía (web), en el
-idioma de la app). El visor interno sigue siendo la puerta offline, en Ayuda →
-Documentación técnica.
+idioma de la app). La puerta general a la documentación dentro de la app
+desaparece con él: el visor interno solo sobrevive donde abre un documento
+concreto (el «?» de la serie en el UFE).
 
 ## English
 
@@ -194,5 +195,6 @@ carries the same line in its documentation section.
 **Revision (2026-10-08, the guide's door on Welcome).** Welcome's "See the full
 guide" button opened the in-app markdown viewer; it now opens the published
 **HTML** guide (the same page as Help > User guide (web), in the app's
-language). The in-app viewer stays the offline door, under Help > Technical
-Documentation.
+language). The general in-app door to the documentation goes away with it: the
+in-app viewer only survives where it opens one concrete document (the UFE
+series "?").

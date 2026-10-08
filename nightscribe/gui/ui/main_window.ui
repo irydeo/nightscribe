@@ -134,7 +134,6 @@
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
      <addaction name="action_welcome"/>
-     <addaction name="action_docs"/>
      <addaction name="action_guide_web"/>
      <addaction name="separator_help"/>
      <addaction name="action_about"/>
@@ -175,9 +174,6 @@
   <action name="action_welcome">
     <property name="text"><string>Welcome / setup guide</string></property>
     <property name="toolTip"><string>Your observatory, your targets and the data report, at any time</string></property>
-  </action>
-  <action name="action_docs">
-    <property name="text"><string>Technical Documentation</string></property>
   </action>
   <action name="action_guide_web">
     <property name="text"><string>User guide (web)</string></property>

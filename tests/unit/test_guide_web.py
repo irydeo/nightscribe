@@ -11,14 +11,14 @@
 #
 ############################################################
 
-"""The application's other door to the guide (ADR-070).
+"""The application's door to the guide (ADR-070).
 
-The in-app browser (Help > Technical Documentation) is the offline door and
-renders the markdown. This one hands the PUBLISHED page to the OS browser, in
-the app's own language, and it exists so the guide can be read on a phone or
-sent to somebody. The two read the same `docs/user`, which is the point of
-the ADR: what is tested here is the seam, not the site (that is
-test_site_build.py).
+The guide is published as a website; the app hands that PUBLISHED page to the
+OS browser, in the app's own language, so it can be read on a phone or sent to
+somebody (Help > User guide (web), and the Welcome screen's "See the full
+guide"). The in-app markdown browser is no longer a general Help entry: it
+only opens a concrete document (the UFE series "?"). What is tested here is
+the seam, not the site (that is test_site_build.py).
 
 Offscreen, no network: the browser is replaced by a stub.
 """
@@ -100,3 +100,20 @@ def test_the_welcome_guide_button_opens_the_web_guide(window, monkeypatch):
     assert window._welcome is not None
     window._welcome.ui.btn_card2_guide.click()
     assert opened == ["https://example.test/g/index.html"]
+
+
+def test_the_help_menu_has_no_technical_documentation(window):
+    # The general in-app door is gone (ADR-053 revision): the guide is the
+    # published website, and the in-app browser only opens one concrete
+    # document (the UFE series "?"). The entry and the method that opened it
+    # go together.
+    assert not hasattr(window._menus, "action_docs")
+    assert not hasattr(window, "on_docs")
+
+
+def test_about_carries_the_project_url(window):
+    # The About box is where somebody checks the exact build before reporting
+    # an issue, so the project URL lives there, as a real link.
+    html = window._about_html()
+    assert '<a href="https://github.com/irydeo/nightscribe">' in html
+    assert "GPL v3" in html

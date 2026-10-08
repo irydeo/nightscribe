@@ -554,8 +554,7 @@ it.
 
 **The [user guide](docs/user/README.md)** ([español](docs/user/README.es.md))
 walks the whole cycle, from the first run to the MPC report, in short
-chapters with the "why" of each option. It also ships inside the app
-(**Help → Technical Documentation**) and it is published as a website:
+chapters with the "why" of each option. It is published as a website:
 **<https://irydeo.github.io/nightscribe/>** (**Help → User guide (web)**).
 
 Design, architecture, data sources, scoring, workflows and every decision

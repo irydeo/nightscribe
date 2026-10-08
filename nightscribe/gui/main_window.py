@@ -1499,7 +1499,6 @@ class MainWindow(QMainWindow):
         self._menus.action_settings.triggered.connect(self.on_open_settings)
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_sources.triggered.connect(self.on_sources)
-        self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_guide_web.triggered.connect(self.on_guide_web)
         self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_welcome.triggered.connect(
@@ -2649,13 +2648,33 @@ class MainWindow(QMainWindow):
     def on_about(self):
         # Show the exact build so the user can check "is this the right one?"
         # before reporting an issue (spirit of ADR-013: self-describing app).
+        # The box is built by hand because QMessageBox.about() offers no way
+        # to let its label open the project link; the HTML itself lives in
+        # _about_html so a test can read it without opening anything.
         # @args: none
-        QMessageBox.about(self, "NightScribe",
-                          f"<b>NightScribe</b> {full_version()}<br><br>"
-                          + self.tr("Plan your night, understand every object, "
-                                    "tell your science.")
-                          + "<br><br>(c) 2026 Francisco José Calvo Fernández<br>"
-                          "GPL v3 · Irydeo Observatory (MPC Z41)")
+        box = QMessageBox(self)
+        box.setWindowTitle("NightScribe")
+        box.setIcon(QMessageBox.Information)
+        box.setTextFormat(Qt.RichText)
+        box.setText(self._about_html())
+        box.setStandardButtons(QMessageBox.Ok)
+        label = box.findChild(QLabel, "qt_msgbox_label")
+        if label is not None:
+            label.setOpenExternalLinks(True)
+        box.exec()
+
+    def _about_html(self):
+        # @return: the About text as rich HTML. The project URL is the one
+        #          thing that leaves the app from here, so it is a real link
+        #          (the report of a bug starts at the same page).
+        return (
+            f"<b>NightScribe</b> {full_version()}<br><br>"
+            + self.tr("Plan your night, understand every object, "
+                      "tell your science.")
+            + "<br><br>(c) 2026 Francisco José Calvo Fernández<br>"
+            "GPL v3 · Irydeo Observatory (MPC Z41)<br><br>"
+            '<a href="https://github.com/irydeo/nightscribe">'
+            "github.com/irydeo/nightscribe</a>")
 
     def on_sources(self):
         QMessageBox.information(
@@ -2681,35 +2700,11 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
         self.statusBar().showMessage(str(path), 8000)
 
-    def on_docs(self):
-        # Opens the in-GUI documentation browser (Help > Documentation):
-        # file tree on the left, rendered doc on the right. Starts at the
-        # master doc for the current language (WORKFLOWS) when present.
-        from .doc_viewer import open_browser
-        root = paths.docs_dir()
-        if not root.is_dir():
-            self.statusBar().showMessage(
-                self.tr("Documentation not found at %1").replace("%1", root),
-                10000)
-            return
-        # The user guide (docs/user/) is the door for the observer; the
-        # WORKFLOWS master doc stays as the fallback when the guide is not
-        # shipped (a dev checkout without docs/user, a trimmed package).
-        lang = self._lang()
-        candidates = [
-            root / "user" / ("README.es.md" if lang == "es" else "README.md"),
-            root / "user" / ("README.md" if lang == "es" else "README.es.md"),
-            root / ("WORKFLOWS.es.md" if lang == "es" else "WORKFLOWS.md"),
-            root / ("WORKFLOWS.md" if lang == "es" else "WORKFLOWS.es.md"),
-        ]
-        start = next((c for c in candidates if c.exists()), None)
-        open_browser(root, self, start=start)
-
     def on_guide_web(self):
-        # Opens the published user guide in the OS browser (ADR-070). The
-        # in-app browser above is the offline door, built from the same
-        # markdown; this is the one you can read on a phone or send to
-        # somebody. The site's own pages pick the language from the suffix.
+        # Opens the published user guide in the OS browser (ADR-070): it is
+        # now the app's only general door to the guide (Help > User guide
+        # (web)), and the one the Welcome screen opens too. The site's own
+        # pages pick the language from the suffix.
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
         suffix = ".es" if self._lang() == "es" else ""

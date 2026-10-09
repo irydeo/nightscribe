@@ -660,12 +660,12 @@ class UfeCompareTab(QWidget):
             ra, dec = target["ra"], target["dec"]
             self.edt_target.setText(target["name"])
             self._prefill_sky = (ra, dec)
-        from .workers import UfeCutoutWorker
+        from .workers import UfeCutoutWorker, hold
         self.btn_dss.setEnabled(False)
         self._say(self.tr("Downloading the survey field…"))
         wait = _busy_wait(self, self.tr("Downloading the survey field…"),
                           self.tr("Comparison field"))
-        self._cutout_worker = UfeCutoutWorker(ra, dec)
+        self._cutout_worker = hold(UfeCutoutWorker(ra, dec))
         self._cutout_worker.progress.connect(
             lambda msg: wait.setLabelText(msg.get(self._lang, "")))
         self._cutout_worker.progress.connect(
@@ -774,7 +774,7 @@ class UfeCompareTab(QWidget):
             self._auto_propose = False
             self._explain_no_wcs()
             return
-        from .workers import UfeFieldWorker
+        from .workers import UfeFieldWorker, hold
         ra, dec = self._state.wcs.center()
         w, h = self._state.plate_shape
         fov_arcmin = max(w, h) * self._state.wcs.pixel_scale() / 60.0
@@ -794,9 +794,9 @@ class UfeCompareTab(QWidget):
         # a safety ring, not a square: quality plan, C2
         from ..core import compstars
         margin = compstars.COMP_MARGIN_ARCSEC
-        self._worker = UfeFieldWorker(self.cmb_catalog.currentData(),
-                                      ra, dec, fov_arcmin,
-                                      naxis=(w, h), margin_arcsec=margin)
+        self._worker = hold(UfeFieldWorker(self.cmb_catalog.currentData(),
+                                           ra, dec, fov_arcmin,
+                                           naxis=(w, h), margin_arcsec=margin))
 
         def _stage(msg):
             # @args: msg - the worker's {"es", "en"} stage text
@@ -1261,10 +1261,10 @@ class UfeCompareTab(QWidget):
         # moment, with a real Cancel).
         # @args: validator - the plate's verdict callable
         # @return: None
-        from .workers import UfeProposeWorker
-        self._propose_worker = UfeProposeWorker(
+        from .workers import UfeProposeWorker, hold
+        self._propose_worker = hold(UfeProposeWorker(
             self._stars, self._proposal_mag(), validator,
-            margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
+            margin_arcsec=compstars.COMP_MARGIN_ARCSEC))
         self._propose_worker.progress.connect(self._on_propose_stage)
         self._propose_worker.finished.connect(self._on_proposed)
         self._propose_worker.cancelled.connect(self._on_propose_cancelled)

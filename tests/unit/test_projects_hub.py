@@ -974,6 +974,9 @@ def test_refresh_position_button_forces_a_fresh_fetch(window, panel, monkeypatch
         def isRunning(self):
             return False
 
+        def isFinished(self):
+            return True
+
         def start(self):
             self._cb({"ra_deg": 31.0, "dec_deg": 21.0,
                       "rate_arcsec_min": 3.0,

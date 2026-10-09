@@ -22,6 +22,63 @@ logger = logging.getLogger(__name__)
 # Network and scoring never run on the GUI thread (see ARCHITECTURE).
 # Each worker emits a single "finished" signal with its payload.
 
+# ---- QThread lifetime guard -------------------------------------------
+#
+# A QThread must not be destroyed while its thread still runs: Qt 6 makes
+# that FATAL ("QThread: Destroyed while thread is still running"), and the
+# whole application aborts with a core dump. PySide6 destroys the C++ QThread
+# when the last Python wrapper is collected, and a worker can lose its last
+# reference while it is still winding down (a slot that nulls the holder, a
+# list that is rebuilt, a local that goes out of scope).
+#
+# Every worker here shadows QThread.finished with its OWN signal, which is
+# emitted from inside run() BEFORE the thread stops, so that signal cannot be
+# the safe moment. hold() instead keeps a strong reference until the thread
+# has REALLY finished (QThread.isFinished()), pruned on the GUI thread.
+_LIVE_WORKERS = []
+
+
+def hold(worker):
+    # Keep a strong reference to a worker until its thread has finished, so
+    # the C++ QThread is never destroyed while it runs (Qt 6 aborts for
+    # that). Call it right after creating a worker and before start().
+    # @args: worker - a QThread (or anything with isFinished())
+    # @return: the worker, so it can be used inline: self._worker = hold(W(...))
+    if worker is not None and hasattr(worker, "isFinished"):
+        _LIVE_WORKERS.append(worker)
+        _prune_workers()
+    return worker
+
+
+def _prune_workers():
+    # Drops the workers whose thread has finished. isFinished() is False
+    # before start() and while running, and True only after the thread has
+    # stopped, which is exactly when the reference can be let go safely. A
+    # wrapper whose C++ object was already freed (a finished worker that also
+    # connected finished->deleteLater) is let go too: it can no longer run.
+    # @return: None
+    kept = []
+    for w in _LIVE_WORKERS:
+        try:
+            if not w.isFinished():
+                kept.append(w)
+        except (RuntimeError, AttributeError):   # C++ gone / not a QThread
+            pass
+    _LIVE_WORKERS[:] = kept
+
+
+def running_workers():
+    # @return: a snapshot of the workers still running (for closeEvent)
+    out = []
+    for w in _LIVE_WORKERS:
+        try:
+            if w.isRunning():
+                out.append(w)
+        except (RuntimeError, AttributeError):   # C++ gone / not a QThread
+            pass
+    return out
+
+
 # How far from the plate's edge a comparison star may sit, in arcsec. The
 # night's drift and the pointing error move the field a little, and a comp
 # that walks off the plate on one frame breaks that frame's zero point (or

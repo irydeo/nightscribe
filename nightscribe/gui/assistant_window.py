@@ -137,12 +137,12 @@ class AssistantWindow(QDialog):
         self._ui.lbl_sources.setText("")
         self._ui.progress.setVisible(True)
         self._ui.lbl_hint.setText(self.tr("Thinking…"))
-        from .workers import AssistantWorker
-        self._worker = AssistantWorker(
+        from .workers import AssistantWorker, hold
+        self._worker = hold(AssistantWorker(
             config, scope, question, past,
             brief_provider=(self._brief_provider
                             if scope == assistant.SCOPE_OBJECT else None),
-            editor_state=state)
+            editor_state=state))
         self._worker.done.connect(self._done)
         self._worker.start()
 

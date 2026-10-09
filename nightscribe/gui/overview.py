@@ -645,8 +645,8 @@ class ObjectPanel(QWidget):
         # @args: name - object identifier, fallback_target - planner target
         # @return: a not-yet-started ExploreWorker
         from ..config import config
-        from .workers import ExploreWorker
-        return ExploreWorker(config, name, fallback_target=fallback_target)
+        from .workers import ExploreWorker, hold
+        return hold(ExploreWorker(config, name, fallback_target=fallback_target))
 
     def _lang(self):
         # @return: "es" or "en"

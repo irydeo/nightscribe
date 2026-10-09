@@ -54,7 +54,7 @@ from .widgets.sparkline import sparkline_pixmap
 from .workers import (AiPostWorker, CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PassWorker,
                       PositionRefreshWorker, PostWorker, SunWorker,
-                      TonightWorker)
+                      TonightWorker, hold, running_workers)
 
 logger = logging.getLogger(__name__)
 
@@ -434,6 +434,7 @@ class MainWindow(QMainWindow):
         self._ccd_version = ""
         self._ccd_worker = None
         self._pos_worker = None        # the position-refresh worker, if any
+        self._pos_target = None        # the project a refresh was for
         self._ccd_point_target = None  # last project a goto/astrometry aimed at
         self._ccd_timer = QTimer(self)
         self._ccd_timer.setInterval(1500)
@@ -2140,7 +2141,7 @@ class MainWindow(QMainWindow):
             return
         install = dlg.edt_exotic_install.text().strip() or str(
             paths.data_dir() / "exotic-venv")
-        self._exotic_worker = PrepareExoticWorker(install, python)
+        self._exotic_worker = hold(PrepareExoticWorker(install, python))
         self._exotic_worker.progress.connect(
             lambda stage: self.statusBar().showMessage(
                 self.tr("Preparing EXOTIC: {0}").format(stage), 0))
@@ -5606,7 +5607,7 @@ class MainWindow(QMainWindow):
             return {"version": version, "dashboard": c.dashboard(),
                     "filters": c.filters()}
 
-        self._ccd_worker = CcdcielWorker(self._ccd_client, action)
+        self._ccd_worker = hold(CcdcielWorker(self._ccd_client, action))
         self._ccd_worker.finished.connect(self._ccd_on_connect)
         self._ccd_worker.start()
 
@@ -5647,6 +5648,7 @@ class MainWindow(QMainWindow):
             return
         self._ccd_worker = CcdcielWorker(self._ccd_client, action,
                                          poll_slew=poll)
+        hold(self._ccd_worker)
         self._ccd_worker.finished.connect(slot)
         self._ccd_worker.start()
 
@@ -5950,10 +5952,18 @@ class MainWindow(QMainWindow):
         btn = w["ccd_refresh_pos"]
         btn.setEnabled(False)
         btn.setText(self.tr("Refreshing…"))
-        self._pos_worker = PositionRefreshWorker(obj_id, site, ctx)
-        self._pos_worker.finished.connect(
-            lambda pos: self._ccd_on_refreshed_position(pos, p))
+        # a bound slot of this QObject, not a lambda: a lambda would run on
+        # the worker's thread and touch the GUI from there
+        self._pos_target = p
+        self._pos_worker = hold(PositionRefreshWorker(obj_id, site, ctx))
+        self._pos_worker.finished.connect(self._ccd_on_position_refreshed)
         self._pos_worker.start()
+
+    def _ccd_on_position_refreshed(self, pos):
+        # @args: pos - the worker's position dict (or {})
+        # @return: None. The project the refresh was for is remembered so the
+        #          queued slot can hand it to the shared handler.
+        self._ccd_on_refreshed_position(pos, self._pos_target)
 
     def _ccd_on_refreshed_position(self, pos, project_row):
         # @args: pos - the worker's position dict (or {}), project_row - the
@@ -8004,8 +8014,8 @@ class MainWindow(QMainWindow):
         basis = plan.get("filter") or "V"
         self._exotic_filter = "V" if basis in ("L", "CV", None) else basis
         from .workers import ExoticRunWorker
-        self._exotic_worker = ExoticRunWorker(python, str(work),
-                                              str(inits_path))
+        self._exotic_worker = hold(ExoticRunWorker(python, str(work),
+                                                   str(inits_path)))
         self._exotic_progress_dialog()
         self._exotic_worker.progress.connect(self._exotic_progress_line)
         self._exotic_worker.finished.connect(
@@ -10978,7 +10988,7 @@ class MainWindow(QMainWindow):
         self._pass_targets = list(targets)
         self._pass_band = band
         self._pass_left = list(left or [])
-        self._pass_worker = PassWorker(source["paths"], cfg)
+        self._pass_worker = hold(PassWorker(source["paths"], cfg))
         self._pass_worker.progress.connect(self._pass_progress)
         self._pass_worker.finished.connect(self._pass_done)
         self._pass_worker.failed.connect(self._pass_failed)
@@ -11900,11 +11910,26 @@ class MainWindow(QMainWindow):
     # ---------------- housekeeping ----------------
 
     def _keep(self, worker):
-        from PySide6.QtCore import QTimer
+        # The window owns the worker: it stays referenced until its thread has
+        # really finished (hold), so it is never destroyed while running (Qt 6
+        # aborts for that). No deleteLater here: it would be triggered by the
+        # worker's OWN finished signal, which is emitted BEFORE the thread
+        # stops, and deleting a running QThread is the very abort we avoid.
+        # The drop goes through a bound slot (queued to the GUI thread) and
+        # sender() names the worker.
         self._workers.append(worker)
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(
-            lambda *a: QTimer.singleShot(0, lambda: self._drop(worker)))
+        hold(worker)
+        worker.finished.connect(self._drop_sender)
+
+    def _drop_sender(self, *args):
+        # @args: args - the signal's payload (ignored: sender() names the
+        #        worker). A bound slot runs on the GUI thread: a lambda here
+        #        would run on the worker's thread and could even fire a QTimer
+        #        with no event loop behind it.
+        # @return: None. Drops the worker that just emitted finished.
+        w = self.sender()
+        if w is not None:
+            self._drop(w)
 
     def _drop(self, worker):
         if worker in self._workers:
@@ -11960,8 +11985,14 @@ class MainWindow(QMainWindow):
         exotic = getattr(self, "_exotic_worker", None)
         if exotic is not None:
             tracked.append(exotic)
-        threads = [w for w in tracked
-                   if isinstance(w, QThread) and Shiboken.isValid(w)]
+        # every worker held by the lifetime guard too (the CCDciel poll, the
+        # position refresh, the UFE tabs): a running one must be waited on
+        # here or Qt aborts the exit with "QThread destroyed while running"
+        tracked.extend(running_workers())
+        threads = []
+        for w in tracked:
+            if isinstance(w, QThread) and Shiboken.isValid(w) and w not in threads:
+                threads.append(w)
         for w in threads:
             if callable(getattr(w, "cancel", None)):
                 w.cancel()

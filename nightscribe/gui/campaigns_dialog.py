@@ -146,13 +146,11 @@ class NewProjectDialog(QDialog):
         name = self.edt_name.text().strip()
         if not name or self._resolve_worker is not None:
             return
-        from .workers import ResolveWorker
+        from .workers import ResolveWorker, hold
         self.btn_resolve.setEnabled(False)
         self.lbl_resolved.setText(self.tr("Resolving…"))
-        self._resolve_worker = ResolveWorker(name)
+        self._resolve_worker = hold(ResolveWorker(name))
         self._resolve_worker.finished.connect(self._resolve_done)
-        self._resolve_worker.finished.connect(
-            self._resolve_worker.deleteLater)
         self._resolve_worker.start()
 
     def _resolve_done(self, result):

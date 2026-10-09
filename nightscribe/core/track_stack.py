@@ -597,26 +597,30 @@ def sequence_motion(frames, name, site="", lat=None, lon=None):
                                     lon=lon)[0]
 
 
-def sequence_ephemeris(frames, name, site="", lat=None, lon=None):
+def sequence_ephemeris(frames, name, site="", lat=None, lon=None,
+                       packed=None):
     # Where the object is AND how bright it should be, over the visit's own
     # window, from the first source that answers: JPL Horizons (with retries),
-    # then the SBDB elements propagated locally (two-body Kepler, J2000), then
-    # NEOfixer for an unconfirmed object. The stack must NOT die because one
-    # service is down, and the same goes for the predicted magnitude: a run
-    # that cannot say how bright the object is still reports its position.
+    # then NEOfixer's own site ephemeris (Find_Orb, perturbed), then the SBDB
+    # elements propagated locally (two-body Kepler, J2000), then the
+    # preliminary NEOfixer orbit. The stack must NOT die because one service
+    # is down, and the same goes for the predicted magnitude: a run that
+    # cannot say how bright the object is still reports its position.
     #
     # The magnitude is asked of the SAME cascade, because it is the same
     # question ("what does the sky say about this object tonight?"): Horizons
     # answers it with a table of its own (quantity 9, V for an asteroid, T for
-    # a comet), and the local orbit with the IAU H-G system from the H and G
-    # the elements come with.
+    # a comet), NEOfixer with its own V magnitude, and the local orbit with
+    # the IAU H-G system from the H and G the elements come with.
     # @args: frames - list[Frame], name - designation, site - MPC code,
-    #        lat/lon - site coordinates when known (topocentric Kepler)
+    #        lat/lon - site coordinates when known (topocentric Kepler),
+    #        packed - packed designation for the NEOfixer route (the readable
+    #        name is not what NEOfixer keys on)
     # @return: {"motion", "source", "reason", "mag", "band", "mag_source"}
     #          with motion a callable(jd) -> (ra_deg, dec_deg) or None, mag
     #          the predicted magnitude at the sequence's middle instant (None
-    #          when nobody can say), mag_source "horizons" | "kepler:sbdb" |
-    #          None.
+    #          when nobody can say), mag_source "horizons" | "neofixer:ephem" |
+    #          "kepler:sbdb" | "kepler:neofixer" | None.
     from . import ephemeris
     from .sources import horizons
     out = {"motion": None, "source": None, "reason": "", "mag": None,
@@ -668,10 +672,31 @@ def sequence_ephemeris(frames, name, site="", lat=None, lon=None):
                 out["mag"], out["band"] = float(mag), band
                 out["mag_source"] = "kepler:sbdb"
             return out
-    # 3 · NEOfixer (Find_Orb): the only route for an unconfirmed object
+    # 3 · NEOfixer's own site ephemeris (Find_Orb, perturbed): the accurate
+    #     route for an unconfirmed object Horizons does not know. The window
+    #     is the night the frames were taken on, not "now": a sequence is
+    #     reduced after the fact, and NEOfixer answers for that night.
+    try:
+        rows = ephemeris._neofixer_rows(site, packed or name, start=start,
+                                        stop=stop)
+    except Exception as err:
+        logger.warning("NEOfixer ephemeris failed for %s: %s", name, err)
+        rows = []
+    if rows:
+        interp = ephemeris.motion_interpolator(rows)
+        if interp is not None:
+            out["motion"] = interp
+            out["source"] = "neofixer:ephem"
+            near = ephemeris._nearest_row(rows, t_mid)
+            if near and near.get("mag") is not None:
+                out["mag"], out["band"] = float(near["mag"]), "V"
+                out["mag_source"] = "neofixer:ephem"
+            return out
+    # 4 · NEOfixer (Find_Orb) preliminary orbit, propagated locally: the
+    #     offline route for an unconfirmed object.
     try:
         from .sources import neofixer
-        orb = neofixer.orbit(name)
+        orb = neofixer.orbit(packed or name)
     except Exception as err:
         logger.warning("NEOfixer fallback failed for %s: %s", name, err)
         orb = None
@@ -694,13 +719,16 @@ def sequence_ephemeris(frames, name, site="", lat=None, lon=None):
     return out
 
 
-def sequence_motion_solution(frames, name, site="", lat=None, lon=None):
+def sequence_motion_solution(frames, name, site="", lat=None, lon=None,
+                             packed=None):
     # @args: frames - list[Frame], name - designation, site - MPC code,
-    #        lat/lon - site coordinates when known (topocentric Kepler)
+    #        lat/lon - site coordinates when known (topocentric Kepler),
+    #        packed - packed designation for the NEOfixer route
     # @return: (motion, source, reason) as before; the position alone, for the
     #          callers that only want it. The predicted magnitude and the rest
     #          are in sequence_ephemeris, which does the work.
-    out = sequence_ephemeris(frames, name, site=site, lat=lat, lon=lon)
+    out = sequence_ephemeris(frames, name, site=site, lat=lat, lon=lon,
+                             packed=packed)
     return out["motion"], out["source"], out["reason"]
 
 

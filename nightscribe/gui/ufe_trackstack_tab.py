@@ -1132,7 +1132,8 @@ class UfeTrackStackTab(QWidget):
             phot_enabled=self.chk_brightness.isChecked(),
             save_star_stack=self.chk_starstack.isChecked(),
             calibrate=self.chk_calibrate.isChecked(),
-            manual_ref=manual_ref)
+            manual_ref=manual_ref,
+            packed=ctx.get("packed") or ctx.get("id"))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

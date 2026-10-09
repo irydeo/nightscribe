@@ -15,7 +15,10 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
   (minutos), vmag, movimiento, incertidumbre, flag NEOCP, flags
   impacto/radar/NHATS/Yarkovsky.
 - `GET .../ephem/?site=<código>&object=<packed>` — pública. Efeméride por sitio
-  (alt, az, mag, movimiento) precalculada por NEOfixer (find_orb de Bill Gray).
+  (alt, az, mag, movimiento) precalculada por NEOfixer (find_orb de Bill Gray, con
+  perturbaciones). Es la posición precisa del goto fresco y del track & stack de un
+  objeto NEOCP/PCCP sin confirmar que Horizons no conoce, por delante de la propagación
+  local de dos cuerpos. Ventana opcional `time-start`/`time-stop` (la noche del visit).
 - `GET .../orbit/?object=<packed>` — pública. **Elementos orbitales preliminares**
   de objetos sin confirmar (NEOCP), calculados con Find_Orb desde la astrometría del
   MPC: elementos keplerianos completos (`a, e, q, Q, i, asc_node, arg_per, M, Tp,
@@ -26,8 +29,8 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
 - `GET .../report/?key=<api key>&site=<código>&object=<id>&status=<s>` — **requiere
   la clave API del usuario** (Configuración). Reporta `will_observe`/`observed`/...
   para coordinación comunitaria. Opcional.
-- TTL: 12 h (`targets`, `ephem`); 1.5 h (`orbit` — las órbitas preliminares cambian
-  rápido). Ojo: `object` debe ser designación *empaquetada* (packed).
+- TTL: 12 h (`targets`); 1.5 h (`orbit` y `ephem` — la órbita preliminar y la tabla
+  derivada de ella cambian rápido). Ojo: `object` debe ser designación *empaquetada* (packed).
 
 ### Rochester Astronomy (David Bishop) — `rochester.py` — supernovas recientes
 

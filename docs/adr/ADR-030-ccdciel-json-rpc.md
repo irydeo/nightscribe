@@ -107,6 +107,25 @@ el combo de objetivo, Start capture, etiqueta de época de coords) vive
 junto a la conexión y la montura; el paso Plan del proyecto conserva solo
 una línea de estado con enlace. El hardware tiene una sola casa.
 
+**Revisión (2026-10-09, efeméride NEOfixer para NEOCP/PCCP)**: para un objeto
+sin confirmar (NEOCP/PCCP) que Horizons no conoce, la posición se calculaba
+propagando con Kepler de dos cuerpos la órbita preliminar de NEOfixer, sin
+perturbaciones y (en el goto) geocéntrica; para un objeto de arco corto y
+movimiento rápido eso son minutos de movimiento de error. La cascada de
+`position_at` y de `sequence_ephemeris` gana, entre SBDB y el Kepler local, la
+**efeméride propia de NEOfixer** (`/ephem/`, Find_Orb con perturbaciones, por
+sitio), interpolada con el mismo código que una tabla de Horizons
+(`neofixer.ephem_rows` → `_interpolate`); el Kepler local queda como último
+recurso sin red. La ventana **abraza el instante pedido** (el goto pide
+«ahora»; el track & stack, la noche del visit), porque NEOfixer redondea el
+inicio hacia arriba y una tabla «desde ahora» empezaría en el futuro. El goto
+pasa a **topocéntrico** (antes geocéntrico) para coincidir con Horizons y con
+el apilado. Se añade el botón **«Refresh position»** en el paso Captura, que
+re-consulta órbita y efeméride saltándose la caché (`force=True`) en su propio
+worker; es una acción de red, así que está activo aunque CCDciel esté
+desconectado. Fuente `neofixer-ephem` con TTL 1.5 h (la tabla se deriva de la
+órbita preliminar, que cambia rápido).
+
 ## English
 
 **Context**: ADR-021 left "telescope control" out of scope (files only) and
@@ -199,3 +218,21 @@ reading the *saved* plan of the project picked in the target combo, Start
 capture, coords epoch label) lives next to the connection and the mount; the
 project's Plan step keeps only a state line with a link. Hardware has a
 single home.
+
+**Review (2026-10-09, NEOfixer ephemeris for NEOCP/PCCP)**: for an unconfirmed
+object (NEOCP/PCCP) Horizons does not know, the position was propagated from
+NEOfixer's preliminary orbit with two-body Kepler — no perturbers and, in the
+goto, geocentric; for a short-arc fast mover that is minutes of motion of
+error. The `position_at` and `sequence_ephemeris` cascades gain, between SBDB
+and the local Kepler, **NEOfixer's own site ephemeris** (`/ephem/`, Find_Orb
+with perturbers), interpolated with the SAME code as a Horizons table
+(`neofixer.ephem_rows` → `_interpolate`); the local Kepler stays as the offline
+last resort. The window **brackets the requested instant** (the goto asks for
+"now"; the track & stack, the visit's night), because NEOfixer rounds the start
+up and a "from now" table would begin in the future. The goto becomes
+**topocentric** (was geocentric) to match Horizons and the stacking. A
+**"Refresh position"** button in the Capture step re-queries orbit and
+ephemeris bypassing the cache (`force=True`) on its own worker; it is a network
+action, so it is enabled even with CCDciel disconnected. Source
+`neofixer-ephem`, TTL 1.5 h (the table derives from the preliminary orbit,
+which changes fast).

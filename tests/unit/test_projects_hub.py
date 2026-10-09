@@ -937,6 +937,74 @@ def test_apply_position_updates_context_and_label(window, panel):
     assert "22:30:00" in window._obs_widgets["ccd_coords"].text()
 
 
+def test_refresh_position_button_forces_a_fresh_fetch(window, panel, monkeypatch):
+    # The refresh button asks for a FRESH orbit + ephemeris (force=True) on
+    # its own worker, folds the answer into the project and names the source.
+    # It is a network action, so it is enabled for a moving target even with
+    # CCDciel disconnected.
+    import nightscribe.gui.main_window as mw
+    ctx = {"id": "A11HPKO", "packed": "A11HPKO", "ra_deg": 30.0,
+           "dec_deg": 20.0, "kind": "neo"}
+    p = _create_and_select(window, "neo", "A11HPKO", ctx)
+    _open_tab(window, p, "plan")
+    w = window._ccd_widgets()
+    assert "ccd_refresh_pos" in w
+    assert w["ccd_refresh_pos"].isEnabled() is True
+
+    seen = {}
+
+    class _FakeWorker:
+        def __init__(self, name, site, fallback_target=None):
+            seen["name"] = name
+            seen["site"] = site
+            seen["fallback"] = fallback_target
+            self._cb = None
+
+        class _sig:
+            def __init__(self, w):
+                self._w = w
+
+            def connect(self, cb):
+                self._w._cb = cb
+
+        @property
+        def finished(self):
+            return self._sig(self)
+
+        def isRunning(self):
+            return False
+
+        def start(self):
+            self._cb({"ra_deg": 31.0, "dec_deg": 21.0,
+                      "rate_arcsec_min": 3.0,
+                      "epoch_iso": "2026-10-09 22:30:00",
+                      "source": "neofixer:ephem", "preliminary": True})
+
+    monkeypatch.setattr(mw, "PositionRefreshWorker", _FakeWorker)
+    window._ccd_refresh_position()
+    from nightscribe.config import config as _cfg
+    assert seen["name"] == "A11HPKO"
+    assert seen["site"] == _cfg.get("mpc_code", "")
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p2 = project.get(dbmod.db, p["id"])
+    assert p2["context"]["ra_deg"] == 31.0
+    assert p2["context"]["coords_source"] == "neofixer:ephem"
+    assert "22:30:00" in window._obs_widgets["ccd_coords"].text()
+
+
+def test_refresh_position_is_refused_for_a_fixed_target(window, panel):
+    # A fixed kind (SN, transit) has no ephemeris to refresh: the button is
+    # disabled and the action says why instead of pretending to work.
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2026rf", ctx)
+    _open_tab(window, p, "plan")
+    w = window._ccd_widgets()
+    assert w["ccd_refresh_pos"].isEnabled() is False
+    window._ccd_refresh_position()      # must not raise
+    assert "nothing" in window.statusBar().currentMessage().lower()
+
+
 # ---------------- A2: close / reopen / advisor ----------------
 
 def _reselect(window, pid):

@@ -148,12 +148,50 @@ def test_sequence_motion_says_why_when_nothing_answers(monkeypatch):
     monkeypatch.setattr(horizons, "ephemeris_ex",
                         lambda *a, **k: ([], "http 503"))
     monkeypatch.setattr(sbdb, "get", lambda name, **k: None)
+    monkeypatch.setattr(neofixer, "ephem", lambda *a, **k: [])
     monkeypatch.setattr(neofixer, "orbit", lambda name, **k: None)
     frames = [track_stack.Frame(path="f.fits", t_mid_jd=2461269.434)]
     motion, source, reason = track_stack.sequence_motion_solution(
         frames, "2026 PY9", site="Z41")
     assert motion is None and source is None
     assert reason == "http 503"
+
+
+def test_sequence_ephemeris_uses_the_neofixer_site_table(monkeypatch):
+    # An unconfirmed object Horizons does not know: NEOfixer's own site
+    # ephemeris (Find_Orb, perturbed) answers before any local two-body
+    # propagation, and it carries the predicted magnitude too. This is the
+    # accurate route for a fresh, short-arc object, where the local orbit can
+    # be arcminutes off.
+    from nightscribe.core import track_stack
+    from nightscribe.core.sources import horizons, sbdb, neofixer
+    monkeypatch.setattr(horizons, "ephemeris_ex",
+                        lambda *a, **k: ([], "http 503"))
+    monkeypatch.setattr(sbdb, "get", lambda name, **k: None)
+    entries = [
+        {"JD": 2461269.42, "RA": 300.0, "Dec": -5.0, "motion_rate": 12.0,
+         "motionPA": 90.0, "mag": 19.5, "delta": 0.05,
+         "ISO_time": "2026-08-16 22:00"},
+        {"JD": 2461269.46, "RA": 300.2, "Dec": -5.0, "motion_rate": 12.0,
+         "motionPA": 90.0, "mag": 19.4, "delta": 0.05,
+         "ISO_time": "2026-08-16 22:02"},
+    ]
+    monkeypatch.setattr(neofixer, "ephem", lambda *a, **k: entries)
+    called = {"orbit": False}
+    monkeypatch.setattr(neofixer, "orbit",
+                        lambda name, **k: called.__setitem__("orbit", True))
+    frames = [track_stack.Frame(path="f.fits", t_mid_jd=2461269.434)]
+    out = track_stack.sequence_ephemeris(frames, "A11HPKO", site="Z41",
+                                         packed="A11HPKO")
+    assert out["source"] == "neofixer:ephem"
+    assert out["motion"] is not None
+    ra, _dec = out["motion"](2461269.44)
+    assert 300.0 < ra < 300.2
+    # the row nearest the sequence's middle instant (22:00 here)
+    assert out["mag"] == pytest.approx(19.5)
+    assert out["band"] == "V"
+    assert out["mag_source"] == "neofixer:ephem"
+    assert called["orbit"] is False
 
 
 # ------------------------------------- the ephemeris' predicted brightness

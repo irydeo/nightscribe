@@ -333,6 +333,32 @@ class MpcResolveWorker(QThread):
         self.finished.emit(info)
 
 
+class PositionRefreshWorker(QThread):
+    # Recomputes a moving target's position from a FRESH source, off the GUI
+    # thread (ADR-030): the observer asks for the latest orbit and ephemeris
+    # when the preliminary one has improved, instead of waiting for the cache
+    # to expire. force=True bypasses the cache and re-stores the answer, so
+    # the next goto reuses the fresh fetch. This is a goto, not a reduction:
+    # the instant asked for is the current one.
+    finished = Signal(dict)         # the position dict, or {} on failure
+
+    def __init__(self, name, site, fallback_target=None):
+        super().__init__()
+        self._name = name
+        self._site = site
+        self._fallback = fallback_target
+
+    def run(self):
+        from ..core import ephemeris
+        try:
+            pos = ephemeris.position_at(self._name, self._site, force=True,
+                                        fallback_target=self._fallback)
+        except Exception as err:      # network never crashes the GUI
+            logger.warning("position refresh failed: %s", err)
+            pos = None
+        self.finished.emit(pos or {})
+
+
 class BlinkWorker(QThread):
     # Prepares the aligned supernova blink pair in the background (ADR-018).
     finished = Signal(dict, dict)   # pair dict, bilingual error messages
@@ -1164,7 +1190,7 @@ class TrackStackWorker(QThread):
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
                  phot_enabled=True, save_star_stack=False, calibrate=False,
-                 manual_ref=None):
+                 manual_ref=None, packed=None):
         super().__init__()
         self._paths = list(paths)
         # ADR-061 applied where the faint object is: calibrate the frames AS
@@ -1179,6 +1205,9 @@ class TrackStackWorker(QThread):
         self._loader = None
         self._pseudo_info = None
         self._name = name
+        # the packed designation the NEOfixer route keys on (the readable
+        # name is not what its API wants); None for a confirmed object
+        self._packed = packed
         self._n_obs = max(1, int(n_obs))
         self._method = method
         self._cfg = cfg
@@ -1852,7 +1881,7 @@ class TrackStackWorker(QThread):
             ephem = track_stack.sequence_ephemeris(
                 frames, self._name, site=self._site,
                 lat=self._cfg_get("lat", None),
-                lon=self._cfg_get("lon", None))
+                lon=self._cfg_get("lon", None), packed=self._packed)
             motion = ephem.get("motion")
             ephem_source = ephem.get("source")
             ephem_reason = ephem.get("reason")

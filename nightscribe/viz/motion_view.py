@@ -52,6 +52,7 @@ def _source_text(source, preliminary, lang):
     #          fire test is only as good as the ephemeris behind the marker,
     #          so the observer must know where the prediction came from.
     labels = {"horizons": "Horizons",
+              "neofixer:ephem": "NEOfixer",
               "kepler:sbdb": "Kepler·SBDB",
               "kepler:neofixer": "Kepler·NEOfixer"}
     text = labels.get(source or "", source or "?")

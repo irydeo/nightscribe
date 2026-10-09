@@ -52,8 +52,9 @@ from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (AiPostWorker, CcdcielWorker,
-                      ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
-                      SunWorker, TonightWorker)
+                      ExploreWorker, MpcResolveWorker, PassWorker,
+                      PositionRefreshWorker, PostWorker, SunWorker,
+                      TonightWorker)
 
 logger = logging.getLogger(__name__)
 
@@ -432,6 +433,7 @@ class MainWindow(QMainWindow):
         self._ccd_filter_names = []
         self._ccd_version = ""
         self._ccd_worker = None
+        self._pos_worker = None        # the position-refresh worker, if any
         self._ccd_point_target = None  # last project a goto/astrometry aimed at
         self._ccd_timer = QTimer(self)
         self._ccd_timer.setInterval(1500)
@@ -5455,8 +5457,15 @@ class MainWindow(QMainWindow):
             "Slew + capture + plate-solve and correct to the true sky "
             "position. Absorbs residual ephemeris error; the reliable "
             "route for NEOCPs and preliminary orbits."))
+        btn_refresh_pos = QPushButton(self.tr("Refresh position"))
+        btn_refresh_pos.setToolTip(self.tr(
+            "Re-query the orbit and the ephemeris now instead of using the "
+            "cache. A preliminary orbit improves as new astrometry arrives, "
+            "so a position computed from an old one can be minutes of "
+            "motion off."))
         row.addWidget(btn_goto)
         row.addWidget(btn_sync)
+        row.addWidget(btn_refresh_pos)
         row.addStretch()
         gv.addLayout(row)
 
@@ -5496,6 +5505,7 @@ class MainWindow(QMainWindow):
             "ccd_slew": lbl_sl,
             "ccd_goto": btn_goto,
             "ccd_sync": btn_sync,
+            "ccd_refresh_pos": btn_refresh_pos,
             "cmb_ccd_filter": cmb_f,
             "ccd_push": btn_push,
             "ccd_start": btn_start,
@@ -5506,6 +5516,7 @@ class MainWindow(QMainWindow):
         btn_r.clicked.connect(self._ccd_refresh)
         btn_goto.clicked.connect(self._ccd_goto)
         btn_sync.clicked.connect(self._ccd_astrometry_goto)
+        btn_refresh_pos.clicked.connect(self._ccd_refresh_position)
         btn_push.clicked.connect(self._ccd_send_plan)
         btn_start.clicked.connect(self._ccd_start_capture)
         self._ccd_apply_state()
@@ -5537,6 +5548,14 @@ class MainWindow(QMainWindow):
             widget = w.get(key)
             if widget is not None:
                 widget.setEnabled(on)
+        # the position refresh is a NETWORK action, not a CCDciel one: it is
+        # enabled by the project (a moving target) even with the mount off,
+        # because the observer may want the freshest orbit before connecting
+        btn_rp = w.get("ccd_refresh_pos")
+        if btn_rp is not None:
+            proj = self._current_project
+            btn_rp.setEnabled(bool(proj)
+                              and proj.get("kind") in ("neo", "comet", "pccp"))
         cb = w.get("cmb_ccd_filter")
         if cb is not None:
             cb.setEnabled(on)
@@ -5904,6 +5923,64 @@ class MainWindow(QMainWindow):
         self._ccd_apply_position(result)
         self.statusBar().showMessage(
             self.tr("Astrometric pointing finished."), 5000)
+
+    def _ccd_refresh_position(self):
+        # Force a fresh orbit + ephemeris for the current moving target,
+        # bypassing the source caches: the preliminary orbit of an
+        # unconfirmed object improves as new astrometry arrives, and a
+        # position computed from an old one can be minutes of motion off.
+        # This is a NETWORK action (no CCDciel), so it works with the mount
+        # off, and it runs on its own worker (ADR-030: never on the GUI
+        # thread).
+        p = self._current_project
+        w = self._ccd_widgets()
+        if not p or not w.get("ccd_refresh_pos"):
+            return
+        if p.get("kind") not in ("neo", "comet", "pccp"):
+            self.statusBar().showMessage(
+                self.tr("This target has fixed coordinates: there is nothing "
+                        "to refresh."), 5000)
+            return
+        if self._pos_worker is not None and self._pos_worker.isRunning():
+            return
+        ctx = dict(p.get("context") or {})
+        obj_id = (ctx.get("id") or ctx.get("packed")
+                  or p.get("object_name") or "")
+        site = config.get("mpc_code", "")
+        btn = w["ccd_refresh_pos"]
+        btn.setEnabled(False)
+        btn.setText(self.tr("Refreshing…"))
+        self._pos_worker = PositionRefreshWorker(obj_id, site, ctx)
+        self._pos_worker.finished.connect(
+            lambda pos: self._ccd_on_refreshed_position(pos, p))
+        self._pos_worker.start()
+
+    def _ccd_on_refreshed_position(self, pos, project_row):
+        # @args: pos - the worker's position dict (or {}), project_row - the
+        #        project the refresh was for (the current one may have moved)
+        w = self._ccd_widgets()
+        btn = w.get("ccd_refresh_pos")
+        if btn is not None:
+            btn.setEnabled(True)
+            btn.setText(self.tr("Refresh position"))
+        cur = self._current_project
+        if (not cur or not project_row
+                or cur.get("id") != project_row.get("id")):
+            return                    # the observer moved on: drop the answer
+        if not pos:
+            self.statusBar().showMessage(
+                self.tr("No fresh position: no source resolved the object."),
+                8000)
+            return
+        self._ccd_point_target = project_row
+        self._ccd_apply_position(pos)
+        src = {"horizons": self.tr("Horizons"),
+               "neofixer:ephem": self.tr("NEOfixer"),
+               "kepler:sbdb": self.tr("SBDB (Kepler)"),
+               "kepler:neofixer": self.tr("NEOfixer (Kepler)")}.get(
+                   pos.get("source"), pos.get("source") or "")
+        self.statusBar().showMessage(
+            self.tr("Position refreshed: %1").replace("%1", src), 6000)
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel
@@ -11183,6 +11260,7 @@ class MainWindow(QMainWindow):
                  if (e.get("kind") or "comp") == "comp"]
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "object_name": p.get("object_name") or "",
+                "packed": ctx.get("packed") or ctx.get("id"),
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}
 

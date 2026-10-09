@@ -119,7 +119,7 @@ def test_position_at_falls_back_to_sbdb_kepler(monkeypatch):
 
 
 def test_position_at_falls_back_to_neofixer(monkeypatch):
-    # Horizons + SBDB empty -> NEOfixer preliminary orbit.
+    # Horizons + SBDB empty, no site table -> NEOfixer preliminary orbit.
     import nightscribe.core.sources.horizons as hor
     import nightscribe.core.sources.sbdb as sb
     import nightscribe.core.sources.neofixer as nf
@@ -127,7 +127,8 @@ def test_position_at_falls_back_to_neofixer(monkeypatch):
            "ma": 5.985, "epoch": 2461277.5}
     monkeypatch.setattr(hor, "ephemeris", lambda *a, **k: [])
     monkeypatch.setattr(sb, "get", lambda name: None)
-    monkeypatch.setattr(nf, "orbit", lambda packed: {"elements": els})
+    monkeypatch.setattr(nf, "ephem", lambda *a, **k: [])
+    monkeypatch.setattr(nf, "orbit", lambda packed, force=False: {"elements": els})
     target = {"packed": "6HJ1A21"}
     out = ephemeris.position_at("6HJ1A21", "Z41", when=_when(),
                                 fallback_target=target)
@@ -136,13 +137,55 @@ def test_position_at_falls_back_to_neofixer(monkeypatch):
     assert out["preliminary"] is True
 
 
+def test_position_at_prefers_the_neofixer_site_ephemeris(monkeypatch):
+    # A fresh NEOCP: NEOfixer's own site table (Find_Orb, perturbed) answers,
+    # so the local two-body propagation is never reached. This is the route
+    # the whole change exists for: the preliminary orbit propagated locally
+    # can be arcminutes off for a fast, short-arc object.
+    import nightscribe.core.sources.horizons as hor
+    import nightscribe.core.sources.sbdb as sb
+    import nightscribe.core.sources.neofixer as nf
+    from nightscribe.core import coords
+    jd = coords.jd_from_datetime(_when())
+    entries = [
+        {"JD": jd - 0.005, "RA": 100.0, "Dec": 0.0, "motion_rate": 12.0},
+        {"JD": jd + 0.005, "RA": 100.2, "Dec": 0.0, "motion_rate": 12.0},
+    ]
+    monkeypatch.setattr(hor, "ephemeris", lambda *a, **k: [])
+    monkeypatch.setattr(sb, "get", lambda name: None)
+    seen = {}
+
+    def fake_ephem(site, packed, start=None, stop=None, force=False):
+        seen.update(site=site, packed=packed, start=start, stop=stop)
+        return entries
+
+    monkeypatch.setattr(nf, "ephem", fake_ephem)
+    called = {"orbit": False}
+    monkeypatch.setattr(nf, "orbit",
+                        lambda packed, force=False: called.__setitem__("orbit", True))
+    out = ephemeris.position_at("A11HPKO", "Z41", when=_when(),
+                                fallback_target={"packed": "A11HPKO"})
+    assert out is not None
+    assert out["source"] == "neofixer:ephem"
+    assert out["preliminary"] is True
+    assert abs(out["ra_deg"] - 100.1) < 1e-6
+    assert called["orbit"] is False
+    # the requested window must BRACKET `when` (NEOfixer rounds the start up,
+    # so a "from now" table would start in the future and _interpolate would
+    # clamp to it): start is before 22:30, stop is after
+    assert seen["start"] < "2026-09-07 22:30"
+    assert seen["stop"] > "2026-09-07 22:30"
+    assert seen["packed"] == "A11HPKO"
+
+
 def test_position_at_returns_none_when_all_fail(monkeypatch):
     import nightscribe.core.sources.horizons as hor
     import nightscribe.core.sources.sbdb as sb
     import nightscribe.core.sources.neofixer as nf
     monkeypatch.setattr(hor, "ephemeris", lambda *a, **k: [])
     monkeypatch.setattr(sb, "get", lambda name: None)
-    monkeypatch.setattr(nf, "orbit", lambda packed: None)
+    monkeypatch.setattr(nf, "ephem", lambda *a, **k: [])
+    monkeypatch.setattr(nf, "orbit", lambda packed, force=False: None)
     assert ephemeris.position_at("nobody", "Z41", when=_when()) is None
 
 

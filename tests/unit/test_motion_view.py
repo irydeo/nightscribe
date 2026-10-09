@@ -288,3 +288,14 @@ def test_motion_gif_and_video(tmp_path, monkeypatch):
 
 def test_motion_gif_empty():
     assert motion_view.make_motion_gif([], [], [], "/dev/null.gif") is None
+
+
+def test_the_neofixer_source_is_named_on_the_frame():
+    # The caption names where the prediction came from. The NEOfixer site
+    # ephemeris is a source of its own (perturbed, Find_Orb) and must not be
+    # shown as an unknown key.
+    text = motion_view._source_text("neofixer:ephem", True, "en")
+    assert "NEOfixer" in text
+    assert "neofixer:ephem" not in text      # a label, not a raw key
+    # and a preliminary NEOfixer table says so
+    assert "(prelim.)" in text

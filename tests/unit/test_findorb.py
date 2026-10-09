@@ -132,3 +132,42 @@ def test_check_says_it_is_unavailable_without_findorb(monkeypatch):
     assert "not configured" in report.note
     # the pointer names the page the field actually lives on now
     assert "Settings > Measurement" in report.note
+
+
+# ------------------------------------------------- the JSON output path
+
+def test_run_points_the_json_output_at_the_workdir(tmp_path, monkeypatch):
+    # On Linux fo drops total.json in ~/.find_orb, not the CWD, and only when
+    # the JSON_*_NAME settings name it. Without this the parser looked for a
+    # file that was never written ("Find_Orb produced no residuals").
+    inp = tmp_path / "obs.txt"
+    inp.write_text("LINE\n")
+    seen = {}
+
+    class _Proc:
+        returncode = 0
+        stdout = "ok"
+        stderr = ""
+
+    def fake_run(args, **kwargs):
+        seen["args"] = args
+        env_path = args[args.index("-D") + 1]
+        seen["env"] = open(env_path).read()
+        return _Proc()
+
+    monkeypatch.setattr(findorb.subprocess, "run", fake_run)
+    ok, workdir, _log = findorb.run(str(inp), "/usr/bin/fo", timeout=5)
+    assert ok
+    assert "JSON_COMBINED_NAME=" in seen["env"]
+    assert "total.json" in seen["env"]
+    assert f"OUTPUT_DIR={workdir}" in seen["env"]
+
+
+def test_as_residual_reads_findorbs_obscode_key():
+    # total.json calls the station "obscode"; the parser must read it, or
+    # every residual would look like it came from an unknown station
+    r = findorb._as_residual({"obscode": "Z41", "dRA": 0.5, "dDec": -0.2,
+                              "JD": 2460000.5})
+    assert r["stn"] == "Z41"
+    assert r["dra"] == 0.5 and r["ddec"] == -0.2
+    assert r["time"] == 2460000.5

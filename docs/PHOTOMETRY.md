@@ -524,11 +524,22 @@ For a transit series that reaches the mmag level, the field recipe:
 
 ### 8.2 Camera profile and linearity limit
 
-In **Settings → Photometric camera profile** you pick a preset (IMX455, IMX571,
-IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) that fills the
-pixel size, the full well, the dark current and a **suggested linearity**. The
-**linearity and the working max exposure are per gain**: measure yours; the
-suggestion is only a starting point.
+In **Settings → Photometric camera profile** you pick a preset from a catalogue
+grouped by family (16-bit Sony CMOS: IMX455/461/411/571/533; 12/14-bit Sony
+CMOS: IMX492/294/183/178/174/290 and the ASI1600's MN34230; Gpixel sCMOS:
+GSENSE400/4040/6060; Sony CCD: ICX694/814; Kodak/ON CCD:
+KAF-8300/16803/09000 and KAI-11002). Each preset fills the pixel size, the
+sensor size, the ADC bit depth, the full well, the read noise (with the gain
+mode it belongs to), the dark current **with the temperature it is quoted at**
+and a **suggested linearity**. The **linearity and the working max exposure are
+per gain**: measure yours; the suggestion is only a starting point.
+
+The suggested linearity is not a fixed number: it comes from the **lesser** of
+the full well (at your gain) and the ADC ceiling (2^bits − 1), times the
+sensor's linearity fraction (0.9 by default; the KAF parts publish it as
+"linear to 90% of Vsat"). So a 12-bit sensor does not suggest a ceiling its ADC
+cannot reach, nor does a 16-bit one at high gain suggest more than the pixel
+holds.
 
 The linearity limit is the ceiling that really rules: the effective ceiling is
 the **minimum** of your linearity, the SATURATE card, the setting and the
@@ -559,6 +570,14 @@ sits above the camera's linearity and **every** comparison star is rejected:
 measured on the author's own 2025 FG18 visit (sky 1552 ADU, 207 frames,
 linearity 53 000) the `sum`'s sky alone is 321 000 ADU and the run reported no
 magnitude at all.
+
+**Adding your camera.** The catalogue is a data file,
+`nightscribe/assets/cameras.toml` (bundled). To add, fix or remove a camera
+without touching the install, edit `<config>/cameras.toml` (next to
+`nightscribe.json`): a `[[camera]]` with a new `key` adds it, with an existing
+`key` corrects its fields, and `hide = ["key", …]` drops a bundled one. The
+file is re-read when Settings opens, so no restart is needed; if it has an
+error, Settings → Camera says so and the bundled catalogue keeps working.
 
 ---
 

@@ -417,3 +417,59 @@ def test_the_astrometry_settings_are_editable_at_last(qapp):
     help_text = dlg.lblH_astro_floor.text()
     assert "recommends 20" in help_text and "ships 10" in help_text
     dlg.deleteLater()
+
+
+def test_selecting_a_preset_loads_its_template(qapp, monkeypatch):
+    # reported confusion (2026-10-09): picking another camera left the old
+    # camera's full well / read noise / dark on screen. Choosing a camera now
+    # loads its datasheet template over whatever was there.
+    from PySide6.QtWidgets import QComboBox, QDialog
+    from nightscribe.gui import main_window as mw
+
+    class _Cfg:
+        def __init__(self):
+            self.d = {"ui_animations": True}
+
+        def get(self, key, default=None):
+            return self.d.get(key, default)
+
+        def set(self, key, value):
+            self.d[key] = value
+
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win.tr = lambda s: s
+    win._enabled_kinds = lambda: ["neo"]
+    win._tonight_all = False
+    win._welcome = None
+    win.statusBar = lambda: type(
+        "S", (), {"showMessage": lambda *a, **k: None})()
+    win._settings_masters_init = lambda dlg: None
+    win.tonight = type("T", (), {"cmb_filter": QComboBox()})()
+    win._apply_kind_filter = lambda: None
+    win._build_suggestion_grid = lambda: None
+
+    dlg = _dlg()
+    monkeypatch.setattr(dlg, "exec", lambda: QDialog.Rejected)
+    monkeypatch.setattr(mw, "_load_ui", lambda name, parent=None: dlg)
+    monkeypatch.setattr(mw, "config", _Cfg())
+    mw.MainWindow.on_open_settings(win)
+
+    def pick(key):
+        dlg.cmb_cam_preset.setCurrentIndex(dlg.cmb_cam_preset.findData(key))
+
+    pick("imx571")
+    assert dlg.spn_pixel_um.value() == 3.76
+    assert dlg.spn_cam_full_well.value() == 50000.0
+    assert dlg.spn_cam_ron.value() == 1.0
+    pick("imx294")
+    # the WHOLE template moves, not only the pixel size
+    assert dlg.spn_pixel_um.value() == 4.63
+    assert dlg.spn_cam_full_well.value() == 63700.0
+    assert dlg.spn_cam_ron.value() == 1.2
+    # a family header reads as a header (bold, uppercased), not as a camera
+    c = dlg.cmb_cam_preset
+    hidx = next(i for i in range(c.count())
+                if not c.model().item(i).isEnabled())
+    assert c.model().item(hidx).font().bold()
+    assert c.itemText(hidx).isupper()
+    dlg.deleteLater()

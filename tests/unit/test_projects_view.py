@@ -283,3 +283,45 @@ def test_the_curve_wins_the_room_at_the_default_width(window):
     assert not row.lbl_spark.isHidden()
     assert not row.lbl_detail.isHidden()
     assert not row.toolTip()
+
+
+def _paints_glyph(widget):
+    # @args: widget - a shown button
+    # @return: True when it paints at least one clearly bright pixel (its
+    #          glyph). A small fixed-width QPushButton with the global
+    #          6px/16px padding has no content rect left and draws an EMPTY
+    #          box (the brightest pixel is its own border, ~70-115): that is
+    #          the reported bug this guards.
+    img = widget.grab().toImage()
+    return any(img.pixelColor(x, y).lightness() > 130
+               for y in range(img.height()) for x in range(img.width()))
+
+
+def test_the_small_glyph_buttons_paint_their_glyph(window):
+    # Reported: the drawer's ✕ (close the project list) and the masthead's
+    # ☆ (favorite) drew as empty boxes. Both are small fixed-width
+    # QPushButtons, and the global padding clips the glyph unless they carry
+    # compact="true" (the same fix the row × and the step ✕ already had).
+    from PySide6.QtWidgets import QApplication, QPushButton
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL, VIEW_TONIGHT
+    p = project.list_projects(coredb.db)[0]
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    for _ in range(4):
+        QApplication.processEvents()
+    assert _paints_glyph(window.projects.btn_favorite), \
+        "the favorite ☆ is clipped to an empty box"
+    # The drawer is the project list overlay; it opens from a view OTHER
+    # than Projects (VIEW_HOME is Projects here), so switch to Tonight first.
+    window.navigate(VIEW_TONIGHT)
+    for _ in range(4):
+        QApplication.processEvents()
+    window._drawer_open(True)
+    for _ in range(4):
+        QApplication.processEvents()
+    assert window._drawer.isVisible(), "the drawer did not open"
+    close = next(b for b in window._drawer.findChildren(QPushButton)
+                 if b.text() == "✕")
+    assert _paints_glyph(close), "the drawer close ✕ is clipped to an empty box"
+    window._drawer_open(False)

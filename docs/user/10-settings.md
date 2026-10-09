@@ -30,11 +30,14 @@ What you observe with.
   honest with the limiting magnitude; the `inject` command (chapter 09)
   gives you the measured number.
 - **Camera**: led by the **preset**, which fills the pixel size and a
-  starting profile in one go. The pixel size and the focal length are
-  printed back as the **plate scale** (arcseconds per pixel), which is what
-  the NEO exposure advice, the photometry and the MPC report actually use.
-  The measured profile (full well, system gain, read noise, dark current,
-  linearity, working max exposure) is one click away.
+  starting profile in one go. Choosing a preset loads **that camera's
+  datasheet** over the profile (full well, read noise, dark current,
+  linearity); the system gain is never touched, because it is yours. The
+  pixel size and the focal length are printed back as the **plate scale**
+  (arcseconds per pixel), which is what the NEO exposure advice, the
+  photometry and the MPC report actually use. The measured profile (full
+  well, system gain, read noise, dark current, linearity, working max
+  exposure) is one click away.
 
 > **Why measure the limiting magnitude instead of trusting the datasheet?**
 > Because the real limit depends on your sky, your camera, your exposures
@@ -47,6 +50,13 @@ What you observe with.
 > starting point; the true value is measured on your own frames (the app
 > does it, chapter 06), and 0 means "unknown": the app says so instead of
 > making something up.
+
+> **Your own camera.** The preset catalogue is a data file. If your camera is
+> not there, add it (or fix one) in `<config>/cameras.toml`, next to
+> `nightscribe.json`: a `[[camera]]` with a new `key` adds it, the same `key`
+> corrects a bundled one, and `hide = ["key"]` removes one. Settings re-reads
+> the file when it opens, so no restart is needed; if there is a mistake,
+> Settings → Camera tells you and keeps the bundled catalogue.
 
 ## Observing
 

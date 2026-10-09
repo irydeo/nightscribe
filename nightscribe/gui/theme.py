@@ -318,6 +318,23 @@ def composite(color, alpha="18", over=C_BASE):
         int(round(x + a * (y - x))) for x, y in zip(b, c))
 
 
+def style_combo_header(item):
+    # Paint one combo row as a FAMILY HEADER: bold, in the accent colour,
+    # uppercased and on a faint accent band, and not selectable. Without it the
+    # family rows read exactly like the cameras and the grouped list looks flat
+    # again (measured 2026-10-09: the "disabled" grey alone was almost
+    # invisible next to the camera rows).
+    # @args: item - the QStandardItem of that combo row
+    # @return: None
+    item.setEnabled(False)                          # a header is not pickable
+    item.setForeground(_c(C_ACCENT))
+    item.setBackground(_c(composite(C_ACCENT, "1e", C_PANEL)))
+    font = item.font()
+    font.setBold(True)
+    item.setFont(font)
+    item.setText(item.text().upper())
+
+
 def row_skin(name, bg, edge, radius=6, spine=None):
     # @args: name - the row's objectName (anchors the QFrame#… selector);
     #        bg/edge - base fill and border ("transparent" for none);
@@ -417,6 +434,80 @@ def kind_card_style(accent, selected=False):
             f" border-left: 3px solid {accent}; }}")
 
 
+def _arrow_glyphs():
+    # @return: the QStyle.StandardPixmap values whose glyph Fusion paints in
+    #          a FIXED dark colour, whatever the palette says: the generic
+    #          arrows and the file dialog's navigation ones.
+    #
+    # Why this exists: the file dialog's back / forward / up buttons looked
+    # black on black. Measured, the cause is not our QSS but Qt itself: with
+    # the dark palette AND with the light one, standardIcon(SP_FileDialogBack)
+    # returns the very same arrow (mean lightness 12.9), so Fusion ignores the
+    # palette for these glyphs. The mapping the dialog uses is
+    # backButton=SP_FileDialogBack, forwardButton=SP_ArrowRight,
+    # toParentButton=SP_FileDialogToParent; the folder and list/detail icons
+    # (SP_FileDialogNewFolder, SP_FileDialogListView/DetailedView) are already
+    # light and stay untouched.
+    #
+    # Built here, not at module level, on purpose: theme.py must stay
+    # importable with no Qt around (the website generator reads only the
+    # colour constants), so every Qt import lives inside a function.
+    from PySide6.QtWidgets import QStyle
+    return frozenset((
+        QStyle.SP_ArrowBack, QStyle.SP_ArrowForward, QStyle.SP_ArrowUp,
+        QStyle.SP_ArrowDown, QStyle.SP_ArrowLeft, QStyle.SP_ArrowRight,
+        QStyle.SP_FileDialogBack, QStyle.SP_FileDialogToParent,
+    ))
+
+
+def _recolor_icon(icon, color):
+    # @args: icon - a QIcon holding a monochrome glyph; color - the #rrggbb
+    #        to repaint it with
+    # @return: the same glyph in that colour, same shape.
+    #
+    # CompositionMode_SourceIn keeps the glyph's alpha (its silhouette) and
+    # swaps only the RGB, so the antialiasing survives the repaint. One
+    # pixmap per size the icon actually offers: repainting the 16 px one and
+    # letting Qt upscale it would smear the arrow at 32 px.
+    from PySide6.QtCore import QSize
+    from PySide6.QtGui import QColor, QIcon, QPainter
+    out = QIcon()
+    for size in (icon.availableSizes() or [QSize(16, 16)]):
+        pm = icon.pixmap(size)
+        painter = QPainter(pm)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.fillRect(pm.rect(), QColor(color))
+        painter.end()
+        out.addPixmap(pm)
+    return out
+
+
+def _dark_glyph_style():
+    # @return: Fusion wrapped in a QProxyStyle that repaints the standard
+    #          navigation glyphs (see _arrow_glyphs) in C_TEXT, so they read
+    #          on the dark chrome. Everything else is delegated to Fusion
+    #          unchanged, so this is a one-line behaviour difference.
+    #
+    # The class is built inside the factory, not at module level, because
+    # theme.py imports Qt only inside functions (see _arrow_glyphs).
+    from PySide6.QtWidgets import QProxyStyle
+    arrows = _arrow_glyphs()
+
+    class _DarkGlyphStyle(QProxyStyle):
+        # @args: standard_icon - a QStyle.StandardPixmap; option / widget -
+        #        the usual Qt context (unused: we repaint by colour, not
+        #        geometry)
+        # @return: the style's icon, recoloured when it is one of the glyphs
+        #          Qt paints dark on purpose, untouched otherwise
+        def standardIcon(self, standard_icon, option=None, widget=None):
+            icon = super().standardIcon(standard_icon, option, widget)
+            if standard_icon in arrows:
+                return _recolor_icon(icon, C_TEXT)
+            return icon
+
+    return _DarkGlyphStyle("Fusion")
+
+
 def _is_themed(app):
     # @args: app - the QApplication
     # @return: True when it already carries this theme. The marker lives on
@@ -431,7 +522,8 @@ def _is_themed(app):
 
 def apply_theme(app):
     # Applies the NightScribe dark theme to a live QApplication:
-    # Fusion base style, dark palette, and the global stylesheet.
+    # Fusion base style (wrapped so its dark navigation glyphs get recoloured,
+    # see _dark_glyph_style), dark palette, and the global stylesheet.
     # Call once, right after the QApplication is created (app.py).
     #
     # It is IDEMPOTENT on purpose. Applying an app stylesheet re-polishes
@@ -447,7 +539,7 @@ def apply_theme(app):
     # @return: None
     if _is_themed(app):
         return
-    app.setStyle("Fusion")
+    app.setStyle(_dark_glyph_style())
     app.setPalette(_palette())
     app.setStyleSheet(_QSS)
     app._nightscribe_themed = True

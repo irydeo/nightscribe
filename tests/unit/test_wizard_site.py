@@ -169,7 +169,9 @@ def test_setup_equipment_lists_the_presets(qapp, monkeypatch):
     monkeypatch.setitem(config._data, "pixel_um", 3.76)
     h = _EquipHusk()
     wizard._setup_equipment(h)
-    assert h.cmb_cam_preset.count() == len(cameras.PRESETS) + 1
+    # "None" + one row per preset + one header per family
+    assert h.cmb_cam_preset.count() == \
+        1 + len(cameras.PRESETS) + len(cameras.FAMILY_ORDER)
     assert h.cmb_cam_preset.itemData(0) == ""
     h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
     assert h.spn_pixel_um.value() == 5.4
@@ -199,7 +201,7 @@ def test_apply_equipment_writes_and_fills_a_new_preset(qapp, monkeypatch):
     assert config.get("limit_mag") == 19.6
     assert config.get("camera_type") == "CMOS"
     assert config.get("cam_preset") == "kaf8300"
-    assert config.get("ccd_read_noise") == 8.0        # the preset's datasheet
+    assert config.get("ccd_read_noise") == 9.0        # the preset's datasheet
     assert config.get("cam_full_well_e") == 25500.0
     # a second visit with the SAME preset leaves the tuned profile alone
     config.set("ccd_read_noise", 7.5)                 # measured by the observer

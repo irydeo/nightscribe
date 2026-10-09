@@ -31,7 +31,10 @@ Con qué observas.
   con la magnitud límite; el comando `inject` (capítulo 09) te da el número
   medido.
 - **Cámara**: manda el **preset**, que rellena el tamaño de píxel y un
-  perfil de partida de una vez. El tamaño de píxel y la focal se devuelven
+  perfil de partida de una vez. Elegir un preset carga **los datos de esa
+  cámara** (full well, ruido de lectura, corriente de oscuridad, linealidad)
+  por encima del perfil; la ganancia del sistema nunca se toca, porque es
+  tuya. El tamaño de píxel y la focal se devuelven
   como la **escala de placa** (arcosegundos por píxel), que es lo que usan
   de verdad el consejo de exposición de NEOs, la fotometría y el informe
   MPC. El perfil medido (full well, ganancia del sistema, ruido de lectura,
@@ -49,6 +52,13 @@ Con qué observas.
 > ficha como punto de partida; el valor verdadero se mide en tus propias
 > tomas (la app lo hace, capítulo 06), y 0 significa "desconocido": la app
 > lo dice en vez de inventarse algo.
+
+> **Tu propia cámara.** El catálogo de presets es un fichero de datos. Si tu
+> cámara no está, añádela (o corrige una) en `<config>/cameras.toml`, junto a
+> `nightscribe.json`: una `[[camera]]` con un `key` nuevo la añade, el mismo
+> `key` corrige una empaquetada, y `hide = ["key"]` quita una. Ajustes relee
+> el fichero al abrirse, así que no hace falta reiniciar; si hay un error,
+> Ajustes → Cámara te lo dice y sigue con el catálogo empaquetado.
 
 ## Observación
 

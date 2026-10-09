@@ -231,7 +231,7 @@
              <item>
               <layout class="QHBoxLayout" name="row_camprofile2">
                <item><widget class="QLabel" name="lbl_camdark"><property name="text"><string>Dark (e-/pix/s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QDoubleSpinBox" name="spn_cam_dark"><property name="maximum"><double>1000.000000000000000</double></property><property name="decimals"><number>4</number></property></widget></item>
+               <item><widget class="QDoubleSpinBox" name="spn_cam_dark"><property name="maximum"><double>1000.000000000000000</double></property><property name="decimals"><number>6</number></property></widget></item>
                <item><widget class="QLabel" name="lbl_camax"><property name="text"><string>Max exposure (s):</string></property></widget></item>
                <item><widget class="QDoubleSpinBox" name="spn_cam_max_exp"><property name="toolTip"><string>Working maximum exposure (per gain). 0 = no cap. For an sCMOS (GSENSE400) it is a few seconds and grouping adds the rest</string></property><property name="maximum"><double>36000.000000000000000</double></property><property name="decimals"><number>0</number></property></widget></item>
               </layout>

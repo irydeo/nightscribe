@@ -1274,6 +1274,10 @@ class MainWindow(QMainWindow):
         close = QPushButton("✕")
         close.setFlat(True)
         close.setFixedWidth(28)
+        # compact="true": the global 6px/16px padding leaves a 28 px button
+        # no content rect, and the ✕ drew as an empty box (same fix the
+        # row-removal × and the step ✕ already carry)
+        close.setProperty("compact", True)
         close.clicked.connect(lambda: self._drawer_open(False))
         head.addWidget(close)
         lay.addLayout(head)
@@ -1813,18 +1817,21 @@ class MainWindow(QMainWindow):
             dlg.edt_exotic_install.setText(path)
 
     def _cam_preset_selected(self, dlg):
-        # Fill the datasheet template from the chosen camera preset,
-        # without stomping a value the user set by hand. The RULE lives in
+        # Load the datasheet TEMPLATE of the chosen camera preset: choosing a
+        # camera IS asking to see that camera's figures, so the datasheet
+        # fields are written over whatever was there. The RULE lives in
         # core/cameras (shared with the Welcome step); here we only map its
-        # config keys to the spins.
+        # config keys to the spins. The gain is passed along so the suggested
+        # linearity comes from the real full well at the observer's gain; it is
+        # never written.
         from ..core import cameras
-        current = {key: getattr(dlg, spin).value()
-                   for key, spin in _CAM_PRESET_SPINS.items()}
         p = cameras.preset(dlg.cmb_cam_preset.currentData())
-        for key, value in cameras.profile_from_preset(p, current).items():
+        gain = dlg.spn_cam_gain.value() or None
+        for key, value in cameras.profile_from_preset(p, gain).items():
             spin = _CAM_PRESET_SPINS.get(key)
             if spin is not None:
-                getattr(dlg, spin).setValue(value)
+                # an unknown field comes back None: show 0 ("unknown")
+                getattr(dlg, spin).setValue(value if value is not None else 0)
         self._cam_ref_update(dlg)
 
     def _cam_ref_update(self, dlg):
@@ -1837,6 +1844,12 @@ class MainWindow(QMainWindow):
         pixel = dlg.spn_pixel_um.value()
         focal = dlg.spn_focal_mm.value()
         bits = []
+        if cameras.USER_ERROR:
+            # the user's cameras.toml could not be read: say it HERE, or the
+            # camera they added would simply not be in the list and nothing
+            # would explain why
+            bits.append(self.tr("My cameras file could not be read: {0}")
+                        .replace("{0}", cameras.USER_ERROR))
         if pixel > 0 and focal > 0:
             # 206265 is the arcseconds in a radian: the small-angle scale
             # of a pixel of this size behind this focal length.
@@ -1845,6 +1858,18 @@ class MainWindow(QMainWindow):
         p = cameras.preset(dlg.cmb_cam_preset.currentData())
         if p is not None:
             bits.append(self.tr("Sensor: {0}").replace("{0}", p["sensor"]))
+            if p.get("sensor_w_mm") and p.get("sensor_h_mm"):
+                bits.append(self.tr("{0:g} × {1:g} mm sensor").format(
+                    p["sensor_w_mm"], p["sensor_h_mm"]))
+                if focal > 0:
+                    # the sky the sensor covers behind this focal length
+                    fov_w = p["sensor_w_mm"] / focal * 57.29578
+                    fov_h = p["sensor_h_mm"] / focal * 57.29578
+                    bits.append(self.tr("FOV {0:.2f}° × {1:.2f}°").format(
+                        fov_w, fov_h))
+            if p.get("bit_depth"):
+                bits.append(self.tr("{0}-bit ADC").replace(
+                    "{0}", str(p["bit_depth"])))
             if p.get("dark_current_e_s") is not None \
                     and p.get("dark_temp_c") is not None:
                 bits.append(self.tr("dark {0} e-/pix/s @ {1} °C")
@@ -1853,10 +1878,14 @@ class MainWindow(QMainWindow):
             bits.append(self.tr("regime: {0}").replace(
                 "{0}", self.tr("short (group frames)")
                 if p["regime"] == "short" else self.tr("normal")))
-            fw = cameras.full_well_adu(p, dlg.spn_cam_gain.value() or None)
+            gain = dlg.spn_cam_gain.value() or None
+            fw = cameras.full_well_adu(p, gain)
             if fw:
                 bits.append(self.tr("full well ≈ {0:.0f} ADU at your gain")
                             .format(fw))
+            lin = cameras.suggested_linearity_adu(p, gain)
+            if lin:
+                bits.append(self.tr("linearity ≈ {0:.0f} ADU").format(lin))
             if p.get("linearity_note"):
                 bits.append(p["linearity_note"])
         dlg.lbl_cam_ref.setText(" · ".join(bits))
@@ -1873,6 +1902,10 @@ class MainWindow(QMainWindow):
             bits = [self.tr("gain {0:.3g} e-/ADU").format(gain)]
             if ron:
                 bits.append(self.tr("read noise {0:.3g} e-").format(ron))
+            from ..core import cameras
+            p = cameras.preset(dlg.cmb_cam_preset.currentData())
+            if p is not None and p.get("read_noise_note"):
+                bits.append(p["read_noise_note"])
             bits.append(self.tr(
                 "the error bar is the CCD equation"))
             dlg.lbl_cam_gain_note.setText(" · ".join(bits))
@@ -2055,6 +2088,11 @@ class MainWindow(QMainWindow):
         from ..core import cameras
         from ..core import vigils
 
+        # the camera catalogue is data (assets/cameras.toml + the user file):
+        # re-read it here so a camera added or corrected in the user's
+        # cameras.toml shows up without restarting the app
+        cameras.reload()
+
         dlg = _load_ui("settings_dialog")
         settings_view.style_help_labels(dlg)
         settings_view.build_rail(dlg, settings_spec.CATEGORIES, self.tr)
@@ -2074,8 +2112,14 @@ class MainWindow(QMainWindow):
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
         dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
         dlg.cmb_cam_preset.addItem(self.tr("None"), "")
-        for preset in cameras.PRESETS:
-            dlg.cmb_cam_preset.addItem(cameras.label(preset), preset["key"])
+        for text, key, is_header in cameras.combo_entries():
+            dlg.cmb_cam_preset.addItem(text, key)
+            if is_header:
+                # a family header: bold, accent and not selectable, so the
+                # list reads as a few groups and not as twenty-one rows
+                theme.style_combo_header(
+                    dlg.cmb_cam_preset.model().item(
+                        dlg.cmb_cam_preset.count() - 1))
         dlg.cmb_marker_style.addItem(self.tr("Ring with ticks (classic)"),
                                      "ring")
         dlg.cmb_marker_style.addItem(self.tr("Full-frame cross with box"),
@@ -2094,7 +2138,15 @@ class MainWindow(QMainWindow):
         idx = dlg.cmb_solver.findData(config.get("solver", "auto"))
         dlg.cmb_solver.setCurrentIndex(idx if idx >= 0 else 0)
         idx = dlg.cmb_cam_preset.findData(config.get("cam_preset", ""))
+        # restore the saved preset WITHOUT firing the template load: the
+        # profile on screen is the observer's (measured) one, not the
+        # datasheet, and opening Settings must not throw it away
+        dlg.cmb_cam_preset.blockSignals(True)
         dlg.cmb_cam_preset.setCurrentIndex(idx if idx >= 0 else 0)
+        dlg.cmb_cam_preset.blockSignals(False)
+        # paint the reference (and the user-file error, if any) on open: the
+        # index above does not fire the fill any more
+        self._cam_ref_update(dlg)
         idx = dlg.cmb_marker_style.findData(config.get("marker_style", "ring"))
         dlg.cmb_marker_style.setCurrentIndex(idx if idx >= 0 else 0)
         idx = dlg.cmb_mark_color.findData(config.get("marker_color", "kind"))
@@ -2172,6 +2224,11 @@ class MainWindow(QMainWindow):
         config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
         _cp = cameras.preset(dlg.cmb_cam_preset.currentData())
         config.set("cam_regime", _cp["regime"] if _cp else "normal")
+        # the temperature the dark current was quoted at travels with it, or
+        # the number in the profile loses its meaning (the preset fill writes
+        # it too, for the Welcome step; this keeps Settings in step)
+        config.set("cam_dark_temp_c",
+                   _cp.get("dark_temp_c") if _cp else None)
         config.set("marker_style",
                    dlg.cmb_marker_style.currentData() or "ring")
         config.set("marker_color",

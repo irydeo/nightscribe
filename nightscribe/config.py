@@ -235,6 +235,13 @@ DEFAULTS = {
     "ai_api_key": "",         # empty is fine for a local server
     "ai_model": "",           # e.g. "openai/gpt-oss-20b:free" | "qwen2.5:7b"
     "ai_temperature": 0.7,
+    # Long reports (2026-10-09): when ON, the AI writes a full article with
+    # every project fact (deep facts, the analysis, the assets) plus the
+    # short post and the tweet, instead of just the short post. OFF by
+    # default: a long report spends many more tokens, and a paid endpoint
+    # charges for them. A local server costs nothing, which is the reason
+    # the setting is worth turning on there.
+    "ai_long_report": False,
 }
 
 

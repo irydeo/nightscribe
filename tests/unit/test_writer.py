@@ -99,3 +99,68 @@ def test_write_post_raises_on_garbage(monkeypatch):
     monkeypatch.setattr(llm, "chat", lambda *a, **k: "I cannot help with that")
     with pytest.raises(llm.LlmError):
         writer.write_post(_brief(), cfg=_cfg())
+
+
+# ---------------- the long report (2026-10-09) ----------------
+
+def test_report_prompt_asks_for_the_article_and_the_images():
+    brief = _brief()
+    brief["gallery"] = [{"key": "orbit", "name": "SN2026abc_orbit.png",
+                         "caption": {"es": "Órbita", "en": "Orbit"}}]
+    msgs = writer.build_messages_report(brief)
+    system = msgs[0]["content"]
+    # the article contract and the exact JSON keys live in the system message
+    assert "LONG" in system or "full article" in system
+    assert "report_es" in system and "report_en" in system
+    # the image list (with the exact file name) reaches the model
+    user = msgs[1]["content"]
+    assert "SN2026abc_orbit.png" in user
+    assert "IMAGES WE MADE" in user
+
+
+def test_parse_report_requires_the_article_keys():
+    # the report is only the article now (the short post is a second call):
+    # a JSON without report_es/report_en is not a report
+    ok = writer.parse_report('{"report_es":"a","report_en":"b"}')
+    assert ok == {"report_es": "a", "report_en": "b"}
+    assert writer.parse_report('{"es":"c","en":"d","tweet":"e"}') is None
+
+
+def test_write_report_makes_two_calls(monkeypatch):
+    # one call for the article, one for the short post + tweet: the article
+    # is not shortened to make room for the short pieces
+    calls = {"n": 0}
+
+    def fake_chat(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return '{"report_es":"A","report_en":"B"}'
+        return '{"es":"c","en":"d","tweet":"e"}'
+
+    monkeypatch.setattr(llm, "chat", fake_chat)
+    out = writer.write_report(_brief(), cfg=_cfg())
+    assert calls["n"] == 2
+    assert out == {"report_es": "A", "report_en": "B",
+                   "es": "c", "en": "d", "tweet": "e"}
+
+
+def test_write_report_survives_a_short_post_failure(monkeypatch):
+    # the article is the point: if the second call fails, the report is kept
+    # and the worker fills the short pieces with the template
+    calls = {"n": 0}
+
+    def fake_chat(*a, **k):
+        calls["n"] += 1
+        return '{"report_es":"A","report_en":"B"}' if calls["n"] == 1 \
+            else "not json"
+
+    monkeypatch.setattr(llm, "chat", fake_chat)
+    out = writer.write_report(_brief(), cfg=_cfg())
+    assert out["report_es"] == "A"
+    assert "es" not in out
+
+
+def test_write_report_raises_on_garbage(monkeypatch):
+    monkeypatch.setattr(llm, "chat", lambda *a, **k: "no json")
+    with pytest.raises(llm.LlmError):
+        writer.write_report(_brief(), cfg=_cfg())

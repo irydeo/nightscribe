@@ -115,6 +115,10 @@ The outside world: a capture server and the optional keys.
   exact names if it is local); **Test connection** checks that the three agree.
   It is off by default: with it off, the assistant and the AI buttons are
   disabled, and nothing leaves your machine until you use it.
+- **Long reports**: with this on, the AI writes a full article (Spanish and
+  English) with every project fact and the generated images, not just the
+  short post. It spends many more tokens, so a paid endpoint charges more for
+  it; a local server costs nothing. Off by default.
 
 ## Interface
 

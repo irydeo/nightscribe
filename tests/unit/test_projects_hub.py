@@ -1963,8 +1963,10 @@ def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
         f.write_text("x")
     monkeypatch.setattr(post_mod, "save_outputs",
                         lambda *a, **k: written)
-    monkeypatch.setattr(window, "_render_object_charts",
-                        lambda *a, **k: {})
+    # the charts are collected through core/post now (one path for the
+    # template and the AI report): stub it so nothing is rendered here
+    monkeypatch.setattr(post_mod, "collect_assets",
+                        lambda *a, **k: ({}, {}))
     window._post_done(post_w, "SN 2099zz",
                       {"name": "SN 2099zz"}, {"es": "a", "en": "b"})
     files = [f for f in proj_mod.list_files(mw.db, p["id"])

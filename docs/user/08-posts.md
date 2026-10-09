@@ -44,6 +44,15 @@ The AI only phrases: it does not measure, it does not classify and it invents
 no figure. Everything it says comes from the dossier, and what is not there it
 does not mention. The draft is still yours: review it before publishing.
 
+If you turn on **long reports** in Settings, the same button also writes a
+**full article** in Spanish and English: it adds the object's deepest
+parameters, the analysis (a saved period, a transit, the astrometry runs, the
+photometry recipe), the campaign the observation belongs to, and it cites the
+charts and videos it generated **inside the story**, with the whole gallery at
+the end. The article appears in its own **Long report** card and is saved next
+to the post. A local model writes it for free; a paid service charges per
+token, which is why the setting is off by default.
+
 > **Why off by default?** Because the app works the same without it: the usual
 > template stays and needs no network. With the AI off, the AI buttons are
 > disabled and the template writes the post. With a local server (Ollama, for

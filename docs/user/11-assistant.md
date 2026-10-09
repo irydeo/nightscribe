@@ -1,16 +1,17 @@
-# 11. The assistant
+# 11. The assistant (experimental)
 
 NightScribe can carry an assistant to ask about the object you are working on,
 about the application itself, or about what you have in front of you in the
 editor. It does not measure, it does not classify and it does not decide: it
-only reads what the app already knows and puts it into words.
+only reads what the app already knows and puts it into words. It is an
+**experimental** feature: it depends on a language model you connect.
 
 ## Where it is
 
-Under **Help → Assistant…**. If you have a project open, the assistant can talk
-about it; if not, it talks about the app. In the FITS editor there is also a
-**?** button in the bar: it opens the assistant focused on what you have
-loaded.
+Under **Help → Assistant (experimental)**. If you have a project open, the
+assistant can talk about it; if not, it talks about the app. In the FITS editor
+there is also a **?** button in the bar: it opens the assistant focused on what
+you have loaded.
 
 ## The three scopes
 
@@ -37,6 +38,7 @@ assistant does not fill the gaps.
 
 ## What you need
 
-A language model configured in **Settings → Integrations** (chapter 10).
-Without one, the assistant says so and sends nothing. The conversation lives
-only in its window: closing it forgets it. Nothing is stored in your database.
+A language model configured in **Settings → Integrations** (chapter 10). If
+the AI is off or there is no model, the menu and the **?** button are disabled
+(with the reason on hover) and no window opens. The conversation lives only in
+its window: closing it forgets it. Nothing is stored in your database.

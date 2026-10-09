@@ -27,11 +27,13 @@ un par de minutos con un modelo que «piensa».
 > foto y el remate final son los de tu observatorio. Edita sin miedo: el
 > borrador se regenera cuando quieras.
 
-## Escribir con IA (opcional)
+## Escribir con IA (opcional, experimental)
 
 Si configuras un modelo de lenguaje en **Ajustes → Integraciones** (un servicio
 compatible con OpenAI, en la nube o en tu propia máquina), el paso Publicación
-gana dos botones:
+gana dos botones. Es una parte **experimental** de la app: depende de un modelo
+externo que tú conectas y puede cambiar; la plantilla de siempre es la
+respuesta estable:
 
 - **Redactar con IA…**: redacta el borrador a partir de **todo** lo que la app
   sabe del proyecto: el objeto con sus parámetros explicados, la noche
@@ -44,9 +46,10 @@ dice sale del dossier, y lo que no está no lo menciona. El borrador sigue siend
 tuyo: revísalo antes de publicar.
 
 > **¿Por qué apagada por defecto?** Porque la app funciona igual sin ella: la
-> plantilla de siempre sigue ahí y no necesita red. Con un servidor local (por
-> ejemplo Ollama) nada sale de tu equipo; con uno en la nube, el coste y la
-> privacidad son los de ese servicio.
+> plantilla de siempre sigue ahí y no necesita red. Con la IA apagada, los
+> botones de IA quedan deshabilitados y el post lo escribe la plantilla. Con un
+> servidor local (por ejemplo Ollama) nada sale de tu equipo; con uno en la
+> nube, el coste y la privacidad son los de ese servicio.
 
 ## Los gráficos
 

@@ -1,15 +1,17 @@
-# 11. El asistente
+# 11. El asistente (experimental)
 
 NightScribe puede llevar un asistente para preguntar por el objeto en el que
 trabajas, por la propia aplicación o por lo que tienes delante en el editor.
 No mide, no clasifica y no decide: solo lee lo que la app ya sabe y lo pone en
-palabras.
+palabras. Es una función **experimental**: depende de un modelo de lenguaje que
+tú conectas.
 
 ## Dónde está
 
-En **Ayuda → Asistente…**. Si tienes un proyecto abierto, el asistente puede
-hablar de él; si no, habla de la app. En el editor de FITS hay además un botón
-**?** en la barra: abre el asistente centrado en lo que tienes cargado.
+En **Ayuda → Asistente (experimental)**. Si tienes un proyecto abierto, el
+asistente puede hablar de él; si no, habla de la app. En el editor de FITS hay
+además un botón **?** en la barra: abre el asistente centrado en lo que tienes
+cargado.
 
 ## Los tres ámbitos
 
@@ -36,5 +38,7 @@ no rellena los huecos.
 ## Lo que necesitas
 
 Un modelo de lenguaje configurado en **Ajustes → Integraciones** (capítulo 10).
-Sin él, el asistente te lo dice y no envía nada. La conversación vive solo en
-su ventana: al cerrarla se olvida. Nada se guarda en tu base de datos.
+Si la IA está apagada o no hay modelo, el menú y el botón **?** quedan
+deshabilitados (con el motivo al pasar el ratón) y no se abre ninguna
+ventana. La conversación vive solo en su ventana: al cerrarla se olvida. Nada
+se guarda en tu base de datos.

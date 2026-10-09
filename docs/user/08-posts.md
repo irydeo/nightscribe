@@ -26,11 +26,13 @@ minutes with a model that "thinks".
 > picture and the final touch belong to your observatory. Edit freely: the
 > draft regenerates whenever you want.
 
-## Writing with AI (optional)
+## Writing with AI (optional, experimental)
 
 If you configure a language model in **Settings → Integrations** (an
 OpenAI-compatible service, in the cloud or on your own machine), the Publishing
-step gains two buttons:
+step gains two buttons. It is an **experimental** part of the app: it depends on
+an external model you connect and may change; the usual template is the stable
+answer:
 
 - **Write with AI…**: drafts the post from **everything** the app knows about
   the project: the object with its explained parameters, the planned night,
@@ -43,7 +45,8 @@ no figure. Everything it says comes from the dossier, and what is not there it
 does not mention. The draft is still yours: review it before publishing.
 
 > **Why off by default?** Because the app works the same without it: the usual
-> template stays and needs no network. With a local server (Ollama, for
+> template stays and needs no network. With the AI off, the AI buttons are
+> disabled and the template writes the post. With a local server (Ollama, for
 > instance) nothing leaves your machine; with a cloud one, the cost and the
 > privacy are that service's.
 

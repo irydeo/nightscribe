@@ -111,13 +111,14 @@ El mundo exterior: un servidor de captura y las claves opcionales.
   resolución a ciegas de placas sin WCS, las imágenes de descubrimiento de
   transitorios y la fotometría de la comunidad que alimenta las vigilias de
   estrellas brillantes (capítulo 04).
-- **Modelo de lenguaje (IA, opcional)**: para redactar el post y el asistente
-  (capítulos 08 y 11). El endpoint es compatible con OpenAI: sirve un
-  servicio de la nube (OpenRouter, Groq, Google AI Studio) o uno local
+- **Modelo de lenguaje (IA, opcional, experimental)**: para redactar el post y
+  el asistente (capítulos 08 y 11). El endpoint es compatible con OpenAI: sirve
+  un servicio de la nube (OpenRouter, Groq, Google AI Studio) o uno local
   (Ollama, LM Studio). Eliges el servicio conocido, pegas la clave y escribes
   el modelo, o pulsas **Listar modelos** y eliges el que el endpoint te dé
   (con sus nombres exactos si es local); **Probar conexión** comprueba que los
-  tres encajan. Está apagado por defecto y nada sale de tu equipo hasta que lo
+  tres encajan. Está apagado por defecto: con él apagado, el asistente y los
+  botones de IA quedan deshabilitados, y nada sale de tu equipo hasta que lo
   usas.
 
 ## Interfaz

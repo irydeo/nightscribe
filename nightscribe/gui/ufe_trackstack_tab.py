@@ -3564,6 +3564,19 @@ class UfeTrackStackTab(QWidget):
                 "published without looking at it")
         return str(flag)
 
+    def _findorb_ready_now(self):
+        # @return: True when Find_Orb is configured RIGHT NOW. The verdict on
+        #          screen belongs to the RUN and may be older than the
+        #          setting: a stack made before Find_Orb was set up keeps
+        #          "not configured" for ever, and without this the observer
+        #          would think the app is still broken.
+        try:
+            from ..core import findorb
+            path, _message = findorb.probe(config.get("findorb_path"))
+            return bool(path)
+        except Exception:
+            return False
+
     def _fill_check(self):
         # The verdict in plain language (D25/D29): available or not,
         # blocked or not, and the numbers behind it. Find_Orb missing is
@@ -3574,11 +3587,20 @@ class UfeTrackStackTab(QWidget):
             return
         if not check.available:
             if str(check.note).startswith("Find_Orb is not configured"):
-                text = self.tr(
-                    "Find_Orb is not configured: the check is not "
-                    "available. Set it up in Settings; meanwhile the "
-                    "centred sequence and the submission floor are the "
-                    "safety net.")
+                if self._findorb_ready_now():
+                    # the run is old, the setup is not: say it, so the fix
+                    # is "re-run", not "go configure it again"
+                    text = self.tr(
+                        "Find_Orb was not configured when this stack was "
+                        "made; it is now. Re-run the track & stack to check "
+                        "this visit; meanwhile the centred sequence and the "
+                        "submission floor are the safety net.")
+                else:
+                    text = self.tr(
+                        "Find_Orb is not configured: the check is not "
+                        "available. Set it up in Settings; meanwhile the "
+                        "centred sequence and the submission floor are the "
+                        "safety net.")
             else:
                 text = self.tr("The check is not available:") \
                     + f" {check.note}"

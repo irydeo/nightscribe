@@ -72,12 +72,11 @@ class NewProjectBar(QWidget):
         name = self.edt_search.text().strip()
         if not name or self._worker is not None:
             return
-        from ..workers import ResolveWorker
+        from ..workers import ResolveWorker, hold
         self.btn_resolve.setEnabled(False)
         self.lbl_status.setText(self.tr("Resolving…"))
-        self._worker = ResolveWorker(name)
+        self._worker = hold(ResolveWorker(name))
         self._worker.finished.connect(self._resolve_done)
-        self._worker.finished.connect(self._worker.deleteLater)
         self._worker.start()
 
     def _resolve_done(self, result):

@@ -60,9 +60,10 @@ el mismo núcleo; todo el trabajo costoso (red, efemérides) se cachea en SQLite
 1. `planner` pide a las fuentes las listas crudas: targets de NEOfixer (site = código MPC),
    supernovas de Rochester, cometas activos de COBS, página PCCP del MPC, catálogo ExoClock.
 2. Cada respuesta cruda se guarda en `http_cache` con su TTL; las llamadas repetidas son gratis.
-3. Visibilidad por objetivo: NEOs vía `ephem` de NEOfixer (específico del sitio);
-   SNs/cometas/PCCP con math alt-az propio (`coords.py`); tránsitos calculados en local
-   (t0 + n·P) y luego alt-az.
+3. La visibilidad de cada objetivo se muestrea con nuestro propio math alt-az (`coords.py`)
+   desde la posición del objetivo; el `ephem` de NEOfixer (Find_Orb, con perturbaciones) es
+   la fuente de posición del goto fresco y del track & stack cuando Horizons no conoce un
+   objeto NEOCP/PCCP sin confirmar; los tránsitos se calculan en local (t0 + n·P) y luego alt-az.
 4. `suggest` puntúa todo 0–100, construye el Top N y las frases «por qué esta noche».
 5. Los flags de observado y el historial de posts vienen de SQLite y realimentan el score
    (lo publicado recientemente pierde novedad; lo observado sin publicar gana urgencia).

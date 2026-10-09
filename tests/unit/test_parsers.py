@@ -94,6 +94,49 @@ def test_parse_neofixer_orbit_missing(fixture_path):
     assert neofixer.parse_neofixer_orbit({}, "XXXXXX") is None
 
 
+def test_neofixer_ephem_rows_normalise_the_site_table():
+    # The site ephemeris comes back with its own key names (JD/RA/Dec,
+    # motion_rate...); it is normalised to the row shape core/ephemeris
+    # interpolates, so it goes through the SAME code as a Horizons table. A
+    # row missing its position is dropped, never guessed.
+    entries = [
+        {"JD": 2461323.4, "RA": 33.4, "Dec": 35.3, "motion_rate": 22.9,
+         "motionPA": 80.0, "mag": 19.27, "delta": 0.0479, "alt": 54.6,
+         "az": 83.5, "sigPos": 0.12, "ISO_time": "2026-10-09T22:15:00Z"},
+        {"JD": None, "RA": 1.0, "Dec": 2.0},
+    ]
+    rows = neofixer.ephem_rows(entries)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["jd"] == pytest.approx(2461323.4)
+    assert r["ra_deg"] == pytest.approx(33.4)
+    assert r["dec_deg"] == pytest.approx(35.3)
+    assert r["rate_arcsec_min"] == pytest.approx(22.9)
+    assert r["pa_deg"] == pytest.approx(80.0)
+    assert r["mag"] == pytest.approx(19.27)
+    assert r["delta"] == pytest.approx(0.0479)
+    assert r["sig_pos"] == pytest.approx(0.12)
+
+
+def test_neofixer_ephem_caches_by_window_and_forces(monkeypatch):
+    # The window is part of the cache key (the goto's "from now" table and a
+    # visit's fixed night must not overwrite each other), and force=True
+    # reaches db.http_get. The source is its own short-TTL entry.
+    seen = {}
+
+    def fake_get(key, source, fetch, force=False):
+        seen.update(key=key, source=source, force=force)
+        return b'{"result": {"entries": []}}', "application/json"
+
+    monkeypatch.setattr(neofixer.db, "http_get", fake_get)
+    neofixer.ephem("Z41", "A11HPKO", start="2026-10-09 20:00",
+                   stop="2026-10-10 04:00", force=True)
+    assert "2026-10-09 20:00" in seen["key"]
+    assert "2026-10-10 04:00" in seen["key"]
+    assert seen["source"] == "neofixer-ephem"
+    assert seen["force"] is True
+
+
 def test_parse_rochester(fixture_path):
     html = (fixture_path / "rochester_sample.html").read_text(encoding="utf-8")
     sne = rochester.parse_sn_list(html)

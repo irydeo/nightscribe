@@ -275,11 +275,11 @@ class UfeBlinkTab(QWidget):
             self._say(self.tr(
                 "Type the supernova name or tick 'Manual coordinates'."))
             return
-        from .workers import BlinkWorker
+        from .workers import BlinkWorker, hold
         self.btn_prepare.setEnabled(False)
         self._say(self.tr("Preparing the blink pair…"))
-        self._worker = BlinkWorker(self._state.path,
-                                   sn_name=name or None, ra=ra, dec=dec)
+        self._worker = hold(BlinkWorker(self._state.path,
+                                        sn_name=name or None, ra=ra, dec=dec))
         self._worker.progress.connect(
             lambda msg: self._say(msg.get(self._lang, "")))
         self._worker.finished.connect(self._on_pair_ready)
@@ -528,7 +528,7 @@ class UfeBlinkTab(QWidget):
             str(Path(self._state.path).parent / fname), filt)
         if not out:
             return
-        from .workers import BlinkExportWorker
+        from .workers import BlinkExportWorker, hold
         sn = self._export_sn_xy() if self.chk_marker.isChecked() else None
         effect = "blink" if self.rdo_blink.isChecked() else "fade"
         from ..config import config
@@ -546,7 +546,7 @@ class UfeBlinkTab(QWidget):
                 self._pair, meta, chart_annotate.site_from_config(config),
                 scale_arcsec_px=scale)
             compass = _bv.pair_compass(self._pair)
-        w = BlinkExportWorker(
+        w = hold(BlinkExportWorker(
             kind, self._ref8, self._obs8, sn, out, effect=effect,
             name=name, ref_label=self._pair["ref_label"], lang=self._lang,
             observatory=config.get("observatory_name", ""),
@@ -555,7 +555,7 @@ class UfeBlinkTab(QWidget):
             interval_ms=self.spn_interval.value(),
             boxes=boxes,
             marker_style=config.get("marker_style", "ring"),
-            compass=compass)
+            compass=compass))
         w.finished.connect(self._on_exported)
         self._export_workers.append(w)
         w.start()

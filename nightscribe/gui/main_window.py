@@ -52,8 +52,9 @@ from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (AiPostWorker, CcdcielWorker,
-                      ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
-                      SunWorker, TonightWorker)
+                      ExploreWorker, MpcResolveWorker, PassWorker,
+                      PositionRefreshWorker, PostWorker, SunWorker,
+                      TonightWorker, hold, running_workers)
 
 logger = logging.getLogger(__name__)
 
@@ -432,6 +433,8 @@ class MainWindow(QMainWindow):
         self._ccd_filter_names = []
         self._ccd_version = ""
         self._ccd_worker = None
+        self._pos_worker = None        # the position-refresh worker, if any
+        self._pos_target = None        # the project a refresh was for
         self._ccd_point_target = None  # last project a goto/astrometry aimed at
         self._ccd_timer = QTimer(self)
         self._ccd_timer.setInterval(1500)
@@ -2138,7 +2141,7 @@ class MainWindow(QMainWindow):
             return
         install = dlg.edt_exotic_install.text().strip() or str(
             paths.data_dir() / "exotic-venv")
-        self._exotic_worker = PrepareExoticWorker(install, python)
+        self._exotic_worker = hold(PrepareExoticWorker(install, python))
         self._exotic_worker.progress.connect(
             lambda stage: self.statusBar().showMessage(
                 self.tr("Preparing EXOTIC: {0}").format(stage), 0))
@@ -5455,8 +5458,15 @@ class MainWindow(QMainWindow):
             "Slew + capture + plate-solve and correct to the true sky "
             "position. Absorbs residual ephemeris error; the reliable "
             "route for NEOCPs and preliminary orbits."))
+        btn_refresh_pos = QPushButton(self.tr("Refresh position"))
+        btn_refresh_pos.setToolTip(self.tr(
+            "Re-query the orbit and the ephemeris now instead of using the "
+            "cache. A preliminary orbit improves as new astrometry arrives, "
+            "so a position computed from an old one can be minutes of "
+            "motion off."))
         row.addWidget(btn_goto)
         row.addWidget(btn_sync)
+        row.addWidget(btn_refresh_pos)
         row.addStretch()
         gv.addLayout(row)
 
@@ -5496,6 +5506,7 @@ class MainWindow(QMainWindow):
             "ccd_slew": lbl_sl,
             "ccd_goto": btn_goto,
             "ccd_sync": btn_sync,
+            "ccd_refresh_pos": btn_refresh_pos,
             "cmb_ccd_filter": cmb_f,
             "ccd_push": btn_push,
             "ccd_start": btn_start,
@@ -5506,6 +5517,7 @@ class MainWindow(QMainWindow):
         btn_r.clicked.connect(self._ccd_refresh)
         btn_goto.clicked.connect(self._ccd_goto)
         btn_sync.clicked.connect(self._ccd_astrometry_goto)
+        btn_refresh_pos.clicked.connect(self._ccd_refresh_position)
         btn_push.clicked.connect(self._ccd_send_plan)
         btn_start.clicked.connect(self._ccd_start_capture)
         self._ccd_apply_state()
@@ -5537,6 +5549,14 @@ class MainWindow(QMainWindow):
             widget = w.get(key)
             if widget is not None:
                 widget.setEnabled(on)
+        # the position refresh is a NETWORK action, not a CCDciel one: it is
+        # enabled by the project (a moving target) even with the mount off,
+        # because the observer may want the freshest orbit before connecting
+        btn_rp = w.get("ccd_refresh_pos")
+        if btn_rp is not None:
+            proj = self._current_project
+            btn_rp.setEnabled(bool(proj)
+                              and proj.get("kind") in ("neo", "comet", "pccp"))
         cb = w.get("cmb_ccd_filter")
         if cb is not None:
             cb.setEnabled(on)
@@ -5587,7 +5607,7 @@ class MainWindow(QMainWindow):
             return {"version": version, "dashboard": c.dashboard(),
                     "filters": c.filters()}
 
-        self._ccd_worker = CcdcielWorker(self._ccd_client, action)
+        self._ccd_worker = hold(CcdcielWorker(self._ccd_client, action))
         self._ccd_worker.finished.connect(self._ccd_on_connect)
         self._ccd_worker.start()
 
@@ -5628,6 +5648,7 @@ class MainWindow(QMainWindow):
             return
         self._ccd_worker = CcdcielWorker(self._ccd_client, action,
                                          poll_slew=poll)
+        hold(self._ccd_worker)
         self._ccd_worker.finished.connect(slot)
         self._ccd_worker.start()
 
@@ -5904,6 +5925,72 @@ class MainWindow(QMainWindow):
         self._ccd_apply_position(result)
         self.statusBar().showMessage(
             self.tr("Astrometric pointing finished."), 5000)
+
+    def _ccd_refresh_position(self):
+        # Force a fresh orbit + ephemeris for the current moving target,
+        # bypassing the source caches: the preliminary orbit of an
+        # unconfirmed object improves as new astrometry arrives, and a
+        # position computed from an old one can be minutes of motion off.
+        # This is a NETWORK action (no CCDciel), so it works with the mount
+        # off, and it runs on its own worker (ADR-030: never on the GUI
+        # thread).
+        p = self._current_project
+        w = self._ccd_widgets()
+        if not p or not w.get("ccd_refresh_pos"):
+            return
+        if p.get("kind") not in ("neo", "comet", "pccp"):
+            self.statusBar().showMessage(
+                self.tr("This target has fixed coordinates: there is nothing "
+                        "to refresh."), 5000)
+            return
+        if self._pos_worker is not None and self._pos_worker.isRunning():
+            return
+        ctx = dict(p.get("context") or {})
+        obj_id = (ctx.get("id") or ctx.get("packed")
+                  or p.get("object_name") or "")
+        site = config.get("mpc_code", "")
+        btn = w["ccd_refresh_pos"]
+        btn.setEnabled(False)
+        btn.setText(self.tr("Refreshing…"))
+        # a bound slot of this QObject, not a lambda: a lambda would run on
+        # the worker's thread and touch the GUI from there
+        self._pos_target = p
+        self._pos_worker = hold(PositionRefreshWorker(obj_id, site, ctx))
+        self._pos_worker.finished.connect(self._ccd_on_position_refreshed)
+        self._pos_worker.start()
+
+    def _ccd_on_position_refreshed(self, pos):
+        # @args: pos - the worker's position dict (or {})
+        # @return: None. The project the refresh was for is remembered so the
+        #          queued slot can hand it to the shared handler.
+        self._ccd_on_refreshed_position(pos, self._pos_target)
+
+    def _ccd_on_refreshed_position(self, pos, project_row):
+        # @args: pos - the worker's position dict (or {}), project_row - the
+        #        project the refresh was for (the current one may have moved)
+        w = self._ccd_widgets()
+        btn = w.get("ccd_refresh_pos")
+        if btn is not None:
+            btn.setEnabled(True)
+            btn.setText(self.tr("Refresh position"))
+        cur = self._current_project
+        if (not cur or not project_row
+                or cur.get("id") != project_row.get("id")):
+            return                    # the observer moved on: drop the answer
+        if not pos:
+            self.statusBar().showMessage(
+                self.tr("No fresh position: no source resolved the object."),
+                8000)
+            return
+        self._ccd_point_target = project_row
+        self._ccd_apply_position(pos)
+        src = {"horizons": self.tr("Horizons"),
+               "neofixer:ephem": self.tr("NEOfixer"),
+               "kepler:sbdb": self.tr("SBDB (Kepler)"),
+               "kepler:neofixer": self.tr("NEOfixer (Kepler)")}.get(
+                   pos.get("source"), pos.get("source") or "")
+        self.statusBar().showMessage(
+            self.tr("Position refreshed: %1").replace("%1", src), 6000)
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel
@@ -7927,8 +8014,8 @@ class MainWindow(QMainWindow):
         basis = plan.get("filter") or "V"
         self._exotic_filter = "V" if basis in ("L", "CV", None) else basis
         from .workers import ExoticRunWorker
-        self._exotic_worker = ExoticRunWorker(python, str(work),
-                                              str(inits_path))
+        self._exotic_worker = hold(ExoticRunWorker(python, str(work),
+                                                   str(inits_path)))
         self._exotic_progress_dialog()
         self._exotic_worker.progress.connect(self._exotic_progress_line)
         self._exotic_worker.finished.connect(
@@ -10901,7 +10988,7 @@ class MainWindow(QMainWindow):
         self._pass_targets = list(targets)
         self._pass_band = band
         self._pass_left = list(left or [])
-        self._pass_worker = PassWorker(source["paths"], cfg)
+        self._pass_worker = hold(PassWorker(source["paths"], cfg))
         self._pass_worker.progress.connect(self._pass_progress)
         self._pass_worker.finished.connect(self._pass_done)
         self._pass_worker.failed.connect(self._pass_failed)
@@ -11183,6 +11270,7 @@ class MainWindow(QMainWindow):
                  if (e.get("kind") or "comp") == "comp"]
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "object_name": p.get("object_name") or "",
+                "packed": ctx.get("packed") or ctx.get("id"),
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}
 
@@ -11822,11 +11910,26 @@ class MainWindow(QMainWindow):
     # ---------------- housekeeping ----------------
 
     def _keep(self, worker):
-        from PySide6.QtCore import QTimer
+        # The window owns the worker: it stays referenced until its thread has
+        # really finished (hold), so it is never destroyed while running (Qt 6
+        # aborts for that). No deleteLater here: it would be triggered by the
+        # worker's OWN finished signal, which is emitted BEFORE the thread
+        # stops, and deleting a running QThread is the very abort we avoid.
+        # The drop goes through a bound slot (queued to the GUI thread) and
+        # sender() names the worker.
         self._workers.append(worker)
-        worker.finished.connect(worker.deleteLater)
-        worker.finished.connect(
-            lambda *a: QTimer.singleShot(0, lambda: self._drop(worker)))
+        hold(worker)
+        worker.finished.connect(self._drop_sender)
+
+    def _drop_sender(self, *args):
+        # @args: args - the signal's payload (ignored: sender() names the
+        #        worker). A bound slot runs on the GUI thread: a lambda here
+        #        would run on the worker's thread and could even fire a QTimer
+        #        with no event loop behind it.
+        # @return: None. Drops the worker that just emitted finished.
+        w = self.sender()
+        if w is not None:
+            self._drop(w)
 
     def _drop(self, worker):
         if worker in self._workers:
@@ -11882,8 +11985,14 @@ class MainWindow(QMainWindow):
         exotic = getattr(self, "_exotic_worker", None)
         if exotic is not None:
             tracked.append(exotic)
-        threads = [w for w in tracked
-                   if isinstance(w, QThread) and Shiboken.isValid(w)]
+        # every worker held by the lifetime guard too (the CCDciel poll, the
+        # position refresh, the UFE tabs): a running one must be waited on
+        # here or Qt aborts the exit with "QThread destroyed while running"
+        tracked.extend(running_workers())
+        threads = []
+        for w in tracked:
+            if isinstance(w, QThread) and Shiboken.isValid(w) and w not in threads:
+                threads.append(w)
         for w in threads:
             if callable(getattr(w, "cancel", None)):
                 w.cancel()

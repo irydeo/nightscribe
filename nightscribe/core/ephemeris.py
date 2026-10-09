@@ -106,7 +106,7 @@ def generate(name, site, lat=None, lon=None, start=None, stop=None,
     rows = horizons.ephemeris(name, center=site, start=start, stop=stop,
                               step=step)
     if not rows:
-        rows = _preliminary_rows(name, start, stop, step)
+        rows = _preliminary_rows(name, site, start, stop, step)
     if not rows:
         return []
     out = []
@@ -136,14 +136,25 @@ def generate(name, site, lat=None, lon=None, start=None, stop=None,
     return out
 
 
-def _preliminary_rows(name, start, stop, step):
-    # Local two-body ephemeris from a preliminary NEOfixer orbit — the
-    # only route for unconfirmed NEOCP objects (Horizons has no orbit).
-    # @args: name - packed designation, start/stop - 'YYYY-MM-DD' or None,
-    #        step - '30m'/'1h' style
+def _preliminary_rows(name, site, start, stop, step):
+    # Site ephemeris for an unconfirmed object: NEOfixer's own Find_Orb
+    # table (perturbed, accurate) first, and only when it does not answer the
+    # local two-body propagation of the preliminary orbit (offline route).
+    # @args: name - packed designation, site - MPC code, start/stop -
+    #        'YYYY-MM-DD' or None, step - '30m'/'1h' style (NEOfixer answers
+    #        on its own grid when it can)
     # @return: list of rows shaped like horizons.parse_ephemeris output,
     #          each flagged preliminary; empty if NEOfixer has no orbit
     from .sources import neofixer
+    rows = []
+    for r in _neofixer_rows(site, name, start=start, stop=stop):
+        rows.append({"time": r.get("time") or _fmt_time(r["jd"]),
+                     "ra": coords.ra_deg_to_hms(r["ra_deg"]),
+                     "dec": coords.dec_deg_to_dms(r["dec_deg"]),
+                     "r": None, "delta": r.get("delta"),
+                     "preliminary": True})
+    if rows:
+        return rows
     orb = neofixer.orbit(name)
     if not orb or not orb.get("elements"):
         return []
@@ -202,6 +213,39 @@ def _fmt_time(jd):
     t = coords.datetime_from_jd(jd)
     return f"{t.year}-{_MONTHS_EN[t.month - 1]}-{t.day:02d} " \
            f"{t.hour:02d}:{t.minute:02d}"
+
+
+def _neofixer_rows(site, packed, start=None, stop=None, force=False):
+    # The NEOfixer site ephemeris, normalised to the row shape _interpolate
+    # understands. This is the perturbed, site-specific table Find_Orb
+    # computes for the object: the accurate route for an unconfirmed object
+    # JPL Horizons does not know, where a local two-body propagation can be
+    # off by arcminutes.
+    # @args: site - MPC code, packed - packed designation, start/stop - ISO
+    #        window (the night being measured; default from now), force -
+    #        bypass the cache
+    # @return: list of rows (empty when NEOfixer cannot answer)
+    try:
+        from .sources import neofixer
+        return neofixer.ephem_rows(
+            neofixer.ephem(site, packed, start=start, stop=stop, force=force))
+    except Exception as err:      # a network miss must never kill a goto
+        logger.warning("NEOfixer ephemeris failed for %s: %s", packed, err)
+        return []
+
+
+def _nearest_row(rows, jd):
+    # @args: rows - ephemeris rows with a "jd" key, jd - the instant
+    # @return: the row nearest that instant, or None
+    best, best_dt = None, None
+    for r in rows or []:
+        try:
+            dt = abs(float(r["jd"]) - jd)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if best_dt is None or dt < best_dt:
+            best, best_dt = r, dt
+    return best
 
 
 def _preliminary_banner(rows):
@@ -1038,18 +1082,22 @@ def _interpolate(rows, jd):
             "rate_arcsec_min": rate, "pa_deg": pa}
 
 
-def _kepler_at(elements, jd):
+def _kepler_at(elements, jd, lat=None, lon=None):
     # Local two-body propagation: position at jd plus a numerical rate from
     # a +1 h delta. RA is unwrapped before differencing so the rate does not
     # spike across the 0h/24h seam. J2000, like the plate's WCS: the of-date
     # path missed by ~0.4 deg, which a goto can shrug off but is not free.
+    # Topocentric when lat/lon are given, matching Horizons (center=site):
+    # the mount points from the observatory, not from Earth's centre, and at
+    # a close approach the parallax is arcminutes.
     # @return: {ra_deg, dec_deg, rate_arcsec_min, pa_deg} or None
-    p0 = ephem_minor.kepler_ra_dec_j2000(elements, jd)
+    p0 = ephem_minor.kepler_ra_dec_j2000(elements, jd, lat_deg=lat, lon_deg=lon)
     if not p0:
         return None
     ra0, dec0 = p0[0], p0[1]
     dh = 1.0 / 24.0
-    p1 = ephem_minor.kepler_ra_dec_j2000(elements, jd + dh)
+    p1 = ephem_minor.kepler_ra_dec_j2000(elements, jd + dh, lat_deg=lat,
+                                         lon_deg=lon)
     if not p1:
         return {"ra_deg": ra0 % 360, "dec_deg": dec0,
                 "rate_arcsec_min": 0.0, "pa_deg": 0.0}
@@ -1078,20 +1126,24 @@ def _horizons_fine_rows(name, site, when):
         step="2m")
 
 
-def position_at(name, site, when=None, fallback_target=None):
-    # Geocentric J2000 RA/Dec of a minor body at a given instant, resolved
+def position_at(name, site, when=None, fallback_target=None, force=False):
+    # Topocentric J2000 RA/Dec of a minor body at a given instant, resolved
     # fresh so a goto never points at a stale snapshot of a moving target.
     # Horizons is queried at a fine step and the two rows bracketing `when`
     # are linearly interpolated. When Horizons knows nothing of the object
-    # (unconfirmed NEOCP), the position is propagated locally with Kepler:
-    # SBDB elements first, then the preliminary NEOfixer orbit.
+    # (unconfirmed NEOCP), the cascade is: NEOfixer's own site ephemeris
+    # (Find_Orb, perturbed) first, then a local two-body propagation of the
+    # SBDB elements and, last, of the preliminary NEOfixer orbit.
     # @args: name - Horizons designation / packed / name, site - MPC code,
     #        when - UTC datetime (default now),
-    #        fallback_target - planner dict (packed/id) for NEOCP fallback
+    #        fallback_target - planner dict (packed/id) for the NEOCP route,
+    #        force - bypass the source caches (the refresh button)
     # @return: dict {ra_deg, dec_deg, rate_arcsec_min, pa_deg, epoch_iso,
     #          source, preliminary} or None when no source resolves
     when = when or datetime.datetime.now(datetime.timezone.utc)
     jd = coords.jd_from_datetime(when)
+    from ..config import config
+    lat, lon = config.get("lat"), config.get("lon")
     rows = _horizons_fine_rows(name, site, when)
     if rows:
         out = _interpolate(rows, jd)
@@ -1103,18 +1155,36 @@ def position_at(name, site, when=None, fallback_target=None):
     from .sources import sbdb
     body = sbdb.get(name)
     if body and body.get("elements"):
-        out = _kepler_at(body["elements"], jd)
+        out = _kepler_at(body["elements"], jd, lat=lat, lon=lon)
         if out:
             out["source"] = "kepler:sbdb"
             out["preliminary"] = False
             out["epoch_iso"] = _iso(when)
             return out
-    from .sources import neofixer
     packed = (fallback_target or {}).get("packed") \
         or (fallback_target or {}).get("id") or name
-    orb = neofixer.orbit(packed)
+    # The table must BRACKET `when`: NEOfixer rounds the start UP to its next
+    # 15-minute step, so a "from now" table begins in the future and
+    # _interpolate would clamp to that first row, answering with a position
+    # minutes of motion ahead (measured: 158" at 23"/min). Ask for a window
+    # centred on `when`, floored to 30 min so repeated gotos share the cache.
+    win_start = _floor_30min(when - datetime.timedelta(hours=2))
+    win_stop = win_start + datetime.timedelta(hours=4)
+    rows = _neofixer_rows(site, packed,
+                          start=win_start.strftime("%Y-%m-%d %H:%M"),
+                          stop=win_stop.strftime("%Y-%m-%d %H:%M"),
+                          force=force)
+    if rows:
+        out = _interpolate(rows, jd)
+        if out:
+            out["source"] = "neofixer:ephem"
+            out["preliminary"] = True
+            out["epoch_iso"] = _iso(when)
+            return out
+    from .sources import neofixer
+    orb = neofixer.orbit(packed, force=force)
     if orb and orb.get("elements"):
-        out = _kepler_at(orb["elements"], jd)
+        out = _kepler_at(orb["elements"], jd, lat=lat, lon=lon)
         if out:
             out["source"] = "kepler:neofixer"
             out["preliminary"] = True

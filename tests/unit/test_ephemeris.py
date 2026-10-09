@@ -124,13 +124,14 @@ def test_preliminary_rows_and_banner(tmp_path):
     # stub the NEOfixer call so the test runs offline
     import nightscribe.core.ephemeris as eph_mod
     import nightscribe.core.sources.neofixer as nf
-    orig = nf.orbit
-    nf.orbit = lambda packed: {"elements": els}
+    orig_orbit, orig_ephem = nf.orbit, nf.ephem
+    nf.ephem = lambda *a, **k: []          # no site table: Kepler fallback
+    nf.orbit = lambda packed, force=False: {"elements": els}
     try:
-        rows = eph_mod._preliminary_rows("TESTOBJ", "2026-08-24",
+        rows = eph_mod._preliminary_rows("TESTOBJ", "Z41", "2026-08-24",
                                          "2026-08-25", "6h")
     finally:
-        nf.orbit = orig
+        nf.orbit, nf.ephem = orig_orbit, orig_ephem
     assert rows and len(rows) == 5  # 0, 6, 12, 18, 24h
     assert all(r["preliminary"] for r in rows)
     assert all(r["r"] > 0 and r["delta"] > 0 for r in rows)

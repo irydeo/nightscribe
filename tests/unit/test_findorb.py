@@ -61,6 +61,14 @@ def test_write_input_mixes_ours_and_theirs(tmp_path):
     assert lines == ["OUR1", "OUR2", "OTHER1", "OTHER2"]
 
 
+def test_write_input_accepts_a_list_of_lines(tmp_path):
+    # the track & stack once handed a LIST to a function that split a string,
+    # and the AttributeError took the whole run down. Either shape must work.
+    out = tmp_path / "obs.txt"
+    findorb.write_input(["OUR1", "OUR2"], ["OTHER1"], out)
+    assert out.read_text().splitlines() == ["OUR1", "OUR2", "OTHER1"]
+
+
 def test_write_environment_is_private(tmp_path):
     env = findorb.write_environment(tmp_path / "environ.dat")
     text = open(env).read()
@@ -122,3 +130,5 @@ def test_check_says_it_is_unavailable_without_findorb(monkeypatch):
     report = findorb.check("OUR LINE", "2025 UR", cfg=None)
     assert report.available is False and not report.blocked
     assert "not configured" in report.note
+    # the pointer names the page the field actually lives on now
+    assert "Settings > Measurement" in report.note

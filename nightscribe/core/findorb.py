@@ -89,17 +89,29 @@ def probe(findorb_path=None):
         found = shutil.which(name)
         if found:
             return found, f"Find_Orb at {found}"
-    return None, "Find_Orb is not configured (Settings > Calibration)"
+    return None, "Find_Orb is not configured (Settings > Measurement)"
+
+
+def _lines(value):
+    # @args: value - a string of 80-column lines, or an iterable of lines
+    # @return: the non-empty lines, as a list of strings
+    # The caller may hand us either shape. Normalising HERE is what keeps a
+    # type slip from taking the whole run down: the track & stack once passed
+    # a list to a function that called `.splitlines()` on it, and the
+    # AttributeError bubbled up as a failed run instead of a check verdict.
+    if isinstance(value, str):
+        return [ln for ln in value.splitlines() if ln.strip()]
+    return [str(ln) for ln in (value or []) if str(ln).strip()]
 
 
 def write_input(ours, others, path):
     # @args: ours - our MPC 80-column lines (core/mpc_astrometry), others -
-    #        the published lines (mpc_obs.observations_80), path - where
+    #        the published lines (mpc_obs.observations_80), path - where.
+    #        Each may be a string or a list of lines.
     # @return: the path
     # `fo` reads 80-column and ADES, mixed, in one file. Ours go first so
     # the residual report is easy to read.
-    text = "\n".join([ln for ln in (ours or "").splitlines() if ln.strip()] +
-                     [ln for ln in (others or "").splitlines() if ln.strip()])
+    text = "\n".join(_lines(ours) + _lines(others))
     Path(path).write_text(text.rstrip() + "\n", encoding="ascii",
                           errors="replace")
     return str(path)

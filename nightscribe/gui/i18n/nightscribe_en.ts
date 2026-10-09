@@ -13319,7 +13319,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">(the aperture would give %1)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3685"/>
+        <location filename="../ufe_trackstack_tab.py" line="3707"/>
         <source>None of the %1 observations clears the submission floor you have set (SNR %2, in Settings → Astrometry; the MPC recommends 20): the report has no lines to send. Lower it there if you take the risk of a marginal detection.</source>
         <translation>None of the %1 observations clears the submission floor you have set (SNR %2, in Settings → Astrometry; the MPC recommends 20): the report has no lines to send. Lower it there if you take the risk of a marginal detection.</translation>
     </message>
@@ -13753,63 +13753,68 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>The object did not clear the detection gate: it was measured at the ephemeris&apos; position and is not to be published without looking at it</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3577"/>
+        <location filename="../ufe_trackstack_tab.py" line="3593"/>
+        <source>Find_Orb was not configured when this stack was made; it is now. Re-run the track &amp; stack to check this visit; meanwhile the centred sequence and the submission floor are the safety net.</source>
+        <translation>Find_Orb was not configured when this stack was made; it is now. Re-run the track &amp; stack to check this visit; meanwhile the centred sequence and the submission floor are the safety net.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="3599"/>
         <source>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</source>
         <translation>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3582"/>
+        <location filename="../ufe_trackstack_tab.py" line="3604"/>
         <source>The check is not available:</source>
         <translation>The check is not available:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3586"/>
+        <location filename="../ufe_trackstack_tab.py" line="3608"/>
         <source>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</source>
         <translation>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3591"/>
+        <location filename="../ufe_trackstack_tab.py" line="3613"/>
         <source>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</source>
         <translation>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3596"/>
+        <location filename="../ufe_trackstack_tab.py" line="3618"/>
         <source>The check passes: our residual fits inside the published observations&apos; dispersion.</source>
         <translation>The check passes: our residual fits inside the published observations&apos; dispersion.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3600"/>
+        <location filename="../ufe_trackstack_tab.py" line="3622"/>
         <source>Our residual: %1″ / %2″ · %3 distinct observatories</source>
         <translation>Our residual: %1″ / %2″ · %3 distinct observatories</translation>
     </message>
     <message>
         <location filename="../ufe_trackstack_tab.py" line="1991"/>
-        <location filename="../ufe_trackstack_tab.py" line="3608"/>
+        <location filename="../ufe_trackstack_tab.py" line="3630"/>
         <source>not available</source>
         <translation>not available</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3610"/>
+        <location filename="../ufe_trackstack_tab.py" line="3632"/>
         <source>nothing to compare</source>
         <translation>nothing to compare</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3612"/>
+        <location filename="../ufe_trackstack_tab.py" line="3634"/>
         <source>blocked</source>
         <translation>blocked</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3614"/>
+        <location filename="../ufe_trackstack_tab.py" line="3636"/>
         <source>passes</source>
         <translation>passes</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3663"/>
+        <location filename="../ufe_trackstack_tab.py" line="3685"/>
         <source>Measure the sequence first.</source>
         <translation>Measure the sequence first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3681"/>
+        <location filename="../ufe_trackstack_tab.py" line="3703"/>
         <source>%1 of %2 observations are in the report.</source>
         <translation>%1 of %2 observations are in the report.</translation>
     </message>
@@ -13818,37 +13823,37 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">None of the %1 observations clears the MPC submission floor of SNR %2 (Settings → Astrometry): the report has no lines to send. Lower the floor there if you take the risk of a marginal detection.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3696"/>
+        <location filename="../ufe_trackstack_tab.py" line="3718"/>
         <source>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</source>
         <translation>Observation %1 left out: no SNR was measured, so it cannot be shown to clear the floor of %2</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3701"/>
+        <location filename="../ufe_trackstack_tab.py" line="3723"/>
         <source>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</source>
         <translation>Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3725"/>
+        <location filename="../ufe_trackstack_tab.py" line="3747"/>
         <source>⚠</source>
         <translation>⚠</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3731"/>
+        <location filename="../ufe_trackstack_tab.py" line="3753"/>
         <source>Report generated: %1 observations kept.</source>
         <translation>Report generated: %1 observations kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3741"/>
+        <location filename="../ufe_trackstack_tab.py" line="3763"/>
         <source>Generate the report first.</source>
         <translation>Generate the report first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3747"/>
+        <location filename="../ufe_trackstack_tab.py" line="3769"/>
         <source>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</source>
         <translation>Report sent to the visit&apos;s MPC block: its validator has the last word before saving.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3751"/>
+        <location filename="../ufe_trackstack_tab.py" line="3773"/>
         <source>The visit window is not open: open the visit to send the report to its MPC block.</source>
         <translation>The visit window is not open: open the visit to send the report to its MPC block.</translation>
     </message>

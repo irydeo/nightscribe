@@ -2111,9 +2111,14 @@ class TrackStackWorker(QThread):
                         available=False,
                         note="no observation clears the submission floor")
                 else:
+                    # to_mpc80 returns the 80-column BLOCK (a string);
+                    # findorb.check wants that string, not a list of lines
+                    # (passing a list crashed the whole run: the check called
+                    # .splitlines() on it). write_input now accepts either,
+                    # and here we hand it the block as it comes.
                     ours = mpc_astrometry.to_mpc80(kept, self._obs_code,
                                                    self._name, self._cfg)
-                    check = findorb.check(ours.splitlines(), self._name,
+                    check = findorb.check(ours, self._name,
                                           self._cfg,
                                           cancel=lambda: self._cancel)
             else:

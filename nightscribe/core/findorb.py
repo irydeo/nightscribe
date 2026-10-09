@@ -25,9 +25,12 @@ Three details that are easy to get wrong and are handled here:
 
 - `fo` is the non-interactive binary; the interactive `find_orb` is a
   different program and cannot be driven this way. `probe` refuses it.
-- `fo` writes its output (total.json, elements.txt) into the CURRENT
-  directory, so it is run in a temporary one; and it creates ~/.find_orb
-  on first use, which is why a private `-D` environment file is passed.
+- `fo` writes its JSON (total.json, with the residuals) to its CONFIGURATION
+  directory (~/.find_orb on Linux), NOT the current directory, and only when
+  the JSON_*_NAME settings say so. It is run in a temporary one and the
+  private `-D` environment points every output at that directory, so the
+  parser finds total.json where it ran (and two runs cannot collide). It
+  also creates ~/.find_orb on first use, which is the other reason for `-D`.
 - `-r 60,65` gives a soft and a hard CPU limit, so a stuck fit cannot hang
   the app.
 
@@ -89,17 +92,29 @@ def probe(findorb_path=None):
         found = shutil.which(name)
         if found:
             return found, f"Find_Orb at {found}"
-    return None, "Find_Orb is not configured (Settings > Calibration)"
+    return None, "Find_Orb is not configured (Settings > Measurement)"
+
+
+def _lines(value):
+    # @args: value - a string of 80-column lines, or an iterable of lines
+    # @return: the non-empty lines, as a list of strings
+    # The caller may hand us either shape. Normalising HERE is what keeps a
+    # type slip from taking the whole run down: the track & stack once passed
+    # a list to a function that called `.splitlines()` on it, and the
+    # AttributeError bubbled up as a failed run instead of a check verdict.
+    if isinstance(value, str):
+        return [ln for ln in value.splitlines() if ln.strip()]
+    return [str(ln) for ln in (value or []) if str(ln).strip()]
 
 
 def write_input(ours, others, path):
     # @args: ours - our MPC 80-column lines (core/mpc_astrometry), others -
-    #        the published lines (mpc_obs.observations_80), path - where
+    #        the published lines (mpc_obs.observations_80), path - where.
+    #        Each may be a string or a list of lines.
     # @return: the path
     # `fo` reads 80-column and ADES, mixed, in one file. Ours go first so
     # the residual report is easy to read.
-    text = "\n".join([ln for ln in (ours or "").splitlines() if ln.strip()] +
-                     [ln for ln in (others or "").splitlines() if ln.strip()])
+    text = "\n".join(_lines(ours) + _lines(others))
     Path(path).write_text(text.rstrip() + "\n", encoding="ascii",
                           errors="replace")
     return str(path)
@@ -125,14 +140,25 @@ def run(input_path, binary, env_file=None, cpu_limit=DEFAULT_CPU_LIMIT,
     #        env_file - the private environment, cpu_limit - the -r value,
     #        cancel - callable() -> True, timeout - wall-clock seconds
     # @return: (ok, workdir, log) with workdir holding total.json
-    # Run in a temporary directory: fo writes its outputs in the CWD, and
-    # the app must not litter the user's project with them.
+    # Run in a temporary directory and tell fo to write EVERYTHING there.
+    # On Linux fo drops its JSON in its configuration directory (~/.find_orb)
+    # unless OUTPUT_DIR and the JSON_*_NAME settings say otherwise, and it
+    # only writes total.json when the names are set: without this the parser
+    # looked for a file that was never written ("produced no residuals").
     workdir = tempfile.mkdtemp(prefix="nightscribe-fo-")
     local_input = Path(workdir) / "obs.txt"
     shutil.copyfile(input_path, local_input)
-    args = [binary, str(local_input)]
-    if env_file:
-        args += ["-D", env_file]
+    base = ""
+    if env_file and Path(env_file).exists():
+        base = Path(env_file).read_text(encoding="utf-8", errors="replace")
+    local_env = Path(workdir) / "environ.dat"
+    local_env.write_text(base.rstrip() + "\n" + "\n".join([
+        f"OUTPUT_DIR={workdir}",
+        f"JSON_COMBINED_NAME={Path(workdir) / 'total.json'}",
+        f"JSON_ELEMENTS_NAME={Path(workdir) / 'elements.json'}",
+        f"JSON_SHORT_ELEMENTS={Path(workdir) / 'short.json'}",
+    ]) + "\n", encoding="utf-8")
+    args = [binary, str(local_input), "-D", str(local_env)]
     if cpu_limit:
         args += ["-r", cpu_limit]
     try:
@@ -186,7 +212,10 @@ def _as_residual(node):
     # @return: {stn, time, dra, ddec} with whatever the record carries
     low = {k.lower(): v for k, v in node.items()}
     return {
-        "stn": low.get("stn") or low.get("code") or low.get("station"),
+        # Find_Orb's total.json calls the station "obscode"; the others are
+        # tolerated so a schema change does not silently empty the column
+        "stn": (low.get("obscode") or low.get("stn") or low.get("code")
+                or low.get("station")),
         "time": low.get("time") or low.get("obstime") or low.get("jd"),
         "dra": _num(low.get("dra") or low.get("resid_ra")),
         "ddec": _num(low.get("ddec") or low.get("resid_dec")),

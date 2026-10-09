@@ -51,7 +51,7 @@ from .widgets.project_row import ProjectRow
 from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
-from .workers import (CcdcielWorker,
+from .workers import (AiPostWorker, CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
                       SunWorker, TonightWorker)
 
@@ -365,6 +365,22 @@ class _ScoreBar(QFrame):
         p.end()
 
 
+class _AiWidgetCfg:
+    # A Config-shaped reader over the AI fields on screen (ADR-075): the
+    # Settings "Test connection" tries the values you typed WITHOUT saving
+    # them, so testing a half-typed endpoint never touches your setup.
+    def __init__(self, dlg):
+        self._dlg = dlg
+
+    def get(self, k, d=None):
+        return {
+            "ai_base_url": self._dlg.edt_ai_base_url.text().strip(),
+            "ai_api_key": self._dlg.edt_ai_api_key.text().strip(),
+            "ai_model": self._dlg.cmb_ai_model.currentText().strip(),
+            "ai_temperature": self._dlg.spn_ai_temp.value(),
+        }.get(k, d)
+
+
 class MainWindow(QMainWindow):
     # Three tabs (ADR-043): Tonight · Projects · Campaigns: the CCDciel
     # control now lives inside the project's Capture step. The Tools menu
@@ -432,6 +448,9 @@ class MainWindow(QMainWindow):
 
         self._build_shell()
         self._connect_menu()
+        # the AI master switch (ADR-075): set the Help action's state before
+        # the window is shown, so a disabled AI never offers its dialog
+        self._refresh_ai_availability()
         self._connect()
         # Projects are visible from the very first open: load the hub list
         # once the event loop starts (a deferred singleShot reads only the
@@ -1446,6 +1465,10 @@ class MainWindow(QMainWindow):
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_guide_web.triggered.connect(self.on_guide_web)
         self._menus.action_log.triggered.connect(self.on_open_log)
+        self._menus.action_assistant.triggered.connect(
+            lambda: self._open_assistant())
+        # keep the "enabled" tooltip; the disabled state swaps in its reason
+        self._assistant_tip = self._menus.action_assistant.toolTip()
         self._menus.action_welcome.triggered.connect(
             lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
@@ -1453,6 +1476,27 @@ class MainWindow(QMainWindow):
         self._menus.edt_nav_explore.returnPressed.connect(self._nav_explore)
         self._menus.action_campaigns.triggered.connect(
             self._tools_campaigns)
+
+    def _refresh_ai_availability(self):
+        # The AI master switch (ADR-075). Off, every AI surface is closed,
+        # not left to fail: the Help action and the editor's "?" button are
+        # disabled, with the reason in their tooltip. The Publish page is
+        # rebuilt each time its project opens, so it reads the switch itself.
+        # @return: None
+        from ..core.sources import llm
+        on = llm.is_enabled(config)
+        menus = getattr(self, "_menus", None)
+        act = getattr(menus, "action_assistant", None)
+        if act is not None:
+            act.setEnabled(on)
+            tip = getattr(self, "_assistant_tip", None)
+            if tip is None:
+                tip = act.toolTip()
+            act.setToolTip(tip if on else self.tr(
+                "The AI is off: turn it on in Settings → Integrations."))
+        ufe = getattr(self, "_ufe", None)
+        if ufe is not None and hasattr(ufe, "set_ai_available"):
+            ufe.set_ai_available(on)
 
     def _connect(self):
         t = self.tonight
@@ -1834,6 +1878,66 @@ class MainWindow(QMainWindow):
                 getattr(dlg, spin).setValue(value if value is not None else 0)
         self._cam_ref_update(dlg)
 
+    def _ai_preset_selected(self, dlg):
+        # Choosing a known endpoint fills the base URL; the key and the model
+        # are the observer's to type (ADR-075). "Custom…" writes nothing, so
+        # a hand-typed address is never clobbered.
+        base = dlg.cmb_ai_preset.currentData()
+        if base:
+            dlg.edt_ai_base_url.setText(base)
+
+    def _ai_list_models(self, dlg):
+        # "List models" (ADR-075): asks the endpoint which models it has and
+        # fills the combo with them, keeping whatever was typed. A local
+        # server answers with its exact names, so nobody types them from
+        # memory. Off the GUI thread; nothing is saved here.
+        from .workers import LlmModelsWorker
+        dlg.btn_ai_models.setEnabled(False)
+        dlg.lbl_ai_status.setText(self.tr("Asking the endpoint…"))
+        dlg.lbl_ai_status.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        worker = LlmModelsWorker(_AiWidgetCfg(dlg))
+
+        def done(models, err):
+            dlg.btn_ai_models.setEnabled(True)
+            if err:
+                dlg.lbl_ai_status.setText("✗ " + err)
+                dlg.lbl_ai_status.setStyleSheet(f"color: {theme.C_WARN};")
+                return
+            current = dlg.cmb_ai_model.currentText().strip()
+            dlg.cmb_ai_model.clear()
+            dlg.cmb_ai_model.addItems(models)
+            if current:
+                dlg.cmb_ai_model.setCurrentText(current)
+            dlg.lbl_ai_status.setText(
+                self.tr("{0} models").format(len(models)))
+            dlg.lbl_ai_status.setStyleSheet(f"color: {theme.C_GOOD};")
+
+        worker.done.connect(done)
+        self._keep(worker)
+        worker.start()
+
+    def _ai_test(self, dlg):
+        # The Settings "Test connection" click (ADR-075): one short call,
+        # off the GUI thread, that tells whether the address, the key and
+        # the model agree. It reads the widgets, not the config, and saves
+        # nothing: testing a half-typed endpoint must not touch your setup.
+        from .workers import LlmTestWorker
+
+        dlg.btn_ai_test.setEnabled(False)
+        dlg.lbl_ai_status.setText(self.tr("Testing…"))
+        dlg.lbl_ai_status.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        worker = LlmTestWorker(_AiWidgetCfg(dlg))
+
+        def done(ok, msg):
+            dlg.btn_ai_test.setEnabled(True)
+            dlg.lbl_ai_status.setText(("✓ " if ok else "✗ ") + msg)
+            dlg.lbl_ai_status.setStyleSheet(
+                f"color: {theme.C_GOOD if ok else theme.C_WARN};")
+
+        worker.done.connect(done)
+        self._keep(worker)
+        worker.start()
+
     def _cam_ref_update(self, dlg):
         # The plate scale FIRST (what the pixel size and the focal length
         # mean together, and the number the NEO advice and the report read),
@@ -2129,6 +2233,19 @@ class MainWindow(QMainWindow):
         dlg.cmb_language.addItems([self.tr("System"), self.tr("Spanish"),
                                    self.tr("English")])
 
+        # AI endpoint presets (ADR-075): a convenience that fills the base
+        # URL. Any OpenAI-compatible address works, cloud or local; the
+        # presets are the ones people ask for first.
+        dlg.cmb_ai_preset.addItem(self.tr("Custom…"), "")
+        for label, base in (
+                (self.tr("OpenRouter"), "https://openrouter.ai/api/v1"),
+                (self.tr("Groq"), "https://api.groq.com/openai/v1"),
+                (self.tr("Google AI Studio"),
+                 "https://generativelanguage.googleapis.com/v1beta/openai"),
+                (self.tr("Ollama (local)"), "http://localhost:11434/v1"),
+                (self.tr("LM Studio (local)"), "http://localhost:1234/v1")):
+            dlg.cmb_ai_preset.addItem(label, base)
+
         # every simple field, one table both ways (ADR-071)
         settings_spec.load(dlg, config)
 
@@ -2155,6 +2272,15 @@ class MainWindow(QMainWindow):
         dlg.cmb_language.setCurrentIndex(
             {"system": 0, "es": 1, "en": 2}.get(lang, 0))
 
+        # reflect the saved AI endpoint: a value that matches no preset shows
+        # as "Custom…" and the base URL below keeps it. Wire the fill AFTER
+        # setting the index, so restoring never overwrites the saved address.
+        saved_base = (config.get("ai_base_url") or "").strip()
+        idx = dlg.cmb_ai_preset.findData(saved_base)
+        dlg.cmb_ai_preset.setCurrentIndex(idx if idx >= 0 else 0)
+        dlg.cmb_ai_preset.currentIndexChanged.connect(
+            lambda _i: self._ai_preset_selected(dlg))
+
         # the vigils list is parsed, not a plain string
         dlg.edt_vigils.setPlainText(
             vigils.vigils_to_text(vigils.vigils_from_config(config)))
@@ -2179,6 +2305,8 @@ class MainWindow(QMainWindow):
         # carries the camera's setting or a placeholder).
         dlg.btn_measure_gain.clicked.connect(
             lambda: self._measure_gain_into(dlg))
+        dlg.btn_ai_test.clicked.connect(lambda: self._ai_test(dlg))
+        dlg.btn_ai_models.clicked.connect(lambda: self._ai_list_models(dlg))
 
         # buttons
         dlg.btn_astap_browse.clicked.connect(lambda: self._pick_astap(dlg))
@@ -2215,6 +2343,10 @@ class MainWindow(QMainWindow):
 
         # save: the same table, one direction (ADR-071)
         settings_spec.save(dlg, config)
+
+        # the AI master switch may have changed (ADR-075): close or reopen
+        # its surfaces right away, so the app acts on what was just saved
+        self._refresh_ai_availability()
 
         # combos with their own mapping
         config.set("camera_type", dlg.cmb_camera_type.currentText())
@@ -2592,6 +2724,41 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QDesktopServices
         suffix = ".es" if self._lang() == "es" else ""
         QDesktopServices.openUrl(QUrl(f"{GUIDE_WEB_URL}{suffix}.html"))
+
+    def _open_assistant(self, scope="app"):
+        # The grounded assistant (ADR-075), non-modal and opt-in. The object
+        # scope is offered only with a project open; the brief is built in
+        # the worker (it may enrich over the network), the editor scope is
+        # opened from the editor itself.
+        # @args: scope - "app"|"object"|"editor"
+        # @return: None
+        from .assistant_window import AssistantWindow
+        from ..core.sources import llm
+        if not llm.is_enabled(config):
+            # the AI is off (ADR-075): no dialog at all. The Help action and
+            # the editor's "?" are already disabled; this is the belt to
+            # their braces
+            return
+        win = getattr(self, "_assistant_win", None)
+        if win is not None:
+            win.close()
+        project = self._current_project
+        name = project.get("object_name") if project else None
+        brief_provider = None
+        if project is not None:
+            def brief_provider(project=project):
+                from ..core import enrich, object_brief
+                e = enrich.enrich(project.get("object_name") or "",
+                                  site=config.get("mpc_code"))
+                return object_brief.build_brief(
+                    project, db, enriched=e, lang=config.ui_language(),
+                    cfg=config)
+        win = AssistantWindow(object_name=name, brief_provider=brief_provider,
+                              start_scope=scope, parent=self)
+        self._assistant_win = win
+        win.show()
+        win.raise_()
+        win.activateWindow()
 
     # ---------------- Tonight: suggestion grid ----------------
 
@@ -8040,14 +8207,167 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(str(folder), 8000)
 
     def _build_publish_tab(self, p, kind, ctx):
+        # Publicar (ADR-045), redesigned 2026-10-09: the post panel lives IN
+        # the page, in the same card voice as Capture (ADR-059), instead of a
+        # modal dialog. The template is the offline answer; the AI is opt-in.
+        # The page never generates on its own: the observer presses a button,
+        # and a busy bar covers the wait (a local reasoning model can take a
+        # couple of minutes).
+        from .widgets.section_card import PanelCard
+        from PySide6.QtWidgets import QTabWidget
         layout = self._step_section("publish")
-        btn = QPushButton(self.tr("Generate post…"))
-        btn.clicked.connect(self._project_post)
-        layout.addWidget(btn)
-        layout.addWidget(QLabel(
-            f"<small>{self.tr('Opens the post dialog for')} "
-            f"{p['object_name']}</small>"))
-        layout.addStretch()
+        accent = theme.KIND_COLORS.get(kind, theme.C_ACCENT)
+        name = p["object_name"]
+
+        post_w = QWidget()
+        self._project_widgets["post_panel"] = post_w
+
+        # --- card: the draft (actions, folder, progress) ----------------
+        card = PanelCard(self.tr("Draft"), accent)
+        layout.addWidget(card)
+        body = card.body
+        intro_txt = self.tr(
+            "Turn this observation into a post. The template works offline; "
+            "the AI (experimental) drafts from your own data.")
+        intro = QLabel(f"<small>{intro_txt}</small>")
+        intro.setWordWrap(True)
+        body.addWidget(intro)
+
+        actions = QHBoxLayout()
+        btn_generate = QPushButton(self.tr("Generate"))
+        # The AI half of this panel is experimental: say so on the button and
+        # in the help, so nobody takes a model's draft for the app's own word
+        btn_ai = QPushButton(self.tr("Write with AI (experimental)…"))
+        btn_ai.setToolTip(self.tr(
+            "Experimental: an optional language model drafts the post from "
+            "your own data; the offline template is the other button."))
+        btn_brief = QPushButton(self.tr("What will be sent…"))
+        btn_brief.setToolTip(self.tr(
+            "Experimental: show exactly what leaves your machine when you "
+            "generate with the model."))
+        for b in (btn_generate, btn_ai, btn_brief):
+            actions.addWidget(b)
+        actions.addStretch(1)
+        body.addLayout(actions)
+
+        lbl_ai_note = QLabel()
+        lbl_ai_note.setWordWrap(True)
+        lbl_ai_note.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        body.addWidget(lbl_ai_note)
+
+        folder_row = QHBoxLayout()
+        folder_row.addWidget(QLabel(self.tr("Save to:")))
+        edt_folder = QLineEdit()
+        edt_folder.setPlaceholderText(
+            self.tr("Folder for the drafts and charts"))
+        btn_browse = QPushButton(self.tr("Browse…"))
+        folder_row.addWidget(edt_folder, 1)
+        folder_row.addWidget(btn_browse)
+        body.addLayout(folder_row)
+
+        progress = QProgressBar()
+        progress.setRange(0, 0)          # indeterminate: the model is opaque
+        progress.setTextVisible(False)
+        progress.setVisible(False)
+        body.addWidget(progress)
+
+        lbl_files = QLabel()
+        lbl_files.setWordWrap(True)
+        body.addWidget(lbl_files)
+
+        # --- card: the text (ES / EN / X) -------------------------------
+        card2 = PanelCard(self.tr("Text"), accent)
+        layout.addWidget(card2)
+        tabs = QTabWidget()
+        for label, key in (("ES", "es"), ("EN", "en"), ("X", "tweet")):
+            page = QWidget()
+            v = QVBoxLayout(page)
+            edt = QTextEdit()
+            btn = QPushButton(self.tr("Copy"))
+            v.addWidget(edt, 1)
+            v.addWidget(btn)
+            tabs.addTab(page, label)
+            setattr(post_w, f"txt_{key}", edt)
+            setattr(post_w, f"btn_copy_{key}", btn)
+        card2.body.addWidget(tabs)
+
+        post_w.btn_generate = btn_generate
+        post_w.btn_ai_generate = btn_ai
+        post_w.btn_ai_brief = btn_brief
+        post_w.lbl_ai_note = lbl_ai_note
+        post_w.edt_folder = edt_folder
+        post_w.btn_folder_browse = btn_browse
+        post_w.progress = progress
+        post_w.lbl_files = lbl_files
+        post_w._enriched = None
+        post_w._brief = None
+
+        self._wire_post_panel(post_w, name)
+        self._post_note(post_w)
+        layout.addStretch(1)
+
+    def _wire_post_panel(self, post_w, name):
+        # The post panel's wiring: the default folder (the project's own), the
+        # generate / copy / AI buttons. One place, since the panel is built in
+        # code now.
+        # @args: post_w - the panel widget, name - the object's name
+        # @return: None
+        default_folder = str(paths.data_dir() / "posts")
+        if self._current_project:
+            default_folder = str(project.storage_dir(self._current_project))
+        post_w.edt_folder.setText(default_folder)
+        post_w.btn_folder_browse.clicked.connect(
+            lambda: self._post_browse_folder(post_w))
+        post_w.btn_generate.clicked.connect(
+            lambda: self._post_generate(post_w, name))
+        post_w.btn_ai_generate.clicked.connect(
+            lambda: self._post_generate_ai(post_w, name))
+        post_w.btn_ai_brief.clicked.connect(
+            lambda: self._post_show_brief(post_w))
+        for key in ("es", "en", "tweet"):
+            edt = getattr(post_w, f"txt_{key}")
+            getattr(post_w, f"btn_copy_{key}").clicked.connect(
+                lambda _c=False, e=edt:
+                QApplication.clipboard().setText(e.toPlainText()))
+
+    def _post_note(self, post_w):
+        # The AI note under the actions: which model is ready, that the AI is
+        # off, or that there is no endpoint. The template is always the
+        # offline answer (ADR-075).
+        # @args: post_w - the panel widget
+        # @return: None
+        from ..core.sources import llm
+        if llm.is_enabled(config):
+            post_w.lbl_ai_note.setText(
+                self.tr("AI model (experimental): {0}").replace(
+                    "{0}", config.get("ai_model", "")))
+            return
+        post_w.btn_ai_generate.setEnabled(False)
+        post_w.btn_ai_brief.setEnabled(False)
+        if not config.get("ai_enabled"):
+            post_w.lbl_ai_note.setText(self.tr(
+                "The AI is off: the template writes the post."))
+        else:
+            post_w.lbl_ai_note.setText(self.tr(
+                "No language model configured: the template writes the post."))
+
+    def _post_busy(self, post_w, on, msg=""):
+        # The busy state: an indeterminate bar (the model is opaque) and the
+        # buttons off while a worker runs. A local reasoning model can take a
+        # couple of minutes, so the page says so instead of looking frozen.
+        # @args: post_w - the panel widget, on - busy?, msg - the line to show
+        # @return: None
+        from ..core.sources import llm
+        post_w.progress.setVisible(on)
+        post_w.btn_generate.setEnabled(not on)
+        post_w.btn_ai_generate.setEnabled(not on and llm.is_enabled(config))
+        post_w.btn_ai_brief.setEnabled(not on)
+        if msg:
+            post_w.lbl_files.setText(msg)
+        elif not on:
+            # finished: the "drafting" line must not linger on screen after
+            # the answer has arrived (the note carries the real status)
+            post_w.lbl_files.setText("")
 
     def _fu_cadence_state(self, p, pid):
         # The cadence line for the follow-up kinds (T9): text + colour,
@@ -8889,10 +9209,6 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)
 
-    def _project_post(self):
-        if self._current_project:
-            self._open_post_dialog(self._current_project["object_name"])
-
     def _project_archive(self):
         if not self._current_project:
             return
@@ -9580,39 +9896,8 @@ class MainWindow(QMainWindow):
             plt.close("all")
         return charts
 
-    def _open_post_dialog(self, name):
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Post — %1").replace("%1", name))
-        dlg.resize(700, 560)
-        layout = QVBoxLayout(dlg)
-        post_w = _load_ui("post_tab")
-        layout.addWidget(post_w)
-        post_w.edt_object.setText(name)
-        # A4: default save folder — the project's own folder when the post
-        # comes from a project, the flat posts dir otherwise
-        default_folder = str(paths.data_dir() / "posts")
-        if self._current_project \
-                and self._current_project["object_name"] == name:
-            default_folder = str(project.storage_dir(self._current_project))
-        post_w.edt_folder.setText(default_folder)
-        post_w.btn_folder_browse.clicked.connect(
-            lambda: self._dialog_post_browse_folder(post_w))
-        post_w.btn_generate.clicked.connect(
-            lambda: self._dialog_generate_post(post_w, name))
-        post_w.btn_copy_es.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                post_w.txt_es.toPlainText()))
-        post_w.btn_copy_en.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                post_w.txt_en.toPlainText()))
-        post_w.btn_copy_tweet.clicked.connect(
-            lambda: QApplication.clipboard().setText(
-                post_w.txt_tweet.toPlainText()))
-        self._dialog_generate_post(post_w, name)
-        dlg.exec()
-
-    def _dialog_post_browse_folder(self, post_w):
-        # @args: post_w - the post tab widget
+    def _post_browse_folder(self, post_w):
+        # @args: post_w - the post panel widget
         # @return: None; asks for a folder and fills edt_folder
         start = post_w.edt_folder.text().strip() or str(paths.data_dir())
         folder = QFileDialog.getExistingDirectory(
@@ -9620,26 +9905,97 @@ class MainWindow(QMainWindow):
         if folder:
             post_w.edt_folder.setText(folder)
 
-    def _dialog_post_folder(self, post_w):
-        # @args: post_w - the post tab widget
+    def _post_folder(self, post_w):
+        # @args: post_w - the post panel widget
         # @return: Path of the chosen folder (created if missing)
         folder = post_w.edt_folder.text().strip() or str(paths.data_dir())
         p = Path(folder)
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    def _dialog_generate_post(self, post_w, name):
-        post_w.btn_generate.setEnabled(False)
+    def _post_generate(self, post_w, name):
+        # The offline template draft (the fallback that always works).
+        # @args: post_w - the panel, name - the object
+        # @return: None
+        self._post_busy(post_w, True, self.tr("Building the draft…"))
         self.statusBar().showMessage(self.tr("Building drafts…"))
         fallback = next((t for t, _s, _p, _ph in self._tonight_all
                          if t["id"] == name or t["name"] == name), None)
         w = PostWorker(config, name, fallback_target=fallback)
-        w.finished.connect(lambda e, r: self._dialog_post_done(post_w, name, e, r))
+        w.finished.connect(lambda e, r: self._post_done(post_w, name, e, r))
         self._keep(w)
         w.start()
 
-    def _dialog_post_done(self, post_w, name, e, rendered):
-        post_w.btn_generate.setEnabled(True)
+    def _post_generate_ai(self, post_w, name):
+        # Draft with the model (ADR-075). The template already on screen
+        # stays: a failure is said, never silent, and never empties the
+        # boxes the observer may already be editing. A local reasoning model
+        # can take a couple of minutes, hence the busy bar.
+        # @args: post_w - the panel, name - the object
+        # @return: None
+        from ..core.sources import llm
+        if not llm.is_enabled(config):
+            self._post_note(post_w)
+            return
+        proj = self._current_project
+        if not (proj and proj.get("object_name") == name):
+            proj = {"id": None, "kind": "", "object_name": name,
+                    "context": {}, "status": ""}
+        fallback = next((t for t, _s, _p, _ph in self._tonight_all
+                         if t["id"] == name or t["name"] == name), None)
+        self._post_busy(post_w, True, self.tr(
+            "The model is drafting. A reasoning model can take a couple of "
+            "minutes."))
+        w = AiPostWorker(config, proj, db,
+                         enriched=getattr(post_w, "_enriched", None),
+                         fallback_target=fallback)
+        w.done.connect(
+            lambda brief, rendered, err:
+            self._post_ai_done(post_w, brief, rendered, err))
+        self._keep(w)
+        w.start()
+
+    def _post_ai_done(self, post_w, brief, rendered, err):
+        self._post_busy(post_w, False)
+        if err:
+            post_w.lbl_ai_note.setText(self.tr("AI draft failed: ") + err)
+            return
+        post_w._brief = brief
+        post_w.txt_es.setPlainText(rendered.get("es", ""))
+        post_w.txt_en.setPlainText(rendered.get("en", ""))
+        post_w.txt_tweet.setPlainText(rendered.get("tweet", ""))
+        post_w.lbl_ai_note.setText(self.tr(
+            "AI draft ready. Review it before publishing: the voice is "
+            "yours."))
+
+    def _post_show_brief(self, post_w):
+        # The exact fact sheet the model reads (ADR-075): the observer sees
+        # what would leave the machine before it does. No network here: it
+        # is the same builder the writer uses.
+        from ..core import object_brief
+        brief = getattr(post_w, "_brief", None)
+        if not brief:
+            proj = self._current_project
+            if not proj:
+                return
+            brief = object_brief.build_brief(
+                proj, db, enriched=getattr(post_w, "_enriched", None),
+                lang=config.ui_language(), cfg=config)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("What will be sent"))
+        lay = QVBoxLayout(dlg)
+        edt = QTextEdit(object_brief.to_text(brief))
+        edt.setReadOnly(True)
+        lay.addWidget(edt)
+        box = QDialogButtonBox(QDialogButtonBox.Close)
+        box.rejected.connect(dlg.reject)
+        lay.addWidget(box)
+        dlg.resize(640, 560)
+        dlg.exec()
+
+    def _post_done(self, post_w, name, e, rendered):
+        self._post_busy(post_w, False)
+        post_w._enriched = e
         if not rendered:
             post_w.lbl_files.setText(self.tr("Not found: ") + name)
             return
@@ -9653,7 +10009,7 @@ class MainWindow(QMainWindow):
             pts = fu.list_points(db, self._current_project["id"])
             if pts:
                 e.setdefault("data", {}).setdefault("followup", {})["points"] = pts
-        outdir = self._dialog_post_folder(post_w)
+        outdir = self._post_folder(post_w)
         safe = "".join(c if c.isalnum() or c in "-_" else "_"
                         for c in name)
         charts, resources = {}, {}

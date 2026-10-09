@@ -1942,10 +1942,10 @@ def test_download_survey_points_are_stored_and_deduped(window):
 
 
 def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
-    # U0.1: _dialog_post_done registered es/en/tweet twice (two A4 blocks).
+    # U0.1: _post_done registered es/en/tweet twice (two A4 blocks).
     from types import SimpleNamespace
-    from PySide6.QtWidgets import QLabel, QLineEdit, QPlainTextEdit, \
-        QPushButton
+    from PySide6.QtWidgets import (QLabel, QLineEdit, QPlainTextEdit,
+                                   QProgressBar, QPushButton)
     from nightscribe.core import project as proj_mod
     from nightscribe.core import post as post_mod
     from nightscribe.gui import main_window as mw
@@ -1955,7 +1955,8 @@ def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
         btn_generate=QPushButton(), lbl_files=QLabel(),
         edt_folder=QLineEdit(str(tmp_path)),
         txt_es=QPlainTextEdit(), txt_en=QPlainTextEdit(),
-        txt_tweet=QPlainTextEdit())
+        txt_tweet=QPlainTextEdit(), progress=QProgressBar(),
+        btn_ai_generate=QPushButton(), btn_ai_brief=QPushButton())
     written = {"es": tmp_path / "x_ES.md", "en": tmp_path / "x_EN.md",
                "tweet": tmp_path / "x_tweet.txt"}
     for f in written.values():
@@ -1964,8 +1965,8 @@ def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
                         lambda *a, **k: written)
     monkeypatch.setattr(window, "_render_object_charts",
                         lambda *a, **k: {})
-    window._dialog_post_done(post_w, "SN 2099zz",
-                             {"name": "SN 2099zz"}, {"es": "a", "en": "b"})
+    window._post_done(post_w, "SN 2099zz",
+                      {"name": "SN 2099zz"}, {"es": "a", "en": "b"})
     files = [f for f in proj_mod.list_files(mw.db, p["id"])
              if f["kind"] == "post"]
     assert len(files) == 3

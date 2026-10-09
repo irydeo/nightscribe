@@ -158,6 +158,8 @@
        </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
+     <addaction name="action_assistant"/>
+     <addaction name="separator"/>
      <addaction name="action_welcome"/>
      <addaction name="action_guide_web"/>
      <addaction name="separator"/>
@@ -204,6 +206,10 @@
   <action name="action_log">
     <property name="text"><string>Open the log…</string></property>
     <property name="toolTip"><string>What the application has been doing, written while it runs: if something failed without saying why, the answer is in here</string></property>
+  </action>
+  <action name="action_assistant">
+    <property name="text"><string>Assistant (experimental)</string></property>
+    <property name="toolTip"><string>Experimental: it answers through an optional language model you connect. Ask about the object you are working on, about the app, or what to do next. It reads only NightScribe's own data and documents</string></property>
   </action>
  </widget>
  <resources/>

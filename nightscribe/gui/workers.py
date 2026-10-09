@@ -142,6 +142,119 @@ class PostWorker(QThread):
             self.finished.emit({}, {})
 
 
+class AiPostWorker(QThread):
+    # Drafts a post with the language model (ADR-075): builds the brief from
+    # the project and its own data, then asks the writer. It emits the brief
+    # too, so the dialog can offer the "what will be sent" preview from the
+    # very same bytes the model read.
+    done = Signal(dict, dict, str)   # brief, rendered, error
+
+    def __init__(self, cfg, project, db, enriched=None, fallback_target=None):
+        super().__init__()
+        self._cfg = cfg
+        self._project = project
+        self._db = db
+        self._enriched = enriched
+        self._fallback = fallback_target
+
+    def run(self):
+        from ..core import enrich, object_brief, writer
+        from ..core.sources import llm
+        try:
+            e = self._enriched
+            if not e:
+                e = enrich.enrich(self._project.get("object_name") or "",
+                                  site=self._cfg.get("mpc_code"),
+                                  fallback_target=self._fallback)
+            brief = object_brief.build_brief(
+                self._project, self._db, enriched=e,
+                lang=self._cfg.ui_language(), cfg=self._cfg)
+            rendered = writer.write_post(brief, self._cfg)
+            self.done.emit(brief, rendered, "")
+        except llm.LlmError as err:
+            self.done.emit({}, {}, str(err))
+        except Exception as err:
+            logger.exception("ai post worker failed: %s", err)
+            self.done.emit({}, {}, str(err))
+
+
+class AssistantWorker(QThread):
+    # One turn of the grounded conversation (ADR-075), off the GUI thread.
+    # The brief may need a network enrichment, so it is built HERE (via the
+    # provider); the editor's state is read on the GUI thread and arrives as
+    # plain data.
+    done = Signal(str, list, str)   # answer, sources, error
+
+    def __init__(self, cfg, scope, question, history, brief_provider=None,
+                 editor_state=None):
+        super().__init__()
+        self._cfg = cfg
+        self._scope = scope
+        self._q = question
+        self._h = history
+        self._brief_provider = brief_provider
+        self._state = editor_state
+
+    def run(self):
+        from ..core import assistant
+        from ..core.sources import llm
+        try:
+            brief = None
+            if self._scope == assistant.SCOPE_OBJECT and self._brief_provider:
+                brief = self._brief_provider()
+            out = assistant.ask(self._cfg, self._scope, self._q,
+                                history=self._h, brief=brief,
+                                editor_state=self._state)
+            self.done.emit(out["answer"], out["sources"], "")
+        except llm.LlmError as err:
+            self.done.emit("", [], str(err))
+        except Exception as err:
+            logger.exception("assistant worker failed: %s", err)
+            self.done.emit("", [], str(err))
+
+
+class LlmModelsWorker(QThread):
+    # The Settings "List models" click (ADR-075): asks the endpoint which
+    # models it has, off the GUI thread. For a local server this returns its
+    # exact names, which is the whole point.
+    done = Signal(list, str)     # models, error
+
+    def __init__(self, cfg):
+        super().__init__()
+        self._cfg = cfg
+
+    def run(self):
+        from ..core.sources import llm
+        try:
+            models = llm.list_models(self._cfg)
+            self.done.emit(models, "")
+        except llm.LlmError as err:
+            self.done.emit([], str(err))
+        except Exception as err:
+            logger.exception("llm models failed: %s", err)
+            self.done.emit([], str(err))
+
+
+class LlmTestWorker(QThread):
+    # The Settings "Test connection" click: asks the endpoint for a one-line
+    # reply off the GUI thread, so a slow (or dead) server never freezes the
+    # dialog. It runs only when the observer clicks, never in the background.
+    done = Signal(bool, str)     # ok, message ready to show
+
+    def __init__(self, cfg):
+        super().__init__()
+        self._cfg = cfg
+
+    def run(self):
+        from ..core.sources import llm
+        try:
+            ok, msg = llm.test_connection(self._cfg)
+        except Exception as err:            # never let a worker die silently
+            logger.exception("llm test failed: %s", err)
+            ok, msg = False, str(err)
+        self.done.emit(ok, msg)
+
+
 class SunWorker(QThread):
     # Fetches the Sun state, the latest SDO image (selected channel) and
     # the HMI continuum image (for the annotated region map) in the background.

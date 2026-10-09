@@ -560,6 +560,16 @@ class UfeDialog(QWidget):
         self.btn_solve_visit.clicked.connect(self._on_solve_visit)
         # the .ui owns the wording; the disabled case needs its own reason
         self._visit_solve_tip = self.btn_solve_visit.toolTip()
+        # ADR-075: the assistant, scoped to this editor. It reads the state
+        # and the guide; it never measures or decides.
+        self.btn_ask = self._ui.btn_ask
+        self.btn_ask.clicked.connect(self._open_assistant)
+        self._ask_tip = self.btn_ask.toolTip()
+        self._assistant_win = None
+        # the AI master switch (ADR-075): off, the "?" is disabled with the
+        # reason, so no AI dialog can be reached from the editor
+        from ..core.sources import llm
+        self.set_ai_available(llm.is_enabled(config))
         # ADR-044 rev (2026-09-24): the toggles' _on/_off glyphs follow
         # the checked state (icons-only mode)
         for name, base in (("btn_north", "ufe_north"),
@@ -1861,6 +1871,66 @@ class UfeDialog(QWidget):
             return (float(ra), float(dec))
         except (TypeError, ValueError):
             return None
+
+    def _assistant_state(self):
+        # The editor's state for the assistant (ADR-075): what is loaded and
+        # which tab is in front, as plain data. A next step only when it is
+        # unambiguous (no plate at all); the rest the guide explains.
+        # @return: the state dict
+        lang = self._lang
+        state = {}
+        if self._object and self._object.get("name"):
+            state["project"] = self._object["name"]
+        if self.tabs is not None and self.tabs.count():
+            state["tab"] = self.tabs.tabText(self.tabs.currentIndex())
+        path = getattr(self.state, "path", None)
+        if path:
+            name = str(path).replace("\\", "/").rsplit("/", 1)[-1]
+            wcs = getattr(self.state, "wcs", None)
+            if lang == "es":
+                state["loaded"] = [name, "con WCS" if wcs else "sin WCS"]
+            else:
+                state["loaded"] = [
+                    name, "with a WCS" if wcs else "without a WCS"]
+        else:
+            state["loaded"] = (["ninguna placa cargada"] if lang == "es"
+                               else ["no plate loaded"])
+            state["next_step"] = (
+                "Cargar una imagen FITS o abrir una visita" if lang == "es"
+                else "Load a FITS image or open a visit")
+        return state
+
+    def set_ai_available(self, on):
+        # The AI master switch (ADR-075), applied to the editor: off, the
+        # assistant's "?" is disabled and says why, so the editor cannot open
+        # an AI dialog the app has turned off.
+        # @args: on - True when the AI is enabled and has an endpoint
+        # @return: None
+        self.btn_ask.setEnabled(on)
+        self.btn_ask.setToolTip(
+            self._ask_tip if on else self.tr(
+                "The AI is off: turn it on in Settings → Integrations."))
+
+    def _open_assistant(self):
+        # Open the assistant scoped to this editor (ADR-075). One window,
+        # opened by the observer, that reads the state and the guide.
+        # @return: None
+        from .assistant_window import AssistantWindow
+        from ..core import assistant as assistant_mod
+        from ..core.sources import llm
+        if not llm.is_enabled(config):
+            # the AI is off: the "?" is disabled; this is the belt to it
+            return
+        win = self._assistant_win
+        if win is not None:
+            win.close()
+        win = AssistantWindow(
+            editor_state_provider=self._assistant_state,
+            start_scope=assistant_mod.SCOPE_EDITOR, parent=self)
+        self._assistant_win = win
+        win.show()
+        win.raise_()
+        win.activateWindow()
 
     def _on_solve_visit(self):
         # Solve every frame of the visit (ADR-051). A visit is one field, so

@@ -184,7 +184,10 @@ def test_integrations_page(qapp):
     for w in ("grp_ccdciel", "edt_ccdciel_host", "spn_ccdciel_port",
               "chk_ccdciel_auto", "grp_apikeys", "edt_neofixer_key",
               "edt_astrometry_key", "edt_tns_bot", "edt_tns_bot_key",
-              "edt_aavso_token"):
+              "edt_aavso_token", "grp_ai", "chk_ai_enabled",
+              "cmb_ai_preset", "edt_ai_base_url", "edt_ai_api_key",
+              "cmb_ai_model", "btn_ai_models", "spn_ai_temp", "btn_ai_test",
+              "lbl_ai_status"):
         assert w in names, f"{w} expected on the Integrations page"
     dlg.deleteLater()
 
@@ -417,6 +420,145 @@ def test_the_astrometry_settings_are_editable_at_last(qapp):
     help_text = dlg.lblH_astro_floor.text()
     assert "recommends 20" in help_text and "ships 10" in help_text
     dlg.deleteLater()
+
+
+def test_the_ai_group_is_marked_experimental(qapp):
+    # ADR-075: the language-model controls are presented as experimental
+    dlg = _dlg()
+    assert "experimental" in dlg.grp_ai.title().lower()
+    assert "experimental" in dlg.lblH_ai_enabled.text().lower()
+    dlg.deleteLater()
+
+
+def test_ai_endpoint_preset_fills_the_address(qapp, monkeypatch):
+    # ADR-075: choosing a known endpoint fills the base URL; the field table
+    # maps the AI fields to their config keys. The endpoint is
+    # OpenAI-compatible, so the local servers are just another entry.
+    from PySide6.QtWidgets import QComboBox, QDialog
+    from nightscribe.gui import main_window as mw, settings_spec
+
+    class _Cfg:
+        def __init__(self):
+            self.d = {"ui_animations": True}
+
+        def get(self, key, default=None):
+            return self.d.get(key, default)
+
+        def set(self, key, value):
+            self.d[key] = value
+
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win.tr = lambda s: s
+    win._enabled_kinds = lambda: ["neo"]
+    win._tonight_all = False
+    win._welcome = None
+    win.statusBar = lambda: type(
+        "S", (), {"showMessage": lambda *a, **k: None})()
+    win._settings_masters_init = lambda dlg: None
+    win.tonight = type("T", (), {"cmb_filter": QComboBox()})()
+    win._apply_kind_filter = lambda: None
+    win._build_suggestion_grid = lambda: None
+
+    dlg = _dlg()
+    monkeypatch.setattr(dlg, "exec", lambda: QDialog.Rejected)
+    monkeypatch.setattr(mw, "_load_ui", lambda name, parent=None: dlg)
+    monkeypatch.setattr(mw, "config", _Cfg())
+    mw.MainWindow.on_open_settings(win)
+
+    table = {f.widget: f.key for f in settings_spec.FIELDS}
+    assert table["chk_ai_enabled"] == "ai_enabled"
+    assert table["edt_ai_base_url"] == "ai_base_url"
+    assert table["cmb_ai_model"] == "ai_model"
+    assert table["spn_ai_temp"] == "ai_temperature"
+
+    # a known endpoint fills the address; "Custom…" (index 0) writes nothing
+    idx = dlg.cmb_ai_preset.findData("http://localhost:11434/v1")
+    assert idx > 0
+    dlg.cmb_ai_preset.setCurrentIndex(idx)
+    assert dlg.edt_ai_base_url.text() == "http://localhost:11434/v1"
+    dlg.cmb_ai_preset.setCurrentIndex(0)
+    assert dlg.edt_ai_base_url.text() == "http://localhost:11434/v1"
+    dlg.deleteLater()
+
+
+def test_ai_test_runs_off_the_gui_thread(qapp, monkeypatch):
+    # the Test button must not call the endpoint on the GUI thread (ADR-075)
+    from nightscribe.gui import main_window as mw, workers
+    dlg = _dlg()
+    dlg.edt_ai_base_url.setText("http://x/v1")
+    dlg.cmb_ai_model.setCurrentText("m")
+    seen = {}
+
+    class _FakeWorker:
+        def __init__(self, cfg):
+            seen["cfg"] = cfg
+
+        done = type("D", (), {
+            "connect": staticmethod(lambda fn: seen.__setitem__("fn", fn))})
+
+        def start(self):
+            seen["started"] = True
+
+    monkeypatch.setattr(workers, "LlmTestWorker", _FakeWorker)
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win.tr = lambda s: s
+    win._keep = lambda w: seen.__setitem__("kept", w)
+    mw.MainWindow._ai_test(win, dlg)
+    assert seen["started"] and seen["kept"]
+    assert seen["cfg"].get("ai_base_url") == "http://x/v1"
+    assert not dlg.btn_ai_test.isEnabled()      # disabled while testing
+    dlg.deleteLater()
+
+
+def test_ai_list_models_fills_the_combo(qapp, monkeypatch):
+    # ADR-075: a local server answers with its exact model names, so nobody
+    # types "qwen2.5:7b" from memory
+    from nightscribe.gui import main_window as mw, workers
+    dlg = _dlg()
+    dlg.edt_ai_base_url.setText("http://localhost:11434/v1")
+    dlg.cmb_ai_model.setCurrentText("kept-model")
+    seen = {}
+
+    class _FakeWorker:
+        def __init__(self, cfg):
+            seen["cfg"] = cfg
+
+        done = type("D", (), {
+            "connect": staticmethod(lambda fn: seen.__setitem__("fn", fn))})
+
+        def start(self):
+            seen["started"] = True
+
+    monkeypatch.setattr(workers, "LlmModelsWorker", _FakeWorker)
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win.tr = lambda s: s
+    win._keep = lambda w: None
+    mw.MainWindow._ai_list_models(win, dlg)
+    assert seen["started"]
+    seen["fn"](["qwen2.5:7b", "llama3.2:latest"], "")
+    items = [dlg.cmb_ai_model.itemText(i)
+             for i in range(dlg.cmb_ai_model.count())]
+    assert "qwen2.5:7b" in items
+    assert dlg.cmb_ai_model.currentText() == "kept-model"   # typed name kept
+    dlg.deleteLater()
+
+
+def test_llm_models_worker_emits_on_success(qapp, monkeypatch):
+    # the bug of 2026-10-09: the worker emitted only on ERROR, so a working
+    # endpoint (a local Ollama) left the button at "Asking the endpoint…"
+    # forever. This runs the REAL run() (no fake worker) with the source
+    # monkeypatched, so the success emit is actually exercised.
+    from nightscribe.gui import workers
+    from nightscribe.core.sources import llm
+    monkeypatch.setattr(llm, "list_models", lambda cfg: ["qwen3.6:latest"])
+    w = workers.LlmModelsWorker(object())
+    got = {}
+    w.done.connect(lambda m, e: got.update(m=m, e=e))
+    w.start()
+    w.wait(3000)
+    qapp.processEvents()
+    assert got.get("m") == ["qwen3.6:latest"]
+    assert got.get("e") == ""
 
 
 def test_selecting_a_preset_loads_its_template(qapp, monkeypatch):

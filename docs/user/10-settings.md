@@ -107,6 +107,14 @@ The outside world: a capture server and the optional keys.
   optional keys for, respectively, community reporting, blind-solving plates
   without WCS, transient discovery images and the community photometry that
   feeds the bright-star vigils (chapter 04).
+- **Language model (AI, optional)**: to draft the post and the assistant
+  (chapters 08 and 11). The endpoint is OpenAI-compatible: a cloud service
+  (OpenRouter, Groq, Google AI Studio) or a local one (Ollama, LM Studio)
+  both work. Pick the known service, paste the key and type the model, or
+  press **List models** and choose the one the endpoint gives you (with its
+  exact names if it is local); **Test connection** checks that the three
+  agree. It is off by default and nothing leaves your machine until you use
+  it.
 
 ## Interface
 

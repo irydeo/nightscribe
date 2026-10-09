@@ -224,6 +224,17 @@ DEFAULTS = {
                               # (the blink GIF/MP4 and the finder chart);
                               # the UFE's plate band is chart_data
     "chart_data": True,       # what the plate's band says (ADR-046 rev.)
+    # AI writing and the grounded assistant (ADR-075). OFF by default: with
+    # no endpoint the app is exactly the same as before, and nothing leaves
+    # the machine until the observer asks for a draft or a question. The
+    # endpoint is OpenAI-compatible on purpose, so a local server (Ollama,
+    # LM Studio) is just another base URL and the data never goes out.
+    "ai_enabled": False,
+    "ai_base_url": "",        # e.g. https://openrouter.ai/api/v1 (cloud) or
+                              # http://localhost:11434/v1 (a local server)
+    "ai_api_key": "",         # empty is fine for a local server
+    "ai_model": "",           # e.g. "openai/gpt-oss-20b:free" | "qwen2.5:7b"
+    "ai_temperature": 0.7,
 }
 
 

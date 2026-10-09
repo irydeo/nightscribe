@@ -940,6 +940,80 @@
             </layout>
            </widget>
           </item>
+          <item>
+           <widget class="QGroupBox" name="grp_ai">
+            <property name="title"><string>AI writing and assistant (experimental, optional)</string></property>
+            <layout class="QVBoxLayout" name="vbox_ai">
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_enabled">
+               <item><widget class="QCheckBox" name="chk_ai_enabled"><property name="text"><string>Use a language model</string></property></widget></item>
+               <item>
+                <spacer name="hsp_ai_enabled">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_enabled"><property name="text"><string>Experimental, and off by default: with it off the app writes the post with its own template and nothing leaves your machine</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_preset">
+               <item><widget class="QLabel" name="lbl_ai_preset"><property name="text"><string>Known endpoint:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_ai_preset"/></item>
+               <item>
+                <spacer name="hsp_ai_preset">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_preset"><property name="text"><string>Fills the address of a common service so you only type the key; any OpenAI-compatible address works, cloud or local</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_base_url">
+               <item><widget class="QLabel" name="lbl_ai_base_url"><property name="text"><string>Endpoint address:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_ai_base_url"/></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_base_url"><property name="text"><string>The address includes its version path; a local server keeps everything on your machine</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_key">
+               <item><widget class="QLabel" name="lbl_ai_key"><property name="text"><string>API key:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_ai_api_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_key"><property name="text"><string>Only for a cloud endpoint; a local server needs none. It is stored in your configuration file and sent only to the address above</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_model">
+               <item><widget class="QLabel" name="lbl_ai_model"><property name="text"><string>Model:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_ai_model"><property name="editable"><bool>true</bool></property><property name="insertPolicy"><enum>QComboBox::NoInsert</enum></property></widget></item>
+               <item><widget class="QPushButton" name="btn_ai_models"><property name="text"><string>List models</string></property><property name="toolTip"><string>Ask the endpoint which models it has. A local server answers with its exact names, so you do not have to type them</string></property></widget></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_model"><property name="text"><string>The exact name the endpoint expects; the endpoint's own list is the source of truth</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_temp">
+               <item><widget class="QLabel" name="lbl_ai_temp"><property name="text"><string>Freedom:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QDoubleSpinBox" name="spn_ai_temp"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.000000000000000</double></property><property name="maximum"><double>2.000000000000000</double></property><property name="singleStep"><double>0.100000000000000</double></property></widget></item>
+               <item>
+                <spacer name="hsp_ai_temp">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_temp"><property name="text"><string>How freely the model phrases things: near zero is more literal, higher is more varied. It never changes the facts</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ai_test">
+               <item><widget class="QPushButton" name="btn_ai_test"><property name="text"><string>Test connection</string></property></widget></item>
+               <item><widget class="QLabel" name="lbl_ai_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ai_test"><property name="text"><string>Asks the endpoint for a one-line reply so you know the address, the key and the model agree; it runs only when you click</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+            </layout>
+           </widget>
+          </item>
          </layout>
         </widget>
        </widget>

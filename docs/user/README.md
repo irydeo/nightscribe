@@ -39,6 +39,7 @@ them start to finish or jump to the one you need:
 | [08. Reporting it](08-posts.md) | Posts, tweets and charts |
 | [09. The command line](09-cli.md) | Appendix: all of the above from the terminal |
 | [10. Settings](10-settings.md) | Reference appendix: every Settings section, what it decides and when to touch it |
+| [11. The assistant](11-assistant.md) | Ask about the object, the app or the editor |
 
 Conventions:
 

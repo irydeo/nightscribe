@@ -128,6 +128,13 @@ FIELDS = [
     Field("edt_tns_bot", "tns_bot_name", "str"),
     Field("edt_tns_bot_key", "tns_bot_key", "str"),
     Field("edt_aavso_token", "aavso_api_token", "str"),
+    # AI writing and the grounded assistant (ADR-075). The preset combo is
+    # filled at runtime (it maps to the base URL), so it stays hand-wired.
+    Field("chk_ai_enabled", "ai_enabled", "bool"),
+    Field("edt_ai_base_url", "ai_base_url", "str"),
+    Field("edt_ai_api_key", "ai_api_key", "str"),
+    Field("cmb_ai_model", "ai_model", "combo_text"),
+    Field("spn_ai_temp", "ai_temperature", "float"),
     # --- Interface -----------------------------------------------------
     Field("chk_animations", "ui_animations", "bool"),
     Field("chk_ufe_bar_icons", "ufe_bar_icons", "bool"),

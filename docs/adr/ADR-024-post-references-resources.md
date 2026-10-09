@@ -36,13 +36,12 @@ que no referencia sus propios recursos no está listo.
      los tres textos, hace que el markdown referencia cada PNG/GIF/MP4
      presente y devuelve el mapa de ficheros con claves `chart_*` y `res_*`.
 
-2. La GUI no duplica lógica: `_render_object_charts()` de
-   `gui/main_window.py` es un wrapper fino sobre `post.build_charts` (se usa
-   también en el diálogo Explore para las miniaturas). En el flujo de post,
-   `_dialog_post_done()` construye los gráficos con el prefijo por objeto
-   (`<safe>_`), recoge del directorio de salida cualquier GIF/MP4/PNG
-   `_before_after` ya existente para el mismo objeto (el blink puede haberse
-   hecho en una sesión anterior) y todo pasa por `save_outputs()`; los
+2. La GUI no duplica lógica: `post.collect_assets()` de `core/post.py`
+   renderiza los gráficos con `build_charts` (se usa también en el diálogo
+   Explore para las miniaturas) y recoge del directorio de salida cualquier
+   GIF/MP4/PNG `_before_after` ya existente para el mismo objeto (el blink
+   puede haberse hecho en una sesión anterior). El flujo de post usa el
+   prefijo por objeto (`<safe>_`) y todo pasa por `save_outputs()`; los
    archivos se registran en el proyecto con `project.add_file()`.
 
 3. CLI: `nightscribe post OBJETO --png` genera los gráficos y un borrador
@@ -95,14 +94,14 @@ its own resources is not ready.
      the three texts, makes the markdown reference every PNG/GIF/MP4 that
      exists, and returns the file map with `chart_*` / `res_*` keys.
 
-2. The GUI does not duplicate logic: `_render_object_charts()` in
-   `gui/main_window.py` is a thin wrapper over `post.build_charts` (it is
-   also used by the Explore dialog for the thumbnails). In the post flow,
-   `_dialog_post_done()` builds the charts with a per-object prefix
-   (`<safe>_`), collects any existing GIF/MP4/`_before_after` PNG in the
-   output folder for the same object (the blink may have been built in an
-   earlier session), and routes everything through `save_outputs()`; the
-   files are registered in the project with `project.add_file()`.
+2. The GUI does not duplicate logic: `post.collect_assets()` in
+   `core/post.py` renders the charts with `build_charts` (it is also used by
+   the Explore dialog for the thumbnails) and collects any existing
+   GIF/MP4/`_before_after` PNG in the output folder for the same object (the
+   blink may have been built in an earlier session). The post flow uses a
+   per-object prefix (`<safe>_`) and routes everything through
+   `save_outputs()`; the files are registered in the project with
+   `project.add_file()`.
 
 3. CLI: `nightscribe post OBJECT --png` generates the charts and a draft
    that already references them; `nightscribe blink NAME IMAGE --video

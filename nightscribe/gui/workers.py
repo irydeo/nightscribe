@@ -143,22 +143,30 @@ class PostWorker(QThread):
 
 
 class AiPostWorker(QThread):
-    # Drafts a post with the language model (ADR-075): builds the brief from
-    # the project and its own data, then asks the writer. It emits the brief
-    # too, so the dialog can offer the "what will be sent" preview from the
-    # very same bytes the model read.
-    done = Signal(dict, dict, str)   # brief, rendered, error
+    # Drafts a post (or the LONG report) with the language model (ADR-075).
+    # It renders the object's charts and finds the extra resources FIRST, so
+    # the model can cite the exact image files by name; then it builds the
+    # brief from the project and its own data and asks the writer. It emits
+    # the brief, the charts and the resources too, so the panel can offer the
+    # "what will be sent" preview from the very same bytes the model read and
+    # can save the images without rebuilding them.
+    done = Signal(dict, dict, dict, dict, str)   # brief, rendered, charts,
+                                                 # resources, error
 
-    def __init__(self, cfg, project, db, enriched=None, fallback_target=None):
+    def __init__(self, cfg, project, db, enriched=None, fallback_target=None,
+                 long=False, outdir=None, safe=None):
         super().__init__()
         self._cfg = cfg
         self._project = project
         self._db = db
         self._enriched = enriched
         self._fallback = fallback_target
+        self._long = long
+        self._outdir = outdir
+        self._safe = safe
 
     def run(self):
-        from ..core import enrich, object_brief, writer
+        from ..core import enrich, object_brief, post, writer
         from ..core.sources import llm
         try:
             e = self._enriched
@@ -166,16 +174,48 @@ class AiPostWorker(QThread):
                 e = enrich.enrich(self._project.get("object_name") or "",
                                   site=self._cfg.get("mpc_code"),
                                   fallback_target=self._fallback)
+            charts, resources = {}, {}
+            if self._outdir and self._safe:
+                # the charts are OPTIONAL: a chart that fails to render must
+                # never take the draft down with it (the template path has
+                # the same guard). A draft with no image is still a draft.
+                try:
+                    charts, resources = post.collect_assets(
+                        e, self._outdir, self._safe, cfg=self._cfg)
+                except Exception:
+                    logger.warning("charts failed; drafting without them")
+            gallery = post.gallery_entries(charts, resources,
+                                           e.get("name") or "")
             brief = object_brief.build_brief(
                 self._project, self._db, enriched=e,
-                lang=self._cfg.ui_language(), cfg=self._cfg)
-            rendered = writer.write_post(brief, self._cfg)
-            self.done.emit(brief, rendered, "")
+                lang=self._cfg.ui_language(), cfg=self._cfg,
+                long=self._long, gallery=gallery)
+            warn = ""
+            if self._long:
+                try:
+                    rendered = writer.write_report(brief, self._cfg)
+                except llm.LlmError as err:
+                    # the long report failed: fall back to the short post so
+                    # the panel is never left empty, and SAY that the report
+                    # is what failed (the observer must not think it worked)
+                    warn = str(err)
+                    rendered = writer.write_post(brief, self._cfg)
+                # the short post is a second call inside write_report; if it
+                # did not come back, the template fills it (the offline
+                # answer is always there, ADR-075)
+                if not rendered.get("es"):
+                    try:
+                        rendered.update(post.render_post(e, self._cfg))
+                    except Exception:
+                        logger.warning("could not build the fallback post")
+            else:
+                rendered = writer.write_post(brief, self._cfg)
+            self.done.emit(brief, rendered, charts, resources, warn)
         except llm.LlmError as err:
-            self.done.emit({}, {}, str(err))
+            self.done.emit({}, {}, {}, {}, str(err))
         except Exception as err:
             logger.exception("ai post worker failed: %s", err)
-            self.done.emit({}, {}, str(err))
+            self.done.emit({}, {}, {}, {}, str(err))
 
 
 class AssistantWorker(QThread):

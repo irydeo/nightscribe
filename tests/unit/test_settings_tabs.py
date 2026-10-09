@@ -257,17 +257,20 @@ def test_the_field_table_round_trips(qapp):
     dlg.chk_chart_data.setChecked(False)
     dlg.spn_cam_gain.setValue(0.0)          # 0 = unknown -> None
     dlg.edt_mpc_code.setText("z41")
+    dlg.chk_ai_long_report.setChecked(True)  # the long report (ADR-075)
     settings_spec.save(dlg, cfg)
     assert cfg.d["limit_mag"] == 17.5
     assert cfg.d["chart_data"] is False
     assert cfg.d["ccd_gain"] is None
     assert cfg.d["mpc_code"] == "Z41"       # uppercased on save
+    assert cfg.d["ai_long_report"] is True
 
     dlg2 = _dlg()
     settings_spec.load(dlg2, cfg)
     assert dlg2.spn_limit_mag.value() == 17.5
     assert dlg2.chk_chart_data.isChecked() is False
     assert dlg2.edt_mpc_code.text() == "Z41"
+    assert dlg2.chk_ai_long_report.isChecked() is True
     dlg.deleteLater()
     dlg2.deleteLater()
 

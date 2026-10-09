@@ -8291,6 +8291,25 @@ class MainWindow(QMainWindow):
             setattr(post_w, f"btn_copy_{key}", btn)
         card2.body.addWidget(tabs)
 
+        # --- card: the long report (ES / EN), when the setting is on -----
+        # It is hidden when the long report is off: without it there is
+        # nothing to put here, and an empty card would be furniture.
+        report_card = PanelCard(self.tr("Long report"), accent)
+        report_card.setVisible(bool(config.get("ai_long_report")))
+        layout.addWidget(report_card)
+        rtabs = QTabWidget()
+        for label, key in (("ES", "report_es"), ("EN", "report_en")):
+            page = QWidget()
+            v = QVBoxLayout(page)
+            edt = QTextEdit()
+            btn = QPushButton(self.tr("Copy"))
+            v.addWidget(edt, 1)
+            v.addWidget(btn)
+            rtabs.addTab(page, label)
+            setattr(post_w, f"txt_{key}", edt)
+            setattr(post_w, f"btn_copy_{key}", btn)
+        report_card.body.addWidget(rtabs)
+
         post_w.btn_generate = btn_generate
         post_w.btn_ai_generate = btn_ai
         post_w.btn_ai_brief = btn_brief
@@ -8299,6 +8318,7 @@ class MainWindow(QMainWindow):
         post_w.btn_folder_browse = btn_browse
         post_w.progress = progress
         post_w.lbl_files = lbl_files
+        post_w.report_card = report_card
         post_w._enriched = None
         post_w._brief = None
 
@@ -8324,11 +8344,13 @@ class MainWindow(QMainWindow):
             lambda: self._post_generate_ai(post_w, name))
         post_w.btn_ai_brief.clicked.connect(
             lambda: self._post_show_brief(post_w))
-        for key in ("es", "en", "tweet"):
-            edt = getattr(post_w, f"txt_{key}")
-            getattr(post_w, f"btn_copy_{key}").clicked.connect(
-                lambda _c=False, e=edt:
-                QApplication.clipboard().setText(e.toPlainText()))
+        for key in ("es", "en", "tweet", "report_es", "report_en"):
+            edt = getattr(post_w, f"txt_{key}", None)
+            btn = getattr(post_w, f"btn_copy_{key}", None)
+            if edt is not None and btn is not None:
+                btn.clicked.connect(
+                    lambda _c=False, e=edt:
+                    QApplication.clipboard().setText(e.toPlainText()))
 
     def _post_note(self, post_w):
         # The AI note under the actions: which model is ready, that the AI is
@@ -8338,9 +8360,17 @@ class MainWindow(QMainWindow):
         # @return: None
         from ..core.sources import llm
         if llm.is_enabled(config):
-            post_w.lbl_ai_note.setText(
-                self.tr("AI model (experimental): {0}").replace(
-                    "{0}", config.get("ai_model", "")))
+            base = self.tr("AI model (experimental): {0}").replace(
+                "{0}", config.get("ai_model", ""))
+            if config.get("ai_long_report"):
+                if llm.is_local(config.get("ai_base_url")):
+                    base += " · " + self.tr(
+                        "long report on; a local model costs nothing")
+                else:
+                    base += " · " + self.tr(
+                        "long report on; a cloud model spends many tokens "
+                        "and may cost")
+            post_w.lbl_ai_note.setText(base)
             return
         post_w.btn_ai_generate.setEnabled(False)
         post_w.btn_ai_brief.setEnabled(False)
@@ -9880,22 +9910,6 @@ class MainWindow(QMainWindow):
         self._keep(worker)
         return worker
 
-    def _render_object_charts(self, e, prefix, outdir=None):
-        # Renders every chart the enriched object supports into the posts
-        # directory, for the post/publish flow. Thin wrapper over
-        # core.post.build_charts (single source of truth).
-        # @args: e - enriched dict, prefix - file name prefix (per-flow),
-        #         outdir - save folder (defaults to the data dir's posts)
-        # @return: dict {chart_key: Path} for the charts actually produced
-        from ..core import post
-        outdir = Path(outdir) if outdir else paths.data_dir() / "posts"
-        outdir.mkdir(parents=True, exist_ok=True)
-        charts = post.build_charts(e, outdir, prefix, cfg=config)
-        if charts:
-            import matplotlib.pyplot as plt
-            plt.close("all")
-        return charts
-
     def _post_browse_folder(self, post_w):
         # @args: post_w - the post panel widget
         # @return: None; asks for a folder and fills edt_folder
@@ -9943,30 +9957,90 @@ class MainWindow(QMainWindow):
                     "context": {}, "status": ""}
         fallback = next((t for t, _s, _p, _ph in self._tonight_all
                          if t["id"] == name or t["name"] == name), None)
+        # the long report is the setting's decision; the images are rendered
+        # in the worker (it needs their exact names to put them in the brief)
+        long = bool(config.get("ai_long_report"))
+        safe = "".join(c if c.isalnum() or c in "-_" else "_"
+                       for c in name)
+        outdir = self._post_folder(post_w)
         self._post_busy(post_w, True, self.tr(
             "The model is drafting. A reasoning model can take a couple of "
             "minutes."))
         w = AiPostWorker(config, proj, db,
                          enriched=getattr(post_w, "_enriched", None),
-                         fallback_target=fallback)
+                         fallback_target=fallback, long=long,
+                         outdir=outdir, safe=safe)
         w.done.connect(
-            lambda brief, rendered, err:
-            self._post_ai_done(post_w, brief, rendered, err))
+            lambda brief, rendered, charts, resources, err:
+            self._post_ai_done(post_w, name, brief, rendered, charts,
+                               resources, err))
         self._keep(w)
         w.start()
 
-    def _post_ai_done(self, post_w, brief, rendered, err):
+    def _post_ai_done(self, post_w, name, brief, rendered, charts, resources,
+                      err):
+        # The AI answer: the long report (when the setting is on), the short
+        # post and the tweet, plus the images the worker rendered. It goes
+        # through the SAME save path as the template, so the images are
+        # linked, the files written and the project updated either way.
         self._post_busy(post_w, False)
-        if err:
+        if not rendered:
             post_w.lbl_ai_note.setText(self.tr("AI draft failed: ") + err)
             return
         post_w._brief = brief
+        self._post_save_and_register(post_w, name, rendered, charts, resources)
+        if err:
+            # the report failed but the short post came back: keep it and be
+            # honest about what failed (never a silent downgrade)
+            post_w.lbl_ai_note.setText(
+                self.tr("The long report failed; the short post was "
+                        "written: ") + err)
+        else:
+            post_w.lbl_ai_note.setText(self.tr(
+                "AI draft ready. Review it before publishing: the voice is "
+                "yours."))
+
+    def _post_save_and_register(self, post_w, name, rendered, charts,
+                                resources):
+        # The one save path for both drafts: writes the text files (with the
+        # gallery attached), shows the final texts and registers every file
+        # in the project. Shared by the template and the AI so neither can
+        # forget a step (the AI path used to save nothing at all).
+        # @args: post_w - the panel, name - the object, rendered - the text
+        #        dict, charts/resources - {key: Path} (may be empty)
+        # @return: None
+        from ..core import post as post_mod
+        outdir = self._post_folder(post_w)
+        written = post_mod.save_outputs(
+            rendered, outdir, name, e={"name": name},
+            charts=charts or None, cfg=config,
+            resources=resources or None)
         post_w.txt_es.setPlainText(rendered.get("es", ""))
         post_w.txt_en.setPlainText(rendered.get("en", ""))
         post_w.txt_tweet.setPlainText(rendered.get("tweet", ""))
-        post_w.lbl_ai_note.setText(self.tr(
-            "AI draft ready. Review it before publishing: the voice is "
-            "yours."))
+        if rendered.get("report_es") and hasattr(post_w, "txt_report_es"):
+            post_w.txt_report_es.setPlainText(rendered["report_es"])
+            post_w.txt_report_en.setPlainText(rendered.get("report_en", ""))
+            card = getattr(post_w, "report_card", None)
+            if card is not None:
+                card.setVisible(True)
+        db.mark_posted(name)
+        # A4: register every written file (posts + report + tweet) in the
+        # project, plus charts and resources, and refresh the files list
+        if self._current_project \
+                and self._current_project["object_name"] == name:
+            pid = self._current_project["id"]
+            for key, p in written.items():
+                if key in ("es", "en", "tweet", "report_es", "report_en"):
+                    project.add_file(db, pid, str(p), "post")
+            for p in (charts or {}).values():
+                project.add_file(db, pid, str(p), "chart")
+            for p in (resources or {}).values():
+                project.add_file(db, pid, str(p), "chart")
+            self._populate_project_files(pid)
+        post_w.lbl_files.setText(
+            self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
+        self.statusBar().showMessage(self.tr("Drafts ready"), 5000)
 
     def _post_show_brief(self, post_w):
         # The exact fact sheet the model reads (ADR-075): the observer sees
@@ -9980,11 +10054,15 @@ class MainWindow(QMainWindow):
                 return
             brief = object_brief.build_brief(
                 proj, db, enriched=getattr(post_w, "_enriched", None),
-                lang=config.ui_language(), cfg=config)
+                lang=config.ui_language(), cfg=config,
+                long=bool(config.get("ai_long_report")))
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("What will be sent"))
         lay = QVBoxLayout(dlg)
-        edt = QTextEdit(object_brief.to_text(brief))
+        # the long report keeps the deep facts too, so the preview shows
+        # exactly the bytes the model would read
+        edt = QTextEdit(object_brief.to_text(
+            brief, deep=bool(config.get("ai_long_report"))))
         edt.setReadOnly(True)
         lay.addWidget(edt)
         box = QDialogButtonBox(QDialogButtonBox.Close)
@@ -10002,7 +10080,7 @@ class MainWindow(QMainWindow):
         from ..core import post as post_mod
         # B9: inject the project's follow-up photometry so the light curve
         # can be drawn in the post (the panel does this for the Details tab;
-        # the post flow must do it too — the post is the living document)
+        # the post flow must do it too: the post is the living document)
         if self._current_project \
                 and self._current_project["object_name"] == name:
             from ..core import followup as fu
@@ -10011,56 +10089,17 @@ class MainWindow(QMainWindow):
                 e.setdefault("data", {}).setdefault("followup", {})["points"] = pts
         outdir = self._post_folder(post_w)
         safe = "".join(c if c.isalnum() or c in "-_" else "_"
-                        for c in name)
+                       for c in name)
         charts, resources = {}, {}
-        # charts for the post/report, drawn with a stable per-object name so
-        # the markdown can reference them (they end up next to the .md)
+        # charts for the post, drawn with a stable per-object name so the
+        # markdown can reference them (they end up next to the .md), plus any
+        # blink/evolution resource already in the folder
         try:
-            charts = self._render_object_charts(e, f"{safe}_", outdir=outdir)
+            charts, resources = post_mod.collect_assets(e, outdir, safe,
+                                                        cfg=config)
         except Exception as err:  # charts must never break the post flow
             logger.warning("post charts failed for %s: %s", name, err)
-        # previous blink resources for this object already in the folder
-        try:
-            for f in sorted(outdir.iterdir()):
-                n = f.name.lower()
-                if not n.startswith(safe.lower() + "_"):
-                    continue
-                if n.endswith(".gif"):
-                    resources.setdefault("gif", f)
-                elif n.endswith(".mp4"):
-                    resources.setdefault("mp4", f)
-                elif n.endswith("_before_after.png"):
-                    resources.setdefault("pair", f)
-                elif n.endswith("_evo.gif"):
-                    resources.setdefault("evo_gif", f)
-                elif n.endswith("_evo.mp4"):
-                    resources.setdefault("evo_mp4", f)
-        except OSError:
-            pass
-        written = post_mod.save_outputs(rendered, outdir, name, e=e,
-                                        charts=charts or None, cfg=config,
-                                        resources=resources or None)
-        # show the final drafts (with the gallery/resources links) in the tab
-        post_w.txt_es.setPlainText(rendered.get("es", ""))
-        post_w.txt_en.setPlainText(rendered.get("en", ""))
-        post_w.txt_tweet.setPlainText(rendered.get("tweet", ""))
-        db.mark_posted(name)
-        # A4: register every written file (posts + tweet) in the project,
-        # plus charts and resources, and refresh the files list
-        if self._current_project \
-                and self._current_project["object_name"] == name:
-            pid = self._current_project["id"]
-            for key, p in written.items():
-                if key in ("es", "en", "tweet"):
-                    project.add_file(db, pid, str(p), "post")
-            for p in charts.values():
-                project.add_file(db, pid, str(p), "chart")
-            for p in resources.values():
-                project.add_file(db, pid, str(p), "chart")
-            self._populate_project_files(pid)
-        post_w.lbl_files.setText(
-            self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
-        self.statusBar().showMessage(self.tr("Drafts ready"), 5000)
+        self._post_save_and_register(post_w, name, rendered, charts, resources)
 
     # ---------------- Solar ----------------
 

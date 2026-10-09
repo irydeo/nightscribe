@@ -156,22 +156,47 @@ def media_section(post, resources, lang):
     return head
 
 
+def _strip_previous_gallery(text, lang):
+    # Removes a gallery this module appended BEFORE, identified by its own
+    # exact headings (Galería/Gallery, Recursos/Resources), so a second call
+    # replaces it instead of duplicating it.
+    #
+    # Why not cut at the first "##" like before: the LONG REPORT is an
+    # article with its own "##" section headings (the prompt asks for them).
+    # Cutting at the first "##" threw the whole body away and left only the
+    # title plus the gallery (the defect the observer saw: the report looked
+    # like a title, "the short report in the long slot"). The report's own
+    # headings must survive; only our gallery is stripped.
+    # @args: text - the post/report text, lang - "es"|"en"
+    # @return: the text without a previously appended gallery
+    for head in (f"\n\n## {'Galería' if lang == 'es' else 'Gallery'}",
+                 f"\n\n## {'Recursos' if lang == 'es' else 'Resources'}"):
+        cut = text.find(head)
+        if cut != -1:
+            return text[:cut]
+    return text
+
+
 def attach_charts(post, charts, resources=None):
     # Appends the chart and the extra-resource blocks to the ES and EN
     # texts (replacing old ones if present), right before the closing lines.
-    # @args: post - dict from render_post(), charts - {key: path or str},
-    #        resources - {key: path or str} for blink/extra files, or None
+    # The long report's texts (report_es / report_en) get the same gallery:
+    # the model cites the images inside the article, and this block is the
+    # complete gallery at the end.
+    # @args: post - dict from render_post() (or the report), charts -
+    #        {key: path or str}, resources - {key: path or str} or None
     # @return: the same post dict, texts updated
     if not charts and not resources:
         return post
-    for lang in ("es", "en"):
-        text = post[lang]
-        cut = text.find("\n\n## ")
-        if cut != -1:
-            text = text[:cut]
-        post[lang] = "\n".join([text,
-                                *chart_section(post, charts, lang),
-                                *media_section(post, resources, lang)])
+    for key in ("es", "en", "report_es", "report_en"):
+        text = post.get(key)
+        if not text:
+            continue
+        lang = "en" if key.endswith("en") else "es"
+        text = _strip_previous_gallery(text, lang)
+        post[key] = "\n".join([text,
+                               *chart_section(post, charts, lang),
+                               *media_section(post, resources, lang)])
     return post
 
 
@@ -327,6 +352,65 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
     return charts
 
 
+def collect_assets(e, outdir, safe, cfg=None, charts=None):
+    # Renders the object's charts (unless already given) and finds the extra
+    # resources already in the folder (blink gif/mp4, before/after, the
+    # evolution animations). One place for the template path and the AI
+    # report, so the two can never disagree on which files exist.
+    # @args: e - enriched dict, outdir - Path, safe - file name prefix
+    #        WITHOUT the trailing "_", cfg - Config, charts - prebuilt dict
+    # @return: (charts {key: Path}, resources {key: Path})
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    prefix = safe + "_"
+    if charts is None:
+        charts = build_charts(e, outdir, prefix, cfg=cfg)
+    resources = {}
+    try:
+        for f in sorted(outdir.iterdir()):
+            n = f.name.lower()
+            if not n.startswith(prefix.lower()):
+                continue
+            # the _evo_ check comes FIRST: the evolution gif/mp4 also end in
+            # ".gif"/".mp4", and the old order labelled them "Blink" (the
+            # generic branch won). Fixed here while the scan moved in, so the
+            # report shows the right caption.
+            if n.endswith("_evo.gif"):
+                resources.setdefault("evo_gif", f)
+            elif n.endswith("_evo.mp4"):
+                resources.setdefault("evo_mp4", f)
+            elif n.endswith("_before_after.png"):
+                resources.setdefault("pair", f)
+            elif n.endswith(".gif"):
+                resources.setdefault("gif", f)
+            elif n.endswith(".mp4"):
+                resources.setdefault("mp4", f)
+    except OSError:
+        pass
+    return charts, resources
+
+
+def gallery_entries(charts, resources, obj_name=""):
+    # The images a report may reference, each with its EXACT file name and a
+    # caption in both languages. The captions come from CHART_LABELS / MEDIA
+    # (their single home), so a report and a gallery cannot name a file two
+    # different ways.
+    # @args: charts - {key: Path}, resources - {key: Path}, obj_name - object
+    # @return: [{"key","name","caption": {"es","en"}}]
+    out = []
+    for source, labels in ((charts, CHART_LABELS), (resources, MEDIA)):
+        for key, p in (source or {}).items():
+            lbl = labels.get(key)
+            if not lbl:
+                continue
+            caption = {}
+            for lang in ("es", "en"):
+                alt = lbl.get(f"alt_{lang}") or lbl.get(lang) or ""
+                caption[lang] = alt.replace("%s", obj_name) if obj_name else alt
+            out.append({"key": key, "name": Path(p).name, "caption": caption})
+    return out
+
+
 def save_outputs(post, outdir, base_name, e=None, charts=None, cfg=None,
                  resources=None):
     # Writes the drafts to disk. Makes the ES/EN posts reference every
@@ -353,8 +437,14 @@ def save_outputs(post, outdir, base_name, e=None, charts=None, cfg=None,
         attach_charts(post, charts, resources)
 
     # --- write text drafts ---
-    for key, fname in (("es", f"{safe}_ES.md"), ("en", f"{safe}_EN.md"),
-                        ("tweet", f"{safe}_tweet.txt")):
+    drafts = [("es", f"{safe}_ES.md"), ("en", f"{safe}_EN.md"),
+              ("tweet", f"{safe}_tweet.txt")]
+    # the long report's own files, when the AI wrote one
+    if post.get("report_es"):
+        drafts.append(("report_es", f"{safe}_report_ES.md"))
+    if post.get("report_en"):
+        drafts.append(("report_en", f"{safe}_report_EN.md"))
+    for key, fname in drafts:
         p = outdir / fname
         p.write_text(post[key], encoding="utf-8")
         written[key] = p

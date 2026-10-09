@@ -131,6 +131,7 @@ FIELDS = [
     # AI writing and the grounded assistant (ADR-075). The preset combo is
     # filled at runtime (it maps to the base URL), so it stays hand-wired.
     Field("chk_ai_enabled", "ai_enabled", "bool"),
+    Field("chk_ai_long_report", "ai_long_report", "bool"),
     Field("edt_ai_base_url", "ai_base_url", "str"),
     Field("edt_ai_api_key", "ai_api_key", "str"),
     Field("cmb_ai_model", "ai_model", "combo_text"),

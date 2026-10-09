@@ -120,6 +120,10 @@ El mundo exterior: un servidor de captura y las claves opcionales.
   tres encajan. Está apagado por defecto: con él apagado, el asistente y los
   botones de IA quedan deshabilitados, y nada sale de tu equipo hasta que lo
   usas.
+- **Informes largos**: con esto activado, la IA escribe un artículo completo
+  (español e inglés) con todos los datos del proyecto y las imágenes generadas,
+  no solo el post corto. Gasta muchos más tokens, así que un servicio de pago
+  cobra más por ello; un servidor local no cuesta nada. Apagado por defecto.
 
 ## Interfaz
 

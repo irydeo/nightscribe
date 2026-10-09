@@ -123,3 +123,45 @@ def test_empty_project_is_honest_not_invented(db, cfg):
     assert b["object_facts"] == []
     # the render still works and says nothing it does not know
     assert "29P" in object_brief.to_text(b)
+
+
+# ---------------- the long report's extra context (2026-10-09) ---------
+
+def test_long_brief_adds_the_analysis_campaign_and_gallery(db, cfg):
+    p = _sn_with_points(db, context={"kind": "sn", "sn_type": "SN Ia",
+                                     "period_d": 12.3, "period_method": "LS",
+                                     "period_fap": 0.001})
+    b = object_brief.build_brief(
+        p, db, lang="es", cfg=cfg, long=True,
+        gallery=[{"key": "lightcurve", "name": "SN_lightcurve.png",
+                  "caption": {"es": "Curva", "en": "Curve"}}])
+    assert b["analysis"]["period"]["days"] == 12.3
+    assert b["analysis"]["period"]["why"]
+    assert b["gallery"][0]["name"] == "SN_lightcurve.png"
+    txt = object_brief.to_text(b, deep=True)
+    assert "THE ANALYSIS" in txt
+    assert "IMAGES WE MADE" in txt
+    assert "SN_lightcurve.png" in txt
+
+
+def test_short_brief_has_no_analysis_or_gallery(db, cfg):
+    p = _sn_with_points(db)
+    b = object_brief.build_brief(p, db, lang="es", cfg=cfg)
+    assert "analysis" not in b
+    assert "gallery" not in b
+
+
+def test_deep_facts_are_kept_only_for_the_long_report(db, cfg):
+    p = _sn_with_points(db)
+    enriched = {"type": "small_body", "name": "2026 QK",
+                "data": {"sbdb": {"elements": {"a": 1.35, "e": 0.4, "i": 6.2,
+                                               "q": 0.81, "Q": 1.89},
+                                  "phys": {"H": 20.5, "diameter": 1.1},
+                                  "moid": 0.028}}}
+    b = object_brief.build_brief(p, db, enriched=enriched, lang="es",
+                                 cfg=cfg, long=True)
+    assert any(f.get("level") == "deep" for f in b["object_facts"]), \
+        "the fixture should carry deep rows"
+    short = object_brief.to_text(b)
+    deep = object_brief.to_text(b, deep=True)
+    assert len(deep) > len(short)

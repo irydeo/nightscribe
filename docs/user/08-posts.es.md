@@ -45,6 +45,15 @@ La IA solo frasea: no mide, no clasifica y no inventa ninguna cifra. Todo lo que
 dice sale del dossier, y lo que no está no lo menciona. El borrador sigue siendo
 tuyo: revísalo antes de publicar.
 
+Si activas los **informes largos** en Ajustes, ese mismo botón escribe además un
+**artículo completo** en español e inglés: añade los parámetros más profundos del
+objeto, el análisis (un período guardado, un tránsito, las corridas de
+astrometría, la receta fotométrica), la campaña a la que pertenece la observación
+y cita los gráficos y vídeos generados **dentro del relato**, con toda la galería
+al final. El artículo aparece en su propia tarjeta **Informe largo** y se guarda
+junto al post. Un modelo local lo escribe gratis; un servicio de pago cobra por
+token, por eso el ajuste está apagado por defecto.
+
 > **¿Por qué apagada por defecto?** Porque la app funciona igual sin ella: la
 > plantilla de siempre sigue ahí y no necesita red. Con la IA apagada, los
 > botones de IA quedan deshabilitados y el post lo escribe la plantilla. Con un

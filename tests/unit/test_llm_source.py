@@ -202,3 +202,29 @@ def test_list_models_empty_is_an_error(monkeypatch):
                         lambda *a, **k: _Resp(200, {"data": []}))
     with pytest.raises(llm.LlmError):
         llm.list_models(_Cfg(ai_base_url="http://x/v1"))
+
+
+# ---------------- is_local (ADR-075, the long report) ----------------
+
+def test_is_local_detects_this_machine():
+    # the endpoints that keep everything on the machine: a loopback address,
+    # a bare host name and a .local name are local; a public name is not
+    assert llm.is_local("http://localhost:11434/v1")
+    assert llm.is_local("http://127.0.0.1:1234/v1")
+    assert llm.is_local("http://[::1]:11434/v1")
+    assert llm.is_local("http://0.0.0.0:8000/v1")
+    assert llm.is_local("http://ollama:11434/v1")     # bare host, no dot
+    assert llm.is_local("http://mybox.local/v1")
+    assert llm.is_local("localhost:11434/v1")         # no scheme either
+    # a private LAN address keeps everything in the house too
+    assert llm.is_local("http://192.168.1.10:11434/v1")
+    assert llm.is_local("http://10.0.0.5/v1")
+    assert llm.is_local("http://172.16.4.2:8000/v1")
+
+
+def test_is_local_rejects_the_cloud():
+    assert not llm.is_local("https://openrouter.ai/api/v1")
+    assert not llm.is_local("https://api.groq.com/openai/v1")
+    assert not llm.is_local("https://generativelanguage.googleapis.com/v1beta/openai")
+    assert not llm.is_local("")
+    assert not llm.is_local(None)

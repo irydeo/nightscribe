@@ -78,6 +78,40 @@ def is_configured(cfg):
     return bool(base and model)
 
 
+# Hosts that are this machine. A bare name with no dot ("ollama", "mybox")
+# and a ".local" name are the machine's own too; anything with a public name
+# is not. Kept here (not in the GUI) so one function decides, and it never
+# touches the network.
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+
+
+def is_local(base_url):
+    # @args: base_url - the configured base (may carry a path and a port)
+    # @return: True when the endpoint runs on this machine, so a report
+    #          written through it never leaves it
+    host = (base_url or "").strip()
+    if not host:
+        return False
+    from urllib.parse import urlparse
+    if "://" not in host:
+        host = "http://" + host
+    h = (urlparse(host).hostname or "").lower()
+    if not h:
+        return False
+    if h in _LOCAL_HOSTS or h.endswith(".local"):
+        return True
+    # a private address (192.168.x, 10.x, 172.16-31.x) is the LAN, not the
+    # internet: nothing leaves the house either, and it costs nothing
+    try:
+        import ipaddress
+        ip = ipaddress.ip_address(h)
+        return ip.is_loopback or ip.is_private or ip.is_unspecified
+    except ValueError:
+        pass
+    # a bare hostname with no dot is a machine/LAN name, not a public one
+    return "." not in h and ":" not in h
+
+
 def is_enabled(cfg):
     # The master switch (ADR-075): the AI may be used only when the observer
     # has turned it ON and there is an endpoint to talk to. `is_configured`

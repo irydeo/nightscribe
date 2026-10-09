@@ -1,0 +1,65 @@
+# NightScribe - the website (GitHub Pages)
+#
+# Publishes the site that is GENERATED from the sources: the landing is the
+# README and the manual is docs/user, the same files the app renders in Help
+# (ADR-070). The workflow builds it with the project's own generator and
+# uploads the OUTPUT, so what goes live can never be a stale copy committed
+# by mistake: a guide edited without rebuilding still publishes correctly.
+#
+# The build needs no third-party library and no Qt: the generator reads the
+# palette and the kind catalogue from the application's own modules, which
+# import Qt only inside their functions.
+#
+# Triggers:
+#   - push to main (the stable branch)
+#   - push to release/v0.1 (the branch that carries the user guide)
+#   - manual: Actions > Website > Run workflow
+#
+# One-time setup in the repository: Settings > Pages > Source: GitHub Actions.
+
+name: Website
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - release/v0.1
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish the site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The repository must have Pages enabled once by hand (Settings >
+      # Pages > Source: GitHub Actions): the workflow's own token is not
+      # allowed to create the site ("Resource not accessible by
+      # integration"), so until that click the deploy step fails and the
+      # build step is still useful as a check.
+      - name: Build the site from its sources
+        run: python website/tools/build_site.py --out _site
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

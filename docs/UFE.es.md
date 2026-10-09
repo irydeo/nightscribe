@@ -9,11 +9,11 @@ procesamiento, no solo un editor) y se abre desde el menú
 **Herramientas → NightScribe Image Workbench…**; «UFE» queda como
 codename interno en código y documentación.
 
-**Convivencia y ajuste por defecto**: los diálogos clásicos (blink,
-carta de comparación, FITS anotado) siguen existiendo para comparar y
-revisar, pero por defecto los flujos abren el UFE: en **Ajustes →
-Desarrollo** puedes volver a los clásicos como predeterminados
-(`ufe_default`). Desde un proyecto, el UFE abre con la placa cargada, la
+**El editor es la única puerta**: los diálogos clásicos (blink, carta de
+comparación, FITS anotado) se retiraron cuando el UFE pasó a ser el
+predeterminado, así que no hay nada a lo que volver. La única preferencia
+del editor que queda es el aspecto de su barra superior, en **Ajustes →
+Interfaz**. Desde un proyecto, el UFE abre con la placa cargada, la
 pestaña correcta en escena y **todo lo que el proyecto sabe del objeto
 ya puesto**: nombre, coordenadas y magnitud en la línea bajo la barra y
 en el título, y cada pestaña con sus campos precargados (Blink: nombre y
@@ -264,7 +264,11 @@ apertura diferencial de una placa):
   sigue al seeing** (FWHM de las comps en tu placa, apertura a 1,35
   veces), **término de color** ajustado con el B−V de las comps y el
   del objetivo, **sustracción de la galaxia huésped** con la referencia
-  PS1 alineada (para SNe en núcleos, una descarga por campo), y el botón
+  PS1 registrada sobre las estrellas del frame (escala incluida), su PSF
+  igualada a la tuya y sus
+  píxeles enmascarados excluidos (para SNe en núcleos, una descarga por
+  campo), y
+  el botón
   **Sugerir** que propone los radios con la curva de crecimiento del
   objetivo y su entorno, con las razones en lenguaje llano.
 * Controles de calidad (fase H, en segundo plano): techo de
@@ -367,7 +371,7 @@ qué necesita cada figura.
 La banda nunca corta una palabra: si la ventana es estrecha suelta campos
 enteros (el FOV primero, la fecha la última) y, en el extremo, se va la
 línea de contexto y queda solo el nombre de la placa. El botón **«Datos»**
-de la barra superior la apaga (Ajustes → Sitio y equipo → «Banda de la
+de la barra superior la apaga (Ajustes → Interfaz → «Banda de la
 placa» fija el valor por defecto), y la rosa de los vientos y la barra de
 escala conservan sus esquinas clásicas. El **GIF/MP4 del blink** y la
 **carta de secuencia** mantienen sus propias cajas de metadatos, con su

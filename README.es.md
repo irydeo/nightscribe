@@ -4,43 +4,24 @@
 
 **Planifica tu noche, entiende cada objeto, cuenta tu ciencia.**
 
-NightScribe es una aplicación de escritorio libre (GPL v3) para observatorios
-astronómicos amateur, con interfaz gráfica (Qt6, tema oscuro) y línea de
-comandos. La construyó el responsable de un observatorio real (Irydeo,
-MPC Z41), cansado de hacer a mano, cada día despejado, lo que un ordenador
-hace mejor.
-
-## ¿Te suena esto?
-
-- **El ritual de la tarde.** Antes de cenar abres NEOfixer para los NEOs, la
-  página del MPC para los posibles cometas, COBS para las magnitudes
-  cometarias, Rochester para las supernovas frescas, ExoClock para los
-  tránsitos de esta noche, el VSX para tus variables; y cuando por fin tienes
-  el cuadro completo, has perdido una hora de crepúsculo.
-- **«¿Qué puedo observar *de verdad* esta noche?»**: no qué hay sobre el
-  horizonte en general, sino qué es visible *desde tu sitio*, sobre *tu
-  horizonte*, con *tu telescopio* y *tu cámara*, en las horas de las que *tú*
-  dispones.
-- **La trampa del objeto rápido.** Planificaste exposiciones de 60 segundos
-  para un NEO sin confirmar y resulta que se mueve a 5″/min: todas las tomas
-  con traza, el hueco perdido.
-- **La noche que se te olvidó.** Capturaste algo grande el mes pasado y nunca
-  quedó escrito en ningún sitio; ahora mismo no sabrías decir qué noche fue,
-  cuántas tomas ni con qué filtro.
-- **La variable que saltó mientras nadie miraba.** T CrB puede estallar
-  cualquier día; R CrB se desploma sin avisar. ¿Quién las vigila cada día?
-
-NightScribe existe para responder a todo eso desde una sola ventana.
+NightScribe es la herramienta de trabajo de un observatorio astronómico
+amateur: reúne en un solo sitio el ciclo completo de una observación, desde
+elegir qué mirar esta noche según tu cielo y tu equipo, hasta entender el
+objeto, capturar y reducir las imágenes y contar lo que has encontrado.
 
 ## ¿Qué es NightScribe?
 
-Tres misiones, un solo bucle:
+Cuatro misiones, un solo bucle:
 
 1. **Planificar la noche**: los mejores objetivos visibles desde *tu*
    observatorio, bajo *tus* restricciones reales, ordenados y explicados.
 2. **Entender cada objeto**: parámetros orbitales y físicos traducidos a
    explicaciones precisas y divulgativas, en español e inglés.
-3. **Contarlo**: un borrador bilingüe (ES/EN) y los gráficos de la noche,
+3. **Capturar y reducir**: maneja tu montura y tu cámara por CCDciel, y
+   calibra, apila y mide tus propias tomas: fotometría (variables,
+   exoplanetas, supernovas) y astrometría de cuerpos menores lista para el
+   MPC, sin salir de la ventana.
+4. **Contarlo**: un borrador bilingüe (ES/EN) y los gráficos de la noche,
    redactados con los datos reales de tu sesión.
 
 Y la pieza que las une: cada objetivo elegido se convierte en un
@@ -131,7 +112,9 @@ y solo habla con los servicios públicos de datos listados más abajo.
 
 ## Tus primeros cinco minutos
 
-1. **Instala** (detalles en [INSTALL.es.md](INSTALL.es.md)):
+1. **Instala** (detalles en [INSTALL.es.md](INSTALL.es.md); en Windows hay un
+   [instalador autónomo](https://github.com/irydeo/nightscribe/releases), sin
+   necesidad de Python):
 
    ```bash
    python3 -m venv --system-site-packages .venv
@@ -142,11 +125,12 @@ y solo habla con los servicios públicos de datos listados más abajo.
 2. **El asistente solo pide una cosa: tu observatorio.** Escribe tu código MPC
    y tus coordenadas se rellenan desde la lista del MPC; o introduce nombre,
    latitud, longitud y altitud a mano.
-3. La pestaña **Esta noche** calcula tu noche por sí sola: descarga las listas
+3. La vista **Esta noche** (desde **+ NUEVO PROYECTO** en la cabecera) calcula tu noche
+   por sí sola: descarga las listas
    de objetivos, las filtra por tu sitio y tu equipo, y lo ordena todo.
 4. **Haz clic en cualquier objetivo** y verás su ficha completa explicada.
    ¿Te gusta lo que ves? Un botón: **Crear proyecto**.
-5. Cuando tengas un minuto, abre **Herramientas → Configuración**: fichero de
+5. Cuando tengas un minuto, abre **Herramientas → Configuración…**: fichero de
    horizonte, magnitud límite, escala de placa de la cámara, valores de sesión.
    Todo trae valores por defecto sensatos; nada más es obligatorio.
 
@@ -154,7 +138,8 @@ y solo habla con los servicios públicos de datos listados más abajo.
 
 Cómo se siente usar NightScribe, en cinco escenas:
 
-1. **Al final de la tarde.** Abres la app. Esta noche ya está calculada: una
+1. **Al final de la tarde.** Abres la app y el panel de noche te recibe; un
+   clic en **+ NUEVO PROYECTO** y la noche ya está calculada: una
    lista de filas amplias, el mejor objetivo primero. Un chip en la cabecera
    avisa de que la Luna está al 87 %; otro anuncia un tránsito de sombra en
    Júpiter a las 23:12. La primera fila es un NEO sin confirmar con *«inicio
@@ -182,12 +167,12 @@ Cómo se siente usar NightScribe, en cinco escenas:
    supernova que confirmaste mantiene su propia curva de luz, y el panel te
    avisa cuando han pasado tres noches sin revisitarla. Si te apetece
    contarla, el borrador bilingüe ya está escrito con los datos reales de la
-   sesión. Una tarde aparece un chip en Esta noche: *«R CrB está cayendo: tu
+   sesión. Una tarde aparece un chip en la vista Esta noche: *«R CrB está cayendo: tu
    vigilia»*.
 
 ## Qué puedes hacer: en detalle
 
-### Planificar la noche (pestaña Esta noche)
+### Planificar la noche (la vista Esta noche)
 
 Una única respuesta ordenada a *«¿qué puedo hacer esta noche?»*, con los ocho
 tipos de objetivos de la sección anterior mezclados en un mismo ranking.
@@ -278,7 +263,7 @@ El flujo que convierte un puntito en movimiento en una observación reportada:
   Ib/c, SLSN, kilonova), la app calcula un análisis de campaña indicativo con
   veredicto, una **animación de la evolución** muestra el decaimiento, una
   copia FITS anotada porta los metadatos, y un recordatorio de cadencia
-  («3 noches desde tu última visita») aparece en Esta noche cuando toca
+  («3 noches desde tu última visita») aparece en la vista Esta noche cuando toca
   volver.
 - Contexto de referencia bajo demanda: los puntos ZTF vía ALeRCE aparecen como
   puntos grises de referencia bajo los tuyos, nunca mezclados con tus
@@ -322,9 +307,9 @@ Pensado para que *cualquiera se atreva* a capturar su primer tránsito:
   científico, protocolo (cadencia, filtros, estrellas de comparación), URLs
   de reporte y datos. Una campaña, muchos proyectos asociados (borrar la
   campaña los libera, nunca los borra). Un miembro *toca* cuando su última
-  sesión tiene `cadence_nights` noches y aterriza en Esta noche
+  sesión tiene `cadence_nights` noches y aterriza en la vista Esta noche
   automáticamente; también aterriza cuando se detecta un **evento** o se
-  acerca un **extremo** predicho. La pestaña Campañas es la sala de guerra:
+  acerca un **extremo** predicho. La vista Campañas es la sala de guerra:
   «Está pasando ahora» con ⚡ eventos, ⏳ extremos por llegar y 👁 vigilias,
   tarjetas de salud por campaña (miembros × cadencia × eventos), y frases
   completas en lenguaje llano.
@@ -444,9 +429,11 @@ EXOTIC o tus propios scripts siguen exactamente donde ella lo deja.
 
 ### Entender cualquier objeto
 
-**Herramientas → Explorar objeto…** (o clic en cualquier objetivo): identidad
-y datos físicos cruzados desde JPL SBDB, Horizons y CAD, SIMBAD, TNS y el NASA
-Exoplanet Archive, presentados como una tarjeta de visita:
+**El buscador «Explorar un objeto…» de la barra superior** (escribe un nombre
+y pulsa Enter) o **Herramientas → Explorar objeto…** (o clic en cualquier
+objetivo): identidad y datos físicos cruzados desde JPL SBDB, Horizons y CAD,
+SIMBAD, TNS y el NASA Exoplanet Archive, presentados como una tarjeta de
+visita:
 
 - Una **frase gancho** y bullets divulgativos, en español e inglés.
 - Una **tabla de parámetros donde cada fila está explicada** en lenguaje
@@ -475,8 +462,8 @@ supernova, rastro de movimiento del NEO. Copias, pegas, listo.
 Cada fuente externa, qué te aporta, con qué frescura, y si necesita clave.
 Toda la red pasa por una **caché SQLite con TTL por fuente** (la columna
 «refresco»): las consultas repetidas son instantáneas y gratuitas para el
-servicio. Si una fuente cae, el resto de la app nunca se rompe; consulta
-**Ayuda → Fuentes de datos** para ver el estado en vivo de cada una.
+servicio. Si una fuente cae, el resto de la app nunca se rompe; las fuentes
+están listadas en **Ayuda → Acerca de NightScribe**.
 
 **Fuentes de planificación (alimentan Esta noche):**
 
@@ -559,32 +546,6 @@ contenedora** (planes, secuencias, informes, gráficos, posts) bajo una raíz
 que eliges tú y puedes cambiar más adelante. Sin cuentas, sin nube, sin
 telemetría. Desinstala y borra la carpeta: no queda nada en ningún otro sitio.
 
-## Qué NO es NightScribe (aún)
-
-Sección de honestidad, para que sepas dónde están los bordes:
-
-- **No es un planetario.** No sustituye a Stellarium o Cartes du Ciel: exporta
-  efemérides *hacia* ellos.
-- **Reduce, y además te deja reducir fuera.** La app calibra, apila y mide
-  astrometría y fotometría ella misma (ver *Reducir y medir en la app*), y lo
-  que produce son ficheros FITS, ADES y AAVSO estándar, así que las
-  herramientas en las que ya confías (Tycho Tracker, AstroImageJ…) siguen
-  funcionando sobre su salida. **EXOTIC** sigue siendo externo: la app lo
-  orquesta, no lo reimplementa.
-- **El informe MPC se genera y se valida; el correo lo envías tú.** La app lo
-  escribe desde sus propias medidas, o revisa el que pegues, y lo contrasta
-  con las demás estaciones antes de que salga.
-- **Formatos de exportación**: el formato de secuencias CCDciel está validado
-  contra una exportación real de CCDciel, y las efemérides TheSkyX y Cartes du
-  Ciel contra importaciones reales; las secuencias NINA y CSV genérico son
-  puntos de partida pendientes de validar contra tus versiones.
-- **Eventos del cielo de calidad planificación**: los eclipses son *eclipses
-  probables*, etiquetados como tales, y los fenómenos de los galileanos llevan
-  su etiqueta ±10 min.
-- **Estado: alpha.** Es la herramienta diaria de un observatorio real
-  (MPC Z41) con una suite de más de 3.000 tests automatizados, pero espera
-  algún borde afilado; y por favor, repórtalo.
-
 ## Inicio rápido y CLI
 
 ```bash
@@ -616,10 +577,20 @@ sistema operativo, el paquete pip y el instalador autónomo, y
 
 ## Documentación
 
+**La [guía de usuario](docs/user/README.es.md)**
+([English](docs/user/README.md)) recorre el ciclo completo, del primer
+arranque al reporte MPC, en capítulos cortos con el «por qué» de cada
+opción. Se publica como web: **<https://irydeo.github.io/nightscribe/>**
+(**Ayuda → Guía de usuario (web)**).
+
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
 decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.
 
+¿Falta algo, algo está mal o no se entiende? [Abre una incidencia](https://github.com/irydeo/nightscribe/issues).
+
 ## Licencia
 
-GPL v3. (c) 2026 Francisco José Calvo Fernández
-([Observatorio Irydeo](https://www.irydeo.com), MPC Z41).
+NightScribe es software libre, publicado bajo la
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE): puedes
+usarlo, estudiarlo, modificarlo y compartirlo, y lo que transmitas sigue
+siendo libre para el siguiente. No hay edición de pago ni función bloqueada.

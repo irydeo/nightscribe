@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05. Captura · NightScribe</title>
+<meta name="description" content="05. Captura">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="05-capture.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Índice</summary><nav class="toc"><a class="toc-link" href="index.es.html">Guía de usuario</a><a class="toc-link" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link on" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a><a class="toc-link" href="11-assistant.es.html"><span>11</span>11. El asistente</a></nav></details>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>05. Captura</h1><h2 id="ccdciel-del-plan-al-telescopio">CCDciel: del plan al telescopio</h2><p>Si tu observatorio se controla con <a href="https://www.ap-i.net/ccdciel/">CCDciel</a>, NightScribe puede entregarle el plan de captura directamente, sin exportar ficheros ni reescribir coordenadas.</p><p>Configuración, una sola vez, en <strong>Herramientas → Configuración… → Integraciones</strong>: host y puerto del equipo donde corre CCDciel (por defecto el 3277) y si quieres que conecte solo. Una condición: <strong>CCDciel tiene que estar abierto</strong>; NightScribe habla con su servidor JSON-RPC, no con los drivers.</p><p>Desde el paso <strong>Captura</strong> de un proyecto:</p><ul><li><p><strong>Conectar CCDciel</strong> muestra el estado del observatorio (montura, rueda de filtros, cámara) en el panel.</p></li><li><p><strong>Enviar plan</strong> prepara en CCDciel el nombre del objeto, la exposición, el número de tomas y el filtro (la lista se lee de tu rueda; si no responde, se usa la lista clásica L/R/G/B/Ha/OIII/SII).</p></li><li><p>El apuntado convierte las coordenadas J2000 del plan a <strong>aparentes</strong> antes de enviarlas, y puede hacer <em>goto</em> con ajuste astrométrico si tu flujo en CCDciel lo tiene configurado.</p></li></ul><blockquote class="why"><strong>¿Por qué coordenadas aparentes y no J2000?</strong> Porque la montura apunta al cielo de <em>ahora</em>, no al del año 2000. Precesión, nutación y aberración mueven la posición aparente de una estrella decenas de segundos de arco: más que el campo de muchas cámaras. NightScribe hace la conversión por ti para que el objeto caiga en el chip, no fuera de él.</blockquote><h2 id="calibración-bias-darks-y-flats">Calibración: bias, darks y flats</h2><p>La pestaña <strong>Calibración</strong> del editor FITS gestiona una <strong>biblioteca de masters</strong> y la receta de cada visita.</p><p>La biblioteca se indexa, no se copia: señalas tus FITS maestros y la app lee de sus cabeceras lo que los hace válidos (cámara, ganancia, temperatura, exposición, filtro). Al indexar declaras qué <em>es</em> cada fichero:</p><ul><li><p><strong>Bias</strong>: el offset electrónico de lectura (exposición cero).</p></li><li><p><strong>Dark</strong>: corriente térmica, a la misma exposición que las luces. <em>Un dark ya incluye el bias</em>, así que con dark no hace falta bias aparte.</p></li><li><p><strong>Dark de flats</strong>: a la exposición de los flats.</p></li><li><p><strong>Flat</strong>: por filtro, normalizado.</p></li></ul><blockquote class="why"><strong>¿Por qué calibrar?</strong> Porque tu sensor miente de tres maneras conocidas y repetibles: añade un pedestal electrónico a cada píxel (bias), acumula carga térmica con el tiempo (dark) y multiplica la luz por la sombra del polvo y el viñeteo (flat). Restar bias+dark y dividir por el flat no es estética: es lo que convierte ADU en fotones comparables de una esquina a otra del chip y de una noche a otra. Sin eso, la fotometría del capítulo 06 mide el polvo de tu tren óptico, no la estrella.</blockquote><blockquote class="why"><strong>¿Por qué el flat es por filtro?</strong> Porque las sombras del polvo cambian de escala con la óptica y la rueda, y la respuesta del sensor cambia con el color. Un flat de V no corrige un R: la sombra de la misma mota cae en otro sitio si la rueda aparca distinto.</blockquote><p><strong>La receta de la visita</strong>: al abrir el editor desde una visita, la app resuelve qué master de la biblioteca usa cada pieza, leyendo la cabecera del primer frame, y avisa de lo que falte (Avisos). <strong>Calibrar la visita</strong> aplica la receta a todos los frames; la calibración trabaja en memoria y solo escribe copias FITS si marcas la exportación.</p><p><strong>Si no tienes flat para un filtro</strong>: la opción <em>Build a flat from the frames</em> construye un pseudo-flat apilando las propias luces (el polvo y el viñeteo están fijos en el frame; las estrellas se mueven entre tomas y desaparecen en el percentil bajo). Úsalo como lo que es: un parche honesto que nunca se antepone a un flat real. Puedes abrirlo con <strong>Ver el flat</strong> y juzgarlo: un flat con una estrella dentro no es un flat.</p><blockquote class="why"><strong>¿Por qué funciona el pseudo-flat?</strong> Porque en una serie con <em>dithering</em> (pequeños desplazamientos entre tomas) lo único que no se mueve es lo que pertenece al instrumento: polvo, viñeteo, píxeles calientes. Un percentil bajo sobre muchas tomas conserva lo fijo y rechaza lo que se movió. Si tu campo es estático (sin dithering), la app enmascara las estrellas antes de apilar, por la misma razón.</blockquote><p>Siguiente: <a href="06-photometry.es.html">06. Fotometría</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="04-campaigns.es.html"><span>Anterior</span>04. Campañas y vigilias</a><a class="pn-next" href="06-photometry.es.html"><span>Siguiente</span>06. Fotometría</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

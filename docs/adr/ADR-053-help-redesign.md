@@ -63,6 +63,18 @@ test_ui_files.py`). Toda cadena visible pasa por `self.tr()` y los `.ts`/`.qm`
 se regeneran (ADR-014). Se añade una fila al índice
 `docs/adr/README.md` y se actualiza el rango de ADRs en `AGENTS.md`.
 
+**Revisión (2026-10-08, la puerta técnica se retira).** El menú Ayuda pierde
+«Technical Documentation»: la guía es la web publicada (**Ayuda → Guía (web)**),
+y el visor interno sobrevive donde abre un documento concreto (el «?» de la
+serie en el UFE, que abre `SEQUENCES`), no como puerta general. `on_docs`
+desaparece con la entrada; `DocViewer` y su árbol se quedan.
+
+**Revisión (2026-10-08, las fuentes se funden en About).** El menú Ayuda pierde
+«Fuentes de datos»: era una lista estática (nunca hubo estado en vivo), así que
+su contenido pasa al cuadro de **Acerca de NightScribe**, que además queda como
+última entrada del menú. Los separadores se arreglan de paso: el
+`separator_help` del `.ui` no pintaba nada.
+
 ## English
 
 **Context**: the Help menu had only three thin entries: "Technical
@@ -121,3 +133,15 @@ and hides the husk (ADR-005 contract, covered in `tests/unit/test_ui_files.py`).
 Every visible string goes through `self.tr()` and the `.ts`/`.qm` are
 regenerated (ADR-014). A row is added to the `docs/adr/README.md` index and
 the ADR range in `AGENTS.md` is updated.
+
+**Revision (2026-10-08, the technical door retires).** The Help menu loses
+"Technical Documentation": the guide is the published website (**Help > User
+guide (web)**), and the in-app browser survives where it opens one concrete
+document (the UFE series "?", which opens `SEQUENCES`), not as a general door.
+`on_docs` goes away with the entry; `DocViewer` and its tree stay.
+
+**Revision (2026-10-08, the sources merge into About).** The Help menu loses
+"Data sources": it was a static list (there never was a live status), so its
+content moves into the **About NightScribe** box, which also becomes the last
+menu entry. The separators are fixed along the way: the `.ui`'s
+`separator_help` drew nothing.

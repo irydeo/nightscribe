@@ -418,12 +418,14 @@ def test_post_charts_attached_to_project(tmp_db):
                   "ephem": {"ra": "12 00 00.0", "dec": "+10 00 00",
                             "r": 1.2, "delta": 0.3}}}
     rendered = {"es": "borrador", "en": "draft", "tweet": "tuit"}
-    post_w = _load_ui("post_tab")
+    # the post panel lives in the Publish page now (ADR-045 redesign)
+    w._build_publish_tab(p, "neo", {})
+    post_w = w._project_widgets["post_panel"]
     # keep the real db clean: route the module-level db to the tmp one
     orig_db = mw.db
     mw.db = tmp_db
     try:
-        w._dialog_post_done(post_w, name, e, rendered)
+        w._post_done(post_w, name, e, rendered)
     finally:
         mw.db = orig_db
     files = project.list_files(tmp_db, p["id"])
@@ -431,7 +433,7 @@ def test_post_charts_attached_to_project(tmp_db):
     assert chart_files, "charts must be attached to the project"
     for f in chart_files:
         assert Path(f["path"]).exists(), f["path"]
-    # the dialog must list the chart files alongside the text drafts
+    # the panel must list the chart files alongside the text drafts
     assert "orbit.png" in post_w.lbl_files.text()
     assert "sky.png" in post_w.lbl_files.text()
     w.close()

@@ -124,6 +124,23 @@ def test_style_lists_read_as_containers(qapp):
     assert "QPlainTextEdit" in qss, "plain text edits should join the input chrome"
 
 
+def test_style_combo_header_marks_a_family(qapp):
+    # a family row in the camera combo must read as a header, not as a camera
+    # (reported 2026-10-09: they looked identical)
+    from PySide6.QtGui import QStandardItem
+    from nightscribe.gui import theme
+
+    theme.apply_theme(qapp)
+    item = QStandardItem("Sony CMOS (16-bit)")
+    theme.style_combo_header(item)
+    assert not item.isEnabled()                     # not pickable
+    assert item.font().bold()
+    assert item.text() == "SONY CMOS (16-BIT)"      # uppercased
+    assert item.foreground().color().name().lower() == theme.C_ACCENT.lower()
+    band = theme.composite(theme.C_ACCENT, "1e", theme.C_PANEL)
+    assert item.background().color().name().lower() == band.lower()
+
+
 def test_style_pushbutton_has_a_visible_edge(qapp):
     # The borderless C_PANEL button on a C_BG dialog read as bare text (the
     # comparison chart's "Remove all" was impossible to find): buttons get
@@ -224,6 +241,65 @@ def test_compact_button_glyph_survives_the_small_width(qapp):
         "the compact glyph button paints no glyph"
     btn.close()
     btn.deleteLater()
+
+
+def _icon_mean_lightness(icon, mode=None):
+    # @args: icon - a QIcon; mode - a QIcon.Mode, or None for Normal
+    # @return: the mean lightness (0..255) of the icon's opaque pixels, or
+    #          None when it paints nothing
+    from PySide6.QtGui import QIcon
+    if mode is None:
+        mode = QIcon.Normal
+    img = icon.pixmap(16, mode).toImage()
+    vals = [img.pixelColor(x, y).lightness()
+            for y in range(img.height()) for x in range(img.width())
+            if img.pixelColor(x, y).alpha() > 40]
+    return sum(vals) / len(vals) if vals else None
+
+
+def test_standard_navigation_glyphs_are_light(qapp):
+    # Fusion paints the standard arrows in a FIXED dark colour that ignores
+    # the palette: measured, SP_FileDialogBack is the same arrow (mean
+    # lightness 12.9) with the dark palette and with the light one, so the
+    # file dialog's navigation read black on black. apply_theme wraps Fusion
+    # in a proxy style that repaints them in C_TEXT.
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QStyle
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    theme.apply_theme(qapp)
+    style = qapp.style()
+    for sp in (QStyle.SP_FileDialogBack, QStyle.SP_FileDialogToParent,
+               QStyle.SP_ArrowRight, QStyle.SP_ArrowUp):
+        icon = style.standardIcon(sp)
+        assert _icon_mean_lightness(icon) > 150, \
+            f"{sp} still paints dark: the glyph would be invisible"
+        # Qt generates the disabled variant from the palette; it must stay
+        # legible too (the dialog's back / forward open disabled).
+        assert _icon_mean_lightness(icon, QIcon.Disabled) > 110, \
+            f"{sp} disabled variant would be invisible"
+
+
+def test_file_dialog_navigation_icons_are_visible(qapp):
+    # The reported symptom, end to end: the file dialog's back / forward / up
+    # buttons were dark on dark. Guards the whole path (the proxy style and
+    # the exact standard pixmaps QFileDialog uses for those buttons).
+    from PySide6.QtWidgets import QFileDialog, QToolButton
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    theme.apply_theme(qapp)
+    dlg = QFileDialog()
+    dlg.setOption(QFileDialog.DontUseNativeDialog, True)
+    dlg.resize(900, 560)
+    dlg.show()
+    qapp.processEvents()
+    try:
+        for name in ("backButton", "forwardButton", "toParentButton"):
+            btn = dlg.findChild(QToolButton, name)
+            assert btn is not None, f"QFileDialog lost its {name}"
+            assert _icon_mean_lightness(btn.icon()) > 150, \
+                f"{name} icon is invisible on the dark theme"
+    finally:
+        dlg.close()
+        dlg.deleteLater()
 
 
 def test_the_app_icon_speaks_the_brand_palette():

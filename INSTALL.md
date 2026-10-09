@@ -97,6 +97,11 @@ admin rights needed) and a portable zip (`NightScribe-*-windows-x64.zip`:
 unzip and run `nightscribe.exe gui`). The binaries are unsigned, so Windows
 SmartScreen will warn: choose *More info → Run anyway*.
 
+Reinstalling upgrades **cleanly**: the installer uninstalls the previous
+version first, so no file from an older build is left behind. Your settings and
+data are kept: they live in `%APPDATA%`/`%LOCALAPPDATA%`, not in the install
+folder.
+
 To build your own instead:
 
 ```bash
@@ -152,7 +157,7 @@ No key is required: every optional integration degrades gracefully.
 - **Windows: SmartScreen warns about the standalone exe** → *More info → Run
   anyway* (the installer is built from this same source tree).
 - **A source fails** (e.g. NEOfixer down) → the app keeps working with the rest;
-  check the *Data sources* menu for per-source status.
+  check *Help → About NightScribe* for the list of sources.
 - **CCDciel actions greyed out** → control is only available while CCDciel is
   running; check host/port under *Settings → Integrations*.
 - **Translations missing after editing** → run

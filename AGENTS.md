@@ -27,6 +27,7 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 
 - **Código siempre en inglés**: identificadores, comentarios, cabeceras. La documentación
   vive en `docs/` en español e inglés.
+- **Mensajes de commit siempre en inglés**: asunto, ámbito y cuerpo.
 - **Cabecera en TODOS los ficheros `.py`** (copiar tal cual, adaptando el nombre del módulo):
 
 ```
@@ -308,11 +309,18 @@ benchmarks/          # bancos de medida (track & stack, cero punto contra el
 tools/bench/         #   catálogo, inyección/recuperación, combinación, flat):
                      #   de aquí salen las cifras de los comentarios y los ADR,
                      #   y no se envían con la app
-website/             # la página de presentación (contenido y capturas)
+website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
+                     #   README y el manual es docs/user, los mismos ficheros
+                     #   que pinta la app; tools/build_site.py los convierte y
+                     #   inyecta la paleta y los chips del tema; el HTML se
+                     #   commitea y un test lo regenera y lo compara
 installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
 .github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
                      #   PyInstaller, zip portable + instalador Inno, pre-release
-                     #   rodante preview-<rama>; push a dev/v0.1 o manual)
+                     #   rodante preview-<rama>; push a main o manual)
+                     # windows-tests.yml: la suite unitaria en Windows, en cada PR
+                     # pages.yml: construye la web y la publica en GitHub Pages
+                     #   (push a main o release/v0.1, y manual)
 ```
 
 ### Cómo trabajar
@@ -352,6 +360,7 @@ drafts + tweet + ready-to-attach PNG charts). And between planning and reporting
 
 - **Code is always English**: identifiers, comments, headers. Documentation lives in
   `docs/` in Spanish and English.
+- **Commit messages are always in English**: subject, scope and body.
 - **The header block above goes in EVERY `.py` file** (adjust module name).
 - **Human voice**: short `# @args:` / `# @return:` comments above each method, in the
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.

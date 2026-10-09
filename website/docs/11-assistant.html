@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The assistant · NightScribe</title>
+<meta name="description" content="The assistant">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="11-assistant.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Contents</summary><nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a><a class="toc-link on" href="11-assistant.html"><span>11</span>The assistant</a></nav></details>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>The assistant</h1><p>NightScribe can carry an assistant to ask about the object you are working on, about the application itself, or about what you have in front of you in the editor. It does not measure, it does not classify and it does not decide: it only reads what the app already knows and puts it into words. It is an <strong>experimental</strong> feature: it depends on a language model you connect.</p><h2 id="where-it-is">Where it is</h2><p>Under <strong>Help → Assistant (experimental)</strong>. If you have a project open, the assistant can talk about it; if not, it talks about the app. In the FITS editor there is also a <strong>?</strong> button in the bar: it opens the assistant focused on what you have loaded.</p><h2 id="the-three-scopes">The three scopes</h2><p>The selector on top decides what it answers about:</p><ul><li><p><strong>This object</strong>: your open project. The assistant reads its fact sheet: the object with its explained parameters, the planned night, your visits, the measured magnitudes and the campaign verdict.</p></li><li><p><strong>The app</strong>: the user guide and the ADRs. Questions like "how do I calibrate the frames?" or "what does MOID mean?".</p></li><li><p><strong>The editor</strong>: what you have loaded (the plate, the tab, whether it has a WCS) plus the guide. "I want to make the light curve, can I?" is answered from what is on screen and from the guide's steps.</p></li></ul><p>Under each answer you will see <strong>the sources</strong> that were used: the fact sheet's fields or the documents. If there was nothing to ground it on, it says so; the assistant does not fill the gaps.</p><blockquote class="why"><strong>Why is it different from a chatbot?</strong> Because it only talks about what the app has in front of it. It invents no figures or classifications and it does not touch your data: if something is not in the fact sheet or the guide, it answers that it does not know. It is a companion that looks at your screen, not a data source.</blockquote><h2 id="what-you-need">What you need</h2><p>A language model configured in <strong>Settings → Integrations</strong> (chapter 10). If the AI is off or there is no model, the menu and the <strong>?</strong> button are disabled (with the reason on hover) and no window opens. The conversation lives only in its window: closing it forgets it. Nothing is stored in your database.</p></article>
+    <nav class="pn"><a class="pn-prev" href="10-settings.html"><span>Previous</span>Settings</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

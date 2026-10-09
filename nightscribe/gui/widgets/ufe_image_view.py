@@ -993,14 +993,14 @@ class UfeImageView(ChartView):
 
     # ----------------------------------------------------------- export
 
-    def export_png(self, path, dpi=100, bg=palette.BG):
-        # The base export renders only scene items; the HUD is painted in
-        # the view's foreground, so it is re-stamped here between the
-        # scene and the watermark (scaled by the export pixel ratio).
-        # @args: path - output file, dpi - output density, bg - background
-        # @return: the Path written
-        path = Path(path)
-        path.parent.mkdir(parents=True, exist_ok=True)
+    def render_image(self, dpi=100, bg=palette.BG):
+        # What export_png writes, as an image instead of a file: the scene
+        # (the frame on screen, marks and overlays included), the HUD band,
+        # the north/scale and the watermark. The astrometry tab's animation
+        # export calls it once per observation to assemble a GIF/MP4 of
+        # exactly what the loop shows.
+        # @args: dpi - output density, bg - background colour
+        # @return: a QImage
         vw = self.viewport().size().width()
         vh = self.viewport().size().height()
         if vw < 2 or vh < 2:
@@ -1023,7 +1023,17 @@ class UfeImageView(ChartView):
         self._paint_hud(painter, pw, ph, k=k)
         self._paint_watermark(painter, pw, ph)
         painter.end()
-        pix.save(str(path))
+        return pix.toImage()
+
+    def export_png(self, path, dpi=100, bg=palette.BG):
+        # The base export renders only scene items; the HUD is painted in
+        # the view's foreground, so render_image re-stamps it between the
+        # scene and the watermark (scaled by the export pixel ratio).
+        # @args: path - output file, dpi - output density, bg - background
+        # @return: the Path written
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.render_image(dpi=dpi, bg=bg).save(str(path))
         return path
 
     # ------------------------------------------------------ empty state

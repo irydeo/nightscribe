@@ -93,23 +93,26 @@ def _patch_picker(monkeypatch, files):
 
 
 def _names(dlg, index):
-    # @args: dlg - settings dialog, index - tab index
+    # @args: dlg - settings dialog, index - page index in the rail
     # @return: objectName of every widget on that page
     from PySide6.QtWidgets import QWidget
-    page = dlg.tabWidget.widget(index)
+    page = dlg.stk_pages.widget(index).widget()
     return {w.objectName() for w in page.findChildren(QWidget)
             if w.objectName()}
 
 
-def test_the_calibration_tab_holds_the_library(qapp):
+def test_the_calibration_library_lives_on_the_measurement_page(qapp):
     dlg = _dlg()
-    tabs = [dlg.tabWidget.tabText(i) for i in range(dlg.tabWidget.count())]
-    assert "Calibration" in tabs
-    names = _names(dlg, tabs.index("Calibration"))
+    found = None
+    for i in range(dlg.stk_pages.count()):
+        if "grp_calibration" in _names(dlg, i):
+            found = i
+    assert found is not None, "the master library must live on a page"
+    names = _names(dlg, found)
     for w in ("lblH_masters", "cmb_master_kind", "btn_master_add",
               "tbl_masters", "btn_master_remove", "lbl_master_status",
               "lblH_master_kind"):
-        assert w in names, f"{w} expected on the Calibration tab"
+        assert w in names, f"{w} expected on the calibration page"
     dlg.deleteLater()
 
 

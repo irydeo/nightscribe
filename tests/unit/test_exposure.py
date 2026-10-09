@@ -58,6 +58,22 @@ def test_sampling_verdict():
     assert exposure.sampling("junk") is None
 
 
+def test_the_welcome_limit_grows_with_the_aperture():
+    # The Welcome step's starting point (the real one is measured; the
+    # tooltip and ADR-058 say so). The anchor is a typical amateur stacked
+    # image where an 8-inch telescope reaches about magnitude 18.5.
+    assert abs(exposure.limit_from_aperture(8) - 18.5) < 0.05
+    assert abs(exposure.limit_from_aperture(4) - 17.0) < 0.05
+    assert abs(exposure.limit_from_aperture(16) - 20.0) < 0.05
+    # monotonic: more aperture never means less depth
+    depths = [exposure.limit_from_aperture(d) for d in (3, 6, 10, 14, 20)]
+    assert depths == sorted(depths)
+    # a non-positive or unusable aperture has no estimate
+    assert exposure.limit_from_aperture(0) is None
+    assert exposure.limit_from_aperture(None) is None
+    assert exposure.limit_from_aperture("junk") is None
+
+
 def test_max_exposure_no_trail():
     # rate 10"/min, scale 0.5"/px, tol 1px -> 1*0.5*60/10 = 3 s
     t = exposure.max_exposure_no_trail(10.0, 0.5)

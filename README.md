@@ -4,40 +4,24 @@
 
 **Plan your night, understand every object, tell your science.**
 
-NightScribe is a free (GPL v3) desktop application for amateur astronomical
-observatories, with a graphical interface (Qt6, dark theme) and a command
-line. It was built by the manager of a real observatory (Irydeo, MPC Z41) who
-got tired of doing by hand, every single clear day, what a computer does
-better.
-
-## Sound familiar?
-
-- **The afternoon ritual.** Before dinner you open NEOfixer for the NEOs, the
-  MPC page for possible comets, COBS for comet magnitudes, Rochester for fresh
-  supernovae, ExoClock for tonight's transits, VSX for your variables; and by
-  the time you have the full picture, you have lost an hour of twilight.
-- **"What can I *actually* observe tonight?"**: not what is above the horizon
-  in general, but what is visible *from your site*, over *your horizon*, with
-  *your telescope* and *your camera*, in the hours *you* have.
-- **The fast-mover trap.** You planned 60-second exposures for an unconfirmed
-  NEO and it turns out it moves 5″/min: every frame trailed, the slot wasted.
-- **The night you forgot.** You captured something great last month and never
-  wrote it down anywhere; right now you couldn't say which night, how many
-  frames or which filter.
-- **The variable that flared while nobody looked.** T CrB can erupt any day;
-  R CrB fades without warning. Who checks them every single day?
-
-NightScribe exists to answer all of that from one window.
+NightScribe is the working tool of an amateur astronomical observatory: it
+gathers the whole cycle of an observation in one place, from choosing what to
+look at tonight with your sky and your equipment, to understanding the object,
+capturing and reducing the images and telling what you have found.
 
 ## What is NightScribe?
 
-Three missions, one loop:
+Four missions, one loop:
 
 1. **Plan the night**: the best targets visible from *your* observatory,
    under *your* real constraints, ranked and explained.
 2. **Understand every object**: orbital and physical parameters translated
    into accurate, engaging explanations, in Spanish and English.
-3. **Tell it**: a bilingual (ES/EN) draft and the night's charts, written
+3. **Capture and reduce**: it drives your mount and camera through CCDciel,
+   and it calibrates, stacks and measures your own frames: photometry
+   (variables, exoplanets, supernovae) and MPC-ready astrometry of minor
+   bodies, without leaving the window.
+4. **Tell it**: a bilingual (ES/EN) draft and the night's charts, written
    with the real data of your session.
 
 And the piece that ties them together: every chosen target becomes a
@@ -125,7 +109,9 @@ and talks only to the public data services listed below.
 
 ## Your first five minutes
 
-1. **Install** (details in [INSTALL.md](INSTALL.md)):
+1. **Install** (details in [INSTALL.md](INSTALL.md); on Windows there is a
+   [standalone installer](https://github.com/irydeo/nightscribe/releases),
+   no Python needed):
 
    ```bash
    python3 -m venv --system-site-packages .venv
@@ -136,11 +122,12 @@ and talks only to the public data services listed below.
 2. **The wizard asks for one thing: your observatory.** Type your MPC code and
    your coordinates are filled in from the MPC list; or enter name, latitude,
    longitude and altitude by hand.
-3. The **Tonight** tab computes your night on its own: it downloads the target
-   lists, filters them by your site and gear, and ranks everything.
+3. The **Tonight** view (from **+ NEW PROJECT** in the header) computes your
+   night on its own: it downloads the target lists, filters them by your site
+   and gear, and ranks everything.
 4. **Click any target** and you get its full explained card. Like what you
    see? One button: **Create project**.
-5. When you have a minute, open **Tools → Settings**: horizon file, limiting
+5. When you have a minute, open **Tools → Settings…**: horizon file, limiting
    magnitude, camera plate scale, session defaults. Everything has a sensible
    default; nothing else is mandatory.
 
@@ -148,7 +135,7 @@ and talks only to the public data services listed below.
 
 What using NightScribe actually feels like, in five scenes:
 
-1. **Late afternoon.** You open the app. Tonight is already computed: a list
+1. **Late afternoon.** You open the app and the night panel greets you; one click on **+ NEW PROJECT** and the night is already computed: a list
    of wide rows, best target first. A chip in the header warns you the Moon is
    87 % lit; another announces a shadow transit on Jupiter at 23:12. The top
    row is an unconfirmed NEO with *"safe start until 23:41; 2.5 h over your
@@ -176,12 +163,12 @@ What using NightScribe actually feels like, in five scenes:
    supernova you confirmed keeps its own light curve, and the dashboard nudges
    you when three nights have passed without a revisit. If you feel like
    telling it, the bilingual draft is already written with the real session
-   data. One evening a chip appears in Tonight: *"R CrB is fading: your
+   data. One evening a chip appears in the Tonight view: *"R CrB is fading: your
    vigil"*.
 
 ## What you can do: in detail
 
-### Plan the night (Tonight tab)
+### Plan the night (the Tonight view)
 
 One ranked answer to *"what can I do tonight?"*, with the eight kinds of
 targets from the previous section mixed into a single ranking.
@@ -264,7 +251,7 @@ The flow that turns a moving dot into a reported observation:
   kilonova), the app computes an indicative campaign analysis and verdict, an
   **evolution animation** shows the fade, an annotated FITS copy carries the
   metadata, and a cadence reminder ("3 nights since your last visit") surfaces
-  in Tonight when it's time to go back.
+  in the Tonight view when it's time to go back.
 - Reference context on request: ZTF points via ALeRCE appear as grey reference
   points under yours, never mixed with your own measurements.
 - Export your photometry as **CSV** or **AAVSO EFF** (the AAVSO's extended
@@ -301,9 +288,9 @@ Designed so that *anyone dares* to capture their first transit:
   goal, protocol (cadence, filters, comparison stars), report and data URLs.
   One campaign, many attached projects (deleting the campaign frees them,
   never deletes them). A member is *due* when its last session is
-  `cadence_nights` old and lands in Tonight automatically; it also lands when
+  `cadence_nights` old and lands in the Tonight view automatically; it also lands when
   an **event** is detected or a predicted **extremum** is imminent. The
-  Campaigns tab is the war room: "Happening now" with ⚡ events, ⏳ upcoming
+  Campaigns view is the war room: "Happening now" with ⚡ events, ⏳ upcoming
   extrema and 👁 vigils, per-campaign health cards (members × cadence ×
   events), and full sentences in plain language.
 - **Vigils**: your standing watch list, *T CrB eruption watch*, *R CrB fade
@@ -420,6 +407,7 @@ scripts pick up exactly where it leaves off.
 
 ### Understand any object
 
+**The "Explore an object…" box in the top bar** (type a name, press Enter) or
 **Tools → Explore object…** (or click any target): identity and physical data
 cross-matched from JPL SBDB, Horizons and CAD, SIMBAD, TNS and the NASA
 Exoplanet Archive, rendered as a calling card:
@@ -451,8 +439,8 @@ Copy, paste, done.
 Every external source, what it gives you, how fresh it is, and whether it
 needs a key. All network access goes through an **SQLite cache with per-source
 TTLs** (the refresh column): repeat queries are instant and free for the
-service. If a source is down, the rest of the app never breaks; check
-**Help → Data sources** for the live status of each one.
+service. If a source is down, the rest of the app never breaks; the sources
+are listed under **Help → About NightScribe**.
 
 **Planning sources (feed Tonight):**
 
@@ -534,31 +522,6 @@ sequences, reports, charts, posts) under a root you choose and can change
 later. No accounts, no cloud, no telemetry. Uninstall and delete the folder:
 nothing remains anywhere else.
 
-## What NightScribe is *not* (yet)
-
-Honesty section, so you know where the edges are:
-
-- **Not a planetarium.** It does not replace Stellarium or Cartes du Ciel: it
-  exports ephemerides *to* them.
-- **It reduces, and it also lets you reduce elsewhere.** The app calibrates,
-  stacks and measures astrometry and photometry itself (see *Reduce and
-  measure in the app*), and what it produces is standard FITS, ADES and AAVSO
-  files, so the tools you already trust (Tycho Tracker, AstroImageJ…) keep
-  working on its output. **EXOTIC** stays external: the app orchestrates it,
-  it does not reimplement it.
-- **The MPC report is generated and validated; you send the email.** The app
-  writes it from its own measurements, or reviews the one you paste, and
-  checks it against the other stations before it leaves.
-- **Export formats**: the CCDciel sequence format is validated against a real
-  CCDciel export, and the TheSkyX and Cartes du Ciel ephemerides against real
-  imports; the NINA and generic-CSV sequence exports are starting points to
-  validate against your own versions.
-- **Planning-grade sky events**: eclipses are *probable eclipses*, labelled as
-  such, and Galilean moon events carry their ±10 min label.
-- **Status: alpha.** It is the daily driver of a real observatory (MPC Z41)
-  with a 3,000+ automated test suite, but expect sharp edges; and please
-  report them.
-
 ## Quickstart and CLI
 
 ```bash
@@ -590,10 +553,19 @@ it.
 
 ## Documentation
 
+**The [user guide](docs/user/README.md)** ([español](docs/user/README.es.md))
+walks the whole cycle, from the first run to the MPC report, in short
+chapters with the "why" of each option. It is published as a website:
+**<https://irydeo.github.io/nightscribe/>** (**Help → User guide (web)**).
+
 Design, architecture, data sources, scoring, workflows and every decision
 (ADRs) live in [`docs/`](docs/), in Spanish and English.
 
+Something missing, wrong or unclear? [Open an issue](https://github.com/irydeo/nightscribe/issues).
+
 ## Licence
 
-GPL v3. (c) 2026 Francisco José Calvo Fernández
-([Irydeo Observatory](https://www.irydeo.com), MPC Z41).
+NightScribe is free software, published under the
+[GPL v3](https://github.com/irydeo/nightscribe/blob/main/LICENSE): you can use
+it, study it, change it and share it, and whatever you pass on stays free for
+the next person. There is no paid edition and no locked feature.

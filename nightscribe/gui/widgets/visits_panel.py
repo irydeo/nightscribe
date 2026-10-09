@@ -43,6 +43,7 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
                                QMessageBox, QWidget)
 
 from ..ui_loader import adopt_ui, drop_in, load_ui
+from .door_menu import build_door
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 # The visits list: how tall it may grow before it scrolls itself.
@@ -112,7 +113,7 @@ class VisitsPanel(QWidget):
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
-                 measure_series=None, astrometry=None, phase=None,
+                 measure_series=None, astrometry=None,
                  on_visit_selected=None, parent=None):
         super().__init__(parent)
         self._db = db
@@ -122,7 +123,6 @@ class VisitsPanel(QWidget):
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
         self._astrometry = astrometry
-        self._phase = phase
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
         self._on_visit_selected = on_visit_selected
@@ -293,7 +293,6 @@ class VisitsPanel(QWidget):
                                 on_measure_click=self._on_measure_click,
                                 measure_series=self._measure_series,
                                 astrometry=self._astrometry,
-                                phase=self._phase,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -348,7 +347,7 @@ class VisitWindow(QDialog):
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
                  on_measure_click=None, measure_series=None, astrometry=None,
-                 phase=None, parent=None):
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -363,7 +362,6 @@ class VisitWindow(QDialog):
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
         self._astrometry = astrometry
-        self._phase = phase
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -396,13 +394,35 @@ class VisitWindow(QDialog):
         self.btn_pin.toggled.connect(self._on_pin_toggled)
         self._ui.vp_btn_delete.clicked.connect(self._on_delete_visit)
 
-        # ---- resources
+        # ---- ONE analysis action, chosen by the kind (ADR-045 review): the
+        # observer does not pick between the series and the track & stack.
+        from ...core import kinds
+        self.btn_analyze = self._ui.vp_btn_analyze
+        self._analysis_action = kinds.analysis_of(self._kind)
+        if self._analysis_action == "astrometry":
+            self.btn_analyze.setText(self.tr("Measure the position…"))
+            self.btn_analyze.setToolTip(self.tr(
+                "Stack this visit's frames along the object's motion and "
+                "measure its position, checked against the other observers "
+                "(track & stack, ADR-062)"))
+        elif self._analysis_action == "photometry":
+            self.btn_analyze.setText(self.tr("Measure the series…"))
+            self.btn_analyze.setToolTip(self.tr(
+                "Open the editor on this visit's frames to measure the whole "
+                "series (per-frame zero point, quality flags, undo by run)"))
+        else:
+            self.btn_analyze.setVisible(False)
+        self.btn_analyze.clicked.connect(self._on_analyze)
+        # the resource actions live behind one door (the U5 pattern): their
+        # texts and tooltips stay in the Designer file and the door is a way
+        # in, not a second copy
+        self.btn_resources = self._ui.vp_btn_resources
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
-        self._ui.vp_btn_series.clicked.connect(self._on_measure_series)
-        self._ui.vp_btn_astrometry.clicked.connect(self._on_astrometry)
-        self._ui.vp_btn_phase.clicked.connect(self._on_phase)
         self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
         self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
+        build_door(self.btn_resources, (self._ui.vp_btn_attach,
+                                        self._ui.vp_btn_open,
+                                        self._ui.vp_btn_remove))
         self.lst_res = PassiveList()
         self.lst_res.setObjectName("vp_resources")
         self.lst_res.itemDoubleClicked.connect(
@@ -522,6 +542,7 @@ class VisitWindow(QDialog):
             "chart": self.tr("chart"),
             "report": self.tr("report"),
             "sequence": self.tr("sequence"),
+            "animation": self.tr("animation"),
             "ephemeris": self.tr("ephemeris"),
             "stack": self.tr("stack"),
             "motion_gif": self.tr("motion (GIF)"),
@@ -552,27 +573,17 @@ class VisitWindow(QDialog):
             item.setData(Qt.UserRole, f["id"])
             self.lst_res.addItem(item)
 
-    def _on_measure_series(self):
-        # D8/D36: the series starts from the visit (its frames), never a
-        # folder dialog. The host opens the editor's measure tab with the
-        # series block armed for this visit.
-        if callable(self._measure_series):
-            self._measure_series(self._sid)
-
-    def _on_astrometry(self):
-        # ADR-062, phase 7 (D15): the track & stack starts from the visit
-        # too (its frames and the project's object), never a folder dialog.
-        # The host opens the editor's Track & Stack tab armed for this
-        # visit; this is the entry point the observer looks for.
-        if callable(self._astrometry):
+    def _on_analyze(self):
+        # The kind's own analysis (ADR-045 review): the host opens the
+        # editor on the right tab for this visit, and the observer does not
+        # choose between the series and the track & stack. The blink and the
+        # rest of the reduction live in the editor.
+        if self._analysis_action == "astrometry" \
+                and callable(self._astrometry):
             self._astrometry(self._sid)
-
-    def _on_phase(self):
-        # The period search works on the PROJECT's curve (every visit,
-        # every source), so it hangs from the visit window's resource
-        # block: the visit is where the observer already is.
-        if callable(self._phase):
-            self._phase(self._pid)
+        elif self._analysis_action == "photometry" \
+                and callable(self._measure_series):
+            self._measure_series(self._sid)
 
     def _on_attach(self):
         # File picker (multi) -> ONE metadata confirmation for the whole

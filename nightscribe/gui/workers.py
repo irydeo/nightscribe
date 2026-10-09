@@ -142,6 +142,159 @@ class PostWorker(QThread):
             self.finished.emit({}, {})
 
 
+class AiPostWorker(QThread):
+    # Drafts a post (or the LONG report) with the language model (ADR-075).
+    # It renders the object's charts and finds the extra resources FIRST, so
+    # the model can cite the exact image files by name; then it builds the
+    # brief from the project and its own data and asks the writer. It emits
+    # the brief, the charts and the resources too, so the panel can offer the
+    # "what will be sent" preview from the very same bytes the model read and
+    # can save the images without rebuilding them.
+    done = Signal(dict, dict, dict, dict, str)   # brief, rendered, charts,
+                                                 # resources, error
+
+    def __init__(self, cfg, project, db, enriched=None, fallback_target=None,
+                 long=False, outdir=None, safe=None):
+        super().__init__()
+        self._cfg = cfg
+        self._project = project
+        self._db = db
+        self._enriched = enriched
+        self._fallback = fallback_target
+        self._long = long
+        self._outdir = outdir
+        self._safe = safe
+
+    def run(self):
+        from ..core import enrich, object_brief, post, writer
+        from ..core.sources import llm
+        try:
+            e = self._enriched
+            if not e:
+                e = enrich.enrich(self._project.get("object_name") or "",
+                                  site=self._cfg.get("mpc_code"),
+                                  fallback_target=self._fallback)
+            charts, resources = {}, {}
+            if self._outdir and self._safe:
+                # the charts are OPTIONAL: a chart that fails to render must
+                # never take the draft down with it (the template path has
+                # the same guard). A draft with no image is still a draft.
+                try:
+                    charts, resources = post.collect_assets(
+                        e, self._outdir, self._safe, cfg=self._cfg)
+                except Exception:
+                    logger.warning("charts failed; drafting without them")
+            gallery = post.gallery_entries(charts, resources,
+                                           e.get("name") or "")
+            brief = object_brief.build_brief(
+                self._project, self._db, enriched=e,
+                lang=self._cfg.ui_language(), cfg=self._cfg,
+                long=self._long, gallery=gallery)
+            warn = ""
+            if self._long:
+                try:
+                    rendered = writer.write_report(brief, self._cfg)
+                except llm.LlmError as err:
+                    # the long report failed: fall back to the short post so
+                    # the panel is never left empty, and SAY that the report
+                    # is what failed (the observer must not think it worked)
+                    warn = str(err)
+                    rendered = writer.write_post(brief, self._cfg)
+                # the short post is a second call inside write_report; if it
+                # did not come back, the template fills it (the offline
+                # answer is always there, ADR-075)
+                if not rendered.get("es"):
+                    try:
+                        rendered.update(post.render_post(e, self._cfg))
+                    except Exception:
+                        logger.warning("could not build the fallback post")
+            else:
+                rendered = writer.write_post(brief, self._cfg)
+            self.done.emit(brief, rendered, charts, resources, warn)
+        except llm.LlmError as err:
+            self.done.emit({}, {}, {}, {}, str(err))
+        except Exception as err:
+            logger.exception("ai post worker failed: %s", err)
+            self.done.emit({}, {}, {}, {}, str(err))
+
+
+class AssistantWorker(QThread):
+    # One turn of the grounded conversation (ADR-075), off the GUI thread.
+    # The brief may need a network enrichment, so it is built HERE (via the
+    # provider); the editor's state is read on the GUI thread and arrives as
+    # plain data.
+    done = Signal(str, list, str)   # answer, sources, error
+
+    def __init__(self, cfg, scope, question, history, brief_provider=None,
+                 editor_state=None):
+        super().__init__()
+        self._cfg = cfg
+        self._scope = scope
+        self._q = question
+        self._h = history
+        self._brief_provider = brief_provider
+        self._state = editor_state
+
+    def run(self):
+        from ..core import assistant
+        from ..core.sources import llm
+        try:
+            brief = None
+            if self._scope == assistant.SCOPE_OBJECT and self._brief_provider:
+                brief = self._brief_provider()
+            out = assistant.ask(self._cfg, self._scope, self._q,
+                                history=self._h, brief=brief,
+                                editor_state=self._state)
+            self.done.emit(out["answer"], out["sources"], "")
+        except llm.LlmError as err:
+            self.done.emit("", [], str(err))
+        except Exception as err:
+            logger.exception("assistant worker failed: %s", err)
+            self.done.emit("", [], str(err))
+
+
+class LlmModelsWorker(QThread):
+    # The Settings "List models" click (ADR-075): asks the endpoint which
+    # models it has, off the GUI thread. For a local server this returns its
+    # exact names, which is the whole point.
+    done = Signal(list, str)     # models, error
+
+    def __init__(self, cfg):
+        super().__init__()
+        self._cfg = cfg
+
+    def run(self):
+        from ..core.sources import llm
+        try:
+            models = llm.list_models(self._cfg)
+            self.done.emit(models, "")
+        except llm.LlmError as err:
+            self.done.emit([], str(err))
+        except Exception as err:
+            logger.exception("llm models failed: %s", err)
+            self.done.emit([], str(err))
+
+
+class LlmTestWorker(QThread):
+    # The Settings "Test connection" click: asks the endpoint for a one-line
+    # reply off the GUI thread, so a slow (or dead) server never freezes the
+    # dialog. It runs only when the observer clicks, never in the background.
+    done = Signal(bool, str)     # ok, message ready to show
+
+    def __init__(self, cfg):
+        super().__init__()
+        self._cfg = cfg
+
+    def run(self):
+        from ..core.sources import llm
+        try:
+            ok, msg = llm.test_connection(self._cfg)
+        except Exception as err:            # never let a worker die silently
+            logger.exception("llm test failed: %s", err)
+            ok, msg = False, str(err)
+        self.done.emit(ok, msg)
+
+
 class SunWorker(QThread):
     # Fetches the Sun state, the latest SDO image (selected channel) and
     # the HMI continuum image (for the annotated region map) in the background.
@@ -530,6 +683,44 @@ class BlinkExportWorker(QThread):
             self.finished.emit(str(self._out), "")
         except Exception as err:  # never crash the GUI on render problems
             logger.exception("blink export failed: %s", err)
+            self.finished.emit("", str(err))
+
+
+class SequenceExportWorker(QThread):
+    # Encodes the astrometry tab's captured animation frames (GIF or MP4)
+    # off the GUI thread. Unlike BlinkExportWorker it does NOT render: the
+    # frames come from the editor's own view, which can only be painted on
+    # the GUI thread, so the tab captures them first and hands them here to
+    # be written while the window stays alive.
+    finished = Signal(str, str)     # output path, error message
+
+    def __init__(self, frames, out, fmt, duration_ms=700, fps=None,
+                 min_seconds=None):
+        super().__init__()
+        self._frames = frames       # list of PIL RGB images (same size)
+        self._out = out
+        self._fmt = fmt             # "gif" | "mp4"
+        self._duration_ms = duration_ms
+        self._fps = fps
+        self._min_seconds = min_seconds
+
+    def run(self):
+        from ..core.viz import video
+        try:
+            if self._fmt == "mp4":
+                kw = {}
+                if self._fps is not None:
+                    kw["fps"] = self._fps
+                if self._min_seconds is not None:
+                    kw["min_seconds"] = self._min_seconds
+                video.write_mp4(self._frames, self._out,
+                                duration_ms=self._duration_ms, **kw)
+            else:
+                video.write_gif(self._frames, self._out,
+                                duration_ms=self._duration_ms)
+            self.finished.emit(str(self._out), "")
+        except Exception as err:  # never crash the GUI on render problems
+            logger.exception("sequence export failed: %s", err)
             self.finished.emit("", str(err))
 
 
@@ -1080,7 +1271,37 @@ class TrackStackWorker(QThread):
         import numpy as np
         from ..core import astrometry as astrometry_mod
         from ..core import compstars, photometry
+        from ..core import gain as gain_mod
+        from ..core import gain_store
         from ..core import wcs as wcs_mod
+        from ..core.db import db as _db
+        # THE WORKING GAIN (2026-10-08, ADR-072): Ajustes -> measured on the
+        # visit's frames -> remembered for this camera -> header. The header
+        # can carry the camera's gain SETTING or a placeholder (measured on
+        # the author's own QHY42Pro frames: GAIN = 5, EGAIN = 1.0, real gain
+        # 0.11 e-/ADU), so it is the last word and not the first.
+        estimate = None
+        if self._cfg_get("ccd_gain", None) is None and frames:
+            try:
+                estimate = gain_mod.estimate_from_paths(
+                    frames, level_max=self._cfg_get("ccd_saturate", None))
+            except Exception as err:            # never fatal
+                logger.warning("gain estimate failed: %s", err)
+        remembered = None
+        if self._cfg_get("ccd_gain", None) is None:
+            try:
+                remembered = gain_store.recall(_db, ref.header)
+            except Exception as err:            # never fatal
+                logger.warning("gain recall failed: %s", err)
+        gain_report = gain_mod.resolve(
+            settings_gain=self._cfg_get("ccd_gain", None),
+            settings_ron=self._cfg_get("ccd_read_noise", None),
+            header=ref.header, estimate=estimate, remembered=remembered)
+        if gain_report.get("source") == "frames":
+            try:
+                gain_store.remember(_db, ref.header, gain_report)
+            except Exception as err:            # never fatal
+                logger.warning("gain remember failed: %s", err)
         recipe = dict(self._recipe or {})
         entries = list(self._comps)
         source = "project" if entries else "auto"
@@ -1194,6 +1415,8 @@ class TrackStackWorker(QThread):
                 color=bool(recipe.get("color", False)),
                 target_bv=float(recipe.get("target_bv") or 0.0),
                 linear_adu=self._cfg_get("cam_linearity_adu", None),
+                gain=gain_report.get("gain"), ron=gain_report.get("ron"),
+                gain_source=gain_report.get("source"),
                 site_gain=self._cfg_get("ccd_gain", None),
                 site_ron=self._cfg_get("ccd_read_noise", None),
                 site_flat=self._cfg_get("flat_resid_mag", 0.007) or 0.007,

@@ -222,6 +222,19 @@ nunca se modifica.
   ganancia) de «total» (más dispersión del ZP, centelleo de Young con tu
   apertura y altura de Ajustes, término de color y un suelo de flat de
   0,007 mag configurable como `flat_resid_mag`).
+* **De dónde sale la ganancia** (2026-10-08): la ecuación CCD cuelga entera de
+  la ganancia (e-/ADU), así que la app la resuelve en un orden fijo: Ajustes,
+  después la **medida en tus propias tomas** (dos tomas de la misma exposición
+  la dicen), después la **recordada** para tu cámara y tu ajuste, y solo entonces
+  la cabecera. La medida gana a la cabecera porque la tarjeta puede llevar el
+  **ajuste** de la cámara (`GAIN`, un número pequeño que no son e-/ADU) o un
+  valor de relleno (`EGAIN = 1.0`): con uno de esos el error sale varias veces
+  más corto de lo que es, y la estrella check no puede avisar porque su semáforo
+  se mide con ese mismo error. La **recordada** resuelve el caso de una sola
+  imagen: en una SN sueles traer un único apilado, y una imagen no puede medir la
+  ganancia, así que la app la mide cuando puede (los frames de la visita, o la
+  acción **«Medir ganancia…»** de **Ajustes → Cámara**) y la recuerda por cámara y ajuste. El panel
+  dice de qué vía salió; el caso medido y sus cifras están en ADR-072.
 * **La estrella check como semáforo**: si la secuencia tiene una, se
   mide y se compara con su catálogo; si se desvía más de 2,5σ_total, la
   medida se marca como NO fiable antes de que te fíes de ella.
@@ -510,11 +523,23 @@ Para una serie de tránsitos que baje al nivel de mmag, la receta de campo:
 
 ### 8.2 Perfil de cámara y límite de linealidad
 
-En **Ajustes → Perfil de cámara fotométrica** eliges un preset (IMX455, IMX571,
-IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) que rellena el
-tamaño de píxel, el full well, la corriente de oscuridad y un **valor sugerido de
-linealidad**. La **linealidad y el tope de exposición son por ganancia**: mídelos
-tú; el sugerido es solo un punto de partida.
+En **Ajustes → Perfil de cámara fotométrica** eliges un preset de un catálogo
+agrupado por familia (CMOS Sony de 16 bits: IMX455/461/411/571/533; CMOS Sony
+de 12/14 bits: IMX492/294/183/178/174/290 y el MN34230 de la ASI1600; sCMOS
+Gpixel: GSENSE400/4040/6060; CCD Sony: ICX694/814; CCD Kodak/ON:
+KAF-8300/16803/09000 y KAI-11002). Cada preset rellena el tamaño de píxel, el
+tamaño del sensor, la profundidad de bits del ADC, el full well, el ruido de
+lectura (con el modo de ganancia al que pertenece), la corriente de oscuridad
+**con la temperatura a la que se cita** y un **valor sugerido de linealidad**.
+La **linealidad y el tope de exposición son por ganancia**: mídelos tú; el
+sugerido es solo un punto de partida.
+
+La linealidad sugerida no es un número fijo: sale del **menor** entre el full
+well (a tu ganancia) y el techo del ADC (2^bits − 1), multiplicado por la
+fracción de linealidad del sensor (0.9 por defecto; los KAF la publican como
+"lineal hasta el 90% de Vsat"). Así un sensor de 12 bits no sugiere un techo
+que su ADC no alcanza, ni uno de 16 bits a ganancia alta sugiere más de lo que
+aguanta el píxel.
 
 El límite de linealidad es el techo que de verdad manda: el techo efectivo toma
 el **mínimo** entre tu linealidad, la tarjeta SATURATE, el ajuste y el recorte
@@ -546,6 +571,15 @@ compararlos con la placa (ADR-062 rev). Sin eso, el propio cielo de un stack
 las comparadas: medido en la visita 2025 FG18 del autor (cielo 1552 ADU, 207
 tomas, linealidad 53 000) el cielo del `sum` solo ya son 321 000 ADU y el run
 no daba ninguna magnitud.
+
+**Añadir tu cámara.** El catálogo es un fichero de datos,
+`nightscribe/assets/cameras.toml` (empaquetado). Para añadir, corregir o
+quitar una cámara sin tocar la instalación, edita `<config>/cameras.toml`
+(junto a `nightscribe.json`): una `[[camera]]` con un `key` nuevo la añade,
+con un `key` existente corrige sus campos, y `hide = ["key", …]` quita una
+empaquetada. El fichero se relee al abrir Ajustes, así que no hace falta
+reiniciar; si tiene un error, Ajustes → Cámara lo dice y se sigue usando el
+catálogo empaquetado.
 
 ---
 

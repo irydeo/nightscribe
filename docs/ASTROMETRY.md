@@ -32,7 +32,7 @@ library** (bias, dark, flat) that you build elsewhere; the app only points
 at it.
 
 - You index each master from the **Calibration tab** of the editor (or from
-  Settings → Calibration). It is keyed by camera, gain, temperature, exposure
+  Settings → Measurement). It is keyed by camera, gain, temperature, exposure
   and filter, which is what makes a master valid. A **flat does not have to
   share the lights' gain**: it is normalised before it is applied, so the gain
   only scales its whole level, never its shape (measured: the author's own
@@ -258,7 +258,7 @@ project). No visit, no series: that is the house rule.
   more** to submit and forbids marginal detections, so a group below the bar
   does not go into the report and the reason is explained. The app ships **10**
   (the author's own Tycho submissions ran at about 16 and were accepted) and
-  you change it in **Settings → Astrometry**, together with the detection gate,
+  you change it in **Settings → Measurement**, together with the detection gate,
   the velocity sweep, the cutout margin, the check and the threads. When **no**
   observation clears it, the report's own group says so, with the floor's
   number and where it is set, and the button that sends the report stays

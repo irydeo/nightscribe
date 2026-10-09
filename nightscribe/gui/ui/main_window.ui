@@ -80,6 +80,31 @@
         </spacer>
        </item>
        <item>
+        <!-- Interfaz 1.0 (2026-10-08): the always-visible door to Explore.
+             Type a name and press Enter to open that object's card, even
+             when tonight's list does not suggest it. Anchored to the RIGHT
+             (after the spacer) so a long breadcrumb never pushes it: it is
+             reachable from EVERY view; the Tools menu keeps its own,
+             self-explaining dialog for whoever does not know the feature
+             yet. -->
+        <widget class="QLineEdit" name="edt_nav_explore">
+         <property name="minimumSize"><size><width>200</width><height>0</height></size></property>
+         <property name="maximumSize"><size><width>280</width><height>16777215</height></size></property>
+         <property name="placeholderText"><string>Explore an object…</string></property>
+         <property name="clearButtonEnabled"><bool>true</bool></property>
+         <property name="toolTip"><string>Look up any object by name, even if it is not in tonight's list</string></property>
+        </widget>
+       </item>
+       <item>
+        <!-- a fixed 12 px breath between the search box and the sky bar:
+             without it the two read as one run of text -->
+        <spacer name="hsp_nav_explore">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         <property name="sizeType"><enum>QSizePolicy::Fixed</enum></property>
+         <property name="sizeHint" stdset="0"><size><width>12</width><height>0</height></size></property>
+        </spacer>
+       </item>
+       <item>
         <!-- Interfaz 1.6: the night, always in sight. The real widget
              (gui/widgets/sky_bar.py) replaces this placeholder: the Moon
              at tonight's phase, the darkness window, the planets at dusk
@@ -133,12 +158,14 @@
        </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
+     <addaction name="action_assistant"/>
+     <addaction name="separator"/>
      <addaction name="action_welcome"/>
-     <addaction name="action_docs"/>
-     <addaction name="separator_help"/>
-     <addaction name="action_about"/>
-     <addaction name="action_sources"/>
+     <addaction name="action_guide_web"/>
+     <addaction name="separator"/>
      <addaction name="action_log"/>
+     <addaction name="separator"/>
+     <addaction name="action_about"/>
     </widget>
     <addaction name="menu_file"/>
     <addaction name="menu_tools"/>
@@ -168,19 +195,21 @@
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>
   </action>
-  <action name="action_sources">
-   <property name="text"><string>Data sources</string></property>
-  </action>
   <action name="action_welcome">
     <property name="text"><string>Welcome / setup guide</string></property>
     <property name="toolTip"><string>Your observatory, your targets and the data report, at any time</string></property>
   </action>
-  <action name="action_docs">
-    <property name="text"><string>Technical Documentation</string></property>
+  <action name="action_guide_web">
+    <property name="text"><string>User guide (web)</string></property>
+    <property name="toolTip"><string>The same guide as a web page, in your browser: handy to read on a phone or to send to somebody</string></property>
   </action>
   <action name="action_log">
     <property name="text"><string>Open the log…</string></property>
     <property name="toolTip"><string>What the application has been doing, written while it runs: if something failed without saying why, the answer is in here</string></property>
+  </action>
+  <action name="action_assistant">
+    <property name="text"><string>Assistant (experimental)</string></property>
+    <property name="toolTip"><string>Experimental: it answers through an optional language model you connect. Ask about the object you are working on, about the app, or what to do next. It reads only NightScribe's own data and documents</string></property>
   </action>
  </widget>
  <resources/>

@@ -343,6 +343,22 @@ def test_header_instrument():
                                           "exptime": None}
 
 
+def test_the_conversion_gain_is_read_before_the_camera_setting():
+    # A capture program writes BOTH: GAIN is the camera's gain SETTING (a
+    # small integer) and EGAIN is the conversion gain in e-/ADU. Reading
+    # GAIN first took the setting for the conversion gain, and the error
+    # bar came out wrong (measured on the author's own QHY42Pro frames:
+    # GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU).
+    out = phot.header_instrument({"GAIN": 5, "EGAIN": 1.0,
+                                  "RDNOISE": 1.7, "EXPTIME": 10})
+    assert out["gain"] == 1.0 and out["ron"] == 1.7
+    # a camera that writes only GAIN still works (some mean e-/ADU)
+    assert phot.header_instrument({"GAIN": 0.8})["gain"] == 0.8
+    # CCDGAIN (MaximDL's name for e-/ADU) beats a bare setting too
+    out = phot.header_instrument({"GAIN": 3, "CCDGAIN": 0.6})
+    assert out["gain"] == 0.6
+
+
 # ---------------- phase H: quality pieces ----------------
 
 
@@ -851,6 +867,32 @@ def test_measure_plate_frozen_reference():
     assert len(res.used) == 6 and res.skipped == {}
     assert res.check is not None and res.check["ok"]
     assert res.check["delta"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_measure_plate_uses_the_resolved_gain_over_the_header():
+    # The working gain the caller resolved (Ajustes -> measured on the
+    # frames -> header) wins over the header's own card, because the card
+    # can be the camera's gain SETTING or a placeholder (2026-10-08). The
+    # error bar follows the gain, so a plate whose header lies gets the
+    # honest error: a gain six times smaller means a flux error
+    # sqrt(6) ~ 2.4 times larger.
+    data = _contract_plate()
+    base = dict(target_xy=_CONTRACT_TARGET, entries=_contract_entries(data),
+                wcs=_FlatWcs(), band="V", radii=(6.0, 10.0, 15.0),
+                fwhm=None, site_flat=0.007, site_lat=40.0, site_lon=-3.0,
+                site_aperture_m=0.254, site_height_m=650.0,
+                header={"EGAIN": 1.0})
+    lying = phot.measure_plate(data, phot.PlateConfig(site_gain=1.0, **base))
+    honest = phot.measure_plate(data, phot.PlateConfig(
+        gain=0.11, ron=5.0, gain_source="frames", **base))
+    assert lying.gain == 1.0 and lying.gain_source == "settings"
+    assert honest.gain == 0.11 and honest.gain_source == "frames"
+    assert honest.err_internal == pytest.approx(
+        lying.err_internal * math.sqrt(1.0 / 0.11), rel=0.05)
+    # a caller that resolved nothing falls back to its settings, and only
+    # then to the header
+    no_settings = phot.measure_plate(data, phot.PlateConfig(**base))
+    assert no_settings.gain == 1.0 and no_settings.gain_source == "header"
 
 
 def test_measure_plate_guards_become_reason_pairs():

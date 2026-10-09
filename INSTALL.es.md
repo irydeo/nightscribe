@@ -98,6 +98,11 @@ por usuario, sin permisos de administrador) y un zip portable
 `nightscribe.exe gui`). Los binarios no están firmados, así que Windows
 SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
 
+Reinstalar actualiza **limpiamente**: el instalador desinstala antes la versión
+anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
+datos se conservan: viven en `%APPDATA%`/`%LOCALAPPDATA%`, no en la carpeta de
+instalación.
+
 Para generar el tuyo:
 
 ```bash
@@ -156,7 +161,7 @@ Ninguna clave es obligatoria: cada integración opcional degrada con elegancia.
   Ejecutar de todas formas* (el instalador se construye desde este mismo
   código).
 - **Una fuente falla** (p. ej. NEOfixer caído) → la app sigue funcionando con el
-  resto; revisa el menú *Fuentes de datos* para ver el estado de cada una.
+  resto; revisa *Ayuda → Acerca de NightScribe* para ver la lista de fuentes.
 - **Acciones CCDciel deshabilitadas** → el control solo está disponible con
   CCDciel en ejecución; revisa host/puerto en *Configuración → Integraciones*.
 - **Faltan traducciones tras editar** → ejecuta

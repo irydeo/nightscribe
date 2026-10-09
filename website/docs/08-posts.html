@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reporting it · NightScribe</title>
+<meta name="description" content="Reporting it">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="08-posts.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Contents</summary><nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link on" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a><a class="toc-link" href="11-assistant.html"><span>11</span>The assistant</a></nav></details>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Reporting it</h1><p>NightScribe's last mission is keeping your observation from dying on the hard drive: it generates the drafts to tell it, in Spanish and English, with your session's real data.</p><h2 id="the-draft">The draft</h2><p>In a project's <strong>Publishing</strong> step, <strong>Generate</strong> enriches the object (its orbital, physical and context data) and builds three pieces:</p><ul><li><p><strong>ES</strong>: the post in Spanish, with the outreach hook, the key facts as bullets and the hashtags (including your MPC code, if you have one).</p></li><li><p><strong>EN</strong>: the same post in English.</p></li><li><p><strong>X</strong>: the short version for the bird network, within the character limit.</p></li></ul><p>Each piece has its own <strong>Copy</strong> button; choose the output folder with <strong>Browse…</strong> if you want them saved as files next to the charts. The draft is written on the page itself, with no window to open; while it works, a progress bar tells you it is still going, because an AI draft can take a couple of minutes with a model that "thinks".</p><blockquote class="why"><strong>Why a draft and not a publishable post?</strong> Because the voice is yours. NightScribe supplies the correct data (the distance, the size, the "why it matters" sentence) so you do not have to look it up, but the tone, the picture and the final touch belong to your observatory. Edit freely: the draft regenerates whenever you want.</blockquote><h2 id="writing-with-ai-optional-experimental">Writing with AI (optional, experimental)</h2><p>If you configure a language model in <strong>Settings → Integrations</strong> (an OpenAI-compatible service, in the cloud or on your own machine), the Publishing step gains two buttons. It is an <strong>experimental</strong> part of the app: it depends on an external model you connect and may change; the usual template is the stable answer:</p><ul><li><p><strong>Write with AI…</strong>: drafts the post from <strong>everything</strong> the app knows about the project: the object with its explained parameters, the planned night, your visits, the measured magnitudes and the campaign verdict.</p></li><li><p><strong>What will be sent…</strong>: shows the exact fact sheet the model would read, so you see what would leave your machine before it does.</p></li></ul><p>The AI only phrases: it does not measure, it does not classify and it invents no figure. Everything it says comes from the dossier, and what is not there it does not mention. The draft is still yours: review it before publishing.</p><p>If you turn on <strong>long reports</strong> in Settings, the same button also writes a <strong>full article</strong> in Spanish and English: it adds the object's deepest parameters, the analysis (a saved period, a transit, the astrometry runs, the photometry recipe), the campaign the observation belongs to, and it cites the charts and videos it generated <strong>inside the story</strong>, with the whole gallery at the end. The article appears in its own <strong>Long report</strong> card and is saved next to the post. A local model writes it for free; a paid service charges per token, which is why the setting is off by default.</p><blockquote class="why"><strong>Why off by default?</strong> Because the app works the same without it: the usual template stays and needs no network. With the AI off, the AI buttons are disabled and the template writes the post. With a local server (Ollama, for instance) nothing leaves your machine; with a cloud one, the cost and the privacy are that service's.</blockquote><h2 id="the-charts">The charts</h2><p>Alongside the text, NightScribe generates PNGs ready to attach: the orbit, the sky chart, the night view, the light curve (with the supernova templates in the background when applicable), the confirmation blink or the animation of a NEO's motion. They follow the interface language.</p><blockquote class="why"><strong>Why is the blink the "acid test"?</strong> Because in transient outreach, credibility is everything: an animation where your object moves (or blinks) against the fixed star background proves in two seconds that something is there, without a single equation. It is the image that turns a "I saw it" into a "see for yourself".</blockquote><p>And with that, the loop closes: from the afternoon's target to the next morning's post. The appendix <a href="09-cli.html">09. The command line</a> summarises how to do all of this without opening the window.</p></article>
+    <nav class="pn"><a class="pn-prev" href="07-astrometry.html"><span>Previous</span>Astrometry</a><a class="pn-next" href="09-cli.html"><span>Next</span>The command line</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

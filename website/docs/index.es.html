@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía de usuario · NightScribe</title>
+<meta name="description" content="Guía de usuario">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="index.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Índice</summary><nav class="toc"><a class="toc-link on" href="index.es.html">Guía de usuario</a><a class="toc-link" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a><a class="toc-link" href="11-assistant.es.html"><span>11</span>11. El asistente</a></nav></details>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1 id="nightscribe-guía-de-usuario">NightScribe: guía de usuario</h1><p>NightScribe es una aplicación de escritorio para observatorios astronómicos amateur que cubre el ciclo completo de un proyecto de observación:</p><ol><li><p><strong>Planificar la noche</strong>: te propone los mejores objetivos visibles desde tu observatorio esta noche (NEOs, cometas, candidatos del PCCP, supernovas, variables, tránsitos de exoplanetas), con una puntuación de 0 a 100 y la razón de cada propuesta.</p></li><li><p><strong>Entender cada objeto</strong>: traduce los parámetros orbitales y físicos a explicaciones claras, para que sepas qué estás mirando y por qué importa.</p></li><li><p><strong>Capturar y reducir</strong>: habla con CCDciel para lanzar tus capturas y, en su editor FITS, calibra, apila y mide tus imágenes: fotometría (variables, exoplanetas, supernovas) y astrometría de cuerpos menores lista para el MPC.</p></li><li><p><strong>Contarlo</strong>: genera borradores bilingües (ES/EN) de posts y tuits, con gráficos listos para redes sociales.</p></li></ol><blockquote class="why"><strong>¿Por qué existe NightScribe?</strong> El cuello de botella de un observatorio amateur no es el telescopio: es decidir qué observar, reducir los datos sin pelearse con cinco programas y dar salida a los resultados. NightScribe une esas tres partes en un solo sitio, con criterio científico.</blockquote><h2 id="cómo-leer-esta-guía">Cómo leer esta guía</h2><p>Los capítulos siguen el orden natural de una noche de observación, así que puedes leerlos de principio a fin o saltar al que necesites:</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Capítulo</th><th style="text-align:left">Qué encontrarás</th></tr></thead><tbody><tr><td style="text-align:left"><a href="01-getting-started.es.html">01. Primeros pasos</a></td><td style="text-align:left">Instalación, asistente inicial y ajustes del observatorio</td></tr><tr><td style="text-align:left"><a href="02-tonight.es.html">02. Planificar la noche</a></td><td style="text-align:left">La vista Esta noche, la puntuación, el calendario del cielo</td></tr><tr><td style="text-align:left"><a href="03-projects.es.html">03. Proyectos</a></td><td style="text-align:left">Crear y seguir proyectos: de la ficha a la publicación</td></tr><tr><td style="text-align:left"><a href="04-campaigns.es.html">04. Campañas y vigilias</a></td><td style="text-align:left">Campañas de seguimiento y vigilias de variables</td></tr><tr><td style="text-align:left"><a href="05-capture.es.html">05. Captura</a></td><td style="text-align:left">CCDciel, secuencias y calibración de imágenes</td></tr><tr><td style="text-align:left"><a href="06-photometry.es.html">06. Fotometría</a></td><td style="text-align:left">Medir brillo, series, curvas de luz y períodos</td></tr><tr><td style="text-align:left"><a href="07-astrometry.es.html">07. Astrometría</a></td><td style="text-align:left">Posiciones de asteroides y cometas, y el reporte al MPC</td></tr><tr><td style="text-align:left"><a href="08-posts.es.html">08. Contarlo</a></td><td style="text-align:left">Posts, tuits y gráficos</td></tr><tr><td style="text-align:left"><a href="09-cli.es.html">09. La línea de comandos</a></td><td style="text-align:left">Apéndice: todo lo anterior desde el terminal</td></tr><tr><td style="text-align:left"><a href="10-settings.es.html">10. Configuración</a></td><td style="text-align:left">Apéndice de referencia: cada sección de Configuración, qué decide y cuándo tocarla</td></tr><tr><td style="text-align:left"><a href="11-assistant.es.html">11. El asistente</a></td><td style="text-align:left">Preguntar por el objeto, por la app o por el editor</td></tr></tbody></table></div><p>Convenciones:</p><ul><li><p>Los nombres de botones, pestañas y menús aparecen <strong>en negrita</strong> y tal cual los verás en la aplicación.</p></li><li><p>Las cajas <strong>«¿Por qué?»</strong> explican la física o la práctica observacional detrás de una opción, para que decidas con criterio. Puedes saltártelas sin perder el hilo.</p></li><li><p>Los ejemplos de comandos van en <code>código</code>.</p></li></ul><p>La guía no pretende ser exhaustiva: pretende que observes antes y mejor. Si echas algo en falta, abre una incidencia en el repositorio.</p></article>
+    <nav class="pn"><a class="pn-next" href="01-getting-started.es.html"><span>Siguiente</span>01. Primeros pasos</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

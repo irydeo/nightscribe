@@ -14,6 +14,32 @@
 > construction, the own TAN WCS for ASTAP and blink, and the rule of never
 > resampling the user's pixels.
 
+> **Nota (2026-10-08)**: la alineación «por construcción» del punto 2 vale
+> para el *blink* (mirar), pero no para la **sustracción de huésped** (H2b):
+> restar dos imágenes exige que coincidan al subpíxel. El WCS solo no basta:
+> los términos SIP se ignoran y, sobre todo, la **escala** del cutout
+> (pedida a la escala del WCS) difiere de la real en una fracción de por
+> ciento, así que las estrellas se emparejan pero caen cada vez más lejos
+> hacia los bordes. Por eso la resta **registra la referencia sobre las
+> estrellas del frame como semejanza** (escala + rotación + traslación,
+> `core/register`) y **excluye los píxeles enmascarados del survey** (llegan
+> como NaN; se rellenan para remuestrear y se vuelven a enmascarar). El
+> nudge manual sigue siendo el ajuste fino del blink. Los píxeles del
+> usuario siguen sin remuestrearse nunca: lo que se remuestrea es el survey.
+>
+> **Note (2026-10-08)**: the "alignment by construction" of point 2 holds
+> for the *blink* (looking), but not for the **host subtraction** (H2b):
+> subtracting two images needs them to match at the sub-pixel level. The
+> WCS alone is not enough: the SIP terms are ignored and, above all, the
+> cutout's **scale** (asked for at the WCS scale) differs from the real one
+> by a fraction of a percent, so the stars pair but land further and
+> further off toward the edges. So the subtraction **registers the
+> reference on the frame's stars as a similarity** (scale + rotation +
+> translation, `core/register`) and **excludes the survey's masked pixels**
+> (they arrive as NaN: filled to survive the resampling, then masked
+> again). The manual nudge stays the blink's fine adjustment. The user's
+> pixels are still never resampled: what is resampled is the survey.
+
 ## Español
 
 **Contexto**: ADR-016 decidió el «antes/después» de supernovas (cutout de referencia

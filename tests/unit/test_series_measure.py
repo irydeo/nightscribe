@@ -1219,3 +1219,45 @@ def test_the_frame_seeing_is_measured_once_and_shared(tmp_path, monkeypatch):
     # every point still carries the frame's seeing for the report and the
     # detrend, and it is the SAME number the centroid used
     assert all(p.fwhm is not None for p in res.points)
+
+
+def test_the_series_measures_the_gain_even_with_a_header_value(
+        tmp_path, monkeypatch):
+    # The header used to be the last word, on the reasoning that it is "a
+    # fact of the camera". It is not: it can carry the camera's gain
+    # SETTING or a placeholder (the author's own frames: GAIN = 2 written
+    # by the capture program, real gain far from it). With no Ajustes
+    # value the series now measures the gain on the very frames it is
+    # about to read and lets the measurement win (2026-10-08).
+    from nightscribe.core import gain as gn
+    paths, wcs, comps = _write_frames(tmp_path, 3)
+    seen = {}
+
+    def _fake(ps, **kw):
+        seen["called"] = True
+        return {"gain": 0.11, "ron": None, "gain_err": 0.001, "notes": [],
+                "n_boxes": 12, "n_kept": 11}
+
+    monkeypatch.setattr(gn, "estimate_from_paths", _fake)
+    cfg = _config(wcs, comps, site_gain=None, site_ron=None)
+    resolved, report = sm._resolve_gain(cfg, paths)
+    assert seen.get("called"), "la serie mide la ganancia aunque haya cabecera"
+    assert report["source"] == "frames" and report["gain"] == 0.11
+    assert resolved.site_gain == 0.11 and resolved.gain_source == "frames"
+
+
+def test_the_settings_gain_skips_the_measurement(tmp_path, monkeypatch):
+    # An observer who set their gain never pays for the two frame reads:
+    # Ajustes wins and the measurement is not even attempted.
+    from nightscribe.core import gain as gn
+    paths, wcs, comps = _write_frames(tmp_path, 3)
+    seen = {}
+
+    def _fake(ps, **kw):
+        seen["called"] = True
+        return {"gain": 0.11, "ron": None, "notes": []}
+
+    monkeypatch.setattr(gn, "estimate_from_paths", _fake)
+    resolved, report = sm._resolve_gain(_config(wcs, comps), paths)
+    assert not seen.get("called")
+    assert report["source"] == "settings" and report["gain"] == 2.0

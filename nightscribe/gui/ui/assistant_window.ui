@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AssistantWindow</class>
+ <widget class="QDialog" name="AssistantWindow">
+  <property name="windowTitle"><string>Assistant (experimental)</string></property>
+  <property name="modal"><bool>false</bool></property>
+  <property name="minimumSize"><size><width>560</width><height>480</height></size></property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="scopeRow">
+     <item><widget class="QLabel" name="lbl_scope"><property name="text"><string>About:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_scope"/></item>
+     <item><widget class="QLabel" name="lbl_context"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item>
+      <spacer name="hsp_scope">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item><widget class="QPushButton" name="btn_clear"><property name="text"><string>Clear</string></property><property name="toolTip"><string>Forget this conversation. Nothing is stored: it lives only in this window while it is open</string></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QTextEdit" name="txt_log"><property name="readOnly"><bool>true</bool></property></widget></item>
+   <item><widget class="QLabel" name="lbl_sources"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QProgressBar" name="progress"><property name="minimum"><number>0</number></property><property name="maximum"><number>0</number></property><property name="textVisible"><bool>false</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="askRow">
+     <item><widget class="QLineEdit" name="edt_question"><property name="placeholderText"><string>Ask about the object, the app or what to do next…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_send"><property name="text"><string>Send</string></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_hint"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Close</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

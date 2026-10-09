@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09. La línea de comandos · NightScribe</title>
+<meta name="description" content="09. La línea de comandos">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="09-cli.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Índice</summary><nav class="toc"><a class="toc-link" href="index.es.html">Guía de usuario</a><a class="toc-link" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link on" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a><a class="toc-link" href="11-assistant.es.html"><span>11</span>11. El asistente</a></nav></details>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>09. La línea de comandos</h1><p>Todo lo importante de NightScribe se puede hacer sin abrir la ventana, con <code>python -m nightscribe &lt;comando&gt;</code> (o <code>nightscribe &lt;comando&gt;</code> si instalaste el paquete). Útil para scripts, cron y noches con prisa.</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Comando</th><th style="text-align:left">Qué hace</th></tr></thead><tbody><tr><td style="text-align:left"><code>gui</code></td><td style="text-align:left">Arranca la aplicación de escritorio</td></tr><tr><td style="text-align:left"><code>tonight</code></td><td style="text-align:left">Los mejores objetivos de esta noche, con su score y el porqué</td></tr><tr><td style="text-align:left"><code>explore &lt;objeto&gt;</code></td><td style="text-align:left">La ficha explicada de un objeto (órbita, física, visibilidad)</td></tr><tr><td style="text-align:left"><code>post &lt;objeto&gt;</code></td><td style="text-align:left">Los borradores ES/EN y el tuit</td></tr><tr><td style="text-align:left"><code>solar</code></td><td style="text-align:left">El estado del Sol (manchas, llamaradas, viento)</td></tr><tr><td style="text-align:left"><code>blink &lt;objeto&gt; &lt;fits&gt;</code></td><td style="text-align:left">Blink de tu FITS contra la referencia PanSTARRS (supernovas)</td></tr><tr><td style="text-align:left"><code>history</code></td><td style="text-align:left">Tu historial de observaciones</td></tr><tr><td style="text-align:left"><code>sequence &lt;objeto&gt;</code></td><td style="text-align:left">Secuencia fotométrica propuesta y carta de comparación</td></tr><tr><td style="text-align:left"><code>inject</code></td><td style="text-align:left">Inyección/recuperación: mide hasta qué magnitud llega de verdad tu pipeline</td></tr><tr><td style="text-align:left"><code>project …</code></td><td style="text-align:left">Gestión de proyectos: <code>list</code>, <code>create</code>, <code>show</code>, <code>advance</code>, <code>close</code>, <code>reopen</code>, <code>files</code></td></tr></tbody></table></div><p>Ejemplos:</p><pre class="code"><code>python -m nightscribe tonight            # el plan de la noche en el terminal
+python -m nightscribe explore 2021EQ3    # la ficha de un NEO
+python -m nightscribe project list       # tus proyectos activos
+python -m nightscribe project show "T CrB"</code></pre><blockquote class="quote"><strong>¿Por qué <code>inject</code> merece un comando propio?</strong> Porque «mi telescopio llega a magnitud 20» es una frase que hay que medir, no creer. <code>inject</code> siembra fuentes de brillo conocido en tus propias tomas y comprueba cuáles recupera el pipeline: el resultado es tu límite <em>real</em>, con tu cielo, tu cámara y tu reducción. Es el número honesto que deberías poner en la magnitud límite de Configuración.</blockquote><p>La GUI y el CLI comparten base de datos, caché y ajustes: lo que hagas en uno lo ve el otro.</p></article>
+    <nav class="pn"><a class="pn-prev" href="08-posts.es.html"><span>Anterior</span>08. Contarlo</a><a class="pn-next" href="10-settings.es.html"><span>Siguiente</span>10. Configuración</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

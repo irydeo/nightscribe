@@ -149,6 +149,26 @@ KINDS = [
 ]
 
 
+# THE ANALYSIS A KIND'S VISITS CALL FOR (ADR-045 review, 2026-10-08): the app
+# decides, the observer does not pick a button. "astrometry" opens the editor's
+# track & stack (the object moves: NEOs, PCCP candidates, comets, alerts);
+# "photometry" opens the series (the object varies: supernovae, HADS, variables,
+# transits). The supernova blink needs no entry: it lives in the editor's own
+# Blink tab. A kind with no entry gets no analysis button.
+ANALYSIS = {
+    "neo": "astrometry", "pccp": "astrometry", "comet": "astrometry",
+    "alert": "astrometry",
+    "sn": "photometry", "hads": "photometry", "variable": "photometry",
+    "transit": "photometry",
+}
+
+
+def analysis_of(kind_id):
+    # @args: kind_id - a kind id (see KINDS)
+    # @return: "astrometry" | "photometry" | None
+    return ANALYSIS.get(kind_id)
+
+
 def ids():
     # @return: the kind ids in display order (e.g. ["neo", "sn", ...])
     return [k["id"] for k in KINDS]

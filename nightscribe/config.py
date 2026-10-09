@@ -190,6 +190,9 @@ DEFAULTS = {
     # between it and the classic dialogs retired with them (2026-10-07);
     # the top bar's look is the only UFE preference left.
     "ufe_bar_icons": True,
+    # Interfaz 1.4: the Welcome sky breathes and the view fades in unless
+    # this is off. Motion is opt-out, never imposed; applies live.
+    "ui_animations": True,
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.
@@ -221,6 +224,24 @@ DEFAULTS = {
                               # (the blink GIF/MP4 and the finder chart);
                               # the UFE's plate band is chart_data
     "chart_data": True,       # what the plate's band says (ADR-046 rev.)
+    # AI writing and the grounded assistant (ADR-075). OFF by default: with
+    # no endpoint the app is exactly the same as before, and nothing leaves
+    # the machine until the observer asks for a draft or a question. The
+    # endpoint is OpenAI-compatible on purpose, so a local server (Ollama,
+    # LM Studio) is just another base URL and the data never goes out.
+    "ai_enabled": False,
+    "ai_base_url": "",        # e.g. https://openrouter.ai/api/v1 (cloud) or
+                              # http://localhost:11434/v1 (a local server)
+    "ai_api_key": "",         # empty is fine for a local server
+    "ai_model": "",           # e.g. "openai/gpt-oss-20b:free" | "qwen2.5:7b"
+    "ai_temperature": 0.7,
+    # Long reports (2026-10-09): when ON, the AI writes a full article with
+    # every project fact (deep facts, the analysis, the assets) plus the
+    # short post and the tweet, instead of just the short post. OFF by
+    # default: a long report spends many more tokens, and a paid endpoint
+    # charges for them. A local server costs nothing, which is the reason
+    # the setting is worth turning on there.
+    "ai_long_report": False,
 }
 
 

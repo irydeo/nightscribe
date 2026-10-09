@@ -45,7 +45,8 @@ for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm",
     for f in glob.glob(os.path.join(ROOT, pattern)):
         sub = os.path.dirname(os.path.relpath(f, ROOT))
         datas.append((f, sub))
-# Whole docs/ tree, including adr/ (Help > Documentation viewer)
+# Whole docs/ tree, including adr/ (the in-app docs browser the UFE's series
+# "?" opens; the Help menu no longer has a general door to it)
 for f in glob.glob(os.path.join(ROOT, "docs/**/*.md"), recursive=True):
     sub = os.path.dirname(os.path.relpath(f, ROOT))
     datas.append((f, sub))

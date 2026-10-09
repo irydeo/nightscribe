@@ -85,7 +85,7 @@ def _seed(db):
 def test_v16_walks_to_v17_without_loss(tmp_path):
     pid = _v16_database(tmp_path / "v16.db")
     db = Database(str(tmp_path / "v16.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     assert _columns(db, "astrometry_runs") == _RUN_COLS
     assert _columns(db, "astrometry_points") == _POINT_COLS
     assert _columns(db, "astrometry_frames") == _FRAME_COLS
@@ -98,7 +98,7 @@ def test_v16_walks_to_v17_without_loss(tmp_path):
 
 def test_fresh_db_is_v17(tmp_path):
     db = Database(str(tmp_path / "fresh.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     tables = {r[0] for r in db.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"astrometry_runs", "astrometry_points",
@@ -110,7 +110,7 @@ def test_reopen_is_idempotent(tmp_path):
     f = tmp_path / "t.db"
     Database(str(f)).close()
     db = Database(str(f))               # reopening must be a no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 18
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
     assert _columns(db, "astrometry_runs") == _RUN_COLS
     db.close()
 

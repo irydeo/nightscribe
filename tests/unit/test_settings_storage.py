@@ -91,18 +91,16 @@ def test_browse_cancel_keeps_field(qapp, monkeypatch):
     dlg.deleteLater()
 
 
-def test_on_open_settings_maps_projects_root(qapp):
-    # mirror the existing language-combo source check: the settings flow
-    # must load and save the new config key from the same widget and wire
-    # the Browse/Reset buttons
+def test_the_field_table_maps_projects_root(qapp):
+    # ADR-071: the simple fields load and save from ONE table. The Browse
+    # and Reset buttons keep their own handlers in on_open_settings (they
+    # are actions, not bindings), so those are checked in the source.
     import inspect
-    import re
     from nightscribe.gui import main_window as mw
+    from nightscribe.gui import settings_spec
+    table = {f.widget: f.key for f in settings_spec.FIELDS}
+    assert table.get("edt_projects_root") == "projects_root"
     src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert "edt_projects_root" in src
-    assert re.search(r"config\.set\(\s*\"projects_root\"\s*,"
-                     r"\s*dlg\.edt_projects_root\.text\(\)\.strip\(\)\s*\)",
-                     src), "on_open_settings must save edt_projects_root"
     assert "btn_projects_browse.clicked.connect" in src, \
         "on_open_settings must wire the Browse button"
     assert "btn_projects_reset.clicked.connect" in src, \

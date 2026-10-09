@@ -1,0 +1,546 @@
+# NightScribe - camera preset catalogue (photometric profile)
+#
+# This file is the DATA of the camera profile; the code that reads it and
+# turns a preset into config keys lives in nightscribe/core/cameras.py. To
+# add, fix or remove a camera, edit THIS file: no Python involved.
+#
+# Two files are merged at load: this bundled one (the source of truth) and an
+# optional user file at <config>/cameras.toml. In the user file you can add a
+# new [[camera]] (a new key), correct an existing one (same key: the fields
+# you write replace the bundled ones), or hide a bundled one with the
+# top-level `hide = ["key", ...]`. A field you do not publish is simply
+# omitted, and the profile reads it as "unknown" (None).
+#
+# Fields per [[camera]]:
+#   key            unique id (also the config value of cam_preset)
+#   family         one of family_order (groups the combo)
+#   sensor         the sensor's name, with its technology and bit depth
+#   cameras        the commercial cameras that use it (comma-separated; each
+#                  one is also an alias the lookup accepts)
+#   pixel_um       pixel pitch, microns
+#   resolution_w/h the native frame, pixels
+#   sensor_w_mm/h  the active area, millimetres
+#   bit_depth      ADC bits (12, 14 or 16)
+#   full_well_e    full well, electrons (native mode; the extended one is
+#                  noted in a comment when the vendor quotes both)
+#   read_noise_e   read noise at the gain where photometry is done
+#   read_noise_note which gain mode that is, and the range
+#   dark_current_e_s  dark current, e-/pixel/s ...
+#   dark_temp_c       ... at THIS temperature (they travel together)
+#   exp_min_s/max_s   the exposure range the camera supports, seconds
+#   regime         "short" (sCMOS that groups many short frames) | "normal"
+#   linearity_frac the fraction of the lesser of the full well (at the user's
+#                  gain) and the ADC ceiling where the sensor is still
+#                  linear. 0.9 is the house default; the KAF datasheets
+#                  publish "linear 1-90% of Vsat".
+#   linearity_adu  an ABSOLUTE measured linearity (GSENSE400 only); when it
+#                  is present it wins over linearity_frac
+#   linearity_note a short note about the linearity suggestion
+#   source         where the figures come from (datasheet / product page)
+#
+# Sources are the manufacturers' datasheets and product pages (ZWO, QHYCCD,
+# Atik, Gpixel, ON Semiconductor / Truesense, Sony) and, for the GSENSE400,
+# the Irydeo QHY42Pro article (linearity measured at gain 6, offset 60).
+
+# The families the combo groups by, in the order they are shown. A family is
+# a sensor-generation story, so the observer scrolls to the kind of camera
+# they own instead of reading one flat list.
+family_order = [
+    "Sony CMOS (16-bit)",
+    "Sony CMOS (12/14-bit)",
+    "Gpixel sCMOS",
+    "CCD Sony",
+    "CCD Kodak/ON",
+]
+
+
+# ---- Sony CMOS, 16-bit BSI ------------------------------------------------
+
+[[camera]]
+key = "imx455"
+family = "Sony CMOS (16-bit)"
+sensor = "Sony IMX455 (BSI, 16-bit)"
+cameras = "QHY600, ASI6200, FLI Kepler 455, SBIG AC455"
+pixel_um = 3.76
+resolution_w = 9576
+resolution_h = 6388
+sensor_w_mm = 36.0
+sensor_h_mm = 24.0
+bit_depth = 16
+full_well_e = 51400.0          # ~80 ke- in extended full-well mode
+read_noise_e = 1.1
+read_noise_note = "high-gain mode; 1.1-3.5 e- across the range"
+dark_current_e_s = 0.0005
+dark_temp_c = -20.0
+exp_min_s = 3.0e-5
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "ZWO ASI6200 manual; QHY600 product page"
+
+[[camera]]
+key = "imx461"
+family = "Sony CMOS (16-bit)"
+sensor = "Sony IMX461 (BSI, 16-bit)"
+cameras = "QHY461, Moravian C3-61000"
+pixel_um = 3.76
+resolution_w = 11664
+resolution_h = 8748
+sensor_w_mm = 44.0
+sensor_h_mm = 33.0
+bit_depth = 16
+full_well_e = 50000.0          # 80 ke- in extended full-well mode
+read_noise_e = 1.0
+read_noise_note = "high-gain mode; 1.0-3.7 e- across the range"
+dark_current_e_s = 0.003
+dark_temp_c = -20.0
+exp_min_s = 5.0e-5
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "QHY461 product page; QHY411/461 comparison"
+
+[[camera]]
+key = "imx411"
+family = "Sony CMOS (16-bit)"
+sensor = "Sony IMX411 (BSI, 16-bit)"
+cameras = "QHY411, FLI Kepler 411, Moravian C5"
+pixel_um = 3.76
+resolution_w = 14208
+resolution_h = 10656
+sensor_w_mm = 54.0
+sensor_h_mm = 40.0
+bit_depth = 16
+full_well_e = 50000.0          # 80 ke- in extended full-well mode
+read_noise_e = 1.0
+read_noise_note = "high-gain mode; 1.0-3.0 e- across the range"
+dark_current_e_s = 0.0011
+dark_temp_c = -20.0
+exp_min_s = 2.0e-5
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "QHY411 product page"
+
+[[camera]]
+key = "imx571"
+family = "Sony CMOS (16-bit)"
+sensor = "Sony IMX571 (BSI, 16-bit)"
+cameras = "QHY268, ASI2600, Touptek ATR2600, Player One Ares-M"
+pixel_um = 3.76
+resolution_w = 6248
+resolution_h = 4176
+sensor_w_mm = 23.5
+sensor_h_mm = 15.7
+bit_depth = 16
+full_well_e = 50000.0          # 73 ke- in extended full-well mode
+read_noise_e = 1.0
+read_noise_note = "high-gain mode (HCG at gain 100); up to 3.3 e-"
+dark_current_e_s = 0.00012
+dark_temp_c = -20.0
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "ZWO ASI2600 manual; QHY268 product page"
+
+[[camera]]
+key = "imx533"
+family = "Sony CMOS (16-bit)"
+sensor = "Sony IMX533 (BSI, 14-bit)"
+cameras = "QHY533, ASI533, Player One Poseidon-M, Touptek ATR533"
+pixel_um = 3.76
+resolution_w = 3008
+resolution_h = 3008
+sensor_w_mm = 11.31
+sensor_h_mm = 11.31
+bit_depth = 14
+full_well_e = 50000.0
+read_noise_e = 1.0
+read_noise_note = "high-gain mode; 1.0-3.8 e- across the range"
+dark_current_e_s = 0.0005
+dark_temp_c = -20.0
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "ZWO ASI533 manual; QHY533 product page"
+
+
+# ---- Sony CMOS, 12/14-bit -------------------------------------------------
+
+[[camera]]
+key = "imx492"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX492 (BSI, 14-bit mono)"
+cameras = "QHY294M, ASI294MM"
+pixel_um = 4.63                 # the 2x2-binned 11 MP mode
+resolution_w = 4144
+resolution_h = 2822
+sensor_w_mm = 19.1
+sensor_h_mm = 13.0
+bit_depth = 14
+full_well_e = 66400.0
+read_noise_e = 1.2
+read_noise_note = "high-gain mode (HCG at gain 120); up to 8 e-"
+dark_current_e_s = 0.0022
+dark_temp_c = -20.0
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "the mono 294 also has a 2.3 um 47 MP mode; this is the binned 4.63 um one"
+source = "ZWO ASI294 manual (mono); QHY294M product page"
+
+[[camera]]
+key = "imx294"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX294 (FSI, 14-bit)"
+cameras = "ASI294, QHY294, Atik ACIS 294"
+pixel_um = 4.63
+resolution_w = 4144
+resolution_h = 2822
+sensor_w_mm = 19.1
+sensor_h_mm = 13.0
+bit_depth = 14
+full_well_e = 63700.0
+read_noise_e = 1.2
+read_noise_note = "high-gain mode (HCG at gain 120); up to 7.3 e-"
+dark_current_e_s = 0.0022
+dark_temp_c = -20.0
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "ZWO ASI294 manual; QHY294 product page"
+
+[[camera]]
+key = "imx183"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX183 (BSI, 12-bit)"
+cameras = "ASI183, QHY183, Atik ACIS 183"
+pixel_um = 2.4
+resolution_w = 5496
+resolution_h = 3672
+sensor_w_mm = 13.2
+sensor_h_mm = 8.8
+bit_depth = 12                  # the 12-bit caveat the AAVSO flags
+full_well_e = 15000.0
+read_noise_e = 1.6
+read_noise_note = "at 30 dB gain"
+# dark_current_e_s: not published; measure if it matters
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "12-bit only and a small full well: the linear limit may sit lower; measure yours"
+source = "ZWO ASI183 manual"
+
+[[camera]]
+key = "imx178"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX178 (BSI, 14-bit)"
+cameras = "ASI178, QHY178, Player One Sedna-M"
+pixel_um = 2.4
+resolution_w = 3096
+resolution_h = 2080
+sensor_w_mm = 7.4
+sensor_h_mm = 5.0
+bit_depth = 14
+full_well_e = 15000.0
+read_noise_e = 0.9
+read_noise_note = "high-gain mode; 0.9-2.4 e- across the range"
+# dark_current_e_s: not published
+exp_min_s = 5.0e-5
+exp_max_s = 1800.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "QHY174/178/224/290 manual; ZWO ASI178"
+
+[[camera]]
+key = "imx174"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX174 (global shutter, 12-bit)"
+cameras = "ASI174, QHY174"
+pixel_um = 5.86
+resolution_w = 1936
+resolution_h = 1216
+sensor_w_mm = 11.3
+sensor_h_mm = 7.1
+bit_depth = 12
+full_well_e = 32000.0
+read_noise_e = 3.5
+read_noise_note = "3.5-6 e- across the range; global shutter"
+# dark_current_e_s: not published
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "global shutter: the exposure is simultaneous in every pixel, which is why occultations use it"
+source = "ZWO ASI174; QHY174GPS manual"
+
+[[camera]]
+key = "imx290"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Sony IMX290 (BSI, 12-bit)"
+cameras = "ASI290, QHY290"
+pixel_um = 2.9
+resolution_w = 1936
+resolution_h = 1096
+sensor_w_mm = 5.6
+sensor_h_mm = 3.2
+bit_depth = 12
+full_well_e = 15000.0
+read_noise_e = 0.75
+read_noise_note = "high-gain mode; 0.75-3.2 e- across the range"
+# dark_current_e_s: not published
+exp_min_s = 5.0e-5
+exp_max_s = 1800.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "QHY174/178/224/290 manual; ZWO ASI290"
+
+[[camera]]
+key = "mn34230"
+family = "Sony CMOS (12/14-bit)"
+sensor = "Panasonic MN34230 (FSI, 12-bit)"
+cameras = "ASI1600, QHY163, Atik Horizon"
+pixel_um = 3.8
+resolution_w = 4656
+resolution_h = 3520
+sensor_w_mm = 17.6
+sensor_h_mm = 13.3
+bit_depth = 12
+full_well_e = 20000.0
+read_noise_e = 1.2
+read_noise_note = "at 30 dB gain; up to 3.8 e-"
+dark_current_e_s = 0.008
+dark_temp_c = -15.0
+exp_min_s = 3.2e-5
+exp_max_s = 2000.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "ZWO ASI1600 manual; QHY163 product page"
+
+
+# ---- Gpixel sCMOS ---------------------------------------------------------
+
+[[camera]]
+key = "gsense400"
+family = "Gpixel sCMOS"
+sensor = "Gpixel GSENSE400 (BSI sCMOS, 12-bit)"
+cameras = "QHY42Pro"
+pixel_um = 11.0
+resolution_w = 2048
+resolution_h = 2048
+sensor_w_mm = 22.5
+sensor_h_mm = 22.5
+bit_depth = 12
+full_well_e = 53000.0           # QHY42Pro HDR mode
+read_noise_e = 1.7
+read_noise_note = "high-gain mode; 1.7-4.2 e- (HGC)"
+dark_current_e_s = 2.2
+dark_temp_c = -20.0
+exp_min_s = 2.0e-5
+exp_max_s = 300.0
+regime = "short"                # high dark: group many short frames
+linearity_adu = 53000.0         # measured on a real unit at gain 6
+linearity_note = "measured at gain 6, offset 60"
+source = "Gpixel GSENSE400 datasheet + QHY42Pro page + irydeo.com QHY42Pro article"
+
+[[camera]]
+key = "gsense4040"
+family = "Gpixel sCMOS"
+sensor = "Gpixel GSENSE4040 (FSI sCMOS, 12-bit)"
+cameras = "QHY4040 Pro, Tucsen Dhyana 4040"
+pixel_um = 9.0
+resolution_w = 4096
+resolution_h = 4096
+sensor_w_mm = 36.86
+sensor_h_mm = 36.86
+bit_depth = 12
+full_well_e = 74200.0           # FSI HDR mode
+read_noise_e = 3.7
+read_noise_note = "FSI part; the BSI reaches 2.3 e-"
+dark_current_e_s = 0.05
+dark_temp_c = -15.0
+exp_min_s = 2.0e-5
+exp_max_s = 600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "Gpixel GSENSE4040 datasheet; QHY4040 Pro page"
+
+[[camera]]
+key = "gsense6060"
+family = "Gpixel sCMOS"
+sensor = "Gpixel GSENSE6060 (BSI sCMOS, 14-bit)"
+cameras = "QHY6060, Tucsen Dhyana 6060"
+pixel_um = 10.0
+resolution_w = 6144
+resolution_h = 6144
+sensor_w_mm = 61.44
+sensor_h_mm = 61.44
+bit_depth = 14
+full_well_e = 72000.0           # 133 ke- in 12-bit low-gain mode
+read_noise_e = 4.1
+read_noise_note = "12-bit high-gain mode; 4.2 e- in 14-bit"
+# dark_current_e_s: Gpixel quotes it at -65 C, out of reach for an amateur TEC
+exp_min_s = 7.0e-6
+exp_max_s = 300.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "Gpixel GSENSE6060 datasheet; Tucsen Dhyana 6060"
+
+
+# ---- CCD, Sony interline --------------------------------------------------
+
+[[camera]]
+key = "icx694"
+family = "CCD Sony"
+sensor = "Sony ICX694 (CCD, 16-bit)"
+cameras = "Atik 460EX, QHY22, QSI 690"
+pixel_um = 4.54
+resolution_w = 2749
+resolution_h = 2199
+sensor_w_mm = 12.5
+sensor_h_mm = 10.0
+bit_depth = 16
+full_well_e = 18000.0
+read_noise_e = 5.0
+read_noise_note = "Atik's figure; down to ~4 e- at slow readout"
+dark_current_e_s = 0.0004
+dark_temp_c = -10.0
+exp_min_s = 1.0e-3
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "Atik specifications; QHY22 product page"
+
+[[camera]]
+key = "icx814"
+family = "CCD Sony"
+sensor = "Sony ICX814 (CCD, 16-bit)"
+cameras = "Atik 490EX, QHY23"
+pixel_um = 3.69
+resolution_w = 3379
+resolution_h = 2703
+sensor_w_mm = 12.5
+sensor_h_mm = 10.0
+bit_depth = 16
+full_well_e = 12500.0
+read_noise_e = 5.0
+read_noise_note = "Atik's figure"
+dark_current_e_s = 0.0003
+dark_temp_c = -10.0
+exp_min_s = 1.0e-3
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "small full well for a CCD; measure yours"
+source = "Atik specifications; QHY23 product page"
+
+
+# ---- CCD, Kodak/ON --------------------------------------------------------
+
+[[camera]]
+key = "kaf8300"
+family = "CCD Kodak/ON"
+sensor = "Kodak/Truesense KAF-8300 (CCD, 16-bit)"
+cameras = "SBIG STF-8300, Atik 383L+, QHY9"
+pixel_um = 5.4
+resolution_w = 3326
+resolution_h = 2504
+sensor_w_mm = 17.96
+sensor_h_mm = 13.52
+bit_depth = 16
+full_well_e = 25500.0
+read_noise_e = 9.0
+read_noise_note = "typical; ABG/NABG parts differ"
+dark_current_e_s = 0.2          # doubles every ~6 C: measure yours
+dark_temp_c = 0.0
+exp_min_s = 1.0
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "the dark current doubles every ~6 C: at -20 C it is about a tenth of the quoted 0 C value"
+source = "Kodak KAF-8300 product summary; Atik specifications"
+
+[[camera]]
+key = "kaf16803"
+family = "CCD Kodak/ON"
+sensor = "Kodak/Truesense KAF-16803 (CCD, 16-bit)"
+cameras = "SBIG STX-16803, FLI PL16803"
+pixel_um = 9.0
+resolution_w = 4096
+resolution_h = 4096
+sensor_w_mm = 36.9
+sensor_h_mm = 36.9
+bit_depth = 16
+full_well_e = 100000.0
+read_noise_e = 9.0
+read_noise_note = "rms at 4 MHz; ~12 e- at fast readout"
+dark_current_e_s = 0.05
+dark_temp_c = -20.0
+exp_min_s = 1.0
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9            # datasheet: linear 1-90% of Vsat
+linearity_note = "datasheet: linear to 90% of Vsat (<=1% deviation)"
+source = "onsemi KAF-16803 datasheet; QHY461 comparison"
+
+[[camera]]
+key = "kaf09000"
+family = "CCD Kodak/ON"
+sensor = "Kodak/Truesense KAF-09000 (CCD, 16-bit)"
+cameras = "FLI PL09000, SBIG STX-09000"
+pixel_um = 12.0
+resolution_w = 3056
+resolution_h = 3056
+sensor_w_mm = 36.7
+sensor_h_mm = 36.7
+bit_depth = 16
+full_well_e = 110000.0
+read_noise_e = 7.0
+read_noise_note = "rms at 3 MHz"
+# dark_current_e_s: Kodak quotes it at 25 C, not cooled
+exp_min_s = 1.0
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9            # datasheet: linear 1-90% of Vsat
+linearity_note = "datasheet: linear to 90% of Vsat; the dark is strongly temperature dependent, measure yours"
+source = "onsemi KAF-09000 datasheet"
+
+[[camera]]
+key = "kai11002"
+family = "CCD Kodak/ON"
+sensor = "Kodak/Truesense KAI-11002 (CCD, 16-bit)"
+cameras = "SBIG STL-11000, QHY11, Atik 11000"
+pixel_um = 9.0
+resolution_w = 4008
+resolution_h = 2672
+sensor_w_mm = 36.1
+sensor_h_mm = 24.0
+bit_depth = 16
+full_well_e = 60000.0
+read_noise_e = 12.0
+read_noise_note = "~12 e- typical; slower readout lowers it"
+dark_current_e_s = 0.03
+dark_temp_c = -20.0
+exp_min_s = 1.0
+exp_max_s = 3600.0
+regime = "normal"
+linearity_frac = 0.9
+linearity_note = "suggested starting point; measure yours"
+source = "Kodak KAI-11002 product summary; Atik specifications"

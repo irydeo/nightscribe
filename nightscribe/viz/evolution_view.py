@@ -186,34 +186,14 @@ def make_evolution_video(frames_data, dates, sn_xy_s, out, names=None,
     if not frames_data:
         logger.warning("evolution video: no frames, skipping")
         return None
-    import imageio_ffmpeg
+    # The H.264 encoder and its quirks (even dimensions, minimum duration)
+    # live in one place now (core/viz/video.py), shared with the blink video.
+    from ..core.viz import video
     names = names or [""] * len(frames_data)
     frames, duration = _evolution_frames(
         frames_data, dates, sn_xy_s, names, watermark, lang,
         zoom, marker_scale, interval_ms)
-    cycle_ms = duration * len(frames)
-    loops = max(1, -(-int(min_seconds * 1000) // cycle_ms))
-    frames = frames * loops
-    w, h = frames[0].size
-    if w % 2 or h % 2:
-        even = (w + w % 2, h + h % 2)
-        padded = []
-        for frame in frames:
-            canvas = Image.new("RGB", even)
-            canvas.paste(frame, (0, 0))
-            padded.append(canvas)
-        frames = padded
-        w, h = even
-    per_frame = max(1, round(fps * duration / 1000))
-    writer = imageio_ffmpeg.write_frames(
-        str(out), (w, h), fps=fps, codec="libx264", pix_fmt_in="rgb24",
-        quality=7, macro_block_size=1, ffmpeg_log_level="error",
-        output_params=["-movflags", "+faststart"])
-    writer.send(None)
-    for frame in frames:
-        arr = np.asarray(frame)
-        for _ in range(per_frame):
-            writer.send(arr)
-    writer.close()
+    video.write_mp4(frames, out, duration_ms=duration, fps=fps,
+                    min_seconds=min_seconds)
     logger.info("evolution video written to %s", out)
     return out

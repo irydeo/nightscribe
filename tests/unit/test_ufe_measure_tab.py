@@ -330,6 +330,124 @@ def test_without_gain_the_error_is_comps_scatter_only(dlg, tmp_path):
     assert dlg.tab_measure._last["mag"] is not None
 
 
+def test_the_tab_measures_the_gain_on_the_visit_frames(
+        dlg, tmp_path, monkeypatch):
+    # The header can lie: the author's own QHY42Pro frames carried
+    # GAIN = 5 and EGAIN = 1.0 while the real conversion gain was
+    # 0.11 e-/ADU. With no Ajustes value the tab measures the gain on the
+    # visit's own frames and lets it win, and the panel says where it came
+    # from (2026-10-08).
+    from nightscribe.core import gain as gn
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "ccd_gain", None)
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "liar.fits", data, instrument=False,
+                         extra=[_card("GAIN", "5"), _card("EGAIN", "1.0"),
+                                _card("RDNOISE", "1.7"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 9,
+                                 "paths": [str(plate)]})
+    monkeypatch.setattr(gn, "estimate_from_paths",
+                        lambda ps, **kw: {"gain": 0.11, "ron": None,
+                                          "gain_err": 0.001, "notes": [],
+                                          "n_boxes": 10, "n_kept": 9})
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["gain_source"] == "frames"
+    assert tab._last["err_internal"] is not None
+    assert "Gain 0.11 e-/ADU" in tab.lbl_result.toPlainText()
+
+
+def test_a_header_gain_is_used_when_there_is_nothing_to_measure(dlg, tmp_path):
+    # No visit frames to measure and no Ajustes value: the header's EGAIN
+    # is the only word, and the panel says the gain came from the card.
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "card.fits", data, instrument=False,
+                         extra=[_card("EGAIN", "0.75"),
+                                _card("RDNOISE", "1.7"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["gain_source"] == "header"
+    assert "Gain 0.75 e-/ADU" in tab.lbl_result.toPlainText()
+
+
+def test_the_tab_remembers_the_gain_it_measures(dlg, tmp_path, monkeypatch):
+    # ADR-072: the gain measured on the visit's frames is remembered for
+    # this camera and setting, so a later single image reuses it.
+    from nightscribe.core import gain as gn
+    from nightscribe.core import gain_store
+    from nightscribe.core.db import db
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "ccd_gain", None)
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "cam.fits", data, instrument=False,
+                         extra=[_card("INSTRUME", "'TESTCAM_A'"),
+                                _card("GAIN", "5"), _card("EGAIN", "1.0"),
+                                _card("RDNOISE", "1.7"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 9,
+                                 "paths": [str(plate)]})
+    monkeypatch.setattr(gn, "estimate_from_paths",
+                        lambda ps, **kw: {"gain": 0.11, "ron": None,
+                                          "gain_err": 0.001, "notes": [],
+                                          "n_boxes": 10, "n_kept": 9})
+    _click(dlg, *target)
+    assert dlg.tab_measure._last["gain_source"] == "frames"
+    rec = gain_store.recall(db, {"INSTRUME": "TESTCAM_A", "GAIN": 5})
+    assert rec is not None and rec["gain"] == 0.11 and rec["matched"]
+
+
+def test_the_tab_reuses_the_remembered_gain(dlg, tmp_path, monkeypatch):
+    # A single plate with no visit frames and no Ajustes value falls to the
+    # gain remembered for its camera (ADR-072).
+    from nightscribe.core import gain_store
+    from nightscribe.core.db import db
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "ccd_gain", None)
+    gain_store.remember(db, {"INSTRUME": "TESTCAM_B", "GAIN": 5},
+                        {"gain": 0.42, "ron": None})
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "single.fits", data, instrument=False,
+                         extra=[_card("INSTRUME", "'TESTCAM_B'"),
+                                _card("GAIN", "5"),
+                                _card("DATE-OBS", "'2026-09-20T23:30:00'")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["gain_source"] == "remembered"
+    assert "Gain 0.42 e-/ADU" in tab.lbl_result.toPlainText()
+
+
+def test_the_series_phase_door_opens_the_project_curve(dlg):
+    # ADR-045 rev: the period search's door from the editor's series block
+    # works on the project's curve; the host arms the hook with the pid (it
+    # used to live in the visit window).
+    seen = []
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": ["/tmp/a.fits"]})
+    dlg.set_phase_hook(lambda pid: seen.append(pid))
+    dlg.tab_measure._on_series_phase()
+    assert seen == [7]
+
+
+def test_the_series_phase_door_says_so_without_a_project(dlg):
+    # Without the host's hook (an ad-hoc open) the door explains itself
+    # instead of opening nothing.
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": []})
+    dlg.set_phase_hook(None)
+    dlg.tab_measure._on_series_phase()
+    assert "project" in dlg.tab_measure.lbl_status.text().lower()
+
+
 def test_new_plate_invalidates_the_measurement(dlg, tmp_path):
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)
@@ -670,6 +788,30 @@ def test_suggest_sits_on_its_own_row_below_the_apertures(dlg):
 
 
 # ---------------- review round 2 (subtract + options re-measure) -----
+
+
+def test_subtraction_does_not_paint_the_survey_holes_black(dlg, monkeypatch):
+    # PanSTARRS masks the cores of bright/saturated stars (NaN in the
+    # reference). Subtracted as-is they painted solid black dots; the tab
+    # now shows the observation there (the un-subtracted star), never a
+    # black hole.
+    _sequence(dlg, dlg._test_comps)
+    data, target, comps = _plate()
+    ref, _t, _c = _plate(target_amp=0.0)
+    cx, cy = int(comps[0][0]), int(comps[0][1])
+    ref[cy - 5:cy + 5, cx - 5:cx + 5] = np.nan
+    pair = {"obs": data, "ref": ref, "sn_xy": target, "name": "SN x",
+            "ra": 0.0, "dec": 0.0, "ref_label": "PS1 g", "flipped": False}
+    monkeypatch.setattr("nightscribe.gui.workers.BlinkWorker",
+                        lambda *a, **k: _FakeSubWorker(*a, pair=pair))
+    tab = dlg.tab_measure
+    tab.chk_subtract.setChecked(True)
+    assert tab._diff is not None
+    frame = tab._display_diff()
+    # the masked comp is shown bright (the observation), not black
+    patch = frame[H - 1 - cy - 3:H - 1 - cy + 4, cx - 3:cx + 4]
+    assert patch.mean() > 20
+    tab.chk_subtract.setChecked(False)
 
 
 def test_subtraction_measures_on_a_consistent_scale(dlg, monkeypatch):

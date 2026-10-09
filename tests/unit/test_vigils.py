@@ -372,8 +372,7 @@ def test_settings_dialog_has_the_token_field(qapp_=None):
 
 
 def test_on_open_settings_maps_the_token():
-    import inspect
-    from nightscribe.gui import main_window as mw
-    src = inspect.getsource(mw.MainWindow.on_open_settings)
-    assert 'config.get("aavso_api_token"' in src
-    assert 'config.set("aavso_api_token"' in src
+    # the token is a simple field: pinned through the field table (ADR-071)
+    from nightscribe.gui import settings_spec
+    table = {f.widget: f.key for f in settings_spec.FIELDS}
+    assert table.get("edt_aavso_token") == "aavso_api_token"

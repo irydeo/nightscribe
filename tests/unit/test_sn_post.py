@@ -106,3 +106,73 @@ def test_chart_labels_include_lightcurve():
 def test_media_labels_include_evolution():
     assert "evo_gif" in MEDIA
     assert "evo_mp4" in MEDIA
+
+
+# ---------------- gallery + report attachment (2026-10-09) -------------
+
+def test_gallery_entries_name_the_exact_files(tmp_path):
+    from nightscribe.core.post import gallery_entries
+    charts = {"orbit": tmp_path / "SN2026abc_orbit.png",
+              "lightcurve": tmp_path / "SN2026abc_lightcurve.png"}
+    resources = {"gif": tmp_path / "SN2026abc_blink.gif"}
+    gal = gallery_entries(charts, resources, "SN2026abc")
+    names = {g["key"]: g["name"] for g in gal}
+    assert names["orbit"] == "SN2026abc_orbit.png"
+    assert names["gif"] == "SN2026abc_blink.gif"
+    # every entry carries a caption in both languages (from the labels)
+    assert all(g["caption"]["es"] and g["caption"]["en"] for g in gal)
+
+
+def test_attach_charts_also_fills_the_report(tmp_path):
+    from nightscribe.core.post import attach_charts
+    png = tmp_path / "x_orbit.png"
+    png.write_bytes(b"x")
+    post = {"es": "ES", "en": "EN", "report_es": "Informe",
+            "report_en": "Report", "tweet": "t"}
+    attach_charts(post, {"orbit": png})
+    assert "## Galería" in post["report_es"]
+    assert "x_orbit.png" in post["report_es"]
+    assert "## Gallery" in post["report_en"]
+    assert post["tweet"] == "t"          # the tweet never gets a gallery
+
+
+def test_attach_charts_keeps_the_reports_own_headings(tmp_path):
+    # The report is an ARTICLE with "##" section headings. Attaching the
+    # gallery must NOT cut the body at its first heading (the defect that
+    # left only the title: "the short report in the long slot").
+    from nightscribe.core.post import attach_charts
+    png = tmp_path / "x_orbit.png"
+    png.write_bytes(b"x")
+    report = ("# V0526 Per\n\n## What it is\n\nA variable star.\n\n"
+              "## The night\n\nMore text.")
+    post = {"report_es": report}
+    attach_charts(post, {"orbit": png})
+    assert "## What it is" in post["report_es"]
+    assert "A variable star." in post["report_es"]
+    assert "## The night" in post["report_es"]
+    assert "## Galería" in post["report_es"]
+
+
+def test_attach_charts_replaces_a_previous_gallery(tmp_path):
+    # a second call replaces the gallery instead of duplicating it, and the
+    # article body is untouched
+    from nightscribe.core.post import attach_charts
+    png = tmp_path / "x_orbit.png"
+    png.write_bytes(b"x")
+    post = {"report_es": "# Title\n\n## Section\n\nBody."}
+    attach_charts(post, {"orbit": png})
+    attach_charts(post, {"orbit": png})
+    assert post["report_es"].count("## Galería") == 1
+    assert "Body." in post["report_es"]
+
+
+def test_collect_assets_labels_evolution_files(tmp_path):
+    from nightscribe.core.post import collect_assets
+    (tmp_path / "SN_blink.gif").write_bytes(b"x")
+    (tmp_path / "SN_evo.gif").write_bytes(b"x")
+    (tmp_path / "SN_evo.mp4").write_bytes(b"x")
+    e = {"name": "SN", "type": "neo", "data": {}}
+    _charts, resources = collect_assets(e, tmp_path, "SN", cfg=_CFG)
+    assert resources.get("evo_gif")           # the _evo_ check wins
+    assert resources.get("evo_mp4")
+    assert resources.get("gif")

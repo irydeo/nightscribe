@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First steps · NightScribe</title>
+<meta name="description" content="First steps">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="01-getting-started.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Contents</summary><nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link on" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a><a class="toc-link" href="11-assistant.html"><span>11</span>The assistant</a></nav></details>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>First steps</h1><div class="shots"><figure class="shot"><a class="zoom" href="../assets/screens/welcome.webp"><img src="../assets/screens/welcome.webp" alt="The first screen, in four steps: where you observe from, your telescope and camera, what you want to follow and the report on your data. The hero answers back with your own night (darkness window, Moon and planets) as you type." loading="lazy"></a><figcaption>The first screen, in four steps: where you observe from, your telescope and camera, what you want to follow and the report on your data. The hero answers back with your own night (darkness window, Moon and planets) as you type.</figcaption></figure></div><h2 id="installation">Installation</h2><p>Three paths, depending on how comfortable you are with a terminal:</p><ul><li><p><strong>Windows installer</strong> (no Python needed): download <code>NightScribeSetup-*.exe</code> from the <a href="https://github.com/irydeo/nightscribe/releases">releases page</a> and run it. Windows SmartScreen will warn because the binary is unsigned: <em>More info → Run anyway</em>.</p></li><li><p><strong>pip</strong>: <code>pip install nightscribe</code> inside a virtual environment, then <code>nightscribe gui</code>.</p></li><li><p><strong>From source</strong> (if you plan to contribute): clone the repository, create the environment and run <code>.venv/bin/python -m nightscribe gui</code>.</p></li></ul><p>The detailed, per-system steps are in <a href="https://github.com/irydeo/nightscribe/blob/main/INSTALL.html">INSTALL.md</a>.</p><p>Either way you need an internet connection: ephemerides and catalogues are downloaded on the fly (and cached locally, so the second query for the same object no longer touches the network).</p><h2 id="first-run-the-welcome-screen">First run: the Welcome screen</h2><p>The first time it starts, NightScribe asks you for the minimum it needs to work. Everything you answer here can be changed later under <strong>Tools → Settings</strong>.</p><h3 id="your-observatory">Your observatory</h3><p>Three ways to tell it where you are; pick one:</p><ol><li><p><strong>Your MPC code</strong> (e.g. <code>Z41</code>): the coordinates resolve automatically from the official Minor Planet Center list. This is the most accurate option if you plan to submit astrometry, because it uses exactly the same point the MPC will see in your reports.</p></li><li><p><strong>"Find my location"</strong>: resolves your city from your public IP. Fine to get started, but check the coordinates: an IP does not know on which rooftop your telescope sits.</p></li><li><p><strong>"Pick on the map"</strong> or type latitude, longitude and height by hand.</p></li></ol><blockquote class="why"><strong>Why so much insistence on coordinates?</strong> Everything else derives from them: what is visible tonight, at what altitude, when twilight starts and ends. And in minor-planet astrometry, a 100 m error in your position turns into a measurable error in the asteroid's position, because the topocentric parallax of a nearby NEO can exceed one arcsecond.</blockquote><h3 id="your-equipment">Your equipment</h3><ul><li><p><strong>Aperture</strong> of the telescope and a realistic <strong>limiting magnitude</strong> for your site: NightScribe uses them to avoid suggesting targets you cannot reach. The limiting magnitude comes pre-filled from the aperture as a starting point; the <code>inject</code> command (chapter 09) measures the real one.</p></li><li><p><strong>Plate scale</strong>: camera pixel size and telescope focal length. If your camera is in the <strong>preset</strong> list, choosing it fills in the pixel size and a starting photometric profile (read noise, full well, working exposure).</p></li></ul><blockquote class="why"><strong>Why does the plate scale matter?</strong> Pixel size and focal length give the arcseconds per pixel, and from that, how much a NEO moves during an exposure or which photometric aperture fits between two stars. A wrong value breaks nothing, but it degrades the advice.</blockquote><h3 id="what-you-want-to-follow">What you want to follow</h3><p>One card per target kind (NEOs, comets, supernovae, variables, transits...). Untick what does not interest you: tonight's list will be shorter and more useful. New kinds arriving with an update come enabled, so you do not miss them.</p><h3 id="your-data">Your data</h3><p>NightScribe keeps everything (projects, observations, cache) in a local database. On every update it first writes a verified backup and tells you so on this same screen; if something does not add up, you will see it here before anything is touched.</p><h2 id="settings-what-you-will-change-eventually">Settings: what you will change eventually</h2><p>Under <strong>Tools → Settings…</strong> lives what did not fit in the Welcome. Chapter <a href="10-settings.html">10. Settings</a> walks through all of it; here, what is worth an early visit:</p><ul><li><p><strong>Interface language</strong>: Spanish, English or system default. Applies on restart.</p></li><li><p><strong>Camera photometric profile</strong>: gain (e⁻/ADU), read noise and linearity. These are the numbers that turn the error bar of your measurements into something honest; the preset provides starting values, but gain and linearity depend on <em>your</em> unit and <em>your</em> gain setting, and NightScribe can measure them from your own frames (chapter 06).</p></li><li><p><strong>Local horizon</strong>: if your observatory has obstacles (buildings, trees, mountains), you can load a horizon file. The planner will stop suggesting targets hiding behind the neighbour's house.</p></li><li><p><strong>Plate solver</strong>: local ASTAP if you have it installed, with nova.astrometry.net as fallback. Needed for astrometry (chapter 07).</p></li><li><p><strong>Optional integrations</strong>: CCDciel (capture, chapter 05), and the NEOfixer, Astrometry.net, TNS and AAVSO keys. None is mandatory: without them, the corresponding feature simply stays quiet.</p></li></ul><blockquote class="why"><strong>Why does it ask for an AAVSO token?</strong> The bright-star vigils (T CrB, R CrB) compare the current state with the photometry the community uploads to the AAVSO, and that API requires identification. Without a token the vigils stay silent; with one, they warn you the day T CrB erupts.</blockquote><p>Next: <a href="02-tonight.html">02. Planning the night</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="index.html"><span>Previous</span>User guide</a><a class="pn-next" href="02-tonight.html"><span>Next</span>Planning the night</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

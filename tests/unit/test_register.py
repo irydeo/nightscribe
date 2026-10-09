@@ -69,6 +69,28 @@ def test_registration_recovers_the_transform(angle_deg, dx, dy):
     assert _resid(warped, ref) < 0.75 * _resid(src, ref)
 
 
+def test_a_scale_mismatch_needs_the_similarity_fit():
+    # The host-subtraction case (2026-10-08): the survey cutout is asked
+    # for at the frame WCS's pixel scale, and that scale is off by a
+    # fraction of a percent, so the stars pair but land further and
+    # further off with distance from the centre. A rigid fit (translation
+    # + rotation) cannot explain that; allow_scale fits the scale and
+    # removes the residual.
+    ref = _field(seed=5)
+    src = reg.apply_transform(ref, 0.0, 3.0, -2.0, scale=0.99)
+    rigid = reg.estimate_transform(ref, src)
+    sim = reg.estimate_transform(ref, src, allow_scale=True)
+    # the fit maps src onto ref, so it recovers 1/0.99
+    assert sim["scale"] == pytest.approx(1.0 / 0.99, abs=0.004)
+    assert rigid["scale"] == pytest.approx(1.0, abs=1e-6)   # pinned
+    assert sim["rms_px"] < rigid["rms_px"]
+    w_rigid = reg.apply_transform(src, rigid["angle"], rigid["dx"],
+                                  rigid["dy"], scale=rigid["scale"])
+    w_sim = reg.apply_transform(src, sim["angle"], sim["dx"], sim["dy"],
+                                scale=sim["scale"])
+    assert _resid(w_sim, ref) < 0.5 * _resid(w_rigid, ref)
+
+
 def test_identity_transform_is_an_exact_no_op():
     ref = _field(seed=2)
     out = reg.apply_transform(ref, 0.0, 0, 0)

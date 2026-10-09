@@ -145,6 +145,9 @@ class _EquipHusk:
         from PySide6.QtWidgets import QComboBox, QDoubleSpinBox
         self.spn_aperture = QDoubleSpinBox()
         self.spn_aperture.setRange(0.0, 100.0)
+        self.spn_limit_mag = QDoubleSpinBox()
+        self.spn_limit_mag.setRange(5.0, 25.0)
+        self.spn_limit_mag.setDecimals(1)
         self.spn_pixel_um = QDoubleSpinBox()
         self.spn_pixel_um.setRange(1.0, 30.0)
         self.spn_pixel_um.setDecimals(2)
@@ -166,7 +169,9 @@ def test_setup_equipment_lists_the_presets(qapp, monkeypatch):
     monkeypatch.setitem(config._data, "pixel_um", 3.76)
     h = _EquipHusk()
     wizard._setup_equipment(h)
-    assert h.cmb_cam_preset.count() == len(cameras.PRESETS) + 1
+    # "None" + one row per preset + one header per family
+    assert h.cmb_cam_preset.count() == \
+        1 + len(cameras.PRESETS) + len(cameras.FAMILY_ORDER)
     assert h.cmb_cam_preset.itemData(0) == ""
     h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
     assert h.spn_pixel_um.value() == 5.4
@@ -178,8 +183,9 @@ def test_apply_equipment_writes_and_fills_a_new_preset(qapp, monkeypatch):
     # measured and tuned it in Settings.
     from nightscribe.config import config
     from nightscribe.gui import wizard
-    for key in ("aperture_inches", "pixel_um", "focal_mm", "camera_type",
-                "cam_preset", "cam_full_well_e", "ccd_read_noise"):
+    for key in ("aperture_inches", "limit_mag", "pixel_um", "focal_mm",
+                "camera_type", "cam_preset", "cam_full_well_e",
+                "ccd_read_noise"):
         monkeypatch.setitem(config._data, key, config.get(key))
     monkeypatch.setitem(config._data, "cam_preset", "")
     monkeypatch.setitem(config._data, "ccd_read_noise", None)
@@ -187,13 +193,15 @@ def test_apply_equipment_writes_and_fills_a_new_preset(qapp, monkeypatch):
     h = _EquipHusk()
     wizard._setup_equipment(h)
     h.spn_aperture.setValue(9.0)
+    h.spn_limit_mag.setValue(19.6)
     h.cmb_camera_type.setCurrentText("CMOS")
     h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
     wizard._apply_equipment(h)
     assert config.get("aperture_inches") == 9.0
+    assert config.get("limit_mag") == 19.6
     assert config.get("camera_type") == "CMOS"
     assert config.get("cam_preset") == "kaf8300"
-    assert config.get("ccd_read_noise") == 8.0        # the preset's datasheet
+    assert config.get("ccd_read_noise") == 9.0        # the preset's datasheet
     assert config.get("cam_full_well_e") == 25500.0
     # a second visit with the SAME preset leaves the tuned profile alone
     config.set("ccd_read_noise", 7.5)                 # measured by the observer

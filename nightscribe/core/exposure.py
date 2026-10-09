@@ -12,10 +12,12 @@
 ############################################################
 
 import datetime
+import math
 
 # Session planning maths (ADR-021): plate scale from the camera profile,
 # trailing-free exposure for fast NEOs, total session duration and the
-# "latest safe start" against the local horizon (ADR-020).
+# "latest safe start" against the local horizon (ADR-020), plus the rough
+# limiting magnitude the Welcome step starts from.
 
 
 def binning_factor(binning):
@@ -82,6 +84,33 @@ def sampling(scale_arcsec_px):
     if scale > SAMPLE_COARSE_MIN_ARCSEC_PX:
         return "coarse"
     return "ok"
+
+
+# ---------------- a starting limiting magnitude (Welcome step) -----------
+
+# The Welcome step asks for the aperture and needs a number to put in the
+# limiting magnitude field, so it estimates one. The physics: for a point
+# source the signal the telescope collects grows with its AREA, D^2, and the
+# magnitude reached grows as 5*log10(D). The constant is anchored on a typical
+# amateur stacked image, where an 8-inch telescope reaches about magnitude
+# 18.5 (4" -> 17.0, 6" -> 17.9, 12" -> 19.4, 16" -> 20.0). It is deliberately
+# rough: the real limit also depends on the sky, the exposure and the
+# reduction, which no first-run form can know. That is why the field says it is
+# a starting point and the `inject` command measures the number that counts.
+_LIMIT_ANCHOR = 7.0
+
+
+def limit_from_aperture(aperture_in):
+    # @args: aperture_in - telescope aperture in inches (0/None = unknown)
+    # @return: an estimated limiting magnitude (float), or None when the
+    #          aperture is unusable
+    try:
+        d_mm = float(aperture_in) * 25.4
+    except (TypeError, ValueError):
+        return None
+    if d_mm <= 0:
+        return None
+    return _LIMIT_ANCHOR + 5.0 * math.log10(d_mm)
 
 
 def max_exposure_no_trail(rate_arcsec_min, plate_scale_arcsec_px, tol_px=1.0):

@@ -32,7 +32,7 @@ las motas del tren óptico. NightScribe usa una **biblioteca de masters**
 (bias, dark, flat) que tú construyes fuera; la app solo los apunta.
 
 - Cada master se da de alta desde la **pestaña Calibración** del editor (o
-  desde Ajustes → Calibración). Se indexa por cámara, ganancia, temperatura,
+  desde Ajustes → Medida). Se indexa por cámara, ganancia, temperatura,
   exposición y filtro, que es lo que hace válido un master. Un **flat no
   tiene que compartir la ganancia** de las tomas: se normaliza antes de
   aplicarlo, así que la ganancia solo escala su nivel entero, nunca su forma
@@ -260,7 +260,7 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   para enviar y prohíbe las detecciones marginales, así que un grupo por
   debajo del listón no entra en el reporte y se explica por qué. La app trae
   **10** (los envíos Tycho del autor iban a ~16 y fueron aceptados) y se
-  cambia en **Ajustes → Astrometría**, junto con el umbral de detección, el
+  cambia en **Ajustes → Medida**, junto con el umbral de detección, el
   barrido de velocidad, el margen del recorte, la comprobación y los hilos.
   Cuando **ninguna** observación lo supera, el propio grupo del reporte lo
   dice, con el número del listón y dónde se ajusta, y el botón que envía el

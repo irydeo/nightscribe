@@ -130,6 +130,12 @@ class SeriesConfig:
     target_bv: float = 0.0
     site_gain: float = None
     site_ron: float = None
+    gain_source: str = None         # "settings" | "frames" | "header": where
+                                    # the resolved gain came from, so the
+                                    # plate can say it (2026-10-08)
+    db: object = None               # the Database, so the run can recall the
+                                    # gain remembered for this camera and
+                                    # remember the one it measures (ADR-072)
     site_flat: float = 0.007
     site_saturate: float = None
     site_lon: float = None
@@ -625,6 +631,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
         matched=bool(getattr(cfg, "matched", True)),
         color=cfg.color, target_bv=cfg.target_bv,
+        gain=cfg.site_gain, ron=cfg.site_ron, gain_source=cfg.gain_source,
         site_gain=cfg.site_gain, site_ron=cfg.site_ron,
         site_flat=cfg.site_flat, site_saturate=cfg.site_saturate,
         site_lon=cfg.site_lon, site_lat=cfg.site_lat,
@@ -1379,16 +1386,21 @@ def sweep_aperture(paths, cfg, ks=None):
 
 def _resolve_gain(cfg, paths):
     # The working gain of the run (quality plan, phase G): what Ajustes
-    # says, else what the frame header says, else what the frames
-    # themselves say. Without any of the three the error bars stay the
+    # says, else what the frames themselves say, else what the frame
+    # header carries. Without any of the three the error bars stay the
     # scatter of the comps, and the panel says so instead of pretending.
     #
-    # The measurement is only attempted when the first two failed: it
-    # costs two frame reads and an observer who set their gain never pays
-    # for it.
+    # THE MEASUREMENT IS ATTEMPTED EVEN WHEN THE HEADER CARRIES A VALUE
+    # (2026-10-08). It used to be the last resort, on the reasoning that
+    # the header is a fact of the camera; it is not, and the author's own
+    # frames proved it (GAIN = 5, EGAIN = 1.0, real gain 0.11 e-/ADU).
+    # An observer who set their gain still pays nothing: the measurement
+    # only runs when Ajustes is empty. The two frame reads it costs are
+    # nothing against the hundreds the series is about to make.
     # @args: cfg - the SeriesConfig, paths - the series in observing order
     # @return: (cfg with the resolved site gain/ron, the report dict)
     from . import gain as gain_mod
+    from . import gain_store
     header = None
     for path in list(paths)[:3]:
         try:
@@ -1397,17 +1409,25 @@ def _resolve_gain(cfg, paths):
         except fits_io.FitsError:
             continue
     estimate = None
-    head = gain_mod.header_numbers(header)
-    if cfg.site_gain is None and head.get("gain") is None and paths:
+    if cfg.site_gain is None and paths:
         try:
             estimate = gain_mod.estimate_from_paths(
                 paths, level_max=cfg.site_saturate)
         except Exception as err:                     # never fatal
             logger.warning("gain estimate failed: %s", err)
             estimate = None
+    # WHAT THE APP REMEMBERED for this camera (ADR-072): a supernova
+    # observer usually hands in ONE image, and one image cannot measure the
+    # gain; a measurement made on another night beats the header too.
+    remembered = None
+    if cfg.site_gain is None and cfg.db is not None and header is not None:
+        try:
+            remembered = gain_store.recall(cfg.db, header)
+        except Exception as err:                     # never fatal
+            logger.warning("gain recall failed: %s", err)
     resolved = gain_mod.resolve(
         settings_gain=cfg.site_gain, settings_ron=cfg.site_ron,
-        header=header, estimate=estimate)
+        header=header, estimate=estimate, remembered=remembered)
     if resolved.get("gain") is not None:
         resolved["used"] = resolved["gain"]
     report = dict(resolved)
@@ -1415,10 +1435,17 @@ def _resolve_gain(cfg, paths):
         report["n_boxes"] = estimate.get("n_boxes")
         report["n_kept"] = estimate.get("n_kept")
         report["pair"] = estimate.get("pair")
+    if report.get("source") == "frames" and cfg.db is not None \
+            and header is not None:
+        try:
+            gain_store.remember(cfg.db, header, report)
+        except Exception as err:                     # never fatal
+            logger.warning("gain remember failed: %s", err)
     g = resolved.get("gain")
     r = resolved.get("ron")
-    if g is not None and (g != cfg.site_gain or r != cfg.site_ron):
-        cfg = replace(cfg, site_gain=g, site_ron=r)
+    if g is not None:
+        cfg = replace(cfg, site_gain=g, site_ron=r,
+                      gain_source=resolved.get("source"))
     return cfg, report
 
 

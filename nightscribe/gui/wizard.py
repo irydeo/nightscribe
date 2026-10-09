@@ -40,7 +40,7 @@ from ..config import config
 from ..version import base_version
 from ..core import kinds
 from .theme import (C_ACCENT, C_GOOD, C_TEXT, C_TEXT_DIM, C_WARN, KIND_COLORS,
-                    kind_card_style)
+                    kind_card_style, style_combo_header)
 
 _K = "NSWizard"
 
@@ -328,12 +328,18 @@ def _setup_equipment(wizard):
     # a pixel the observer typed by hand.
     # @args: wizard - the loaded Welcome husk
     from ..core import cameras
+    # the catalogue is data: re-read it so a camera added or corrected in the
+    # user's cameras.toml shows up without restarting the app
+    cameras.reload()
     combo = wizard.cmb_cam_preset
     combo.blockSignals(True)
     combo.clear()
     combo.addItem(tr(S_CAM_NONE), "")
-    for p in cameras.PRESETS:
-        combo.addItem(cameras.label(p), p["key"])
+    for text, key, is_header in cameras.combo_entries():
+        combo.addItem(text, key)
+        if is_header:
+            # a family header: bold, accent and not selectable
+            style_combo_header(combo.model().item(combo.count() - 1))
     idx = combo.findData((config.get("cam_preset") or "").strip())
     combo.setCurrentIndex(idx if idx >= 0 else 0)
     combo.blockSignals(False)
@@ -468,6 +474,7 @@ def _apply_equipment(wizard):
     # @args: wizard - the loaded Welcome husk
     from ..core import cameras
     config.set("aperture_inches", wizard.spn_aperture.value())
+    config.set("limit_mag", wizard.spn_limit_mag.value())
     config.set("pixel_um", wizard.spn_pixel_um.value())
     config.set("focal_mm", wizard.spn_focal_mm.value())
     config.set("camera_type", wizard.cmb_camera_type.currentText())
@@ -479,7 +486,7 @@ def _apply_equipment(wizard):
     p = cameras.preset(key)
     if p is None:
         return
-    for k, value in cameras.profile_from_preset(p, {}).items():
+    for k, value in cameras.profile_from_preset(p).items():
         if k != "pixel_um":          # the spin above is the truth for it
             config.set(k, value)
 

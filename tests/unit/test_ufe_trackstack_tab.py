@@ -2355,3 +2355,37 @@ def test_the_stack_says_how_it_was_combined(tmp_path, qapp):
     # the card that would have saved the afternoon: the method is readable
     # from the file alone
     assert str(header["NS_COMB"]) in track_stack.METHODS
+
+
+# ------------------------------------------------- the check, restored
+
+def test_a_saved_check_says_findorb_is_configured_now(qapp, tmp_path,
+                                                      monkeypatch):
+    # The verdict on screen belongs to the RUN: a stack made before Find_Orb
+    # was set up keeps "not configured" for ever. When Find_Orb IS set up
+    # now, the tab must say so and point at the re-run, not send the
+    # observer to Settings again.
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=False,
+        note="Find_Orb is not configured (Settings > Measurement)")}
+    monkeypatch.setattr(
+        findorb, "probe",
+        lambda path=None: ("/usr/bin/fo", "Find_Orb at /usr/bin/fo"))
+    tab._fill_check()
+    text = tab.txt_check.toPlainText()
+    assert "was not configured when this stack was made" in text
+    assert "Re-run the track & stack" in text
+
+
+def test_a_saved_check_still_says_configure_it_when_findorb_is_missing(
+        qapp, tmp_path, monkeypatch):
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=False,
+        note="Find_Orb is not configured (Settings > Measurement)")}
+    monkeypatch.setattr(findorb, "probe", lambda path=None: (None, "no"))
+    tab._fill_check()
+    assert "Set it up in Settings" in tab.txt_check.toPlainText()

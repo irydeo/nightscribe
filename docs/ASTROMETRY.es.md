@@ -160,7 +160,11 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    publicaba PA 33 donde la efeméride dice 41,8 (2025 HL5) y 37 donde dice
    46,2 (2025 FG18), exactamente un paso de la rejilla. Cuando el barrido no
    mejora a la efeméride, la velocidad y el PA publicados son su predicción y
-   la nota lo dice.
+   la nota lo dice. La **traza** del propio objeto en el stack base también
+   **siembra** el barrido: la traza medida (su longitud y su PA) da dos
+   movimientos candidatos, uno por signo, y se puntúan como los demás; la misma
+   guarda de tres sigma se aplica, así que una traza ruidosa no mueve el
+   movimiento.
 5. **Secuencia centrada.** Se monta un GIF o un montaje con las N
    observaciones, todas centradas en el objeto: si está en todas, la
    detección es sólida; si en alguna no, se ve. En la pestaña tienes además

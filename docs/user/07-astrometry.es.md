@@ -87,12 +87,19 @@ centroide: sobre el stack y frame a frame. Un desacuerdo mayor de 0,5″ o 3σ
 se marca; nunca se resuelve en silencio.
 
 El botón **Re-medir el brillo** vuelve a ejecutar la receta sobre los
-**apilados guardados** de la observación (el del objeto y el de estrellas) sin
-re-apilar la visita, y reescribe solo la banda del stack: la posición y la
-detección no se tocan. Necesita que el run haya guardado el **stack de
-estrellas**. Cuando hay un track & stack abierto, la marca del objeto del
-proyecto se apaga: el stack ya trae la posición medida por el run, y dos marcas
-(en las coordenadas del plan y en las medidas) se leen como un error.
+**apilados guardados de las observaciones del run** (los del objeto y sus
+estrellas) sin re-apilar la visita, y reescribe solo las bandas de los stacks:
+la posición y la detección no se tocan. Necesita que el run haya guardado el
+**stack de estrellas**. Cuando hay un track & stack abierto, la marca del objeto
+del proyecto se apaga: el stack ya trae la posición medida por el run, y dos
+marcas (en las coordenadas del plan y en las medidas) se leen como un error.
+
+La **traza** del propio objeto en el stack de toda la secuencia también ayuda:
+su longitud y su dirección dan dos movimientos candidatos que siembran el
+barrido de velocidad, así que un movimiento que la efeméride acertó a medias se
+puede encontrar con la propia luz del objeto. El barrido sigue decidiendo, con
+la misma guarda de siempre: solo adopta un candidato que supere a la efeméride
+por más que la dispersión de la rejilla.
 
 **Animar o verificar** reproduce los stacks de las observaciones centrados en
 el objeto y con un solo estirado: el objeto debe quedarse quieto en el

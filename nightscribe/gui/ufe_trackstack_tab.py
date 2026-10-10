@@ -2001,6 +2001,11 @@ class UfeTrackStackTab(QWidget):
                 "object)").replace("%1", f"{sweep.best['rate']:.2f}").replace(
                     "%2", f"{sweep.best['pa']:.0f}").replace(
                     "%3", str(len(sweep.grid))))
+        if self._result.get("trail_seed"):
+            notes.append(self.tr(
+                "The object's own trail seeded the velocity sweep: two extra "
+                "candidate motions (both signs of the measured trail) were "
+                "scored alongside the ephemeris' grid."))
         det = self._result.get("detection")
         if det is not None:
             gate = float(config.get("astrometry_snr_sigma", 3.5))
@@ -2984,64 +2989,86 @@ class UfeTrackStackTab(QWidget):
         return float(fwhm) if fwhm else None
 
     def _on_remeasure(self):
-        # Re-measures the brightness of the observation on stage from its
+        # Re-measures the brightness of EVERY observation of the run from its
         # SAVED stacks (object + star) with the recipe the Photometry tab is
-        # holding right now, without re-stacking the visit. The position and
-        # the detection are untouched: only the zero point and the magnitude.
+        # holding right now, without re-stacking the visit. The recipe is the
+        # same for the whole series, so the series is re-measured whole. The
+        # positions and the detection are untouched.
         result = self._result or {}
         paths = result.get("stack_paths") or []
-        index = self._shown_group
-        if index is None or index >= len(paths) or not paths[index]:
+        if not any(paths):
             self._say(self.tr("Stack the sequence first."))
             return
         if self._remeasure_worker is not None \
                 and self._remeasure_worker.isRunning():
             return
-        star_path = self._stack_path(index, stars=True)
-        if not Path(str(star_path)).exists():
+        points = result.get("points") or []
+        per_obs = (result.get("photometry") or {}).get("per_obs") or []
+        observations = []
+        for i, path in enumerate(paths):
+            if not path:
+                continue
+            sp = points[i][0] if i < len(points) else None
+            if sp is None or getattr(sp, "x", None) is None:
+                continue
+            star = self._stack_path(i, stars=True)
+            star = str(star) if Path(str(star)).exists() else None
+            fwhm = None
+            if i < len(per_obs) and per_obs[i]:
+                fwhm = (per_obs[i].get("shape") or {}).get("fwhm_px")
+            observations.append({"index": i, "stack": path, "star": star,
+                                 "target_xy": (sp.x, sp.y), "fwhm": fwhm})
+        if not observations:
+            self._say(self.tr("No measured point to re-measure."))
+            return
+        if not any(o["star"] for o in observations):
             self._say(self.tr(
                 "This run kept no star stack, so the comparison stars are not "
                 "on a plate to re-measure them: run again with 'keep the star "
                 "stack'."))
             return
-        entries = (result.get("photometry") or {}).get("comps") or []
-        point = self._shown_point()
-        if point is None or getattr(point, "x", None) is None:
-            self._say(self.tr("No measured point to re-measure."))
-            return
-        band = (result.get("photometry") or {}).get("band")
+        phot = result.get("photometry") or {}
         from .workers import StackRemeasureWorker, hold
         self.btn_remeasure.setEnabled(False)
         self._say(self.tr("Re-measuring the brightness…"))
         self._remeasure_worker = hold(StackRemeasureWorker(
-            paths[index], star_path, (point.x, point.y), entries, band,
-            recipe=self._recipe(), fwhm=self._shown_fwhm(), cfg=config))
+            observations, phot.get("comps") or [], phot.get("band"),
+            recipe=self._recipe(), cfg=config))
         self._remeasure_worker.finished.connect(self._on_remeasured)
         self._remeasure_worker.start()
 
     def _on_remeasured(self, payload):
-        # @args: payload - the worker's summary (or {"error": ...})
-        # @return: None. Folds the new magnitude into the run, rewrites the
-        #          stack's band cards (the pixels are untouched) and says the
-        #          result. The astrometry point keeps the measurement.
+        # @args: payload - {"results": [{index, mag, err, ...}, ...]}
+        # @return: None. Folds every observation's new magnitude into the run,
+        #          rewrites the stacks' band cards (the pixels are untouched)
+        #          and says the result. The astrometry points keep the
+        #          measurement.
         self.btn_remeasure.setEnabled(True)
-        payload = payload or {}
-        if payload.get("error"):
-            self._say(self.tr("The brightness could not be re-measured:") +
-                      " " + str(payload["error"]))
+        results = (payload or {}).get("results") or []
+        if not results:
+            self._say(self.tr("The brightness could not be re-measured."))
             return
         result = self._result or {}
-        index = self._shown_group
         phot = result.get("photometry") or {}
         per_obs = phot.get("per_obs") or []
-        if index is not None and 0 <= index < len(per_obs) and per_obs[index]:
-            one = per_obs[index]
-            one["mag"] = payload.get("mag")
-            one["err"] = payload.get("err")
-            one["n_comps"] = payload.get("n_comps")
-            one["check_ok"] = payload.get("check_ok")
-            one["comps_skipped"] = payload.get("comps_skipped") or {}
-        # the run's median, recomputed from the observations that measured
+        done, failed = [], []
+        for r in results:
+            i = r.get("index")
+            if r.get("error") or i is None or not (0 <= i < len(per_obs)) \
+                    or not per_obs[i]:
+                failed.append(i)
+                continue
+            one = per_obs[i]
+            one["mag"] = r.get("mag")
+            one["err"] = r.get("err")
+            one["n_comps"] = r.get("n_comps")
+            one["check_ok"] = r.get("check_ok")
+            one["comps_skipped"] = r.get("comps_skipped") or {}
+            done.append(i)
+        if not done:
+            self._say(self.tr("The brightness could not be re-measured."))
+            return
+        # the run's medians, recomputed from the observations that measured
         mags = sorted(p["mag"] for p in per_obs
                       if p and p.get("mag") is not None)
         errs = sorted(p["err"] for p in per_obs
@@ -3056,18 +3083,16 @@ class UfeTrackStackTab(QWidget):
         # the recipe's report_mag may have changed too: it rides the band
         result["report_mag"] = str(
             (self._recipe() or {}).get("report_mag") or "measured")
-        # rewrite the shown stack's band cards so the band over the image
-        # says the new number (the file's pixels are untouched)
         paths = result.get("stack_paths") or []
-        path = paths[index] if (index is not None
-                                and index < len(paths)) else None
-        if path:
-            self._rewrite_band(path, result, index)
-        self._say(self.tr("Brightness re-measured: %1 ± %2 %3 (%4 comps)").replace(
-            "%1", f"{payload.get('mag'):.3f}").replace(
-            "%2", f"{payload.get('err') or 0:.3f}").replace(
-            "%3", str(payload.get("band") or "")).replace(
-            "%4", str(payload.get("n_comps") or 0)))
+        for i in done:
+            if 0 <= i < len(paths) and paths[i]:
+                self._rewrite_band(paths[i], result, i)
+        self._say(self.tr(
+            "Brightness re-measured on %1 observation(s): %2 ± %3 %4").replace(
+                "%1", str(len(done))).replace(
+                "%2", f"{phot.get('mag'):.3f}").replace(
+                "%3", f"{phot.get('err') or 0:.3f}").replace(
+                "%4", str(phot.get("band") or "")))
 
     def _rewrite_band(self, path, result, index):
         # @args: path - the object's stack, result - the run, index - the

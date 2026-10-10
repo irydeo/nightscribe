@@ -72,13 +72,15 @@ observador no podía entender ni corregir desde la interfaz, más una sobre el P
    presente), la **marca del objeto del proyecto se apaga** (el botón de la barra
    superior la reactiva si el observador la quiere). La posición que cuenta en un
    stack es la que el run midió.
-5. **El PA**: se documenta tal cual (se mide y se muestra; el reporte no lo
-   lleva). La mejora propuesta, **no implementada aquí**: realimentar el PA
-   medido de la traza como semilla de una **segunda pasada** del apilado (o
-   apretar el grid de PA y re-medir la traza), con lo que el objeto dejaría de
-   salir alargado. Se deja fuera porque no es un cambio acotado: exige una pasada
-   de apilado extra y validación contra datos reales, y el barrido ya incluye un
-   candidato a ±4.5° que en un objeto de SNR ~9 no se distingue del ruido.
+5. **El PA**: se mide y se muestra (barrido y traza); el reporte MPC no lo
+   lleva. Además, la traza del objeto en el stack base **siembra el barrido**:
+   `track_stack.motion_from_trail` convierte la traza medida en dos movimientos
+   candidatos (los dos signos, porque una traza es una recta) y el barrido los
+   puntúa junto a su grid; solo adopta uno si supera a la efeméride por más de
+   tres veces la dispersión, así que una traza ruidosa no mueve el movimiento.
+   Lo que **no** se hace todavía es una segunda pasada de apilado con el
+   movimiento corregido: la siembra reutiliza el scoring del barrido, que es
+   seguro, mientras que una pasada extra exige validación contra datos reales.
 
 **Consecuencias**: el resumen del run y la nota ganan dos campos
 (`n_comps_requested`, `comps_skipped`); la receta gana `report_mag`; el stack
@@ -163,13 +165,15 @@ could neither understand nor fix from the interface, plus one about the PA:
    present), the **project's object mark is switched off** (the top-bar toggle
    brings it back if the observer wants it). The position that counts on a stack
    is the one the run measured.
-5. **The PA**: documented as it is (measured and shown; the report carries none).
-   The proposed improvement, **not implemented here**: feed the measured trail PA
-   back as the seed of a **second stacking pass** (or tighten the PA grid and
-   re-measure the trail), so the object stops coming out trailed. It is left out
-   because it is not a bounded change: it needs an extra stacking pass and
-   validation against real data, and the sweep already includes a ±4.5° candidate
-   that, on an object of SNR ~9, is not distinguishable from the noise.
+5. **The PA**: it is measured and shown (sweep and trail); the MPC report
+   carries none. And the object's trail on the base stack **seeds the sweep**:
+   `track_stack.motion_from_trail` turns the measured trail into two candidate
+   motions (both signs, because a trail is a line) and the sweep scores them
+   alongside its grid; it adopts one only if it beats the ephemeris by more than
+   three times the scatter, so a noisy trail cannot move the motion. What is
+   **not** done yet is a second stacking pass with the corrected motion: the
+   seeding reuses the sweep's scoring, which is safe, while an extra pass needs
+   validation against real data.
 
 **Consequences**: the run's summary and note gain two fields
 (`n_comps_requested`, `comps_skipped`); the recipe gains `report_mag`; a stack

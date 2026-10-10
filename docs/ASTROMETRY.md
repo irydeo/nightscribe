@@ -155,7 +155,11 @@ project). No visit, no series: that is the house rule.
    before this: the app published PA 33 where the ephemeris says 41.8
    (2025 HL5) and 37 where it says 46.2 (2025 FG18), exactly one grid step.
    When the sweep does not improve on the ephemeris, the reported rate and PA
-   are the ephemeris' prediction and the note says so.
+   are the ephemeris' prediction and the note says so. The object's own
+   **trail** on the base stack also **seeds** the sweep: the measured trail
+   (its length and its PA) gives two candidate motions, one per sign, and they
+   are scored like the rest; the same three-sigma guard applies, so a noisy
+   trail cannot move the motion.
 5. **Centred sequence.** A GIF or a montage of the N observations, all
    centred on the object: if it is there in every panel the detection is
    solid; if one panel is empty, you see it. The tab also carries a **strip

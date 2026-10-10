@@ -1482,14 +1482,58 @@ def _roundness(stack, x, y, radius=4.0):
     return float(math.sqrt(max(l2, 0.0) / l1))
 
 
+def motion_from_trail(wcs, center_xy, trail_px, trail_pa_deg, span_min,
+                      base_rate, base_pa):
+    # The motion the object's own trail on a stack implies. The stack was
+    # tracked with `base_rate`/`base_pa`, so what is left as a trail is the
+    # RESIDUAL between the real motion and that assumption: adding it back
+    # gives the real motion. The trail is a LINE, so its direction is known
+    # modulo 180 degrees: BOTH signs are offered and the caller's own scoring
+    # decides (the sweep adopts one only if it beats the ephemeris).
+    # @args: wcs - the stack's Wcs (it places the trail on the sky),
+    #        center_xy - the object's (x, y) on that stack,
+    #        trail_px/trail_pa_deg - the measured trail (core/photometry),
+    #        span_min - the time the trail accumulated over, in minutes,
+    #        base_rate/base_pa - the assumed motion (arcsec/min, deg E of N)
+    # @return: [(rate, pa), ...] candidate motions, or [] when it cannot tell
+    if not wcs or trail_px is None or trail_pa_deg is None or span_min <= 0 \
+            or base_rate is None or base_pa is None:
+        return []
+    ang = math.radians(float(trail_pa_deg))
+    dx = math.cos(ang) * float(trail_px)
+    dy = math.sin(ang) * float(trail_px)
+    out = []
+    for sign in (1.0, -1.0):
+        try:
+            ra0, dec0 = wcs.pixel_to_sky(center_xy[0], center_xy[1])
+            ra1, dec1 = wcs.pixel_to_sky(center_xy[0] + sign * dx,
+                                         center_xy[1] + sign * dy)
+        except Exception:
+            return []
+        # the residual on the sky, in arcsec and in PA (east of north)
+        d_ra = (float(ra1) - float(ra0)) * math.cos(math.radians(float(dec0)))
+        d_dec = float(dec1) - float(dec0)
+        res_rate = math.hypot(d_ra, d_dec) * 3600.0 / span_min
+        res_pa = math.degrees(math.atan2(d_ra, d_dec)) % 360.0
+        # the corrected motion: the assumed one PLUS the residual, as vectors
+        ve = (base_rate * math.sin(math.radians(base_pa))
+              + res_rate * math.sin(math.radians(res_pa)))
+        vn = (base_rate * math.cos(math.radians(base_pa))
+              + res_rate * math.cos(math.radians(res_pa)))
+        out.append((float(math.hypot(ve, vn)),
+                    float(math.degrees(math.atan2(ve, vn)) % 360.0)))
+    return out
+
+
 def sweep(frames, q, base_rate, base_pa, box, shape, pct=5.0, steps=5,
           method="median", cfg=None, loader=None, sigma=3.0, iterations=3,
-          progress=None, cancel=None):
+          extra_cands=None, progress=None, cancel=None):
     # @args: frames - list[Frame] (the whole sequence), q - the reference
     #        point, base_rate - arcsec/min, base_pa - degrees, box/shape,
     #        pct - the +/- percentage of the grid, steps - per axis,
     #        method - the fast combination, cfg/loader/sigma/iterations,
-    #        progress/cancel
+    #        extra_cands - [(rate, pa), ...] candidates added to the grid
+    #        (the object's own trail, see motion_from_trail), progress/cancel
     # @return: SweepResult
     # A 5x5 grid around the theoretical velocity: 5 factors of the modulus
     # by 5 position-angle offsets. Modulus and PA are used, not RA/Dec
@@ -1508,6 +1552,15 @@ def sweep(frames, q, base_rate, base_pa, box, shape, pct=5.0, steps=5,
     base, t0, scale = _sweep_base(frames, q, shape)
     cands = [(float(base_rate * factor), float(base_pa + dpa))
              for factor in factors for dpa in pas]
+    # The trail-derived candidates (core.track_stack.motion_from_trail) join
+    # the grid: the sweep scores them like any other candidate and adopts one
+    # only if it beats the ephemeris by more than the grid's own scatter, so a
+    # noisy trail cannot move the published motion.
+    for extra in (extra_cands or []):
+        try:
+            cands.append((float(extra[0]), float(extra[1])))
+        except (TypeError, ValueError, IndexError):
+            continue
     if not base:
         grid = [{"rate": rate, "pa": pa, "score": 0.0, "snr": 0.0,
                  "roundness": 0.0} for rate, pa in cands]

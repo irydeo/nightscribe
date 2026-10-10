@@ -1833,6 +1833,35 @@ class TrackStackWorker(QThread):
             return None
         return tuple(float(r) for r in radii)
 
+    def _trail_candidates(self, base_stack, q_box, w0, box_all, frames,
+                          base_rate, base_pa):
+        # The object's own trail on the base stack, turned into candidate
+        # motions (see track_stack.motion_from_trail). They seed the sweep so
+        # a motion the ephemeris got slightly wrong can be found from the
+        # object's own light; the sweep still decides whether to adopt one.
+        # @args: base_stack - the whole-sequence stack, q_box - the object's
+        #        (x, y) on it, w0 - the reference WCS, box_all - its cutout,
+        #        frames - the sequence, base_rate/base_pa - the ephemeris'
+        # @return: [(rate, pa), ...] or []
+        if base_stack is None or base_rate is None or base_pa is None:
+            return []
+        try:
+            from ..core import photometry
+            shape = photometry.psf_elongation(base_stack, q_box[0], q_box[1])
+        except Exception as err:      # a trail we cannot read is no candidate
+            logger.warning("trail measurement failed: %s", err)
+            return []
+        if not (shape.get("ok") and shape.get("significant")):
+            return []
+        stamps = [f.t_mid_jd for f in frames
+                  if f.t_mid_jd is not None and track_stack.usable(f)]
+        if len(stamps) < 2:
+            return []
+        span_min = (max(stamps) - min(stamps)) * 1440.0
+        return track_stack.motion_from_trail(
+            _shift_wcs(w0, box_all), q_box, shape.get("trail_px"),
+            shape.get("pa_deg"), span_min, base_rate, base_pa)
+
     def _build_calibrator(self):
         # @return: a calibration.FrameCalibrator ready to be used as the
         #          engine's loader, or None when it cannot be built
@@ -2056,12 +2085,21 @@ class TrackStackWorker(QThread):
                 # the engine wants the steps per axis
                 steps = max(2, int(round(math.sqrt(
                     float(self._cfg_get("astrometry_sweep_steps", 25))))))
+                # The object's OWN trail on the base stack says how far the
+                # ephemeris' motion is from the real one. Its two signs seed
+                # the sweep, which scores them like any other candidate and
+                # adopts one only if it beats the ephemeris by more than the
+                # grid's scatter (a noisy trail cannot move the motion).
+                trail_cands = self._trail_candidates(
+                    base_stack, q_all_box, w0, box_all, frames, base_rate,
+                    base_pa)
+                out["trail_seed"] = len(trail_cands)
                 self.progress.emit("sweep", 0, steps * steps)
                 sweep = track_stack.sweep(
                     frames, q_all, base_rate, base_pa, box_all, shape,
                     pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
                     steps=steps, method="median", cfg=self._cfg,
-                    loader=self._loader,
+                    loader=self._loader, extra_cands=trail_cands,
                     progress=lambda d, t, _l: self.progress.emit(
                         "sweep", d, t),
                     cancel=lambda: self._cancel)
@@ -2413,25 +2451,25 @@ class FrameThumbWorker(QThread):
 
 
 class StackRemeasureWorker(QThread):
-    # Re-measures the BRIGHTNESS of one track & stack observation from the
-    # SAVED pair (the object's stack and the star stack) with the recipe the
+    # Re-measures the BRIGHTNESS of one or more track & stack observations
+    # from their SAVED stacks (the object's and the star's) with the recipe the
     # Photometry tab is holding RIGHT NOW. The recipe used to be captured at
     # run time, so tuning the apertures or the comps meant re-stacking the
     # whole visit; here the zero point and the magnitude are recomputed on the
     # stacks that already exist. The position, the detection and the rest are
-    # untouched.
-    finished = Signal(dict)     # the photometry summary, or {"error": ...}
+    # untouched. It runs the WHOLE series of observations of a run, not only
+    # the one on stage: the recipe is the same for all of them.
+    finished = Signal(dict)     # {"results": [{index, mag, err, ...}], ...}
 
-    def __init__(self, stack_path, star_path, target_xy, entries, band,
-                 recipe=None, fwhm=None, cfg=None):
+    def __init__(self, observations, entries, band, recipe=None, cfg=None):
+        # @args: observations - [{"index", "stack", "star", "target_xy",
+        #        "fwhm"}, ...], entries - the comparison sequence, band - the
+        #        photometric band, recipe - the recipe dict, cfg - the config
         super().__init__()
-        self._stack_path = str(stack_path)
-        self._star_path = str(star_path) if star_path else None
-        self._target_xy = (float(target_xy[0]), float(target_xy[1]))
+        self._observations = list(observations or [])
         self._entries = list(entries or [])
         self._band = band
         self._recipe = dict(recipe or {})
-        self._fwhm = fwhm
         self._cfg = cfg
 
     def _get(self, key, default=None):
@@ -2442,61 +2480,74 @@ class StackRemeasureWorker(QThread):
         except Exception:
             return default
 
-    def run(self):
-        from ..core import fits_io, photometry, wcs as wcs_mod
+    def _config_for(self, header, target_xy, fwhm):
+        # @args: header - the object stack's header, target_xy - the object's
+        #        (x, y) on it, fwhm - the seeing (px) or None
+        # @return: the PlateConfig the plate recipe needs
+        from ..core import photometry, wcs as wcs_mod
+        recipe = self._recipe
+        rap, rin, rout = (recipe.get("rap"), recipe.get("rin"),
+                          recipe.get("rout"))
+        radii = ((float(rap), float(rin), float(rout))
+                 if rap and rin and rout else None)
+        return photometry.PlateConfig(
+            target_xy=(float(target_xy[0]), float(target_xy[1])),
+            entries=self._entries,
+            comp_image=None,           # set per observation
+            header=header, wcs=wcs_mod.Wcs.from_header(header),
+            band=self._band, fallback_band=self._band,
+            radii=radii, fwhm=fwhm,
+            centroid_mode=("none" if recipe.get("manual_centre")
+                           else "gaussian"),
+            sigmaclip=bool(recipe.get("sigmaclip", True)),
+            matched=bool(recipe.get("matched",
+                                    self._get("phot_matched", True))),
+            sky_mode=recipe.get("sky") or "median",
+            color=bool(recipe.get("color", False)),
+            target_bv=float(recipe.get("target_bv") or 0.0),
+            linear_adu=self._get("cam_linearity_adu", None),
+            site_gain=self._get("ccd_gain", None),
+            site_ron=self._get("ccd_read_noise", None),
+            site_flat=self._get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=self._get("ccd_saturate", None),
+            site_lon=self._get("lon", None), site_lat=self._get("lat", None),
+            site_aperture_m=float(self._get("aperture_inches", 10.0)
+                                  or 10.0) * 0.0254,
+            site_height_m=float(self._get("height", 0) or 0.0),
+            site_dark=self._get("cam_dark_current_e_s", None))
+
+    def _one(self, ob):
+        # @args: ob - one observation {"index", "stack", "star", "target_xy",
+        #        "fwhm"}
+        # @return: {index, mag, err, ...} or {index, error}
+        from ..core import fits_io, photometry
+        index = ob.get("index")
         try:
-            header, image = fits_io.read_fits(self._stack_path)
+            header, image = fits_io.read_fits(ob["stack"])
             star = None
-            if self._star_path:
-                _sh, star = fits_io.read_fits(self._star_path)
-            w = wcs_mod.Wcs.from_header(header)
-            recipe = self._recipe
-            rap, rin, rout = (recipe.get("rap"), recipe.get("rin"),
-                              recipe.get("rout"))
-            radii = ((float(rap), float(rin), float(rout))
-                     if rap and rin and rout else None)
-            cfg = photometry.PlateConfig(
-                target_xy=self._target_xy,
-                entries=self._entries,
-                comp_image=star,
-                header=header, wcs=w,
-                band=self._band, fallback_band=self._band,
-                radii=radii, fwhm=self._fwhm,
-                centroid_mode=("none" if recipe.get("manual_centre")
-                               else "gaussian"),
-                sigmaclip=bool(recipe.get("sigmaclip", True)),
-                matched=bool(recipe.get("matched",
-                                        self._get("phot_matched", True))),
-                sky_mode=recipe.get("sky") or "median",
-                color=bool(recipe.get("color", False)),
-                target_bv=float(recipe.get("target_bv") or 0.0),
-                linear_adu=self._get("cam_linearity_adu", None),
-                site_gain=self._get("ccd_gain", None),
-                site_ron=self._get("ccd_read_noise", None),
-                site_flat=self._get("flat_resid_mag", 0.007) or 0.007,
-                site_saturate=self._get("ccd_saturate", None),
-                site_lon=self._get("lon", None),
-                site_lat=self._get("lat", None),
-                site_aperture_m=float(self._get("aperture_inches", 10.0)
-                                      or 10.0) * 0.0254,
-                site_height_m=float(self._get("height", 0) or 0.0),
-                site_dark=self._get("cam_dark_current_e_s", None))
+            if ob.get("star"):
+                _sh, star = fits_io.read_fits(ob["star"])
+            cfg = self._config_for(header, ob["target_xy"], ob.get("fwhm"))
+            cfg.comp_image = star
             res = photometry.measure_plate(image, cfg)
             if not res.ok or res.mag is None:
-                self.finished.emit({"error": "the plate could not be "
-                                    "calibrated (no usable comparison)"})
-                return
-            self.finished.emit({
-                "mag": float(res.mag),
-                "err": float(res.err_total or 0.0),
-                "band": res.band or self._band,
-                "n_comps": len([1 for e, _r in (res.used or [])
-                                if (e.get("kind") or "comp") == "comp"]),
-                "comps_skipped": dict(getattr(res, "skipped", None) or {}),
-                "check_ok": ((res.check or {}).get("ok") if res.check else None),
-                "matched_used": bool(getattr(res, "matched_used", False)),
-            })
-        except Exception as err:      # never crash the GUI on a re-measure
-            logger.warning("stack re-measure failed: %s", err)
-            self.finished.emit({"error": str(err)})
+                return {"index": index, "error": "the plate could not be "
+                        "calibrated (no usable comparison)"}
+            return {"index": index, "mag": float(res.mag),
+                    "err": float(res.err_total or 0.0),
+                    "band": res.band or self._band,
+                    "n_comps": len([1 for e, _r in (res.used or [])
+                                    if (e.get("kind") or "comp") == "comp"]),
+                    "comps_skipped": dict(getattr(res, "skipped", None) or {}),
+                    "check_ok": ((res.check or {}).get("ok")
+                                 if res.check else None),
+                    "matched_used": bool(getattr(res, "matched_used", False))}
+        except Exception as err:      # a broken pair never crashes the GUI
+            logger.warning("stack re-measure failed for #%s: %s", index, err)
+            return {"index": index, "error": str(err)}
+
+    def run(self):
+        self.finished.emit({"results": [self._one(ob)
+                                        for ob in self._observations]})
+
 

@@ -86,13 +86,19 @@ observation is measured **twice** with the same centroid recipe: on the
 stack and frame by frame. A disagreement beyond 0.5″ or 3σ is flagged;
 it is never resolved silently.
 
-The **Re-measure the brightness** button re-runs the recipe on the
-observation's **saved stacks** (the object's and the star's) without
-re-stacking the visit, and rewrites only the stack's band: the position and
+The **Re-measure the brightness** button re-runs the recipe on the **saved
+stacks of the run's observations** (each object's and its star's) without
+re-stacking the visit, and rewrites only the stacks' bands: the positions and
 the detection are untouched. It needs the run to have kept the **star stack**.
 When a track & stack is open, the project's own object mark is switched off:
 the stack already carries the run's measured position, and two marks (at the
 plan's coordinates and at the measured ones) read as an error.
+
+The object's own **trail** on the whole-sequence stack also helps: its length
+and direction give two candidate motions that seed the velocity sweep, so a
+motion the ephemeris got slightly wrong can be found from the object's own
+light. The sweep still decides, with the same guard as always: it only adopts
+a candidate that beats the ephemeris by more than the grid's scatter.
 
 **Animate / verify** plays the observation stacks centred on the object with
 one shared stretch: the object must stay put in the middle while the stars

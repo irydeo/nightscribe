@@ -237,7 +237,18 @@ project). No visit, no series: that is the house rule.
     measured from your mark: the mark is your signature and it travels with
     the figure. The red cross of the measured position stays on the plate: it
     is anchored to the sky, so it survives loading another image of the series
-    and switching to the Photometry tab.
+    and switching to the Photometry tab. On a track & stack the **project's own
+    object mark is switched off**: the stack already carries the run's measured
+    position, and two marks (at the plan's coordinates and at the measured ones)
+    read as an error. The top-bar toggle brings it back if you want it.
+12. **Tune the brightness without re-stacking.** The Photometry tab's recipe
+    (apertures, sky, comps, and what the band reports) used to be frozen when
+    the run started, so changing it meant re-stacking the whole visit. The
+    Astrometry tab now has **Re-measure the brightness**: it re-runs the recipe
+    on the **saved stacks** of the observation on stage (the object's and the
+    star's) and rewrites only the stack's band. The position and the detection
+    are untouched. It needs the run to have kept the **star stack** (the box in
+    the panel); without it the button says so.
 
 ## 4. What each figure means
 
@@ -278,6 +289,16 @@ project). No visit, no series: that is the house rule.
   behind it, and with its error. The star stack also brings a **check
   star**: if it leaves its catalogue value, the night did not behave and
   the run says so.
+  When the zero point rests on **too few comps** the run says **why** the
+  others were dropped (off the plate, saturated, non-linear, no positive flux,
+  no catalogue value) and warns that the large error is the honest consequence
+  of a thin sequence: a big error stops looking like a bug and becomes a figure
+  with a cause.
+  What the band **reports** is a choice of the **photometry recipe** (Photometry
+  tab): the **measurement** or the **ephemeris' prediction**. A measurement not
+  worth reporting (too few comps, a trailed object) is replaced by the labelled
+  `(eph)` figure without hiding it: the measurement stays in the run and in the
+  astrometry point.
 - **Distinct observatories and last observation** (on the object card):
   many and recent means a live, well-determined object; one and months ago,
   a candidate to be lost.

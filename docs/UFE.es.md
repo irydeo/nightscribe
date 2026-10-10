@@ -271,6 +271,13 @@ apertura diferencial de una placa):
   el botón
   **Sugerir** que propone los radios con la curva de crecimiento del
   objetivo y su entorno, con las razones en lenguaje llano.
+* **Brillo a mostrar** (en el mismo bloque de la receta): qué enseña la banda
+  sobre la imagen, la **medida** de esta placa o la **predicción de la
+  efeméride**. Es parte de la receta porque decide lo que ve un lector; el
+  track & stack lo escribe en la banda del propio stack, así que una medida
+  que no merece publicarse (muy pocas comparsas, objeto con traza) se
+  sustituye por la cifra etiquetada `(eph)` sin ocultar la medida, que se
+  queda en el run y en el punto de astrometría.
 * Controles de calidad (fase H, en segundo plano): techo de
   **saturación real** (SATURATE o `ccd_saturate`), **error interno vs.
   total** (fotones + dispersión + centelleo + color + flats) y la
@@ -358,9 +365,16 @@ banda:
   es el valor del proyecto o del catálogo, que no es una medida de esta
   placa. La magnitud que se enseña es la medida en ESA toma (la curva de la
   visita cuando la hay), después una medida de placa, y solo entonces el
-  catálogo;
+  catálogo. En un track & stack, lo que enseña la banda lo elige el propio run
+  (**Brillo a mostrar**, en la receta de Fotometría): la medida o la
+  efeméride, etiquetada en ambos casos;
 * lo demás (fecha, exposición, filtro, equipo, estación, escala, FOV) en
   el color discreto: es contexto, no un juicio.
+
+En un track & stack, la **marca del objeto del proyecto se apaga** al cargar la
+placa: el stack ya trae la posición medida por el run (su cruz y el círculo
+`ANNOTATE`), y dos marcas, en las coordenadas del plan y en las medidas, se leen
+como un error. El conmutador de la barra superior la reactiva.
 
 El mismo código está en los **puntos de la curva** (botón **Colores de
 calidad** de la ventana de la carta, activado por defecto) y en el **panel de la

@@ -59,6 +59,15 @@ from.
 term, host-galaxy subtraction). Each plate keeps its own recipe: changing it
 on one does not touch the others.
 
+**What the band reports.** The recipe also decides what the strip over the
+image shows: the **measurement** of this plate or the **ephemeris' prediction**.
+Choose **Ephemeris prediction** when the measurement is not worth reporting (a
+zero point resting on too few comparisons, a trailed object): the figure then
+wears `(eph)` and the measurement is kept in the run. When the zero point rests
+on **too few comps**, the run says **why** the others were dropped (off the
+plate, saturated, non-linear, no positive flux, no catalogue value), so a large
+error is a figure with a cause and not a mystery.
+
 **Host-galaxy subtraction.** For a supernova sitting on its galaxy's core,
 tick **Subtract host galaxy (PS1 reference)**: the app fetches the survey's
 cutout of the field, lines it up with your plate on the stars they share,

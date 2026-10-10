@@ -240,7 +240,19 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
     **marca humana** y la tabla marca el punto como medido desde tu marca: la
     marca es tu firma y viaja con la cifra. La cruz roja de la posición medida
     se queda en la placa: está anclada al cielo, así que sobrevive a cargar
-    otra imagen de la serie y a cambiar a la pestaña Fotometría.
+    otra imagen de la serie y a cambiar a la pestaña Fotometría. En un track &
+    stack, la **marca del objeto del proyecto se apaga**: el stack ya trae la
+    posición medida por el run, y dos marcas (en las coordenadas del plan y en
+    las medidas) se leen como un error. El botón de la barra superior la
+    reactiva si la quieres.
+12. **Ajustar el brillo sin re-apilar.** La receta de la pestaña Fotometría
+    (aperturas, cielo, comparsas y qué reporta la banda) quedaba congelada al
+    arrancar el run, así que cambiarla obligaba a re-apilar toda la visita. La
+    pestaña Astrometría tiene ahora **«Re-medir el brillo»**: vuelve a ejecutar
+    la receta sobre los **apilados guardados** de la observación en escena (el
+    del objeto y el de estrellas) y reescribe solo la banda del stack. La
+    posición y la detección no se tocan. Necesita que el run haya guardado el
+    **stack de estrellas** (la casilla del panel); si no, el botón lo dice.
 
 ## 4. Qué significa cada cifra
 
@@ -280,6 +292,16 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   observaciones que la sostienen, y con su error. El apilado de estrellas
   trae además una **estrella de control**: si ella se sale de su valor de
   catálogo, la noche no se comportó y lo dice.
+  Cuando el punto cero se apoya en **muy pocas comparsas**, el run dice **por
+  qué** se cayeron las demás (fuera de la placa, saturadas, no lineales, sin
+  flujo positivo, sin valor de catálogo) y avisa de que el error grande es la
+  consecuencia honesta de una secuencia pobre: un error grande deja de parecer
+  un fallo y pasa a ser una cifra con causa.
+  Lo que la banda **reporta** es una elección de la **receta de fotometría**
+  (pestaña Fotometría): la **medida** o la **predicción de la efeméride**. Una
+  medida que no merece publicarse (muy pocas comparsas, objeto con traza) se
+  sustituye por la cifra etiquetada `(eph)` sin ocultarla: la medida se queda
+  en el run y en el punto de astrometría.
 - **Observatorios distintos y última observación** (en la ficha del objeto):
   muchos y reciente significa objeto vivo y bien determinado; uno solo y
   hace meses, candidato a perderse.

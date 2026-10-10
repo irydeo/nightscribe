@@ -59,6 +59,15 @@ la ganancia.
 término de color, sustracción de galaxia anfitriona). Cada placa guarda su
 propia receta: cambiarla en una no toca las demás.
 
+**Qué reporta la banda.** La receta también decide qué enseña la franja sobre
+la imagen: la **medida** de esta placa o la **predicción de la efeméride**.
+Elige **Predicción de la efeméride** cuando la medida no merezca publicarse (un
+punto cero sobre muy pocas comparsas, un objeto con traza): la cifra pasa a
+llevar `(eph)` y la medida se conserva en el run. Cuando el punto cero se apoya
+en **muy pocas comparsas**, el run dice **por qué** se cayeron las demás (fuera
+de la placa, saturadas, no lineales, sin flujo positivo, sin valor de catálogo),
+así que un error grande es una cifra con causa y no un misterio.
+
 **Sustracción de la galaxia anfitriona.** Para una supernova en el núcleo de
 su galaxia, marca **Restar galaxia anfitriona (referencia PS1)**: la app
 descarga el recorte del survey del campo, lo alinea con tu placa por las

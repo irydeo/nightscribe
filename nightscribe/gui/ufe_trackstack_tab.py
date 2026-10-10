@@ -238,6 +238,10 @@ class UfeTrackStackTab(QWidget):
         self.lbl_recipe = self._ui.lbl_recipe
         self.btn_recipe = self._ui.btn_recipe
         self.btn_recipe.clicked.connect(self._on_edit_recipe)
+        self.btn_remeasure = self._ui.btn_remeasure
+        self.btn_remeasure.clicked.connect(self._on_remeasure)
+        self.btn_remeasure.setEnabled(False)
+        self._remeasure_worker = None
         self.chk_brightness.toggled.connect(lambda _on: self._sync_recipe_row())
         self._sync_recipe_row()
         # ADR-038: three levels of prominence. What the observer SEES on
@@ -1920,6 +1924,33 @@ class UfeTrackStackTab(QWidget):
         self._draw_marks()
         self._start_run(manual_ref=ref)
 
+    def _comps_note(self, phot):
+        # @args: phot - the run's photometry summary
+        # @return: a suffix that explains a weak zero point (or "" when the
+        #          sequence is fine). "3 of 8 comps" is the whole story of a
+        #          large error: the number alone looks like a bug.
+        n = int(phot.get("n_comps") or 0)
+        asked = phot.get("n_comps_requested")
+        skipped = phot.get("comps_skipped") or {}
+        labels = {"off": self.tr("off the plate"),
+                  "sat": self.tr("saturated"),
+                  "nonlinear": self.tr("non-linear"),
+                  "band": self.tr("no catalogue value in the band"),
+                  "other": self.tr("no positive flux")}
+        parts = [f"{count} {labels.get(reason, reason)}"
+                 for reason, count in skipped.items() if count]
+        detail = " (" + ", ".join(parts) + ")" if parts else ""
+        if n and n < 4:
+            return self.tr(
+                " · WARNING: the zero point rests on %1 of %2 comps%3, so the "
+                "error is the honest consequence: check the sequence in the "
+                "Photometry tab").replace(
+                    "%1", str(n)).replace("%2", str(asked or n)).replace(
+                    "%3", detail)
+        if detail:
+            return self.tr(" · comps dropped:%1").replace("%1", detail)
+        return ""
+
     def _paint_run(self):
         # @return: None. The run's notes (dithering D27, WCS quality, the
         #          sweep's winner), the group viewer, the measurement
@@ -2032,14 +2063,14 @@ class UfeTrackStackTab(QWidget):
                       else self.tr("an automatic proposal"))
             notes.append(self.tr(
                 "Brightness %1 ± %2 %3 per observation (%4 observations, "
-                "%5 frames each) from %6 comparison stars · %7").replace(
+                "%5 frames each) from %6 comparison stars · %7%8").replace(
                     "%1", f"{phot['mag']:.3f}").replace(
                     "%2", f"{phot.get('err') or 0:.3f}").replace(
                     "%3", str(phot.get("band") or "")).replace(
                     "%4", str(phot.get("n_obs") or 0)).replace(
                     "%5", str(phot.get("n_frames") or 0)).replace(
                     "%6", str(phot.get("n_comps") or 0)).replace(
-                    "%7", origin))
+                    "%7", origin).replace("%8", self._comps_note(phot)))
         elif self._result.get("phot_skipped"):
             notes.append(self.tr(
                 "The brightness was not measured (the box is off): this "
@@ -2087,6 +2118,9 @@ class UfeTrackStackTab(QWidget):
                 i)
         self.cmb_group.blockSignals(False)
         self.cmb_group.setEnabled(self.cmb_group.count() > 0)
+        # the brightness can be re-measured on the saved stacks (the recipe
+        # applied without re-stacking) whenever there are stacks to read
+        self.btn_remeasure.setEnabled(bool(self._result.get("stack_paths")))
         # the strip: the same stacks, visible side by side at ONE stretch,
         # so a faint observation cannot hide behind a bright one
         qs = self._result.get("qs") or []
@@ -2884,6 +2918,19 @@ class UfeTrackStackTab(QWidget):
         if index is not None:
             per_obs = phot.get("per_obs") or []
             one = per_obs[index] if 0 <= index < len(per_obs) else None
+        if str(result.get("report_mag") or "measured") == "ephemeris" \
+                and result.get("ephem_mag") is not None:
+            # The photometry recipe asked for the ephemeris' figure (the
+            # measurement is not worth reporting, but it stays in the run).
+            # The band says so and wears the dimmed (eph) colour.
+            header["NS_MAG"] = (float(result["ephem_mag"]),
+                                "predicted by the ephemeris "
+                                "(chosen in the recipe)")
+            header["NS_MAGSR"] = ("ephemeris", "a prediction, not measured")
+            if result.get("ephem_band"):
+                header["NS_MAGB"] = (str(result["ephem_band"]),
+                                     "band of the ephemeris' prediction")
+            return
         if one is not None and one.get("mag") is not None:
             header["NS_MAG"] = (float(one["mag"]),
                                 "measured on this stack")
@@ -2921,6 +2968,123 @@ class UfeTrackStackTab(QWidget):
         elif result.get("ephem_band"):
             header["NS_MAGB"] = (str(result["ephem_band"]),
                                  "band of the ephemeris' prediction")
+
+    # ------------------------------------------- re-measure the brightness
+
+    def _shown_fwhm(self):
+        # @return: the seeing (px) of the observation on stage, when the run
+        #          measured it, so the matched filter can be used again
+        index = self._shown_group
+        phot = (self._result or {}).get("photometry") or {}
+        per_obs = phot.get("per_obs") or []
+        if index is None or not (0 <= index < len(per_obs)):
+            return None
+        shape = (per_obs[index] or {}).get("shape") or {}
+        fwhm = shape.get("fwhm_px")
+        return float(fwhm) if fwhm else None
+
+    def _on_remeasure(self):
+        # Re-measures the brightness of the observation on stage from its
+        # SAVED stacks (object + star) with the recipe the Photometry tab is
+        # holding right now, without re-stacking the visit. The position and
+        # the detection are untouched: only the zero point and the magnitude.
+        result = self._result or {}
+        paths = result.get("stack_paths") or []
+        index = self._shown_group
+        if index is None or index >= len(paths) or not paths[index]:
+            self._say(self.tr("Stack the sequence first."))
+            return
+        if self._remeasure_worker is not None \
+                and self._remeasure_worker.isRunning():
+            return
+        star_path = self._stack_path(index, stars=True)
+        if not Path(str(star_path)).exists():
+            self._say(self.tr(
+                "This run kept no star stack, so the comparison stars are not "
+                "on a plate to re-measure them: run again with 'keep the star "
+                "stack'."))
+            return
+        entries = (result.get("photometry") or {}).get("comps") or []
+        point = self._shown_point()
+        if point is None or getattr(point, "x", None) is None:
+            self._say(self.tr("No measured point to re-measure."))
+            return
+        band = (result.get("photometry") or {}).get("band")
+        from .workers import StackRemeasureWorker, hold
+        self.btn_remeasure.setEnabled(False)
+        self._say(self.tr("Re-measuring the brightness…"))
+        self._remeasure_worker = hold(StackRemeasureWorker(
+            paths[index], star_path, (point.x, point.y), entries, band,
+            recipe=self._recipe(), fwhm=self._shown_fwhm(), cfg=config))
+        self._remeasure_worker.finished.connect(self._on_remeasured)
+        self._remeasure_worker.start()
+
+    def _on_remeasured(self, payload):
+        # @args: payload - the worker's summary (or {"error": ...})
+        # @return: None. Folds the new magnitude into the run, rewrites the
+        #          stack's band cards (the pixels are untouched) and says the
+        #          result. The astrometry point keeps the measurement.
+        self.btn_remeasure.setEnabled(True)
+        payload = payload or {}
+        if payload.get("error"):
+            self._say(self.tr("The brightness could not be re-measured:") +
+                      " " + str(payload["error"]))
+            return
+        result = self._result or {}
+        index = self._shown_group
+        phot = result.get("photometry") or {}
+        per_obs = phot.get("per_obs") or []
+        if index is not None and 0 <= index < len(per_obs) and per_obs[index]:
+            one = per_obs[index]
+            one["mag"] = payload.get("mag")
+            one["err"] = payload.get("err")
+            one["n_comps"] = payload.get("n_comps")
+            one["check_ok"] = payload.get("check_ok")
+            one["comps_skipped"] = payload.get("comps_skipped") or {}
+        # the run's median, recomputed from the observations that measured
+        mags = sorted(p["mag"] for p in per_obs
+                      if p and p.get("mag") is not None)
+        errs = sorted(p["err"] for p in per_obs
+                      if p and p.get("err") is not None)
+        if mags:
+            phot["mag"] = float(mags[len(mags) // 2])
+        if errs:
+            phot["err"] = float(errs[len(errs) // 2])
+        counts = [p.get("n_comps") or 0 for p in per_obs if p]
+        if counts:
+            phot["n_comps"] = max(counts)
+        # the recipe's report_mag may have changed too: it rides the band
+        result["report_mag"] = str(
+            (self._recipe() or {}).get("report_mag") or "measured")
+        # rewrite the shown stack's band cards so the band over the image
+        # says the new number (the file's pixels are untouched)
+        paths = result.get("stack_paths") or []
+        path = paths[index] if (index is not None
+                                and index < len(paths)) else None
+        if path:
+            self._rewrite_band(path, result, index)
+        self._say(self.tr("Brightness re-measured: %1 ± %2 %3 (%4 comps)").replace(
+            "%1", f"{payload.get('mag'):.3f}").replace(
+            "%2", f"{payload.get('err') or 0:.3f}").replace(
+            "%3", str(payload.get("band") or "")).replace(
+            "%4", str(payload.get("n_comps") or 0)))
+
+    def _rewrite_band(self, path, result, index):
+        # @args: path - the object's stack, result - the run, index - the
+        #        observation
+        # @return: None. Rewrites ONLY the band cards of an existing stack,
+        #          so the band over the image says the new brightness. The
+        #          plate's pixels are never touched.
+        try:
+            from astropy.io import fits
+            with fits.open(str(path), mode="update") as hdul:
+                self._write_mag_cards(hdul[0].header, result, index)
+            # if the open plate IS that stack, reload it so the band repaints
+            state = self._state if self._view is not None else self._stack_state
+            if state is not None and self._is_shown_stack(state):
+                state.load(str(path))
+        except Exception as err:      # a band that cannot be rewritten is not fatal
+            logger.warning("band rewrite failed: %s", err)
 
     def _write_star_stack(self, index, result):
         # @args: index - the observation, result - the run's payload

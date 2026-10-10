@@ -58,6 +58,23 @@
      </layout>
     </item>
     <item>
+     <layout class="QHBoxLayout" name="row_report_mag">
+      <property name="layoutStretch" stdset="0">
+       <string notr="true">0,1</string>
+      </property>
+      <item>
+       <widget class="QLabel" name="lbl_report_mag">
+        <property name="text">
+         <string>Report brightness:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="cmb_report_mag"/>
+      </item>
+     </layout>
+    </item>
+    <item>
      <layout class="QHBoxLayout" name="row_apertures">
       <item>
        <widget class="QLabel" name="lbl_apertures">

@@ -2706,6 +2706,15 @@ class UfeDialog(QWidget):
         self.btn_solve.setEnabled(self.state.has_image)
         self._sync_wcs_buttons()
         self._update_title()
+        # A track & stack carries its OWN measured position (the run's cross
+        # and the ANNOTATE circle it wrote). The project's object mark would
+        # be a SECOND mark, at the PLAN's coordinates and not the measured
+        # ones, and the two together read as an error (reported). It is
+        # switched off when a stack loads; the top-bar toggle brings it back
+        # if the observer wants it.
+        header = getattr(self.state, "header", None) or {}
+        if self.state.has_image and header.get("NS_STACK"):
+            self.btn_mark.setChecked(False)
 
     def _sync_wcs_buttons(self):
         # North arrow / scale bar need a WCS (present at load or after a

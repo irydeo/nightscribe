@@ -108,6 +108,18 @@ def test_settings_has_the_editor_switch_on_interface(qapp):
     dlg.deleteLater()
 
 
+def test_a_stack_plate_hides_the_project_mark(dlg):
+    # Point 4: a track & stack carries its OWN measured position (the run's
+    # cross and the ANNOTATE circle), so the project's mark would be a
+    # SECOND one, at the plan's coordinates, and the two together read as an
+    # error. Loading a stack switches it off; the toggle brings it back.
+    dlg.open_plate(str(MONO))
+    dlg.btn_mark.setChecked(True)
+    dlg.state.header["NS_STACK"] = "object"
+    dlg._on_image_loaded()
+    assert dlg.btn_mark.isChecked() is False
+
+
 def test_open_plate_and_show_tab(dlg, qapp):
     assert dlg.open_plate(str(MONO))
     assert not dlg.open_plate(str(FIXTURES / "missing.fits"))

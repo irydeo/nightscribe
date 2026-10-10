@@ -1441,6 +1441,12 @@ class TrackStackWorker(QThread):
         # point is the same number for a fraction of the time.
         total = max(1, 2 * len(groups))
         per_obs = []
+        # Why the comparison stars were dropped, summed over the observations
+        # (core/photometry counts them per plate: off the plate, saturated,
+        # non-linear, no positive flux, no catalog value in the band). A
+        # zero point resting on three comps is a large error with a reason,
+        # and the run must say the reason instead of only the number.
+        skipped_total = {}
         # P3: the night's diagnosis is built from the SAME comps the zero
         # point uses: their (magnitude, signal-to-noise) gives how faint this
         # night went, and their position against the catalogue gives whether
@@ -1518,6 +1524,8 @@ class TrackStackWorker(QThread):
             if not res.ok or res.mag is None:
                 per_obs.append(None)
                 continue
+            for _reason, _count in (getattr(res, "skipped", None) or {}).items():
+                skipped_total[_reason] = skipped_total.get(_reason, 0) + _count
             # P2: the object's SHAPE on its own stack, and what the matched
             # filter reads there. The FWHM comes from the STARS (on this
             # stack they are trails), and the filter is given the shape just
@@ -1658,6 +1666,11 @@ class TrackStackWorker(QThread):
                 "n_comps": max(p["n_comps"] for p in good),
                 "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
                 "n_obs": len(good), "source": source, "per_obs": per_obs,
+                # the sequence that was ASKED for and the reasons its comps
+                # were dropped: "3 of 8 used" is the whole story of a large
+                # zero-point error
+                "n_comps_requested": len(entries),
+                "comps_skipped": dict(skipped_total),
                 # the comparison stars themselves, so the project can KEEP
                 # them: the Photometry tab then opens with the same sequence
                 # the run used instead of proposing a different one
@@ -1946,6 +1959,11 @@ class TrackStackWorker(QThread):
             out["ephem_mag"] = ephem.get("mag")
             out["ephem_band"] = ephem.get("band")
             out["ephem_mag_source"] = ephem.get("mag_source")
+            # what the band must report (the photometry recipe's choice): the
+            # measurement, or the ephemeris' prediction when the measurement
+            # is not worth reporting. The stack's band cards carry it.
+            out["report_mag"] = str(
+                (self._recipe or {}).get("report_mag") or "measured")
             if motion is None:
                 out.update(status="error",
                            error="no ephemeris for the object: JPL Horizons "
@@ -2392,3 +2410,93 @@ class FrameThumbWorker(QThread):
                 break
             self.sampled.emit(index, sample, facts)
         self.done.emit()
+
+
+class StackRemeasureWorker(QThread):
+    # Re-measures the BRIGHTNESS of one track & stack observation from the
+    # SAVED pair (the object's stack and the star stack) with the recipe the
+    # Photometry tab is holding RIGHT NOW. The recipe used to be captured at
+    # run time, so tuning the apertures or the comps meant re-stacking the
+    # whole visit; here the zero point and the magnitude are recomputed on the
+    # stacks that already exist. The position, the detection and the rest are
+    # untouched.
+    finished = Signal(dict)     # the photometry summary, or {"error": ...}
+
+    def __init__(self, stack_path, star_path, target_xy, entries, band,
+                 recipe=None, fwhm=None, cfg=None):
+        super().__init__()
+        self._stack_path = str(stack_path)
+        self._star_path = str(star_path) if star_path else None
+        self._target_xy = (float(target_xy[0]), float(target_xy[1]))
+        self._entries = list(entries or [])
+        self._band = band
+        self._recipe = dict(recipe or {})
+        self._fwhm = fwhm
+        self._cfg = cfg
+
+    def _get(self, key, default=None):
+        # @args: key - a config key, default - fallback when absent
+        # @return: the setting, or the default (a double without config)
+        try:
+            return self._cfg.get(key, default)
+        except Exception:
+            return default
+
+    def run(self):
+        from ..core import fits_io, photometry, wcs as wcs_mod
+        try:
+            header, image = fits_io.read_fits(self._stack_path)
+            star = None
+            if self._star_path:
+                _sh, star = fits_io.read_fits(self._star_path)
+            w = wcs_mod.Wcs.from_header(header)
+            recipe = self._recipe
+            rap, rin, rout = (recipe.get("rap"), recipe.get("rin"),
+                              recipe.get("rout"))
+            radii = ((float(rap), float(rin), float(rout))
+                     if rap and rin and rout else None)
+            cfg = photometry.PlateConfig(
+                target_xy=self._target_xy,
+                entries=self._entries,
+                comp_image=star,
+                header=header, wcs=w,
+                band=self._band, fallback_band=self._band,
+                radii=radii, fwhm=self._fwhm,
+                centroid_mode=("none" if recipe.get("manual_centre")
+                               else "gaussian"),
+                sigmaclip=bool(recipe.get("sigmaclip", True)),
+                matched=bool(recipe.get("matched",
+                                        self._get("phot_matched", True))),
+                sky_mode=recipe.get("sky") or "median",
+                color=bool(recipe.get("color", False)),
+                target_bv=float(recipe.get("target_bv") or 0.0),
+                linear_adu=self._get("cam_linearity_adu", None),
+                site_gain=self._get("ccd_gain", None),
+                site_ron=self._get("ccd_read_noise", None),
+                site_flat=self._get("flat_resid_mag", 0.007) or 0.007,
+                site_saturate=self._get("ccd_saturate", None),
+                site_lon=self._get("lon", None),
+                site_lat=self._get("lat", None),
+                site_aperture_m=float(self._get("aperture_inches", 10.0)
+                                      or 10.0) * 0.0254,
+                site_height_m=float(self._get("height", 0) or 0.0),
+                site_dark=self._get("cam_dark_current_e_s", None))
+            res = photometry.measure_plate(image, cfg)
+            if not res.ok or res.mag is None:
+                self.finished.emit({"error": "the plate could not be "
+                                    "calibrated (no usable comparison)"})
+                return
+            self.finished.emit({
+                "mag": float(res.mag),
+                "err": float(res.err_total or 0.0),
+                "band": res.band or self._band,
+                "n_comps": len([1 for e, _r in (res.used or [])
+                                if (e.get("kind") or "comp") == "comp"]),
+                "comps_skipped": dict(getattr(res, "skipped", None) or {}),
+                "check_ok": ((res.check or {}).get("ok") if res.check else None),
+                "matched_used": bool(getattr(res, "matched_used", False)),
+            })
+        except Exception as err:      # never crash the GUI on a re-measure
+            logger.warning("stack re-measure failed: %s", err)
+            self.finished.emit({"error": str(err)})
+

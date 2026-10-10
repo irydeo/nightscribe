@@ -36,6 +36,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPen
 from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
@@ -190,6 +191,29 @@ class UfeMeasureTab(QWidget):
         # measure again, changing the band for instance, the magnitude does
         # not update").
         self.cmb_band.currentIndexChanged.connect(
+            lambda _i: self._remeasure())
+
+        # WHAT THE BAND REPORTS (2026-10-10): the brightness measured on the
+        # stack, or the ephemeris' prediction for the same instant. It is
+        # part of the recipe because it decides what a reader sees over the
+        # image; the track & stack writes it into the stack's own band
+        # (NS_MAGSR) and the astrometry's point keeps the measurement.
+        self.cmb_report_mag = self._ui.cmb_report_mag
+        self.cmb_report_mag.addItem(self.tr("Measured on this stack"),
+                                    "measured")
+        self.cmb_report_mag.addItem(self.tr("Ephemeris prediction"),
+                                    "ephemeris")
+        self.cmb_report_mag.setItemData(0, self.tr(
+            "The brightness measured here (the object on its own stack, the "
+            "comps on the star stack), with its own error and quality colour. "
+            "It is what the MPC gets."), Qt.ToolTipRole)
+        self.cmb_report_mag.setItemData(1, self.tr(
+            "The ephemeris' predicted magnitude for this instant, labelled "
+            "(eph). Use it when the measurement is not worth reporting (a "
+            "zero point resting on too few comparisons, a trailed object): "
+            "the measurement is kept in the run, only the band changes."),
+            Qt.ToolTipRole)
+        self.cmb_report_mag.currentIndexChanged.connect(
             lambda _i: self._remeasure())
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
@@ -1109,6 +1133,7 @@ class UfeMeasureTab(QWidget):
             "target_bv": float(self.spn_target_bv.value()),
             "manual_centre": bool(self.chk_manual_centre.isChecked()),
             "matched": bool(self.chk_matched.isChecked()),
+            "report_mag": self.cmb_report_mag.currentData() or "measured",
         }
 
     def apply_state(self, st):
@@ -1149,6 +1174,13 @@ class UfeMeasureTab(QWidget):
             row = self.cmb_sky.findData(sky)
             if row >= 0:
                 self.cmb_sky.setCurrentIndex(row)
+        rep = st.get("report_mag")
+        if rep:
+            row = self.cmb_report_mag.findData(rep)
+            if row >= 0:
+                self.cmb_report_mag.blockSignals(True)
+                self.cmb_report_mag.setCurrentIndex(row)
+                self.cmb_report_mag.blockSignals(False)
         if st.get("target_bv") is not None:
             self.spn_target_bv.blockSignals(True)
             try:

@@ -324,6 +324,14 @@
           </property>
          </widget>
         </item>
+        <item>
+         <widget class="QPushButton" name="btn_remeasure">
+          <property name="text"><string>Re-measure the brightness</string></property>
+          <property name="toolTip">
+           <string>Measures the brightness again on the observation's stacks with the recipe the Photometry tab is holding right now (apertures, sky, comps), without re-stacking the visit. The position and the detection are untouched</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </item>
      </layout>

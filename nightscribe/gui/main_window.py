@@ -11322,6 +11322,7 @@ class MainWindow(QMainWindow):
             "ephem_mag": _scalar(payload.get("ephem_mag")),
             "ephem_band": _scalar(payload.get("ephem_band")),
             "ephem_mag_source": _scalar(payload.get("ephem_mag_source")),
+            "report_mag": _scalar(payload.get("report_mag")),
             "detection": _obj(payload.get("detection"),
                               ("detected", "snr", "x", "y", "fwhm",
                                "roundness", "mag_limit", "notes")),

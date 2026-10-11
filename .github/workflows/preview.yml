@@ -17,7 +17,6 @@ on:
   push:
     branches:
       - main
-      - feature/mpc-report   # TEMPORARY: only to trigger a run on this branch
 
 permissions:
   contents: write   # needed to publish the pre-release

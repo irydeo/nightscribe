@@ -74,6 +74,9 @@ jobs:
           grep -E "^(FAILED|ERROR) " pytest.log | head -40 | while IFS= read -r line; do
             echo "::error::${line}"
           done
+          grep -aE "ImportError|ModuleNotFoundError|cannot open shared object|No module named|libGL|libEGL|libxkb" pytest.log | sort -u | head -25 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
           exit $code
 
       - name: Resolve the version

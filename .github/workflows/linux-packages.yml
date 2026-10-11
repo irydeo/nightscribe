@@ -68,6 +68,12 @@ jobs:
             tail -25 pytest.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # Annotations ARE readable without admin rights (the raw log is
+          # not): turn each failure line into one so a red run can be
+          # diagnosed from outside.
+          grep -E "^(FAILED|ERROR) " pytest.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
           exit $code
 
       - name: Resolve the version

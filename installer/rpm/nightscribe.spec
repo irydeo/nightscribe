@@ -23,6 +23,13 @@
 # version: it is a parse error, "bad condition".)
 %define version %{?_version}%{!?_version:0.0.0}
 
+# The package ships a PREBUILT binary (`fo`, from conda-forge) that carries no
+# build-id note, and Fedora's find-debuginfo --strict-build-id refuses to
+# process it ("No build ID note found"), failing the whole build. There is
+# nothing of ours to debug in a vendored binary, so the debuginfo package is
+# disabled.
+%global debug_package %{nil}
+
 Name:           nightscribe
 Version:        %{version}
 Release:        1%{?dist}

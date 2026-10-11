@@ -163,8 +163,15 @@ jobs:
           tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \
             --exclude=.venv --exclude=.git --exclude=dist --exclude=rpmbuild \
             --transform "s,^\.,nightscribe-$ver," .
+          set +e
           rpmbuild -bb --define "_version $ver" \
-            --define "_topdir $top" installer/rpm/nightscribe.spec
+            --define "_topdir $top" installer/rpm/nightscribe.spec > rpm.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            # The log is not readable without admin rights: surface it.
+            tail -50 rpm.log | while IFS= read -r line; do echo "::error::${line}"; done
+            exit $code
+          fi
           mkdir -p dist
           find "$top/RPMS" -name '*.rpm' -exec cp {} dist/ \;
           ls -la dist
@@ -198,7 +205,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ls -la dist || true
-          if ! ls dist/*.deb dist/*.rpm >/dev/null 2>&1; then
+          # Publish whatever exists: a broken .rpm must not throw away a good
+          # .deb (the earlier guard demanded BOTH and published nothing).
+          files=$(ls dist/*.deb dist/*.rpm 2>/dev/null || true)
+          if [ -z "$files" ]; then
             echo "no package was built; nothing to publish"
             exit 0
           fi
@@ -216,4 +226,4 @@ jobs:
 
           gh release create "$tag" --target "${GITHUB_SHA}" --prerelease \
             --title "Linux preview ${{ github.ref_name }} ($sha)" \
-            --notes "$notes" dist/*.deb dist/*.rpm
+            --notes "$notes" $files

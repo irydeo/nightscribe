@@ -33,17 +33,12 @@ URL:            https://github.com/irydeo/nightscribe
 # The source tarball is assembled by the CI (this spec is built from the
 # checked-out tree); %{SOURCE0} points at it.
 Source0:        %{name}-%{version}.tar.gz
-BuildArch:      noarch
 BuildRequires:  python3-devel
+# imageio-ffmpeg is OPTIONAL: it only powers the MP4 animation export, and
+# Fedora does not package it. Without it the GIF and the montage keep working.
+Recommends:     python3dist(imageio-ffmpeg)
 
 %description
-NightScribe plans the night's best targets, captures and reduces the images
-(calibration, track & stack astrometry, photometry) and drafts the report and
-the social post.
-
-%package -n %{name}
-Recommends:     python3dist(imageio-ffmpeg)
-%description -n %{name}
 NightScribe plans the night's best targets, captures and reduces the images
 (calibration, track & stack astrometry, photometry) and drafts the report and
 the social post.

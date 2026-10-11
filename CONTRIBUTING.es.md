@@ -20,19 +20,22 @@
 ## Traducciones (GUI)
 
 ```bash
-# nota: lista las fuentes explícitamente — escanear el directorio omitiría los .py
-# (y las cartas vectoriales viven en gui/widgets/ — si las dejas fuera,
-# lupdate marca sus cadenas "vanished" y los tests de i18n fallan)
-# core/kinds.py y core/db.py llevan cadenas de runtime (NSKinds, NSMigrations),
-# no tr() de widgets, así que también hay que listarlas aquí
-pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
-    nightscribe/core/kinds.py nightscribe/core/db.py \
-    nightscribe/gui/ui/*.ui \
-    -ts nightscribe/gui/i18n/nightscribe_es.ts \
-    nightscribe/gui/i18n/nightscribe_en.ts
+# recompila los catálogos: lupdate + lrelease ATÓMICO (ver más abajo)
+.venv/bin/python tools/i18n.py
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # traduce
-pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compila .qm
+.venv/bin/python tools/i18n.py --release-only              # recompila .qm
 ```
+
+`tools/i18n.py` ejecuta `lupdate` con la misma lista de fuentes que antes
+(los `.py` de `gui/` y `gui/widgets/`, `core/kinds.py`, `core/db.py` y los
+`.ui`) y luego compila cada `.qm` **atómicamente**: escribe a un temporal en la
+misma carpeta y lo renombra sobre el destino. Nunca lo hagas con el comando
+crudo de `lrelease` mientras la app está abierta: `QTranslator` **mapea el
+`.qm` en memoria**, y reescribirlo en su sitio invalida el mapeo de una sesión
+abierta, que se cae en la siguiente traducción (fue un core dump real de la GUI,
+2026-10-10). La app, además, carga el `.qm` **desde memoria** (sin mmap), así que
+una recompilación ya no puede tumbarla; el rename atómico protege a cualquier
+otra app que lo tenga mapeado.
 
 El inglés es el idioma base del código; el español es una traducción. Los tests
 fallan si queda alguna cadena `unfinished`.

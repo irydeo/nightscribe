@@ -243,11 +243,16 @@ def build_boxes(name=None, meta=None, wcs_info=None, site=None,
 
 def site_from_config(cfg):
     # @args: cfg - the app config (or any mapping with .get)
-    # @return: the site dict build_boxes expects, from the config keys
+    # @return: the site dict build_boxes expects, from the config keys. The
+    #          telescope is BUILT (aperture + type + f/) when the free text is
+    #          empty, so the boxes and the band always have it: it is the same
+    #          line the MPC report carries (2026-10-11).
+    from . import mpc_astrometry
+    ctx = mpc_astrometry.report_context(cfg)
     return {"observer": cfg.get("observer_name", ""),
             "measurer": cfg.get("measurer_name", ""),
             "station": cfg.get("mpc_code", ""),
-            "telescope": cfg.get("telescope_desc", ""),
+            "telescope": ctx.tel_body(),
             "camera": cfg.get("camera_model", "")}
 
 
@@ -276,9 +281,10 @@ ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
 
 # The context fields, in the order they are DROPPED when the band runs out
 # of room: the least report-critical first and the date last (a chart
-# without a date is not a chart). The renderer walks this list, never a
-# half-drawn field.
-DROP_ORDER = ("fov", "psc", "equip", "filter", "stn", "date")
+# without a date is not a chart). The camera goes before the telescope and
+# the station: the rig that took the plate is a report datum. The renderer
+# walks this list, never a half-drawn field.
+DROP_ORDER = ("fov", "psc", "equip", "filter", "stn", "tel", "date")
 # ... and the identity line, when even that does not fit: the motion goes
 # first (it is the story, not the identity), then the magnitude, and only
 # then is the position elided. The name is never dropped.
@@ -355,37 +361,41 @@ def magnitude_role(measured):
 MAX_EQUIP_CHARS = 10
 
 
-def equipment_from_header(header, cfg=None):
-    # The kit that took THIS plate, preferred over the observer's own
-    # Settings: a colleague's frame says SXV-H18, and stamping the
-    # observer's camera on it would be a lie. And the two are never MIXED
-    # (his camera with my telescope would be a worse lie than either): if
-    # the header names any of it, the header is the whole answer, and the
-    # Settings are only the fallback for a frame that says nothing.
+def camera_from_header(header, cfg=None):
+    # The camera that took THIS plate, preferred over the observer's own
+    # Settings: a colleague's frame says SXV-H18, and stamping the observer's
+    # camera on it would be a lie.
     # @args: header - the plate's FITS header dict, cfg - the app config
-    # @return: "SXV-H18" / "SXV-H18 · 0.2 m SCT" / "ASI2600 · 0.25 m" / None
+    # @return: "SXV-H18" / "ASI2600" (capped), or None
     header = header or {}
-    cfg = cfg or {}
+    camera = ""
+    for key in ("INSTRUME", "CAMERA"):
+        camera = str(header.get(key) or "").strip()
+        if camera:
+            break
+    if not camera:
+        camera = str((cfg or {}).get("camera_model") or "").strip()
+    if len(camera) > MAX_EQUIP_CHARS:
+        # cut at the cap and never leave a dangling separator
+        camera = camera[:MAX_EQUIP_CHARS - 1].rstrip(" ·") + "…"
+    return camera or None
 
-    def pick(keys):
-        for key in keys:
-            value = str(header.get(key) or "").strip()
-            if value:
-                return value
-        return ""
 
-    camera = pick(("INSTRUME", "CAMERA"))
-    telescope = pick(("TELESCOP",))
-    if not camera and not telescope:
-        camera = str(cfg.get("camera_model") or "").strip()
-        telescope = str(cfg.get("telescope_desc") or "").strip()
-    parts = [p for p in (camera, telescope) if p]
-    text = " · ".join(parts)
-    if len(text) > MAX_EQUIP_CHARS:
-        # cut at the cap and never leave a dangling separator: "ASI2600 ·…"
-        # reads like a typo, "ASI2600…" reads like a cut name
-        text = text[:MAX_EQUIP_CHARS - 1].rstrip(" ·") + "…"
-    return text or None
+def telescope_from_header(header, cfg=None):
+    # The telescope that took THIS plate. The plate's own header wins (the
+    # same reason as the camera: a colleague's frame must not wear the
+    # observer's rig); the Settings are the fallback, and the line is BUILT
+    # from the aperture, the type and the focal ratio the same way the MPC
+    # report builds its TEL line, so the band and the report cannot disagree
+    # (2026-10-11).
+    # @args: header - the plate's FITS header dict, cfg - the app config
+    # @return: "0.43-m f/4.9 reflector", "0.2 m SCT", or None
+    header = header or {}
+    value = str(header.get("TELESCOP") or "").strip()
+    if value:
+        return value
+    from . import mpc_astrometry
+    return mpc_astrometry.report_context(cfg).tel_body() or None
 
 
 def _seg(text, role, field):
@@ -396,9 +406,9 @@ def _seg(text, role, field):
 
 
 def build_band(name=None, meta=None, wcs_info=None, measured=None,
-               catalog_mag=None, equipment=None, site=None, target=None,
-               motion=None, measured_pos=None, predicted_mag=None,
-               detection=None):
+               catalog_mag=None, equipment=None, telescope=None, site=None,
+               target=None, motion=None, measured_pos=None,
+               predicted_mag=None, detection=None):
     # The plate's heading, as two lines of segments.
     # @args: name - object name (always shown when known),
     #        meta - fits_meta.meta_from_header dict (date_obs, exptime_s,
@@ -406,8 +416,9 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
     #        "dec_deg", "scale_arcsec_px", "fov_arcmin": (w, h)} or None
     #        when the plate is not solved, measured - a calibration of this
     #        plate (see magnitude_role), catalog_mag - the project's/catalog
-    #        magnitude or None, equipment - see equipment_from_header,
-    #        site - see site_from_config (only the station is shown),
+    #        magnitude or None, equipment - the camera (camera_from_header),
+    #        telescope - the telescope (telescope_from_header), site - see
+    #        site_from_config (only the station is shown),
     #        target - (ra_deg, dec_deg) of the object, for the case where
     #        there is no solution to place it on the plate, motion -
     #        {"rate_arcsec_min", "pa_deg", "measured"} of the object's
@@ -495,6 +506,11 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
         context.append(_seg(filt, ROLE_CONTEXT, "filter"))
     if equipment:
         context.append(_seg(str(equipment), ROLE_CONTEXT, "equip"))
+    if telescope:
+        # The telescope is its own datum, separate from the camera: the two
+        # used to be glued into one 10-character segment and the telescope was
+        # the half that got cut (2026-10-11). The label says which is which.
+        context.append(_seg(f"Tel {telescope}", ROLE_CONTEXT, "tel"))
     if (site.get("station") or "").strip():
         context.append(_seg(f"Stn {site['station'].strip()}", ROLE_CONTEXT,
                             "stn"))

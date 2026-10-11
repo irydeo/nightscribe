@@ -691,7 +691,9 @@ def test_generating_the_report_shows_why_an_observation_was_left_out(
     tab._sections["notes"].setCollapsed(False)
     assert tab.txt_notes.isVisibleTo(tab)
     text = tab.txt_notes.toPlainText()
-    assert "left out" in text and "6.0" in text
+    # 2026-10-10: the floor WARNS, it does not drop. The low-SNR observation
+    # is IN the report and the note says the app does not recommend sending it.
+    assert "6.0" in text and "does not recommend" in text
     # the box is shared with the run notes, as it was before the rename
     assert "the run's own notes" not in text
 
@@ -1116,15 +1118,20 @@ def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
     # limit (and pushes the rest of the column out) or it clips its lines.
     # The run's notes and the check's verdict are read-only text boxes with
     # a floor and a ceiling and their own scrollbar, so they are always
-    # readable and never eat the panel. The report's box gets a floor too.
+    # readable and never eat the panel. The report's box lives in its own
+    # window now (ADR-080), so the panel does not carry it any more.
     from PySide6.QtWidgets import QPlainTextEdit
     tab, _host = _tab(qapp, tmp_path)
-    for name in ("txt_notes", "txt_check", "txt_report"):
+    for name in ("txt_notes", "txt_check"):
         box = getattr(tab, name, None) or getattr(tab._ui, name, None)
         assert isinstance(box, QPlainTextEdit), name
         assert box.isReadOnly(), name
         assert box.minimumHeight() >= 70, name      # a floor to read from
         assert box.maximumHeight() <= 200, name     # a ceiling to live with
+    # the report's box is a read-only box in its own window, with room to read
+    assert isinstance(tab.txt_report, QPlainTextEdit)
+    assert tab.txt_report.isReadOnly()
+    assert tab.txt_report.minimumHeight() >= 70
     # the notes keep their own height whatever the text says
     tab.txt_notes.setVisible(True)
     tab.txt_notes.setPlainText("\n".join("• note %d" % i for i in range(40)))
@@ -2181,14 +2188,12 @@ def test_the_calibration_button_opens_the_window_not_a_tab(qapp, tmp_path):
     d.deleteLater()
 
 
-def test_the_report_says_what_came_out_and_never_sends_nothing(qapp,
-                                                               tmp_path):
-    # Reported 2026-10-06: a 2025 FG18 sequence with two observations
-    # "generated nothing". Measured: both were below the MPC submission floor
-    # (SNR 20 by default), so the generator returned the format's header and
-    # no data lines, and the reason lived in a group that is closed by
-    # default. Now the report's own group says it, the send button refuses an
-    # empty report and the notes group is marked.
+def test_the_report_includes_everything_and_warns_about_the_floor(qapp,
+                                                                  tmp_path):
+    # 2026-10-10: the floor RECOMMENDS, it does not filter. A sequence whose
+    # two observations are both below the floor still produces a report with
+    # both lines; the app says it does not recommend sending the marginal ones
+    # and the decision is the observer's.
     from nightscribe.core import astrometry
     tab, _host = _tab(qapp, tmp_path)
 
@@ -2206,16 +2211,164 @@ def test_the_report_says_what_came_out_and_never_sends_nothing(qapp,
     from nightscribe.config import config
     floor = int(float(config.get("astrometry_submit_snr", 20.0)))
     assert floor > 6                          # this test needs it below
-    run(6.0)                                  # below the floor: no report
-    assert "None of the 2 observations" in tab.lbl_report_note.text()
-    assert f"SNR {floor}" in tab.lbl_report_note.text()
-    assert tab.btn_send_mpc.isEnabled() is False
-    assert tab._sections["notes"].notice() is not None
-    assert "SNR 6.0" in tab.txt_notes.toPlainText()
-    run(25.0)                                 # above it: a report to send
-    assert tab.lbl_report_note.text() == "2 of 2 observations are in the report."
+    run(6.0)                                  # below the floor: kept + warned
+    assert tab.lbl_report_note.text() == \
+        "2 of 2 observations are in the report."
     assert tab.btn_send_mpc.isEnabled() is True
+    assert "SNR 6.0" in tab.txt_notes.toPlainText()
+    assert "does not recommend" in tab.txt_notes.toPlainText()
     assert tab.txt_report.toPlainText().count("\n") >= 2   # header + rows
+    run(25.0)                                 # above it: no warning, same lines
+    assert tab.lbl_report_note.text() == \
+        "2 of 2 observations are in the report."
+    assert tab.btn_send_mpc.isEnabled() is True
+
+
+def test_unchecking_an_observation_excludes_it_from_the_report(
+        qapp, tmp_path, monkeypatch):
+    # 2026-10-10: the observer decides. The first column of the points table
+    # is a checkbox; unchecking it takes the observation out of the report and
+    # the check, and checking it puts it back. The measurement is never
+    # deleted, and the check is re-run (debounced) so the listing stays true.
+    from PySide6.QtCore import Qt
+    from nightscribe.config import config
+    from nightscribe.core import astrometry
+    monkeypatch.setitem(config._data, "mpc_code", "Z41")
+    tab, host = _tab(qapp, tmp_path)
+    saved = []
+    host.set_point_excluded = \
+        lambda rid, gi, exc: saved.append((rid, gi, exc))
+    tab._run_id = 7
+    monkeypatch.setattr(tab, "_on_recheck", lambda: None)
+    good = astrometry.AstrometryPoint(
+        ra=322.0, dec=-12.0, rms_ra=0.2, rms_dec=0.2, mag=18.0, band="G",
+        snr=35.0, n_frames=5, group_index=0, mjd=59288.5)
+    weak = astrometry.AstrometryPoint(
+        ra=322.0, dec=-12.0, rms_ra=0.2, rms_dec=0.2, mag=18.0, band="G",
+        snr=6.0, n_frames=5, group_index=1, mjd=59288.6)
+    tab._result = {"status": "ok", "points": [(good, None, []),
+                                              (weak, None, [])],
+                   "check": None}
+    tab._fill_points()
+    tab._on_report()
+    assert tab._report_kept == 2
+    # the checkbox starts checked: everything goes in by default
+    assert tab.tbl_points.item(1, 0).checkState() == Qt.Checked
+
+    # uncheck the second observation: out of the report, flagged, saved
+    tab.tbl_points.item(1, 0).setCheckState(Qt.Unchecked)
+    assert saved == [(7, 1, True)]
+    sp, _fp, flags = tab._result["points"][1]
+    assert "user_excluded" in flags and "user_excluded" in sp.flags
+    assert tab._report_kept == 1
+    assert tab.tbl_points.item(1, 0).checkState() == Qt.Unchecked
+    assert tab._recheck_timer.isActive()      # the check will be re-run
+    tab._recheck_timer.stop()
+
+    # put it back: it returns to the report and the flag is gone
+    tab.tbl_points.item(1, 0).setCheckState(Qt.Checked)
+    assert saved[-1] == (7, 1, False)
+    sp, _fp, flags = tab._result["points"][1]
+    assert "user_excluded" not in flags
+    assert "user_excluded" not in sp.flags
+    assert tab._report_kept == 2
+    tab._recheck_timer.stop()
+
+
+# ------------------------------------- the report window and the send (ADR-080)
+
+def _report_tab(qapp, tmp_path, monkeypatch, **cfg):
+    # @return: (tab, host) with a one-point run and the observer's own header
+    #          details in the config
+    from nightscribe.config import config
+    from nightscribe.core import astrometry
+    base = {"mpc_code": "Z41", "observer_name": "F. Calvo",
+            "observer_email": "obs@example.org", "telescope_type": "reflector",
+            "telescope_focal_ratio": 4.9, "aperture_inches": 16.9,
+            "camera_type": "CMOS", "astrometry_astcat": "Gaia3E"}
+    base.update(cfg)
+    for key, value in base.items():
+        monkeypatch.setitem(config._data, key, value)
+    tab, host = _tab(qapp, tmp_path)
+    pt = astrometry.AstrometryPoint(
+        ra=322.0, dec=-12.0, rms_ra=0.2, rms_dec=0.2, mag=18.0, band="G",
+        snr=35.0, n_frames=5, group_index=0, mjd=59288.5)
+    tab._result = {"status": "ok", "points": [(pt, None, [])], "check": None}
+    tab._sync_report_buttons()
+    return tab, host
+
+
+def test_the_report_opens_in_its_own_window_with_the_full_header(
+        qapp, tmp_path, monkeypatch):
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    assert tab.btn_report.isEnabled()
+    # the MPC 1992 shape is the one that carries the header lines
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    tab.btn_report.click()
+    assert not tab._report_dialog.isHidden()
+    text = tab.txt_report.toPlainText()
+    assert text.splitlines()[0] == "COD Z41"
+    assert "CON F. Calvo" in text
+    assert "TEL 0.43-m f/4.9 reflector + CMO" in text
+    assert "AC2 obs@example.org" in text
+    assert text.rstrip().endswith("----- end -----")
+    # the format selector rebuilds in the other shape, in the window
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("xml"))
+    assert tab.txt_report.toPlainText().startswith('<?xml version="1.0"')
+    assert "<mpcCode>Z41</mpcCode>" in tab.txt_report.toPlainText()
+
+
+def test_the_send_dialog_blocks_without_the_contact_email(
+        qapp, tmp_path, monkeypatch):
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch,
+                             observer_email="")
+    tab._on_report()
+    tab._open_send_dialog()
+    assert tab._send_dialog.btn_send.isEnabled() is False
+    assert "contact email" in tab._send_dialog.lbl_missing.text()
+    # with the email, the door opens
+    tab._send_dialog.edt_ack_email.setText("obs@example.org")
+    tab._refresh_send_gate()
+    assert tab._send_dialog.btn_send.isEnabled() is True
+    assert tab._send_dialog.lbl_missing.text() == ""
+
+
+def test_the_send_builds_the_report_with_the_ack_and_target(
+        qapp, tmp_path, monkeypatch):
+    from nightscribe.gui import workers
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    tab._on_report()
+    tab._open_send_dialog()
+    tab._send_dialog.edt_ack_email.setText("obs@example.org")
+    tab._send_dialog.edt_ack.setText("batch 1")
+    tab._send_dialog.cmb_target.setCurrentIndex(
+        tab._send_dialog.cmb_target.findData("NEOCP"))
+    tab._refresh_send_gate()
+    started = {}
+
+    class _Sig:
+        def connect(self, _fn):
+            pass
+
+    class _Worker:
+        finished = _Sig()
+
+        def __init__(self, *args, **kwargs):
+            started["args"] = args
+            started["kwargs"] = kwargs
+
+        def start(self):
+            started["started"] = True
+
+    monkeypatch.setattr(workers, "MpcSubmitWorker", _Worker)
+    tab._on_mpc_submit()
+    assert started["started"] is True
+    assert started["kwargs"]["obj_type"] == "NEOCP"
+    assert started["kwargs"]["ack"] == "batch 1"
+    # the report that goes out carries the target keyword on its ACK line
+    assert "NEOCP" in started["args"][1]
+    assert tab._submission == {"ack": "batch 1", "obj_type": "NEOCP"}
 
 
 def test_the_run_says_which_method_measured_the_brightness(qapp, tmp_path):
@@ -2389,3 +2542,136 @@ def test_a_saved_check_still_says_configure_it_when_findorb_is_missing(
     monkeypatch.setattr(findorb, "probe", lambda path=None: (None, "no"))
     tab._fill_check()
     assert "Set it up in Settings" in tab.txt_check.toPlainText()
+
+
+# ------------------------------------- the listing, the rename, the re-check
+
+def test_the_check_lists_the_published_observations(qapp, tmp_path):
+    # The observer asked to SEE their error next to the others', the way
+    # Find_Orb shows it: the whole published list, ours highlighted. The
+    # listing lives in its own window (ADR-077), so the check block shows the
+    # button that opens it and the table is filled and ready inside.
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"status": "ok", "points": [(object(), None, [])],
+                   "check": findorb.CheckReport(
+                       available=True, n_obs=3, n_stations=3,
+                       our_residual=(-0.2, 0.1),
+                       residuals=[
+                           {"stn": "I41", "iso": "2026-10-09T21:07:30",
+                            "ra": 33.0, "dec": 35.0, "dra": 0.2, "ddec": 0.3,
+                            "ours": False},
+                           {"stn": "Z41", "iso": "2026-10-09T21:59:29",
+                            "ra": 33.36, "dec": 35.42, "dra": -0.2,
+                            "ddec": 0.1, "ours": True},
+                           {"stn": "F51", "iso": "2026-10-09T22:10:00",
+                            "ra": 33.5, "dec": 35.5, "dra": 0.1, "ddec": -0.1,
+                            "ours": False}])}
+    tab._fill_check()
+    assert not tab.btn_residuals.isHidden()
+    tbl = tab._residuals_dialog.tbl_residuals
+    assert tbl.rowCount() == 3
+    # our row is there, and it is the bold one
+    assert tbl.item(1, 2).text() == "Z41"
+    assert tbl.item(1, 0).font().bold()
+    assert not tbl.item(0, 0).font().bold()
+    # a signed residual, so which way it missed is never lost
+    assert tbl.item(1, 5).text().startswith("-")
+
+
+def test_no_residuals_hides_the_button(qapp, tmp_path):
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=True, no_reference=True)}
+    tab._fill_check()
+    assert tab.btn_residuals.isHidden()
+
+
+def test_the_listing_opens_in_a_non_modal_window(qapp, tmp_path):
+    # The button opens the published listing, and the window is NON-MODAL
+    # (ADR-077): the observer keeps working with it open, and re-clicking
+    # brings the same window back instead of stacking a second copy.
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=True, n_obs=1, residuals=[
+            {"stn": "Z41", "iso": "2026-10-09T21:59:29", "ra": 33.36,
+             "dec": 35.42, "dra": -0.2, "ddec": 0.1, "ours": True}])}
+    tab._fill_check()
+    dlg = tab._residuals_dialog
+    assert dlg.isModal() is False
+    assert dlg.isHidden()
+    tab.btn_residuals.click()
+    assert not dlg.isHidden()
+    # re-clicking does not build a second window
+    tab.btn_residuals.click()
+    assert tab._residuals_dialog is dlg
+
+
+def test_a_new_visit_closes_the_listing_and_its_button(qapp, tmp_path):
+    # The list belonged to the run being replaced: a stale table reads as the
+    # current comparison, so the door goes with the visit (and with a new run).
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=True, residuals=[
+            {"stn": "Z41", "iso": "2026-10-09T21:59:29", "ra": 33.36,
+             "dec": 35.42, "dra": -0.2, "ddec": 0.1, "ours": True}])}
+    tab._fill_check()
+    tab.btn_residuals.click()
+    assert not tab._residuals_dialog.isHidden()
+    # the visit goes away: the invalidation closes the window and its button
+    tab._context = lambda: {}
+    tab._sync_context()
+    assert tab._residuals_dialog.isHidden()
+    assert tab.btn_residuals.isHidden()
+
+
+def test_the_rename_notice_names_the_new_designation(qapp, tmp_path):
+    # The object was observed while on the confirmation page and confirmed
+    # since: the new name and the circular are shown, and the fact that our
+    # data is in it.
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)   # the visit's object is "2026 QX"
+    tab._result = {"check": findorb.CheckReport(
+        available=True, no_reference=True, n_obs=0,
+        resolved_desig="2026 TQ8", mpec="MPEC 2026-T201",
+        mpec_url="https://www.minorplanetcenter.net/mpec/K26/K26TK1.html",
+        ours_published=True)}
+    tab._fill_check()
+    assert not tab.lbl_rename.isHidden()
+    text = tab.lbl_rename.text()
+    assert "2026 TQ8" in text and "MPEC 2026-T201" in text
+    assert "data is in that MPEC" in text
+
+
+def test_no_rename_notice_when_the_name_has_not_changed(qapp, tmp_path):
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=True, resolved_desig="2026 QX")}
+    tab._fill_check()
+    assert tab.lbl_rename.isHidden()
+
+
+def test_recheck_is_armed_only_with_a_measured_point(qapp, tmp_path):
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(
+        available=True, no_reference=True)}
+    tab._fill_check()
+    assert tab.btn_recheck.isEnabled() is False
+    tab._result["points"] = [(object(), None, [])]
+    tab._fill_check()
+    assert tab.btn_recheck.isEnabled() is True
+
+
+def test_no_fit_is_said_in_plain_language(qapp, tmp_path):
+    # "Find_Orb produced no residuals" was the old, misleading wording: it
+    # hid that the published arc was simply too short to fit.
+    from nightscribe.core import findorb
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"check": findorb.CheckReport(available=True, no_fit=True)}
+    tab._fill_check()
+    assert "too short an arc" in tab.txt_check.toPlainText()

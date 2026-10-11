@@ -737,6 +737,17 @@ def test_suggest_without_a_measurement_guides(dlg):
     assert "Measure the target first" in dlg.tab_measure.lbl_status.text()
 
 
+def test_the_recipe_says_what_the_band_reports(dlg):
+    # Point 2: the recipe carries what the band over the image shows, the
+    # measurement or the ephemeris' prediction. It defaults to the
+    # measurement and follows the combo.
+    tab = dlg.tab_measure
+    assert tab.capture_state()["report_mag"] == "measured"
+    tab.cmb_report_mag.setCurrentIndex(
+        tab.cmb_report_mag.findData("ephemeris"))
+    assert tab.capture_state()["report_mag"] == "ephemeris"
+
+
 def _innermost_row_of(tab, target):
     # the nearest layout that holds `target`, walking the tab's layout
     # tree (rows are QHBoxLayouts nested in the main QVBoxLayout). It

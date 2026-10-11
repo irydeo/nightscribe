@@ -322,32 +322,54 @@ def test_the_drop_order_goes_from_the_least_to_the_most_needed():
     # (a chart without a date is not a chart), and never half a field. On
     # the identity line the motion goes first (it is the story, not who the
     # plate is), then the magnitude, and the position is the last to go.
-    assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "date")
+    # The telescope is a report datum, so it survives longer than the camera.
+    assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "tel",
+                             "date")
     assert ca.DROP_ORDER_NAME == ("motion", "mag", "pos")
 
 
-def test_the_equipment_comes_from_the_plate_not_from_my_settings():
-    # A colleague's frame says SXV-H18: stamping the observer's own camera
-    # on it would be a lie, and MIXING the two (his camera with my
-    # telescope) would be a worse one. If the header names any of it, the
-    # header is the whole answer; the Settings are only for a frame that
-    # says nothing at all.
-    cfg = {"camera_model": "ASI2600", "telescope_desc": "0.25 m"}
-    assert ca.equipment_from_header({"INSTRUME": "SXV-H18"}, cfg) == \
-        "SXV-H18"
-    assert ca.equipment_from_header({}, {}) is None
+def test_the_camera_comes_from_the_plate_not_from_my_settings():
+    # A colleague's frame says SXV-H18: stamping the observer's own camera on
+    # it would be a lie. The header wins; the Settings are only for a frame
+    # that says nothing.
+    cfg = {"camera_model": "ASI2600"}
+    assert ca.camera_from_header({"INSTRUME": "SXV-H18"}, cfg) == "SXV-H18"
+    assert ca.camera_from_header({}, {}) is None
     # the field is capped: a chart needs the rig, not its serial number, and
     # a 31-character camera name was eating the field of view out of the
     # band. A name that fits stays whole; a longer one is cut, never leaving
     # a dangling separator. The full value stays in the header.
-    assert ca.equipment_from_header({}, cfg) == "ASI2600…"
-    assert ca.equipment_from_header({"INSTRUME": "SXV-H18",
-                                     "TELESCOP": "0.2 m SCT"}, cfg) == \
-        "SXV-H18…"
-    long_name = ca.equipment_from_header(
+    assert ca.camera_from_header({}, cfg) == "ASI2600"
+    long_name = ca.camera_from_header(
         {"INSTRUME": "QHY42PRO-1d74db4888698d84c-QHYCCD"}, {})
     assert long_name == "QHY42PRO-…"
     assert len(long_name) <= ca.MAX_EQUIP_CHARS
+
+
+def test_the_telescope_comes_from_the_plate_or_is_built():
+    # The telescope is its own datum now (2026-10-11). The plate's TELESCOP
+    # wins; without it the Settings build the line the same way the MPC
+    # report builds its TEL line, so the band and the report agree.
+    assert ca.telescope_from_header(
+        {"TELESCOP": "0.2 m SCT"}, {}) == "0.2 m SCT"
+    cfg = {"aperture_inches": 16.9, "telescope_type": "reflector",
+           "telescope_focal_ratio": 4.9}
+    assert ca.telescope_from_header({}, cfg) == "0.43-m f/4.9 reflector"
+    assert ca.telescope_from_header({}, {}) is None
+
+
+def test_the_band_shows_the_telescope_as_its_own_datum():
+    # The camera and the telescope are two segments: glued into one 10-char
+    # segment, the telescope was the half that got cut.
+    band = ca.build_band(name="X", equipment="SXV-H18",
+                         telescope="0.43-m f/4.9 reflector",
+                         site={"station": "Z41"})
+    second = band["lines"][1]
+    fields = [s["field"] for s in second]
+    assert "equip" in fields and "tel" in fields
+    tel = [s for s in second if s["field"] == "tel"][0]
+    assert tel["text"] == "Tel 0.43-m f/4.9 reflector"
+    assert tel["role"] == ca.ROLE_CONTEXT
 
 
 def test_a_band_with_nothing_to_say_is_an_empty_identity_line():

@@ -155,7 +155,11 @@ project). No visit, no series: that is the house rule.
    before this: the app published PA 33 where the ephemeris says 41.8
    (2025 HL5) and 37 where it says 46.2 (2025 FG18), exactly one grid step.
    When the sweep does not improve on the ephemeris, the reported rate and PA
-   are the ephemeris' prediction and the note says so.
+   are the ephemeris' prediction and the note says so. The object's own
+   **trail** on the base stack also **seeds** the sweep: the measured trail
+   (its length and its PA) gives two candidate motions, one per sign, and they
+   are scored like the rest; the same three-sigma guard applies, so a noisy
+   trail cannot move the motion.
 5. **Centred sequence.** A GIF or a montage of the N observations, all
    centred on the object: if it is there in every panel the detection is
    solid; if one panel is empty, you see it. The tab also carries a **strip
@@ -195,7 +199,15 @@ project). No visit, no series: that is the house rule.
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your
    residual with the others' cloud. Outside the cloud, the report is
-   blocked by default.
+   blocked by default. It also **shows the whole list**: every published
+   observation Find_Orb used, with the instant, the station, the direction
+   and its residual in right ascension and declination, **your rows
+   highlighted**. When the check cannot run it says why in plain words (no
+   Find_Orb, no published observations yet, or a reference arc too short to
+   fit), and none of those blocks the report. If the object was **confirmed
+   under a new name** since the visit, the app finds it on its own, checks
+   under the new name and shows the new designation and the circular that
+   published it, with the note that your data is in it.
 9. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
    validated with the same validator as always and sent to the visit's MPC
    block. You do the sending.
@@ -237,7 +249,18 @@ project). No visit, no series: that is the house rule.
     measured from your mark: the mark is your signature and it travels with
     the figure. The red cross of the measured position stays on the plate: it
     is anchored to the sky, so it survives loading another image of the series
-    and switching to the Photometry tab.
+    and switching to the Photometry tab. On a track & stack the **project's own
+    object mark is switched off**: the stack already carries the run's measured
+    position, and two marks (at the plan's coordinates and at the measured ones)
+    read as an error. The top-bar toggle brings it back if you want it.
+12. **Tune the brightness without re-stacking.** The Photometry tab's recipe
+    (apertures, sky, comps, and what the band reports) used to be frozen when
+    the run started, so changing it meant re-stacking the whole visit. The
+    Astrometry tab now has **Re-measure the brightness**: it re-runs the recipe
+    on the **saved stacks** of the observation on stage (the object's and the
+    star's) and rewrites only the stack's band. The position and the detection
+    are untouched. It needs the run to have kept the **star stack** (the box in
+    the panel); without it the button says so.
 
 ## 4. What each figure means
 
@@ -264,7 +287,9 @@ project). No visit, no series: that is the house rule.
   number and where it is set, and the button that sends the report stays
   disabled: a report with no observations is not a report.
 - **Residual**: how far your measurement is from what the orbit predicts,
-  in arcseconds.
+  in arcseconds. The block also lists **every published observation** with
+  its own residual (dRA / dDec), so your figure sits next to everyone
+  else's; your rows are highlighted.
 - **Scatter of the others**: how far they are. It is the fair scale: with a
   bad orbit every residual is large, and what matters is whether you are
   **outside the cloud**, not how far you are from zero.
@@ -278,6 +303,16 @@ project). No visit, no series: that is the house rule.
   behind it, and with its error. The star stack also brings a **check
   star**: if it leaves its catalogue value, the night did not behave and
   the run says so.
+  When the zero point rests on **too few comps** the run says **why** the
+  others were dropped (off the plate, saturated, non-linear, no positive flux,
+  no catalogue value) and warns that the large error is the honest consequence
+  of a thin sequence: a big error stops looking like a bug and becomes a figure
+  with a cause.
+  What the band **reports** is a choice of the **photometry recipe** (Photometry
+  tab): the **measurement** or the **ephemeris' prediction**. A measurement not
+  worth reporting (too few comps, a trailed object) is replaced by the labelled
+  `(eph)` figure without hiding it: the measurement stays in the run and in the
+  astrometry point.
 - **Distinct observatories and last observation** (on the object card):
   many and recent means a live, well-determined object; one and months ago,
   a candidate to be lost.

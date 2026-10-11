@@ -390,6 +390,81 @@ class MpcResolveWorker(QThread):
         self.finished.emit(info)
 
 
+class FindOrbRecheckWorker(QThread):
+    # Re-runs the Find_Orb check on ALREADY measured points, without
+    # stacking the frames again. The observer asked for it: when the object
+    # was confirmed under a new name since the visit the automatic lookup
+    # finds it, but the rolling NEOCP list is short and the designation can
+    # also be typed by hand. Only the MPC round trip and Find_Orb run here.
+    finished = Signal(object)       # the CheckReport, or None on failure
+
+    def __init__(self, ours_lines, desig, cfg=None, obs_code=""):
+        super().__init__()
+        self._ours = ours_lines
+        self._desig = desig
+        self._cfg = cfg
+        self._obs_code = obs_code
+
+    def run(self):
+        from ..core import findorb
+        try:
+            report = findorb.check(self._ours, self._desig, self._cfg,
+                                   obs_code=self._obs_code)
+        except Exception as err:      # network never crashes the GUI
+            logger.warning("Find_Orb re-check failed: %s", err)
+            report = None
+        self.finished.emit(report)
+
+
+class MpcAliasWorker(QThread):
+    # Looks up whether a NEOCP object was CONFIRMED under a new name since
+    # the visit (A11HPKO -> 2026 TQ8), off the GUI thread. It is cached by
+    # the source, so opening the same project does not hammer the MPC.
+    finished = Signal(dict)         # {"designation","mpec","mpec_url"} or {}
+
+    def __init__(self, name):
+        super().__init__()
+        self._name = name
+
+    def run(self):
+        from ..core.sources import mpc_obs
+        try:
+            hit = mpc_obs.resolve_neocp_alias(self._name) or {}
+        except Exception as err:      # network never crashes the GUI
+            logger.warning("NEOCP alias lookup failed: %s", err)
+            hit = {}
+        self.finished.emit(hit)
+
+
+class MpcSubmitWorker(QThread):
+    # Sends the report to the MPC off the GUI thread (ADR-080). The
+    # submission is a POST to the MPC's own endpoint (submit_obs / submit_psv
+    # / submit_xml, or their _test twins): it can take seconds, so it never
+    # blocks the window, and the server's own answer is shown in the log.
+    finished = Signal(dict)         # {"ok","status","text","url"}
+
+    def __init__(self, fmt, text, ack="", email="", obj_type="", test=False):
+        super().__init__()
+        self._fmt = fmt
+        self._text = text
+        self._ack = ack
+        self._email = email
+        self._obj_type = obj_type
+        self._test = test
+
+    def run(self):
+        from ..core.sources import mpc_submit
+        try:
+            out = mpc_submit.submit(self._fmt, self._text, ack=self._ack,
+                                    email=self._email, obj_type=self._obj_type,
+                                    test=self._test)
+        except Exception as err:      # never crash the GUI thread
+            logger.warning("MPC submission failed: %s", err)
+            out = {"ok": False, "status": 0, "url": "",
+                   "text": f"Could not reach the MPC: {err}"}
+        self.finished.emit(out)
+
+
 class PositionRefreshWorker(QThread):
     # Recomputes a moving target's position from a FRESH source, off the GUI
     # thread (ADR-030): the observer asks for the latest orbit and ephemeris
@@ -398,7 +473,6 @@ class PositionRefreshWorker(QThread):
     # the next goto reuses the fresh fetch. This is a goto, not a reduction:
     # the instant asked for is the current one.
     finished = Signal(dict)         # the position dict, or {} on failure
-
     def __init__(self, name, site, fallback_target=None):
         super().__init__()
         self._name = name
@@ -1441,6 +1515,12 @@ class TrackStackWorker(QThread):
         # point is the same number for a fraction of the time.
         total = max(1, 2 * len(groups))
         per_obs = []
+        # Why the comparison stars were dropped, summed over the observations
+        # (core/photometry counts them per plate: off the plate, saturated,
+        # non-linear, no positive flux, no catalog value in the band). A
+        # zero point resting on three comps is a large error with a reason,
+        # and the run must say the reason instead of only the number.
+        skipped_total = {}
         # P3: the night's diagnosis is built from the SAME comps the zero
         # point uses: their (magnitude, signal-to-noise) gives how faint this
         # night went, and their position against the catalogue gives whether
@@ -1518,6 +1598,8 @@ class TrackStackWorker(QThread):
             if not res.ok or res.mag is None:
                 per_obs.append(None)
                 continue
+            for _reason, _count in (getattr(res, "skipped", None) or {}).items():
+                skipped_total[_reason] = skipped_total.get(_reason, 0) + _count
             # P2: the object's SHAPE on its own stack, and what the matched
             # filter reads there. The FWHM comes from the STARS (on this
             # stack they are trails), and the filter is given the shape just
@@ -1658,6 +1740,11 @@ class TrackStackWorker(QThread):
                 "n_comps": max(p["n_comps"] for p in good),
                 "n_frames": (groups[0][1] - groups[0][0]) if groups else 0,
                 "n_obs": len(good), "source": source, "per_obs": per_obs,
+                # the sequence that was ASKED for and the reasons its comps
+                # were dropped: "3 of 8 used" is the whole story of a large
+                # zero-point error
+                "n_comps_requested": len(entries),
+                "comps_skipped": dict(skipped_total),
                 # the comparison stars themselves, so the project can KEEP
                 # them: the Photometry tab then opens with the same sequence
                 # the run used instead of proposing a different one
@@ -1820,6 +1907,43 @@ class TrackStackWorker(QThread):
             return None
         return tuple(float(r) for r in radii)
 
+    def _trail_candidates(self, base_stack, q_box, w0, box_all, frames,
+                          base_rate, base_pa):
+        # The object's own trail on the base stack, turned into candidate
+        # motions (see track_stack.motion_from_trail). They seed the sweep so
+        # a motion the ephemeris got slightly wrong can be found from the
+        # object's own light; the sweep still decides whether to adopt one.
+        # @args: base_stack - the whole-sequence stack, q_box - the object's
+        #        (x, y) on it, w0 - the reference WCS, box_all - its cutout,
+        #        frames - the sequence, base_rate/base_pa - the ephemeris'
+        # @return: [(rate, pa), ...] or []
+        from ..core import track_stack
+        from ..core.wcs import Wcs
+        if base_stack is None or base_rate is None or base_pa is None:
+            return []
+        try:
+            from ..core import photometry
+            shape = photometry.psf_elongation(base_stack, q_box[0], q_box[1])
+        except Exception as err:      # a trail we cannot read is no candidate
+            logger.warning("trail measurement failed: %s", err)
+            return []
+        if not (shape.get("ok") and shape.get("significant")):
+            return []
+        stamps = [f.t_mid_jd for f in frames
+                  if f.t_mid_jd is not None and track_stack.usable(f)]
+        if len(stamps) < 2:
+            return []
+        span_min = (max(stamps) - min(stamps)) * 1440.0
+        # motion_from_trail speaks the series engine's own Wcs (ADR-048), whose
+        # pixel_to_sky the astropy WCS of the reference solve does NOT have:
+        # handing it the astropy object made the call return [] in silence, so
+        # the seed never moved the velocity. The conversion is the same bridge
+        # the brightness' comp windows already use (Wcs.from_astropy).
+        return track_stack.motion_from_trail(
+            Wcs.from_astropy(_shift_wcs(w0, box_all)), q_box,
+            shape.get("trail_px"), shape.get("pa_deg"), span_min,
+            base_rate, base_pa)
+
     def _build_calibrator(self):
         # @return: a calibration.FrameCalibrator ready to be used as the
         #          engine's loader, or None when it cannot be built
@@ -1946,6 +2070,11 @@ class TrackStackWorker(QThread):
             out["ephem_mag"] = ephem.get("mag")
             out["ephem_band"] = ephem.get("band")
             out["ephem_mag_source"] = ephem.get("mag_source")
+            # what the band must report (the photometry recipe's choice): the
+            # measurement, or the ephemeris' prediction when the measurement
+            # is not worth reporting. The stack's band cards carry it.
+            out["report_mag"] = str(
+                (self._recipe or {}).get("report_mag") or "measured")
             if motion is None:
                 out.update(status="error",
                            error="no ephemeris for the object: JPL Horizons "
@@ -2038,12 +2167,21 @@ class TrackStackWorker(QThread):
                 # the engine wants the steps per axis
                 steps = max(2, int(round(math.sqrt(
                     float(self._cfg_get("astrometry_sweep_steps", 25))))))
+                # The object's OWN trail on the base stack says how far the
+                # ephemeris' motion is from the real one. Its two signs seed
+                # the sweep, which scores them like any other candidate and
+                # adopts one only if it beats the ephemeris by more than the
+                # grid's scatter (a noisy trail cannot move the motion).
+                trail_cands = self._trail_candidates(
+                    base_stack, q_all_box, w0, box_all, frames, base_rate,
+                    base_pa)
+                out["trail_seed"] = len(trail_cands)
                 self.progress.emit("sweep", 0, steps * steps)
                 sweep = track_stack.sweep(
                     frames, q_all, base_rate, base_pa, box_all, shape,
                     pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
                     steps=steps, method="median", cfg=self._cfg,
-                    loader=self._loader,
+                    loader=self._loader, extra_cands=trail_cands,
                     progress=lambda d, t, _l: self.progress.emit(
                         "sweep", d, t),
                     cancel=lambda: self._cancel)
@@ -2190,12 +2328,12 @@ class TrackStackWorker(QThread):
             self.progress.emit("check", 0, 1)
             check = None
             if bool(self._cfg_get("astrometry_check_enabled", True)):
-                kept, _dropped, _notes = mpc_astrometry.submittable(
+                kept, _excluded, _warnings = mpc_astrometry.submittable(
                     [sp for sp, _fp, _fl in points], self._cfg)
                 if not kept:
                     check = findorb.CheckReport(
                         available=False,
-                        note="no observation clears the submission floor")
+                        note="no observation to check: they are all excluded")
                 else:
                     # to_mpc80 returns the 80-column BLOCK (a string);
                     # findorb.check wants that string, not a list of lines
@@ -2206,7 +2344,8 @@ class TrackStackWorker(QThread):
                                                    self._name, self._cfg)
                     check = findorb.check(ours, self._name,
                                           self._cfg,
-                                          cancel=lambda: self._cancel)
+                                          cancel=lambda: self._cancel,
+                                          obs_code=self._obs_code)
             else:
                 check = findorb.CheckReport(available=False,
                                             note="disabled in the settings")
@@ -2392,3 +2531,106 @@ class FrameThumbWorker(QThread):
                 break
             self.sampled.emit(index, sample, facts)
         self.done.emit()
+
+
+class StackRemeasureWorker(QThread):
+    # Re-measures the BRIGHTNESS of one or more track & stack observations
+    # from their SAVED stacks (the object's and the star's) with the recipe the
+    # Photometry tab is holding RIGHT NOW. The recipe used to be captured at
+    # run time, so tuning the apertures or the comps meant re-stacking the
+    # whole visit; here the zero point and the magnitude are recomputed on the
+    # stacks that already exist. The position, the detection and the rest are
+    # untouched. It runs the WHOLE series of observations of a run, not only
+    # the one on stage: the recipe is the same for all of them.
+    finished = Signal(dict)     # {"results": [{index, mag, err, ...}], ...}
+
+    def __init__(self, observations, entries, band, recipe=None, cfg=None):
+        # @args: observations - [{"index", "stack", "star", "target_xy",
+        #        "fwhm"}, ...], entries - the comparison sequence, band - the
+        #        photometric band, recipe - the recipe dict, cfg - the config
+        super().__init__()
+        self._observations = list(observations or [])
+        self._entries = list(entries or [])
+        self._band = band
+        self._recipe = dict(recipe or {})
+        self._cfg = cfg
+
+    def _get(self, key, default=None):
+        # @args: key - a config key, default - fallback when absent
+        # @return: the setting, or the default (a double without config)
+        try:
+            return self._cfg.get(key, default)
+        except Exception:
+            return default
+
+    def _config_for(self, header, target_xy, fwhm):
+        # @args: header - the object stack's header, target_xy - the object's
+        #        (x, y) on it, fwhm - the seeing (px) or None
+        # @return: the PlateConfig the plate recipe needs
+        from ..core import photometry, wcs as wcs_mod
+        recipe = self._recipe
+        rap, rin, rout = (recipe.get("rap"), recipe.get("rin"),
+                          recipe.get("rout"))
+        radii = ((float(rap), float(rin), float(rout))
+                 if rap and rin and rout else None)
+        return photometry.PlateConfig(
+            target_xy=(float(target_xy[0]), float(target_xy[1])),
+            entries=self._entries,
+            comp_image=None,           # set per observation
+            header=header, wcs=wcs_mod.Wcs.from_header(header),
+            band=self._band, fallback_band=self._band,
+            radii=radii, fwhm=fwhm,
+            centroid_mode=("none" if recipe.get("manual_centre")
+                           else "gaussian"),
+            sigmaclip=bool(recipe.get("sigmaclip", True)),
+            matched=bool(recipe.get("matched",
+                                    self._get("phot_matched", True))),
+            sky_mode=recipe.get("sky") or "median",
+            color=bool(recipe.get("color", False)),
+            target_bv=float(recipe.get("target_bv") or 0.0),
+            linear_adu=self._get("cam_linearity_adu", None),
+            site_gain=self._get("ccd_gain", None),
+            site_ron=self._get("ccd_read_noise", None),
+            site_flat=self._get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=self._get("ccd_saturate", None),
+            site_lon=self._get("lon", None), site_lat=self._get("lat", None),
+            site_aperture_m=float(self._get("aperture_inches", 10.0)
+                                  or 10.0) * 0.0254,
+            site_height_m=float(self._get("height", 0) or 0.0),
+            site_dark=self._get("cam_dark_current_e_s", None))
+
+    def _one(self, ob):
+        # @args: ob - one observation {"index", "stack", "star", "target_xy",
+        #        "fwhm"}
+        # @return: {index, mag, err, ...} or {index, error}
+        from ..core import fits_io, photometry
+        index = ob.get("index")
+        try:
+            header, image = fits_io.read_fits(ob["stack"])
+            star = None
+            if ob.get("star"):
+                _sh, star = fits_io.read_fits(ob["star"])
+            cfg = self._config_for(header, ob["target_xy"], ob.get("fwhm"))
+            cfg.comp_image = star
+            res = photometry.measure_plate(image, cfg)
+            if not res.ok or res.mag is None:
+                return {"index": index, "error": "the plate could not be "
+                        "calibrated (no usable comparison)"}
+            return {"index": index, "mag": float(res.mag),
+                    "err": float(res.err_total or 0.0),
+                    "band": res.band or self._band,
+                    "n_comps": len([1 for e, _r in (res.used or [])
+                                    if (e.get("kind") or "comp") == "comp"]),
+                    "comps_skipped": dict(getattr(res, "skipped", None) or {}),
+                    "check_ok": ((res.check or {}).get("ok")
+                                 if res.check else None),
+                    "matched_used": bool(getattr(res, "matched_used", False))}
+        except Exception as err:      # a broken pair never crashes the GUI
+            logger.warning("stack re-measure failed for #%s: %s", index, err)
+            return {"index": index, "error": str(err)}
+
+    def run(self):
+        self.finished.emit({"results": [self._one(ob)
+                                        for ob in self._observations]})
+
+

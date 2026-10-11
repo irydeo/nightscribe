@@ -208,7 +208,16 @@ DEFAULTS = {
     # switches (the object marker's shape and the boxes layer)
     "observer_name": "",
     "measurer_name": "",      # empty -> falls back to observer_name
+    # The MPC submission header (2026-10-11): the contact email is the AC2
+    # address and the CON contact (PII, so it never enters an ADES document),
+    # and the TEL line is built from the aperture, the type and the focal
+    # ratio. A blank focal ratio is derived from the focal length and the
+    # aperture, never invented.
+    "observer_email": "",
     "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
+    "telescope_type": "",     # reflector / Schmidt-Cassegrain / ...
+    "telescope_focal_ratio": 0.0,
+    "mpc_report_comment": "",  # optional COM line in the MPC header
     "camera_model": "",
     "marker_style": "ring",   # ring | cross (the object marker)
     # The object's marks in the editor: the full-frame crosshair (the object

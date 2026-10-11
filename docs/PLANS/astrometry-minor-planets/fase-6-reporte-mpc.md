@@ -108,3 +108,22 @@ no lo expone.
 A7 y A15 pasan en los dos formatos, y ningún caso (sin magnitud, sin
 incertidumbre, PCCP, Dec negativa, grupo con SNR bajo) produce un reporte
 inválido o una línea silenciada.
+
+## Revisión (2026-10-11, ADR-080)
+
+El generador emitía **solo las líneas de datos**: el MPC ignora un lote sin
+cabecera, y la designación provisional/temporal iba truncada en las columnas
+del número. Ahora:
+
+- `to_mpc80` escribe la **cabecera completa** (`COD/CON/OBS/MEA/TEL/NET/COM/
+  ACK/AC2/NUM`) y el terminador `----- end -----`, y coloca la designación en
+  su columna (número 1-5, provisional/temporal 6-12).
+- `to_ades_psv` y el nuevo `to_ades_xml` llevan el `obsContext` (`# version`,
+  `# observatory`, `# submitter`, `# telescope`, `# observers`, `# measurers`,
+  `# comment`) y usan `permID`/`provID`/`trkSub`.
+- El `ReportContext` (observador, medidor, email, telescopio construido de
+  apertura + tipo + f/ + detector, `astcat`) se lee de la config.
+- `mpc_report.validate` **salta** las cabeceras y cuenta solo medidas.
+- El envío real (`core/sources/mpc_submit.py`, `submit_obs`/`submit_psv`/
+  `submit_xml` y sus `*_test`) lo dispara el diálogo de envío de la GUI.
+

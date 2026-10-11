@@ -100,6 +100,108 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Optional; written into the EXOTIC inits.json handoff (transit projects)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_observer">
+               <item><widget class="QLabel" name="lbl_observer"><property name="text"><string>Observer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_observer"/></item>
+               <item>
+                <spacer name="hsp_observer">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_observer"><property name="text"><string>Your name as it should read in the MPC report and in the chart boxes (Obs)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_measurer">
+               <item><widget class="QLabel" name="lbl_measurer"><property name="text"><string>Measurer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_measurer"/></item>
+               <item>
+                <spacer name="hsp_measurer">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_measurer"><property name="text"><string>Who measured the plate (Msr); empty means the observer</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_teldesc">
+               <item><widget class="QLabel" name="lbl_teldesc"><property name="text"><string>Telescope:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_telescope"><property name="placeholderText"><string>0.43-m f/4.9 reflector</string></property></widget></item>
+               <item>
+                <spacer name="hsp_teldesc">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_teldesc"><property name="text"><string>Free-text telescope line: the MPC report's TEL and the chart boxes use it. When it is empty the app builds the line from the aperture, the type and the focal ratio</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_cammodel">
+               <item><widget class="QLabel" name="lbl_cammodel"><property name="text"><string>Camera model:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_camera_model"/></item>
+               <item>
+                <spacer name="hsp_cammodel">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_cammodel"><property name="text"><string>Free-text camera line for the chart boxes (Cam)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_observer_email">
+               <item><widget class="QLabel" name="lbl_observer_email"><property name="text"><string>Contact email:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_observer_email"><property name="placeholderText"><string>you@example.org</string></property></widget></item>
+               <item>
+                <spacer name="hsp_observer_email">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_observer_email"><property name="text"><string>The MPC submission header's AC2 address and the contact's email: without it the report cannot be sent. It is personal data, so it never enters an ADES document, only the submission form</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_teltype">
+               <item><widget class="QLabel" name="lbl_teltype"><property name="text"><string>Telescope type:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_telescope_type"><property name="editable"><bool>true</bool></property>
+                <item><property name="text"><string>reflector</string></property></item>
+                <item><property name="text"><string>Newtonian</string></property></item>
+                <item><property name="text"><string>refractor</string></property></item>
+                <item><property name="text"><string>Schmidt-Cassegrain</string></property></item>
+                <item><property name="text"><string>Maksutov-Cassegrain</string></property></item>
+                <item><property name="text"><string>Ritchey-Chretien</string></property></item>
+                <item><property name="text"><string>Cassegrain</string></property></item>
+                <item><property name="text"><string>astrograph</string></property></item>
+               </widget></item>
+               <item><widget class="QLabel" name="lbl_telfratio"><property name="text"><string>f/</string></property></widget></item>
+               <item><widget class="QDoubleSpinBox" name="spn_telescope_fratio"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>40.0</double></property><property name="singleStep"><double>0.1</double></property><property name="specialValueText"><string>derived</string></property><property name="toolTip"><string>The focal ratio (f/) the MPC's TEL line wants. Leave it at 0 to derive it from the focal length and the aperture</string></property></widget></item>
+               <item>
+                <spacer name="hsp_teltype">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_teltype"><property name="text"><string>The MPC report builds its TEL line from the aperture, this type and the focal ratio, plus the camera type as the detector, for example "0.43-m f/4.9 reflector + CMO". The free-text telescope above, when set, is used verbatim instead</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_mpc_comment">
+               <item><widget class="QLabel" name="lbl_mpc_comment"><property name="text"><string>Report comment:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_mpc_comment"/></item>
+               <item>
+                <spacer name="hsp_mpc_comment">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_mpc_comment"><property name="text"><string>An optional COM line in the MPC submission header; may stay empty</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -605,7 +707,7 @@
              <item><widget class="QLabel" name="lblH_astro_gate"><property name="text"><string>How many times the object's signal must beat the background noise for the run to call it detected. Below it the velocity sweep is not run (a noise maximum is how a false positive is made), but the brightness IS still measured at the ephemeris' position and marked as not to be published without looking at it</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_astro_floor">
-               <item><widget class="QLabel" name="lbl_astro_floor"><property name="text"><string>MPC submission floor (SNR):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLabel" name="lbl_astro_floor"><property name="text"><string>MPC recommended floor (SNR):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
                <item><widget class="QDoubleSpinBox" name="spn_astro_floor"><property name="value"><double>10.0</double></property><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>200.0</double></property><property name="singleStep"><double>1.0</double></property></widget></item>
                <item>
                 <spacer name="hsp_astro_floor">
@@ -615,7 +717,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_astro_floor"><property name="text"><string>Per observation. The MPC recommends 20 or more and forbids marginal detections, so an observation below this floor does not go into the report and says why. The app ships 10 on purpose: it is a recommendation, and real submissions at about 16 have been accepted. Lowering it further is taking the risk of a false tracklet; a report whose observations all fall below it comes out empty and says so</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_astro_floor"><property name="text"><string>Per observation. The MPC recommends 20 or more. Below this floor the app WARNS: it says it does not recommend sending the observation, but it keeps it in the report and the decision is yours (uncheck it in the Astrometry tab to leave it out). The app ships 10 on purpose: it is a recommendation, and real submissions at about 16 have been accepted. Sending a marginal detection is taking the risk of a false tracklet</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -1057,58 +1159,6 @@
            <widget class="QGroupBox" name="grp_chartann">
             <property name="title"><string>Charts and annotations</string></property>
             <layout class="QVBoxLayout" name="vbox_chartann">
-             <item>
-              <layout class="QHBoxLayout" name="row_observer">
-               <item><widget class="QLabel" name="lbl_observer"><property name="text"><string>Observer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QLineEdit" name="edt_observer"/></item>
-               <item>
-                <spacer name="hsp_observer">
-                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
-                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item><widget class="QLabel" name="lblH_observer"><property name="text"><string>Your name as it should read in the chart boxes (Obs); may stay empty</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-             <item>
-              <layout class="QHBoxLayout" name="row_measurer">
-               <item><widget class="QLabel" name="lbl_measurer"><property name="text"><string>Measurer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QLineEdit" name="edt_measurer"/></item>
-               <item>
-                <spacer name="hsp_measurer">
-                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
-                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item><widget class="QLabel" name="lblH_measurer"><property name="text"><string>Who measured the plate (Msr); empty means the observer</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-             <item>
-              <layout class="QHBoxLayout" name="row_teldesc">
-               <item><widget class="QLabel" name="lbl_teldesc"><property name="text"><string>Telescope:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QLineEdit" name="edt_telescope"><property name="placeholderText"><string>0.43-m f/4.9 reflector</string></property></widget></item>
-               <item>
-                <spacer name="hsp_teldesc">
-                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
-                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item><widget class="QLabel" name="lblH_teldesc"><property name="text"><string>Free-text telescope line for the chart boxes (Tel)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-             <item>
-              <layout class="QHBoxLayout" name="row_cammodel">
-               <item><widget class="QLabel" name="lbl_cammodel"><property name="text"><string>Camera model:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QLineEdit" name="edt_camera_model"/></item>
-               <item>
-                <spacer name="hsp_cammodel">
-                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
-                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item><widget class="QLabel" name="lblH_cammodel"><property name="text"><string>Free-text camera line for the chart boxes (Cam)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_marker_style">
                <item><widget class="QLabel" name="lbl_marker_style"><property name="text"><string>Object marker:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

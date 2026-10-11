@@ -160,7 +160,11 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    publicaba PA 33 donde la efeméride dice 41,8 (2025 HL5) y 37 donde dice
    46,2 (2025 FG18), exactamente un paso de la rejilla. Cuando el barrido no
    mejora a la efeméride, la velocidad y el PA publicados son su predicción y
-   la nota lo dice.
+   la nota lo dice. La **traza** del propio objeto en el stack base también
+   **siembra** el barrido: la traza medida (su longitud y su PA) da dos
+   movimientos candidatos, uno por signo, y se puntúan como los demás; la misma
+   guarda de tres sigma se aplica, así que una traza ruidosa no mueve el
+   movimiento.
 5. **Secuencia centrada.** Se monta un GIF o un montaje con las N
    observaciones, todas centradas en el objeto: si está en todas, la
    detección es sólida; si en alguna no, se ve. En la pestaña tienes además
@@ -198,6 +202,15 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube
    de los demás. Si estás fuera de la nube, bloquea el reporte por defecto.
+   Además **te enseña la lista entera**: todas las observaciones publicadas
+   que usó Find_Orb, con el instante, la estación, la dirección y su residuo
+   en ascensión recta y declinación, **tus filas resaltadas**. Cuando el
+   chequeo no puede correr lo dice con palabras llanas (no hay Find_Orb, aún
+   no hay observaciones publicadas, o el arco de referencia es demasiado
+   corto para ajustar), y nada de eso bloquea el reporte. Si el objeto se
+   **confirmó con un nombre nuevo** desde la visita, la app lo encuentra
+   sola, chequea con el nombre nuevo y muestra la designación nueva y la
+   circular que lo publicó, diciendo que tus datos están en ella.
 9. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
    con el mismo validador de siempre y se envía al bloque MPC de la visita.
    El envío lo haces tú.
@@ -240,7 +253,19 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
     **marca humana** y la tabla marca el punto como medido desde tu marca: la
     marca es tu firma y viaja con la cifra. La cruz roja de la posición medida
     se queda en la placa: está anclada al cielo, así que sobrevive a cargar
-    otra imagen de la serie y a cambiar a la pestaña Fotometría.
+    otra imagen de la serie y a cambiar a la pestaña Fotometría. En un track &
+    stack, la **marca del objeto del proyecto se apaga**: el stack ya trae la
+    posición medida por el run, y dos marcas (en las coordenadas del plan y en
+    las medidas) se leen como un error. El botón de la barra superior la
+    reactiva si la quieres.
+12. **Ajustar el brillo sin re-apilar.** La receta de la pestaña Fotometría
+    (aperturas, cielo, comparsas y qué reporta la banda) quedaba congelada al
+    arrancar el run, así que cambiarla obligaba a re-apilar toda la visita. La
+    pestaña Astrometría tiene ahora **«Re-medir el brillo»**: vuelve a ejecutar
+    la receta sobre los **apilados guardados** de la observación en escena (el
+    del objeto y el de estrellas) y reescribe solo la banda del stack. La
+    posición y la detección no se tocan. Necesita que el run haya guardado el
+    **stack de estrellas** (la casilla del panel); si no, el botón lo dice.
 
 ## 4. Qué significa cada cifra
 
@@ -266,7 +291,9 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   dice, con el número del listón y dónde se ajusta, y el botón que envía el
   reporte queda deshabilitado: un reporte sin observaciones no es un reporte.
 - **Residual**: cuánto se separa tu medida de lo que predice la órbita, en
-  segundos de arco.
+  segundos de arco. El bloque lista además **todas las observaciones
+  publicadas** con su propio residuo (dRA / dDec), para que tu cifra quede
+  junto a la de los demás; tus filas aparecen resaltadas.
 - **Dispersión de los demás**: cuánto se separan ellos. Es la escala justa:
   con una órbita mala todos los residuos son grandes, y lo que importa es si
   estás **fuera de la nube**, no a qué distancia estás de cero.
@@ -280,6 +307,16 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   observaciones que la sostienen, y con su error. El apilado de estrellas
   trae además una **estrella de control**: si ella se sale de su valor de
   catálogo, la noche no se comportó y lo dice.
+  Cuando el punto cero se apoya en **muy pocas comparsas**, el run dice **por
+  qué** se cayeron las demás (fuera de la placa, saturadas, no lineales, sin
+  flujo positivo, sin valor de catálogo) y avisa de que el error grande es la
+  consecuencia honesta de una secuencia pobre: un error grande deja de parecer
+  un fallo y pasa a ser una cifra con causa.
+  Lo que la banda **reporta** es una elección de la **receta de fotometría**
+  (pestaña Fotometría): la **medida** o la **predicción de la efeméride**. Una
+  medida que no merece publicarse (muy pocas comparsas, objeto con traza) se
+  sustituye por la cifra etiquetada `(eph)` sin ocultarla: la medida se queda
+  en el run y en el punto de astrometría.
 - **Observatorios distintos y última observación** (en la ficha del objeto):
   muchos y reciente significa objeto vivo y bien determinado; uno solo y
   hace meses, candidato a perderse.

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Astrometry tab: the MPC report in its own non-modal window (ADR-080).
+  The tab keeps only the "Report…" button and the note; the window holds the
+  format selector, the full report and the actions (Copy, Save, Send). The tab
+  owns the behaviour and fills the widgets; the window stays a dumb container.
+  Loaded by gui/ufe_report_dialog.py through gui/ui_loader.py; the class tag
+  matches the Python class so the i18n context carries over.
+-->
+<ui version="4.0">
+ <class>UfeReportDialog</class>
+ <widget class="QWidget" name="UfeReportDialog">
+  <layout class="QVBoxLayout" name="vbox_report_dlg">
+   <property name="leftMargin"><number>11</number></property>
+   <property name="topMargin"><number>11</number></property>
+   <property name="rightMargin"><number>11</number></property>
+   <property name="bottomMargin"><number>11</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_format_dlg">
+     <item><widget class="QLabel" name="lbl_format"><property name="text"><string>Format:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_format"><property name="toolTip"><string>ADES XML is the format the MPC prefers, then ADES PSV, then the classic 80-column one; all three carry the submission header</string></property></widget></item>
+     <item>
+      <spacer name="hsp_format_dlg">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="txt_report">
+     <property name="minimumSize"><size><width>640</width><height>320</height></size></property>
+     <property name="readOnly"><bool>true</bool></property>
+     <property name="font"><font><family>Monospace</family></font></property>
+    </widget>
+   </item>
+   <item><widget class="QLabel" name="lbl_report_hint"><property name="text"><string>The report carries the observer, the telescope and the catalogue header the MPC needs, then one line (or row) per observation. It is what the send dialog submits.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_report_actions">
+     <item><widget class="QPushButton" name="btn_copy"><property name="text"><string>Copy to clipboard</string></property><property name="toolTip"><string>Copy the report as it reads, so it can be pasted anywhere</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_save"><property name="text"><string>Save to file…</string></property><property name="toolTip"><string>Write the report to a file in the project</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_send"><property name="text"><string>Send to MPC…</string></property><property name="toolTip"><string>Open the submission dialog: it asks for the acknowledgement email, the target and the mode, and sends the batch to the MPC</string></property></widget></item>
+     <item>
+      <spacer name="hsp_report_actions">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item><widget class="QPushButton" name="btn_close"><property name="text"><string>Close</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

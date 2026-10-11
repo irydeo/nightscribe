@@ -265,6 +265,13 @@ differential aperture photometry):
   on cores, one download per field), and the **Suggest** button that
   proposes the radii with the target's growth curve and its
   neighbourhood, with the reasons in plain words.
+* **Report brightness** (in the same recipe block): what the band over the
+  image shows, the **measurement** of this plate or the **ephemeris'
+  prediction**. It is part of the recipe because it decides what a reader
+  sees; the track & stack writes it into the stack's own band, so a
+  measurement not worth reporting (too few comps, a trailed object) is
+  replaced by the labelled `(eph)` figure without hiding the measurement,
+  which stays in the run and in the astrometry point.
 * Quality controls (phase H, in the background): the **real
   saturation** ceiling (SATURATE or `ccd_saturate`), **internal vs.
   total error** (photons + scatter + scintillation + colour + flats)
@@ -352,9 +359,16 @@ point of the band:
   is only the project's or the catalogue's value, which is not a measurement
   of this plate. The magnitude shown is the one measured on THAT frame (the
   visit's curve when there is one), then a single-plate measurement, and
-  only then the catalogue;
+  only then the catalogue. On a track & stack, what the band shows is the
+  run's own **Report brightness** choice (see the Photometry recipe): the
+  measured figure or the ephemeris', labelled either way;
 * everything else (date, exposure, filter, kit, station, scale, FOV) in
   the quiet colour: it is context, not a judgement.
+
+On a track & stack the **project's object mark is switched off** when the
+plate loads: the stack already carries the run's measured position (its cross
+and the `ANNOTATE` circle), and two marks, at the plan's coordinates and at the
+measured ones, read as an error. The top bar's toggle brings it back.
 
 The same code is on the **curve's points** (the chart's **Quality colours**
 button, on by default) and on the measurement's **panel**: green clean, orange

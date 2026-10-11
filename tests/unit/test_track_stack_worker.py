@@ -374,3 +374,47 @@ def test_the_sweep_keeps_its_own_order_whatever_the_observer_picked():
     # and it is deliberately independent of the cosmetic default: if the two
     # ever became the same number by accident, the pinning would be a lie
     assert track_stack.WARP_ORDER_SWEEP != track_stack.WARP_ORDER
+
+
+# ---------------------------------------------- the trail's velocity seed
+
+def test_the_trail_seed_reaches_the_engine(monkeypatch):
+    # 2026-10-10. A fast mover whose base stack shows a significant trail is
+    # the one case that reads the frame stamps and asks motion_from_trail for
+    # candidate motions. No test reached that branch, and TWO defects hid in
+    # it: the helper used track_stack WITHOUT importing it, so the whole run
+    # died with "name 'track_stack' is not defined" precisely on a trailed
+    # object; and motion_from_trail speaks the series engine's own Wcs
+    # (pixel_to_sky), so being handed the astropy WCS of the reference solve
+    # made it return [] in silence. The two assertions below are the guard.
+    import numpy as np
+    from astropy.wcs import WCS
+    from nightscribe.core import photometry, track_stack
+
+    worker = _worker()
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.crpix = [33.0, 33.0]
+    w.wcs.cd = [[-0.0003, 0.0], [0.0, 0.0003]]
+    w.wcs.radesys = "ICRS"
+    w.wcs.equinox = 2000.0
+    w.pixel_shape = (64, 64)
+
+    # a significant trail: the branch that touches the missing name
+    monkeypatch.setattr(photometry, "psf_elongation",
+                        lambda *_a, **_k: {"ok": True, "significant": True,
+                                           "trail_px": 5.0, "pa_deg": 30.0})
+    frames = [
+        track_stack.Frame(path="a.fits", t_mid_jd=2461269.40,
+                          transform={"dx": 0.0, "dy": 0.0}),
+        track_stack.Frame(path="b.fits", t_mid_jd=2461269.42,
+                          transform={"dx": 0.0, "dy": 0.0}),
+    ]
+    cands = worker._trail_candidates(
+        np.zeros((64, 64), dtype=np.float32), (32.0, 32.0), w,
+        (0, 0, 64, 64), frames, 12.0, 90.0)
+    # the trail's two signs (a line has no head), and no NameError on the way
+    assert len(cands) == 2
+    for rate, pa in cands:
+        assert rate > 0.0 and 0.0 <= pa < 360.0

@@ -70,16 +70,17 @@ class _PointDataclass:
 # --- formatting -----------------------------------------------------------
 
 def test_format_time_mpc80_t_mid():
-    # JD 2459289.0 is 2021-03-15 12:00 UTC.
-    assert mpc.format_time_mpc80(2459289.0) == "2021 03 15.500000"
+    # JD 2459289.0 is 2021-03-15 12:00 UTC. 5 decimals of a day is the MPC's
+    # normal precision (0.001 s would fill the field and eat the separator).
+    assert mpc.format_time_mpc80(2459289.0) == "2021 03 15.50000"
 
 
 def test_format_ra_mpc80():
-    assert mpc.format_ra_mpc80(_RA_DEG) == "21 30 45.678"
+    assert mpc.format_ra_mpc80(_RA_DEG) == "21 30 45.68"
 
 
 def test_format_dec_mpc80_negative():
-    assert mpc.format_dec_mpc80(_DEC_DEG) == "-12 34 56.78"
+    assert mpc.format_dec_mpc80(_DEC_DEG) == "-12 34 56.8"
 
 
 def test_format_dec_mpc80_positive_sign():
@@ -89,9 +90,9 @@ def test_format_dec_mpc80_positive_sign():
 def test_format_sexagesimal_never_overflows():
     # A value a hair below the next second must round cleanly, not to 60.
     ra = (1 * 3600 + 59 * 60 + 59.9996) / 240.0
-    assert mpc.format_ra_mpc80(ra).endswith("00.000")
+    assert mpc.format_ra_mpc80(ra).endswith("00.00")
     dec = (10 + 59 / 60.0 + 59.9996 / 3600.0)
-    assert mpc.format_dec_mpc80(dec).endswith("00.00")
+    assert mpc.format_dec_mpc80(dec).endswith("00.0")
 
 
 # --- bands ----------------------------------------------------------------
@@ -102,6 +103,9 @@ def test_band_code_known_filters():
     assert mpc.band_code("Clear") == "C"
     assert mpc.band_code("r'") == "r"
     assert mpc.band_code("g") == "g"
+    # the MPC lists both G (Gaia) and g (SDSS): the app's "G" is the Gaia
+    # band its comparisons come from, so it stays uppercase (2026-10-11)
+    assert mpc.band_code("G") == "G"
     assert mpc.band_code(None) == "C"
 
 
@@ -170,11 +174,11 @@ def test_a7_ades_round_trip():
 def test_a7_fields_land_where_mpc_report_expects():
     line = mpc.to_mpc80([_point()], "Z41", "2021 EQ3").splitlines()[0]
     assert line[mpc_report._DATE[0]:mpc_report._DATE[1]].strip() == \
-        "2021 03 15.500000"
-    assert line[mpc_report._RA[0]:mpc_report._RA[1]].strip() == "21 30 45.678"
+        "2021 03 15.50000"
+    assert line[mpc_report._RA[0]:mpc_report._RA[1]].strip() == "21 30 45.68"
     assert line[mpc_report._DEC[0]:mpc_report._DEC[1]].strip() == \
-        "-12 34 56.78"
-    assert line[mpc_report._MAG[0]:mpc_report._MAG[1]].strip() == "18.40"
+        "-12 34 56.8"
+    assert line[mpc_report._MAG[0]:mpc_report._MAG[1]].strip() == "18.4"
     assert line[mpc_report._BAND[0]:mpc_report._BAND[1]].strip() == "V"
     assert line[mpc_report._STATION[0]:mpc_report._STATION[1]].strip() == "Z41"
 
@@ -267,50 +271,66 @@ def test_a7_dataclass_with_ra_dec_alias():
     assert mpc_report.validate(text, "Z41", "00433")["valid"] is True
 
 
-# --- A15: submission floor ------------------------------------------------
+# --- A15: the recommended floor (advises, never drops) --------------------
 
-def test_a15_low_snr_dropped_and_explained():
+def test_a15_low_snr_is_kept_with_a_warning():
+    # 2026-10-10: the floor RECOMMENDS. A low-SNR observation stays in the
+    # report and the app says it does not recommend sending it; the decision
+    # is the observer's.
     good = _point(group=0, snr=30.0)
     weak = _point(group=1, snr=8.0)
-    kept, dropped, notes = mpc.submittable([good, weak])
-    assert kept == [good]
-    assert dropped == [weak]
-    assert len(notes) == 1
-    assert "SNR 8.0" in notes[0]
-    assert "20" in notes[0]
+    kept, excluded, warnings = mpc.submittable([good, weak])
+    assert kept == [good, weak]
+    assert excluded == []
+    assert len(warnings) == 1
+    assert "SNR 8.0" in warnings[0]
+    assert "20" in warnings[0]
 
 
 def test_a15_threshold_is_configurable():
     weak = _point(snr=8.0)
-    kept, dropped, notes = mpc.submittable(
+    kept, excluded, warnings = mpc.submittable(
         [weak], cfg={"astrometry_submit_snr": 5.0})
     assert kept == [weak]
-    assert dropped == []
-    assert notes == []
+    assert excluded == []
+    assert warnings == []
 
 
-def test_a15_missing_snr_is_not_silently_submitted():
-    kept, dropped, notes = mpc.submittable([_point(snr=None)])
-    assert kept == []
-    assert len(dropped) == 1
-    assert notes
+def test_a15_missing_snr_is_kept_with_a_warning():
+    point = _point(snr=None)
+    kept, excluded, warnings = mpc.submittable([point])
+    assert kept == [point]
+    assert excluded == []
+    assert warnings
 
 
-def test_generate_applies_floor_and_validates():
+def test_a15_user_excluded_is_the_only_thing_dropped():
+    # The observer's own exclusion is the one decision that takes a point out
+    # of the report: the flag is set from the Astrometry tab and is reversible.
+    keep = _point(group=0, snr=30.0)
+    drop = _point(group=1, snr=30.0)
+    drop["flags"] = ["user_excluded"]
+    kept, excluded, warnings = mpc.submittable([keep, drop])
+    assert kept == [keep]
+    assert excluded == [drop]
+    assert warnings == []
+
+
+def test_generate_keeps_everything_and_warns():
     points = [_point(group=0, snr=30.0), _point(group=1, snr=5.0)]
     out = mpc.generate(points, "ades", "Z41", "2021 EQ3")
     assert out["format"] == "ades"
-    assert len(out["kept"]) == 1
-    assert len(out["dropped"]) == 1
-    assert out["notes"]
+    # both go in: the low-SNR one is kept and warned about, not dropped
+    assert len(out["kept"]) == 2
+    assert out["excluded"] == []
+    assert out["warnings"]
     assert out["validation"]["valid"] is True
-    # The low-SNR group left no row behind.
-    assert out["validation"]["n_lines"] == 1
+    assert out["validation"]["n_lines"] == 2
 
 
 def test_generate_unknown_format_raises():
     with pytest.raises(ValueError):
-        mpc.generate([_point()], "xml", "Z41", "2021 EQ3")
+        mpc.generate([_point()], "garbage", "Z41", "2021 EQ3")
 
 
 def test_generate_stack_and_frames_differ():
@@ -326,3 +346,118 @@ def test_validate_generated_is_the_same_judge():
     text = mpc.to_mpc80([_point()], "Z41", "2021 EQ3")
     assert mpc.validate_generated(text, "Z41", "2021 EQ3") == \
         mpc_report.validate(text, "Z41", "2021 EQ3")
+
+
+# --- the full submission header (2026-10-11) ------------------------------
+
+def _ctx(**over):
+    base = dict(obs_code="Z41", observer="F. Calvo", measurer="F. Calvo",
+                email="obs@example.org", aperture_m=0.43, focal_ratio=4.9,
+                telescope_type="reflector", detector="CMO", astcat="Gaia3E")
+    base.update(over)
+    return mpc.ReportContext(**base)
+
+
+def test_the_mpc80_report_carries_the_full_header():
+    # The report the MPC reads is header + data + end marker: without the
+    # header the batch is IGNORED (ObsDetails.html), which is what the report
+    # was missing.
+    text = mpc.to_mpc80([_point()], "Z41", "2021 EQ3", context=_ctx(),
+                        submission={"ack": "batch 1", "obj_type": "NEOCP"})
+    lines = text.splitlines()
+    head = lines[:lines.index("----- end -----")]
+    assert head[0] == "COD Z41"
+    assert "CON F. Calvo" in head
+    assert "CON [obs@example.org]" in head
+    assert "OBS F. Calvo" in head
+    assert "MEA F. Calvo" in head
+    assert "TEL 0.43-m f/4.9 reflector + CMO" in head
+    assert "NET Gaia EDR 3" in head
+    assert "AC2 obs@example.org" in head
+    assert "NUM 1" in head
+    # the target keyword rides the ACK line (the MPC reads it there)
+    assert any(l.startswith("ACK ") and "NEOCP" in l for l in head)
+    assert text.rstrip().endswith("----- end -----")
+    # the round trip still accepts our own header
+    result = mpc_report.validate(text, "Z41", "2021 EQ3")
+    assert result["valid"] is True, result["errors"]
+    assert result["n_lines"] == 1
+
+
+def test_the_mpc80_designation_lands_in_the_right_columns():
+    # Temporary (NEOCP): columns 6-12, the number field blank. Before this the
+    # app wrote 5 chars of the tag in the NUMBER field (2026-10-11).
+    line = mpc.to_mpc80([_point()], "Z41", "A11HPKO").splitlines()[0]
+    assert line[0:5] == "     "
+    assert line[5:12] == "A11HPKO"
+    # Provisional: the full packed form in 6-12, never truncated.
+    line = mpc.to_mpc80([_point()], "Z41", "2021 EQ3").splitlines()[0]
+    assert line[0:5] == "     "
+    assert line[5:12] == "K21E03Q"
+    # Numbered: the packed number in 1-5, the provisional field blank.
+    line = mpc.to_mpc80([_point()], "Z41", "433").splitlines()[0]
+    assert line[0:5] == "00433"
+    assert line[5:12] == "       "
+
+
+def test_the_ades_psv_report_carries_the_obs_context():
+    text = mpc.to_ades_psv([_point()], "Z41", "2021 EQ3", context=_ctx())
+    lines = text.splitlines()
+    assert lines[0] == "# version=2017"
+    assert "# observatory" in lines and "! mpcCode Z41" in lines
+    assert "# submitter" in lines and "! name F. Calvo" in lines
+    assert "! aperture 0.43" in lines and "! fRatio 4.9" in lines
+    assert "! design reflector" in lines and "! detector CMO" in lines
+    # ADES keeps PII out of the document: no email anywhere
+    assert "obs@example.org" not in text
+    # the object goes in provID (ADES), not the legacy objid
+    assert any(l.startswith("provID|mode|stn|") for l in lines)
+    result = mpc_report.validate(text, "Z41", "2021 EQ3")
+    assert result["valid"] is True, result["errors"]
+    assert result["n_lines"] == 1
+
+
+def test_the_ades_psv_uses_trksub_for_a_temporary_designation():
+    text = mpc.to_ades_psv([_point()], "Z41", "A11HPKO", kind="neocp")
+    assert text.splitlines()[0].startswith("trkSub|")
+    assert text.splitlines()[1].startswith("A11HPKO|")
+
+
+def test_the_ades_xml_report_is_well_formed():
+    import xml.etree.ElementTree as ET
+    text = mpc.to_ades_xml([_point()], "Z41", "2021 EQ3", context=_ctx())
+    root = ET.fromstring(text)
+    assert root.tag == "ades" and root.get("version") == "2017"
+    prov = root.find(".//obsBlock/obsData/optical/provID")
+    assert prov is not None and prov.text == "2021 EQ3"
+    assert root.find(
+        ".//obsBlock/obsContext/observatory/mpcCode").text == "Z41"
+    assert root.find(
+        ".//obsBlock/obsContext/telescope/design").text == "reflector"
+    # the generated XML goes through generate() too
+    out = mpc.generate([_point()], "xml", "Z41", "2021 EQ3", context=_ctx())
+    assert out["format"] == "xml"
+    assert out["validation"]["valid"] is True
+
+
+def test_report_context_is_built_from_the_settings():
+    ctx = mpc.report_context({
+        "mpc_code": "z41", "observer_name": "F. Calvo",
+        "aperture_inches": 16.9, "focal_mm": 2000.0,
+        "telescope_type": "reflector", "camera_type": "CMOS",
+        "observer_email": "obs@example.org", "astrometry_astcat": "Gaia3E"})
+    assert ctx.obs_code == "Z41"
+    assert ctx.measurer == "F. Calvo"          # falls back to the observer
+    assert ctx.detector == "CMO"
+    assert ctx.aperture_m == 0.429
+    assert ctx.focal_ratio == 4.7              # derived: 2000mm / 0.429m
+    assert ctx.tel_mpc80() == "0.43-m f/4.7 reflector + CMO"
+    assert ctx.missing() == []
+
+
+def test_report_context_says_what_is_missing():
+    ctx = mpc.report_context({"mpc_code": "Z41"})
+    missing = ctx.missing()
+    assert "the contact email" in missing
+    assert "the observer's name" in missing
+    assert "the telescope" in missing

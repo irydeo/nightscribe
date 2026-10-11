@@ -309,6 +309,9 @@ benchmarks/          # bancos de medida (track & stack, cero punto contra el
 tools/bench/         #   catálogo, inyección/recuperación, combinación, flat):
                      #   de aquí salen las cifras de los comentarios y los ADR,
                      #   y no se envían con la app
+tools/i18n.py        # recompila los catálogos de traducción: lupdate + lrelease
+                     #   ATÓMICO (ADR-079); nunca el lrelease crudo con la app
+                     #   abierta
 website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
                      #   README y el manual es docs/user, los mismos ficheros
                      #   que pinta la app; tools/build_site.py los convierte y

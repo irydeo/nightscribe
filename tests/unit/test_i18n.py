@@ -11,10 +11,16 @@
 #
 ############################################################
 
+import subprocess
+import sys
+import textwrap
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+import pytest
+
 I18N = Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
+ROOT = Path(__file__).parents[2]
 
 
 def test_ts_files_complete():
@@ -91,3 +97,40 @@ def test_the_english_catalogue_repeats_the_source():
                 wrong.append((ctx.findtext("name"), src.text, tr.text))
     assert not wrong, ("the English catalogue must repeat the source "
                        "verbatim: %r" % (wrong,))
+
+
+def test_the_app_loads_its_catalogue_from_memory_not_mapped():
+    # QTranslator MEMORY-MAPS a .qm loaded BY FILENAME. Rebuilding the
+    # catalogue while the app is open rewrites that file in place, the live
+    # mapping is invalidated, and the next translation walks off it and
+    # crashes: that is the GUI core dump of 2026-10-10, inside
+    # QTranslator::translate, reached from a plain self.tr() in the
+    # sky-event chips. app.load_translator reads the BYTES instead, so the
+    # catalogue never appears in the process maps and a rebuild cannot touch
+    # it. Run in a CHILD process: /proc/self/maps is global, and another test
+    # in this session may already have mapped the file.
+    if not sys.platform.startswith("linux"):
+        pytest.skip("needs /proc/self/maps")
+    code = textwrap.dedent("""
+        import os
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PySide6.QtCore import QTranslator
+        from PySide6.QtWidgets import QApplication
+        from nightscribe.gui.app import load_translator
+        app = QApplication([])
+        tr = load_translator(app, "es")
+        assert tr is not None, "no translator was installed"
+        # for contrast: loading BY PATH maps the file, which is the hazard.
+        # Keep a reference (a temporary is destroyed at once and its mapping
+        # released) and translate once so the file is really faulted in.
+        by_path = QTranslator()
+        by_path.load("nightscribe/gui/i18n/nightscribe_en.qm")
+        by_path.translate("MainWindow", "Date")
+        maps = open("/proc/self/maps").read()
+        print("ES:" + ("MAPPED" if "nightscribe_es.qm" in maps else "MEMORY"))
+        print("EN:" + ("MAPPED" if "nightscribe_en.qm" in maps else "MEMORY"))
+    """)
+    out = subprocess.run([sys.executable, "-c", code], cwd=ROOT,
+                         capture_output=True, text=True)
+    assert "ES:MEMORY" in out.stdout, out.stdout + out.stderr
+    assert "EN:MAPPED" in out.stdout, out.stdout + out.stderr

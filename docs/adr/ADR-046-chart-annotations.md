@@ -101,6 +101,23 @@ tiñe la pestaña y el proyecto) por defecto, o **un color común** para las tre
 círculo el color viaja en la tarjeta, que es el modelo AIJ, así que el fichero dice lo
 mismo que se ve.
 
+**Revisión (2026-10-11): el telescopio es un dato propio de la banda.** La cámara y el
+telescopio iban pegados en un solo segmento de 10 caracteres, y el telescopio era la
+mitad que se recortaba: en una placa cuyo FITS no trae `TELESCOP` y sin texto libre en
+Ajustes, no aparecía. Ahora:
+
+- La banda lleva **dos segmentos**: la cámara (`equip`, de `INSTRUME` o del ajuste) y el
+  **telescopio** (`tel`, etiquetado `Tel …` para no confundirlo con la cámara).
+- El telescopio sale del `TELESCOP` de la propia toma; si no está, de los Ajustes,
+  **construido con la misma regla que el TEL del reporte MPC** (apertura + tipo + f/), así
+  que la banda y el reporte no pueden discrepar. `site_from_config` también lo da, y los
+  corner boxes del blink/finder dicen su `Tel:` aunque no haya texto libre.
+- `DROP_ORDER` pasa a `(fov, psc, equip, filter, stn, tel, date)`: el telescopio es dato
+  de reporte y sobrevive más que la cámara.
+- Los datos del observador y del equipo (observer, measurer, email, telescope, type, f/,
+  camera model, comment) salen de **Charts and annotations** y pasan a **Observatory**:
+  no son meramente visuales, construyen la cabecera del reporte y la banda.
+
 ## English
 
 **Context.** The charts the observatory publishes carried only the object
@@ -388,3 +405,21 @@ tints the tab and the project) by default, or **one common colour** for all thre
 (`theme.mark_color`) hands it out, so the three cannot disagree; and for the circle the
 colour travels in the card, which is the AIJ model, so the file says the same as what is
 seen.
+
+**Revision (2026-10-11): the telescope is its own datum in the band.** The camera and
+the telescope were glued into one 10-character segment, and the telescope was the half
+that got cut: on a plate whose FITS has no `TELESCOP` and with no free text in Settings,
+it did not appear. Now:
+
+- The band carries **two segments**: the camera (`equip`, from `INSTRUME` or the
+  setting) and the **telescope** (`tel`, labelled `Tel …` so it is not mistaken for the
+  camera).
+- The telescope comes from the plate's own `TELESCOP`; failing that, from the Settings,
+  **built with the same rule as the MPC report's TEL line** (aperture + type + f/), so
+  the band and the report cannot disagree. `site_from_config` provides it too, and the
+  blink/finder corner boxes show their `Tel:` even with no free text.
+- `DROP_ORDER` becomes `(fov, psc, equip, filter, stn, tel, date)`: the telescope is a
+  report datum and survives longer than the camera.
+- The observer's and the equipment's details (observer, measurer, email, telescope,
+  type, f/, camera model, comment) leave **Charts and annotations** for **Observatory**:
+  they are not merely visual, they build the report's header and the band.

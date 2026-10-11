@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The MPC submission dialog (ADR-080): sending a report is never silent. It
+  asks for the acknowledgement email, the acknowledgement text, the target and
+  the mode (Normal or Test), shows the server's own answer in the log, and
+  refuses to send when the report cannot be built (no email, no header). The
+  Astrometry tab owns the behaviour; the dialog stays a dumb container.
+  Loaded by gui/mpc_send_dialog.py through gui/ui_loader.py.
+-->
+<ui version="4.0">
+ <class>MpcSendDialog</class>
+ <widget class="QWidget" name="MpcSendDialog">
+  <layout class="QVBoxLayout" name="vbox_send">
+   <property name="leftMargin"><number>11</number></property>
+   <property name="topMargin"><number>11</number></property>
+   <property name="rightMargin"><number>11</number></property>
+   <property name="bottomMargin"><number>11</number></property>
+   <item>
+    <widget class="QPlainTextEdit" name="txt_log">
+     <property name="minimumSize"><size><width>560</width><height>140</height></size></property>
+     <property name="readOnly"><bool>true</bool></property>
+     <property name="font"><font><family>Monospace</family></font></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_ack_email">
+     <item><widget class="QLabel" name="lbl_ack_email"><property name="text"><string>Ack. email:</string></property><property name="minimumSize"><size><width>90</width><height>0</height></size></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_ack_email"><property name="placeholderText"><string>you@example.org</string></property><property name="toolTip"><string>Where the MPC sends its acknowledgement and any designations. It is the contact email you set in Settings, and you can change it here; without it the send is blocked, because the MPC needs it</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_ack">
+     <item><widget class="QLabel" name="lbl_ack"><property name="text"><string>Ack.:</string></property><property name="minimumSize"><size><width>90</width><height>0</height></size></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_ack"><property name="placeholderText"><string>a short acknowledgement text (optional)</string></property><property name="toolTip"><string>A short text the MPC echoes back, so you can tell one batch from another; may stay empty</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_target">
+     <item><widget class="QLabel" name="lbl_target"><property name="text"><string>Target:</string></property><property name="minimumSize"><size><width>90</width><height>0</height></size></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_target"><property name="toolTip"><string>How the MPC routes the batch. Unclassified: the object is already classified (a definitive designation), a normal submission. NEOCP or PCCP: it is on a confirmation page right now. NEW NEO, NEW COMET, NEW NATURAL SATELLITE, NEW TNO, NEW KBO, NEW DISTANT, NEW CENTAUR: a new candidate of that kind. A missing or wrong keyword can misroute the batch or stop it being processed as you expect. The keyword rides the report's ACK line (80 columns) or the obj_type field (ADES)</string></property></widget></item>
+     <item><widget class="QLabel" name="lbl_mode"><property name="text"><string>Mode:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_mode"><property name="toolTip"><string>Normal sends the batch to the MPC for real: it is processed and published. Test uses the MPC's test endpoint, which runs the same format and validity checks but does NOT process the batch: the rehearsal, to check the report without committing it</string></property></widget></item>
+     <item>
+      <spacer name="hsp_target">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_missing"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="styleSheet"><string notr="true">color: #c0392b;</string></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_send">
+     <item>
+      <spacer name="hsp_send">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+      </spacer>
+     </item>
+     <item><widget class="QPushButton" name="btn_send"><property name="text"><string>Send</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_close"><property name="text"><string>Close</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

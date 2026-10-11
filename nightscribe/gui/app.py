@@ -41,13 +41,51 @@ def set_window_icon(app):
     app.setWindowIcon(icon)
 
 
+def load_translator(app, lang=None):
+    # Installs the UI language's catalogue, loaded FROM MEMORY.
+    # @args: app - the QApplication, lang - "es"/"en"/"system" or None (the
+    #        configured language, or the OS one, see ADR-014)
+    # @return: the installed QTranslator, or None when there is none
+    #
+    # It reads the bytes and hands them to QTranslator.load(data) on purpose.
+    # A .qm loaded BY FILENAME is MEMORY-MAPPED by QTranslator (it shows up
+    # in /proc/self/maps), and rebuilding the catalogue while the app is open
+    # rewrites that file IN PLACE: the live mapping is then invalidated and
+    # the next translation walks off it and crashes. That is not theory: on
+    # 2026-10-10 a running GUI dumped core inside QTranslator::translate,
+    # reached from a plain self.tr() in the sky-event chips, because
+    # pyside6-lrelease had rewritten nightscribe_es.qm minutes earlier. A
+    # copy in RAM is out of the file's reach, so the rebuild is harmless.
+    from PySide6.QtCore import QLocale, QTranslator
+    if lang is None:
+        from ..config import config
+        lang = config.get("language", "system")
+    if lang == "system":
+        lang = QLocale.system().name()[:2]
+    qm = I18N_DIR / f"nightscribe_{lang}.qm"
+    if not qm.exists():
+        return None
+    data = qm.read_bytes()
+    translator = QTranslator(app)
+    # QTranslator.load(bytes) keeps a POINTER into the buffer, it does NOT
+    # copy it: a temporary bytes object is freed the moment the call returns
+    # and the translator's data dangles, so installTranslator/translate then
+    # read freed memory and crash (measured 2026-10-11). Holding the buffer
+    # on the translator makes it live exactly as long as the catalogue it
+    # feeds, which is the whole point.
+    translator._ns_catalogue = data
+    if translator.load(data):
+        app.installTranslator(translator)
+        logger.debug("translation loaded from memory: %s", qm)
+        return translator
+    return None
+
+
 def run():
     # Starts the Qt application and shows the main window.
     # @return: exit code
-    from PySide6.QtCore import QLocale, QTranslator
     from PySide6.QtWidgets import QApplication
 
-    from ..config import config
     from .theme import apply_theme
 
     app = QApplication(sys.argv)
@@ -59,16 +97,9 @@ def run():
     # window is created so nothing paints with the platform style.
     apply_theme(app)
 
-    # UI language: configured or the OS one (see ADR-014).
-    # Install before the wizard so its tr() strings resolve.
-    lang = config.get("language", "system")
-    if lang == "system":
-        lang = QLocale.system().name()[:2]
-    translator = QTranslator(app)
-    qm = I18N_DIR / f"nightscribe_{lang}.qm"
-    if qm.exists() and translator.load(str(qm)):
-        app.installTranslator(translator)
-        logger.debug("translation loaded: %s", qm)
+    # UI language: configured or the OS one (see ADR-014). Install before
+    # the wizard so its tr() strings resolve.
+    load_translator(app)
 
     # First the backup snapshot (ADR-042): core/backup.py copies the
     # current database before anything imports core.db, because that

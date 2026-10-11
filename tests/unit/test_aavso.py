@@ -115,7 +115,14 @@ def test_extract_star_name_normalizes_spacing():
     assert aavso.extract_star_name("V838 Her  still") == "V838 Her"
 
 
-def test_alerts_parse_filter_and_sort(fake_get):
+def test_alerts_parse_filter_and_sort(fake_get, monkeypatch):
+    # The 60-day window is relative to "now", and the fixture is a capture
+    # from 2026-09-16: freeze the clock to that date, or the hard-coded
+    # topics fall out of the window as the real clock advances (the 2026-08-12
+    # one did, the day after the fixture was taken).
+    import time as _time
+    frozen = _time.mktime(_time.strptime("2026-09-16", "%Y-%m-%d"))
+    monkeypatch.setattr(aavso.time, "time", lambda: frozen)
     fake_get("aavso:alerts", FORUM_JSON)
     out = aavso.alerts(days=60)
     # pinned and stale topics dropped, newest first

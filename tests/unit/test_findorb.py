@@ -171,3 +171,83 @@ def test_as_residual_reads_findorbs_obscode_key():
     assert r["stn"] == "Z41"
     assert r["dra"] == 0.5 and r["ddec"] == -0.2
     assert r["time"] == 2460000.5
+
+
+def test_as_residual_keeps_the_fields_the_listing_needs():
+    # The observer's table shows the instant, the direction and the
+    # magnitude: the parser must carry them, not just the residual.
+    r = findorb._as_residual({
+        "obscode": "I41", "iso date": "2025-10-18T04:51:03.513Z",
+        "RA": 17.66, "Dec": 21.96, "dRA": 0.0, "dDec": -0.1,
+        "MagObs": 18.4, "MagBand": "R", "note1": "K"})
+    assert r["iso"] == "2025-10-18T04:51:03.513Z"
+    assert r["ra"] == 17.66 and r["dec"] == 21.96
+    assert r["mag"] == 18.4 and r["band"] == "R"
+    # a residual of exactly 0.0 is a PERFECT fit, never "missing"
+    assert r["dra"] == 0.0
+    assert r["note"] == "K"
+
+
+def test_match_ours_prefers_the_same_instant_and_station():
+    rows = [{"stn": "I41", "time": 100.0}, {"stn": "Z41", "time": 100.0},
+            {"stn": "Z41", "time": 50.0}]
+    ours, others = findorb._match_ours(rows, [100.0], "Z41")
+    assert ours == [rows[1]] and len(others) == 2
+
+
+def test_match_ours_handles_a_merged_near_duplicate():
+    # Find_Orb merges our line into an already published point from our own
+    # station (same night, seconds apart): our instant is not in the list,
+    # so the nearest of OUR station's rows is the one that stands for us.
+    rows = [{"stn": "Z41", "time": 100.0}, {"stn": "Z41", "time": 300.0}]
+    ours, _others = findorb._match_ours(rows, [299.999], "Z41")
+    assert ours == [rows[1]]
+
+
+def test_match_ours_falls_back_to_the_first_line():
+    rows = [{"stn": "X", "time": 1.0}, {"stn": "Y", "time": 2.0}]
+    ours, others = findorb._match_ours(rows, [], "")
+    assert ours == [rows[0]] and len(others) == 1
+
+
+def test_decide_from_residuals_flags_ours_and_carries_the_listing():
+    rows = [{"stn": "Z41", "time": 10.0, "dra": 0.1, "ddec": 0.1},
+            {"stn": "I41", "time": 11.0, "dra": 0.2, "ddec": 0.2},
+            {"stn": "F51", "time": 12.0, "dra": 0.3, "ddec": 0.3}]
+    report = findorb._decide_from_residuals(rows, None, "Z41")
+    assert report.residuals == rows and report.n_obs == 3
+    assert [r["ours"] for r in rows] == [True, False, False]
+    assert report.n_others == 2
+
+
+def test_check_with_no_reference_is_not_a_failure(monkeypatch):
+    # The old wording was "Find_Orb produced no residuals", which hid that
+    # the real cause was an EMPTY reference (an object known only by its
+    # NEOCP name). No reference is its own honest answer, not unavailable.
+    monkeypatch.setattr(findorb, "probe",
+                        lambda path=None: ("/usr/bin/fo", "fo"))
+    report = findorb.check("OUR LINE", "A11HPKO", cfg=None,
+                           others_lines="", obs_code="Z41")
+    assert report.available is True and report.no_reference is True
+    assert not report.blocked
+    assert "no published observations" in report.note
+
+
+def test_check_reports_no_fit_when_findorb_fits_nothing(tmp_path,
+                                                        monkeypatch):
+    # `fo` writes a TRUNCATED total.json when it fits zero objects; that is
+    # "it ran but could not fit", not "it failed". It must not be dressed up
+    # as "produced no residuals".
+    work = tmp_path / "run"
+    work.mkdir()
+    (work / "total.json").write_text('{\n  "num": 0,\n  "ids": [],\n'
+                                     '  "objects":\n  {\n')
+    monkeypatch.setattr(findorb, "probe",
+                        lambda path=None: ("/usr/bin/fo", "fo"))
+    monkeypatch.setattr(findorb, "run",
+                        lambda *a, **k: (True, str(work), "Processing 0 objects"))
+    report = findorb.check("OUR LINE", "X", cfg=None,
+                           others_lines="OTHER LINE", obs_code="Z41")
+    assert report.available is True and report.no_fit is True
+    assert not report.blocked
+    assert "could not fit" in report.note

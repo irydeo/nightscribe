@@ -4658,6 +4658,8 @@ class MainWindow(QMainWindow):
         mast.lbl_mast_camp.setText("")
         mast.btn_files.setEnabled(False)
         mast.btn_files.setText(self.tr("Files (0)"))
+        mast.lbl_confirm.setVisible(False)
+        mast.lbl_confirm.setText("")
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
         # Interfaz 1.0: drop the list's current item too, or the refresh
@@ -4734,6 +4736,66 @@ class MainWindow(QMainWindow):
                 advisor.setVisible(False)
         else:
             advisor.setVisible(False)
+        # The rename notice (the observer's idea): an object visited while
+        # still on the confirmation page and CONFIRMED SINCE is shown as
+        # such, very visibly, with the circular that published it. The
+        # lookup is cached and runs once, off the GUI thread.
+        conf = ctx.get("confirmed") or {}
+        self._paint_confirmation(conf)
+        if not conf.get("designation") and ctx.get("neocp"):
+            self._start_alias_lookup(p)
+
+    def _paint_confirmation(self, conf):
+        # @args: conf - {"designation","mpec","mpec_url"} or {}
+        # @return: None. The banner reads as data (the new name and the
+        #          circular), never as a code: the observer sees what it
+        #          means without looking anything up.
+        lbl = self.projects.lbl_confirm
+        desig = (conf or {}).get("designation")
+        if not desig:
+            lbl.setVisible(False)
+            lbl.setText("")
+            return
+        mpec = conf.get("mpec") or ""
+        url = conf.get("mpec_url") or ""
+        if mpec and url:
+            tail = self.tr('published in <a href="%1">%2</a>').replace(
+                "%1", url).replace("%2", mpec)
+        elif mpec:
+            tail = self.tr("published in %1").replace("%1", mpec)
+        else:
+            tail = ""
+        text = "★ " + self.tr("Confirmed as <b>%1</b>").replace("%1", desig)
+        if tail:
+            text += " · " + tail
+        text += ". " + self.tr(
+            "Your observations of it are in that circular.")
+        lbl.setText(text)
+        lbl.setVisible(True)
+
+    def _start_alias_lookup(self, p):
+        # @args: p - the project row (its id and object_name)
+        # @return: None. Asks the MPC, off the GUI thread, whether this
+        #          object was confirmed under a new name; the answer is
+        #          written into the project's context so the banner is
+        #          instant the next time and the visit window can read it.
+        from .workers import MpcAliasWorker, hold
+        name = p["object_name"]
+        worker = hold(MpcAliasWorker(name))
+        pid = p["id"]
+        worker.finished.connect(
+            lambda hit, pid=pid: self._on_confirmation(pid, hit))
+        worker.start()
+
+    def _on_confirmation(self, pid, hit):
+        # @args: pid - the project id, hit - {"designation","mpec",...} or {}
+        # @return: None
+        if not hit or not hit.get("designation"):
+            return
+        project.update_context(db, pid, {"confirmed": hit})
+        cur = self._current_project
+        if cur and cur.get("id") == pid:
+            self._paint_confirmation(hit)
 
     def _advisor_dismiss(self):
         # A2: dismiss the close-advisor banner for the current project.
@@ -10706,6 +10768,12 @@ class MainWindow(QMainWindow):
             manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
             if callable(manual_hook):
                 manual_hook(self._ufe_manual_magnitude)
+            # The observer excludes an observation from the report and the
+            # check (2026-10-10): the flag is written into the run's points,
+            # never deleting the measurement, so a reopened run keeps it.
+            excluded_hook = getattr(dlg, "set_point_excluded_hook", None)
+            if callable(excluded_hook):
+                excluded_hook(self._ufe_set_point_excluded)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10778,6 +10846,9 @@ class MainWindow(QMainWindow):
             manual_hook = getattr(dlg, "set_manual_magnitude_hook", None)
             if callable(manual_hook):
                 manual_hook(None)
+            excluded_hook = getattr(dlg, "set_point_excluded_hook", None)
+            if callable(excluded_hook):
+                excluded_hook(None)
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
@@ -11322,6 +11393,7 @@ class MainWindow(QMainWindow):
             "ephem_mag": _scalar(payload.get("ephem_mag")),
             "ephem_band": _scalar(payload.get("ephem_band")),
             "ephem_mag_source": _scalar(payload.get("ephem_mag_source")),
+            "report_mag": _scalar(payload.get("report_mag")),
             "detection": _obj(payload.get("detection"),
                               ("detected", "snr", "x", "y", "fwhm",
                                "roundness", "mag_limit", "notes")),
@@ -11332,8 +11404,10 @@ class MainWindow(QMainWindow):
             "sweep": _obj(payload.get("sweep"), ("best", "grid", "method")),
             "check": _obj(payload.get("check"),
                           ("available", "blocked", "outlier", "no_reference",
-                           "our_residual", "scatter", "z", "n_others",
-                           "n_stations", "note")),
+                           "no_fit", "our_residual", "scatter", "z",
+                           "n_others", "n_stations", "note", "residuals",
+                           "reference", "resolved_desig", "mpec", "mpec_url",
+                           "confirmed_at", "ours_published", "n_obs")),
             "photometry": _scalar(payload.get("photometry")),
             "register_report": _scalar(payload.get("register_report")),
             "calibration": _scalar(payload.get("calibration")),
@@ -11544,6 +11618,29 @@ class MainWindow(QMainWindow):
         if done:
             # the list says WHO wrote the magnitude: a measurement made by
             # hand has to show up there at once
+            run = self._analysis_astrometry_run(int(run_id))
+            if run is not None and self._project_widgets.get(
+                    "astrometry_runs_tbl") is not None:
+                self._analysis_astrometry_refresh(run["project_id"])
+        return done
+
+    def _ufe_set_point_excluded(self, run_id, group_index, excluded):
+        # @args: run_id - the execution, group_index - the observation,
+        #        excluded - True to leave it out of the report and the check,
+        #        False to put it back
+        # @return: True when the observation took it. The point is NEVER
+        #          deleted: the flag rides in its own `flags`, so the audit
+        #          keeps the measurement and a reopened run keeps the
+        #          observer's decision (2026-10-10).
+        from ..core import astrometry_store as store
+        try:
+            done = bool(store.set_point_excluded(db, int(run_id),
+                                                 int(group_index),
+                                                 bool(excluded)))
+        except Exception as err:
+            logger.warning("the exclusion could not be stored: %s", err)
+            return False
+        if done:
             run = self._analysis_astrometry_run(int(run_id))
             if run is not None and self._project_widgets.get(
                     "astrometry_runs_tbl") is not None:

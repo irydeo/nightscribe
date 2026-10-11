@@ -369,6 +369,40 @@ class VisitWindow(QDialog):
 
     # ------------------------------------------------------------ build
 
+    def _paint_confirmation(self):
+        # @return: None. The rename notice in the visit's own header: the
+        #          project's context already carries it (the ficha looked it
+        #          up), so this reads and paints and never hits the network.
+        lbl = getattr(self._ui, "vp_lbl_confirm", None)
+        if lbl is None:
+            return
+        try:
+            from ...core import project as project_mod
+            p = project_mod.get(self._db, self._pid)
+        except Exception:
+            p = None
+        conf = ((p or {}).get("context") or {}).get("confirmed") or {}
+        desig = conf.get("designation")
+        if not desig:
+            lbl.setVisible(False)
+            return
+        mpec = conf.get("mpec") or ""
+        url = conf.get("mpec_url") or ""
+        if mpec and url:
+            tail = self.tr('published in <a href="%1">%2</a>').replace(
+                "%1", url).replace("%2", mpec)
+        elif mpec:
+            tail = self.tr("published in %1").replace("%1", mpec)
+        else:
+            tail = ""
+        text = "★ " + self.tr("Confirmed as <b>%1</b>").replace("%1", desig)
+        if tail:
+            text += " · " + tail
+        text += ". " + self.tr(
+            "Your observations of it are in that circular.")
+        lbl.setText(text)
+        lbl.setVisible(True)
+
     def _build_ui(self):
         from ...core import followup as fu
         s = fu.get_session(self._db, self._sid)
@@ -379,6 +413,7 @@ class VisitWindow(QDialog):
         # blocks are fragments loaded on demand (absent means absent),
         # and the Passive widgets land in their placeholders.
         self._ui = adopt_ui(self, "visit_window")
+        self._paint_confirmation()
         # the visit's date is its name in the list — editable in place
         # (ADR-045 review: «pin or edit a visit's name»)
         self._date_ed = self._ui.vp_visit_date

@@ -66,12 +66,27 @@ class CheckReport:
     blocked: bool = False
     outlier: bool = False
     no_reference: bool = False
+    no_fit: bool = False                    # Find_Orb could not fit an orbit
     our_residual: tuple | None = None      # (dra, ddec) arcsec
     scatter: tuple | None = None           # (dra, ddec) arcsec, robust
     z: tuple | None = None
     n_others: int = 0
     n_stations: int = 0
     note: str = ""
+    # The whole published list, ours included, so the GUI can show the
+    # table the observer asked for (Find_Orb's own Num/Date/Stn/RA/Dec/
+    # dRA/dDec). Each row is a dict; `ours` marks our own observations.
+    residuals: list = field(default_factory=list)
+    # The identity facts: where the reference came from, the designation
+    # it really lives under (a NEOCP object confirmed since the visit) and
+    # the MPEC that published it. The GUI shows them as the rename notice.
+    reference: str = ""                     # "MPC" | "NEOCP" | ""
+    resolved_desig: str = ""                # the confirmed designation, if any
+    mpec: str = ""
+    mpec_url: str = ""
+    confirmed_at: str = ""
+    ours_published: bool = False            # our station already in the list
+    n_obs: int = 0
 
 
 def probe(findorb_path=None):
@@ -172,21 +187,35 @@ def run(input_path, binary, env_file=None, cpu_limit=DEFAULT_CPU_LIMIT,
 
 def parse_output(workdir):
     # @args: workdir - where `fo` ran
-    # @return: dict {residuals: [...], elements: ..., ok: bool}
+    # @return: dict {residuals: [...], ok: bool, incomplete: bool}
     # `fo` writes total.json with the elements, the observations and their
     # residuals. The exact schema is fixed in the phase-0 checklist, so the
     # parser is defensive: it walks the structure looking for the residual
     # records instead of trusting one shape.
+    #
+    # Two very different failures are told apart here. No file at all means
+    # Find_Orb never wrote its answer (ok=False). A file that exists but is
+    # empty or truncated is the signature of a fit that produced ZERO
+    # objects: with nothing to fit, `fo` writes the header and stops
+    # ("objects": { and no closing brace), which is NOT valid JSON. That is
+    # "it ran but could not fit", not "it failed", so it is reported as
+    # ok=True with no residuals and `incomplete=True`; the caller then says
+    # the honest thing instead of "produced no residuals".
     path = Path(workdir) / "total.json"
     if not path.exists():
-        return {"residuals": [], "ok": False}
+        return {"residuals": [], "ok": False, "incomplete": False}
+    raw = path.read_text(encoding="utf-8", errors="replace")
+    if not raw.strip():
+        return {"residuals": [], "ok": True, "incomplete": True}
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (ValueError, OSError) as err:
-        logger.warning("cannot read Find_Orb's total.json: %s", err)
-        return {"residuals": [], "ok": False}
+        data = json.loads(raw)
+    except ValueError:
+        # a truncated file: Find_Orb fitted no object (see above)
+        logger.warning("Find_Orb's total.json is truncated: no object fitted")
+        return {"residuals": [], "ok": True, "incomplete": True}
     residuals = _find_residuals(data)
-    return {"residuals": residuals, "ok": True, "raw": data}
+    return {"residuals": residuals, "ok": True, "incomplete": False,
+            "raw": data}
 
 
 def _find_residuals(node, out=None):
@@ -207,18 +236,39 @@ def _find_residuals(node, out=None):
     return out
 
 
+def _first(node, *keys):
+    # @args: node - a dict with lowercased keys, keys - candidate key names
+    # @return: the first present, non-None value (None when none is)
+    # `value or fallback` is WRONG for numbers: a residual of exactly 0.0
+    # is a perfect fit, not "missing", and would fall through to the next
+    # key (or to None). This picks the first key that is PRESENT.
+    for key in keys:
+        if key in node and node[key] is not None:
+            return node[key]
+    return None
+
+
 def _as_residual(node):
     # @args: node - one residual record
-    # @return: {stn, time, dra, ddec} with whatever the record carries
+    # @return: a normalised dict with whatever the record carries
+    # The record is exactly what the listing needs: the instant, the
+    # station, the observed direction, the residual in RA and Dec and the
+    # magnitude. Find_Orb's total.json names the station "obscode" and the
+    # fields "dRA"/"dDec"/"RA"/"Dec"; the others are tolerated so a schema
+    # change does not silently empty a column.
     low = {k.lower(): v for k, v in node.items()}
     return {
-        # Find_Orb's total.json calls the station "obscode"; the others are
-        # tolerated so a schema change does not silently empty the column
-        "stn": (low.get("obscode") or low.get("stn") or low.get("code")
-                or low.get("station")),
-        "time": low.get("time") or low.get("obstime") or low.get("jd"),
-        "dra": _num(low.get("dra") or low.get("resid_ra")),
-        "ddec": _num(low.get("ddec") or low.get("resid_dec")),
+        "stn": (_first(low, "obscode", "stn", "code", "station") or ""),
+        "time": _first(low, "jd", "time", "obstime"),
+        "iso": _first(low, "iso date", "iso_date", "iso") or "",
+        "ra": _num(_first(low, "ra", "resid_ra")),
+        "dec": _num(_first(low, "dec", "resid_dec")),
+        "dra": _num(_first(low, "dra", "resid_ra")),
+        "ddec": _num(_first(low, "ddec", "resid_dec")),
+        "mag": _num(_first(low, "magobs", "mag")),
+        "band": _first(low, "magband", "band") or "",
+        "note": (_first(low, "note1", "note") or "").strip(),
+        "ours": False,
     }
 
 
@@ -283,11 +333,90 @@ def decide(our_dra, our_ddec, others, our_rms_arcsec=0.0, cfg=None):
     return report
 
 
+def _our_code(cfg, obs_code=None):
+    # @args: cfg - Config or None, obs_code - an explicit station code
+    # @return: our MPC station code, upper-cased ("" when unknown)
+    code = obs_code
+    if not code and cfg is not None:
+        code = cfg.get("mpc_code") if hasattr(cfg, "get") else None
+    return str(code or "").strip().upper()
+
+
+def _our_jds(ours_lines):
+    # @args: ours_lines - our 80-column lines (string or list)
+    # @return: the Julian dates we submitted, as floats
+    # The instant is what identifies OUR residuals when the MPC already
+    # holds other observations from our own station (a visit is not the
+    # first time a code appears): matching by station alone would pick the
+    # older published point and compare us with ourselves. The date is
+    # columns 15-31 ("YYYY MM DD.DDDDDDD", UTC), so the same clock the app
+    # wrote it with converts it back (core/coords).
+    from .coords import jd_from_datetime
+    import datetime as _dt
+    out = []
+    for line in _lines(ours_lines):
+        if len(line) < 32:
+            continue
+        try:
+            year = int(line[15:19])
+            month = int(line[20:22])
+            day = float(line[23:32])
+        except (ValueError, IndexError):
+            continue
+        base = _dt.datetime(year, month, 1, tzinfo=_dt.timezone.utc)
+        out.append(jd_from_datetime(base + _dt.timedelta(days=day - 1)))
+    return out
+
+
+def _match_ours(residuals, our_jds, want_code):
+    # @args: residuals - the parsed records, our_jds - our submitted JDs,
+    #        want_code - our station code
+    # @return: (ours, others) with the chosen record's `ours` flag set
+    # Four identities, strongest first, because the same station can appear
+    # more than once and our line can be MERGED by Find_Orb into an already
+    # published near-duplicate (same station, seconds apart):
+    #   1. the exact instant we submitted AND our station (the real answer);
+    #   2. the exact instant, any station (our line accepted, station blank);
+    #   3. our station, the record nearest our instant (Find_Orb merged our
+    #      near-duplicate into a published point: our data is already there);
+    #   4. the first line, which is ours because write_input puts ours first.
+    tol = 1e-6   # ~0.09 s: the 80-column time carries ~0.9 ms
+    for r in residuals:      # every row carries the flag the table reads
+        r["ours"] = False
+
+    def time_ok(r):
+        jd = r.get("time")
+        return (jd is not None
+                and any(abs(float(jd) - o) <= tol for o in our_jds))
+
+    def stn_ok(r):
+        return bool(want_code) and \
+            str(r.get("stn") or "").strip().upper() == want_code
+
+    chosen = next((r for r in residuals if time_ok(r) and stn_ok(r)), None)
+    if chosen is None:
+        chosen = next((r for r in residuals if time_ok(r)), None)
+    if chosen is None and want_code:
+        near = [r for r in residuals if stn_ok(r)]
+        if near:
+            chosen = min(near, key=lambda r: min(
+                (abs(float(r["time"]) - o) for o in our_jds), default=0.0)
+                if r.get("time") is not None else 0.0)
+    if chosen is None and residuals:
+        chosen = residuals[0]
+    if chosen is None:
+        return [], []
+    chosen["ours"] = True
+    others = [r for r in residuals if r is not chosen]
+    return [chosen], others
+
+
 def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
-          cancel=None, timeout=180):
+          cancel=None, timeout=180, obs_code=None):
     # @args: ours_lines - our 80-column lines, desig - the object, cfg -
     #        Config, others_lines - the published lines (when the caller
-    #        already fetched them), findorb_path - override, cancel, timeout
+    #        already fetched them), findorb_path - override, cancel, timeout,
+    #        obs_code - our MPC station code (to flag our own rows)
     # @return: CheckReport
     # The whole handoff, in order: fetch the others (unless given), write
     # the file, run `fo`, parse the residuals, decide. Without Find_Orb the
@@ -296,9 +425,28 @@ def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
                             (cfg.get("findorb_path") if cfg else None))
     if not binary:
         return CheckReport(available=False, note=message)
+    ref = None
     if others_lines is None:
         from .sources import mpc_obs
-        others_lines = mpc_obs.observations_80(desig)
+        ref = mpc_obs.reference_80(desig, obs_code=_our_code(cfg, obs_code))
+        others_lines = ref.lines
+    if not _lines(others_lines):
+        # No published observations means nothing to fit an orbit from, so
+        # there is nothing to compare with. That is NOT a Find_Orb failure
+        # and must not be dressed up as one: an object known only by its
+        # NEOCP name used to answer "Find_Orb produced no residuals" when
+        # the real cause was an empty reference. Say it plainly, and carry
+        # the identity facts (it may have been confirmed since).
+        note = (ref.note if ref else "") or (
+            f"no published observations found for {desig}")
+        return CheckReport(
+            no_reference=True, note=note,
+            reference=(ref.source if ref else ""),
+            resolved_desig=(ref.designation if ref else ""),
+            mpec=(ref.mpec if ref else ""),
+            mpec_url=(ref.mpec_url if ref else ""),
+            confirmed_at=(ref.confirmed_at if ref else ""),
+            ours_published=(ref.ours_present if ref else False))
     workdir = None
     try:
         workdir = tempfile.mkdtemp(prefix="nightscribe-fo-in-")
@@ -310,28 +458,56 @@ def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
         if not ok:
             return CheckReport(available=False, note=log)
         parsed = parse_output(run_dir)
-        if not parsed["ok"] or not parsed["residuals"]:
+        if not parsed["ok"]:
             return CheckReport(available=False,
-                               note="Find_Orb produced no residuals")
-        return _decide_from_residuals(parsed["residuals"], cfg)
+                               note="Find_Orb produced no output")
+        if not parsed["residuals"]:
+            # It ran, but fitted no object: too few or too short a set of
+            # reference observations. Honest wording, not "no residuals".
+            report = CheckReport(
+                no_fit=True,
+                note="Find_Orb could not fit an orbit from the published "
+                     "observations (too few or too short an arc)")
+            _attach_reference(report, ref)
+            return report
+        report = _decide_from_residuals(parsed["residuals"], cfg,
+                                        _our_code(cfg, obs_code),
+                                        ours_lines=ours_lines)
+        _attach_reference(report, ref)
+        return report
     finally:
         for path in (workdir,):
             if path:
                 shutil.rmtree(path, ignore_errors=True)
 
 
-def _decide_from_residuals(residuals, cfg):
-    # @args: residuals - the parsed records, cfg - Config
+def _attach_reference(report, ref):
+    # @args: report - a CheckReport, ref - a mpc_obs.Reference or None
+    # @return: None. Copies the identity facts onto the report so the GUI
+    #          can show the rename notice without another network call.
+    if ref is None:
+        return
+    report.reference = ref.source
+    report.resolved_desig = ref.designation
+    report.mpec = ref.mpec
+    report.mpec_url = ref.mpec_url
+    report.confirmed_at = ref.confirmed_at
+    report.ours_published = ref.ours_present
+
+
+def _decide_from_residuals(residuals, cfg, obs_code="", ours_lines=None):
+    # @args: residuals - the parsed records, cfg - Config, obs_code - our
+    #        station, ours_lines - our 80-column lines (to match by instant)
     # @return: CheckReport
-    # Split ours from the others: ours are the ones Find_Orb fitted OUT (a
-    # zero weight) and reported as check observations; without that
-    # distinction the caller would compare us with ourselves.
-    ours = [r for r in residuals if r.get("check")]
-    others = [r for r in residuals if not r.get("check")]
-    if not ours:
-        ours = residuals[:1]
-        others = residuals[1:]
+    # Split ours from the others. Find_Orb's total.json has no "check" flag,
+    # so ours are found by the instant we submitted, then by our station.
+    # Without that distinction the caller would compare us with ourselves.
+    our_jds = _our_jds(ours_lines) if ours_lines is not None else []
+    ours, others = _match_ours(residuals, our_jds, obs_code)
     if not ours:
         return CheckReport(no_reference=True, note="no residual for ours")
     our = ours[0]
-    return decide(our.get("dra"), our.get("ddec"), others, cfg=cfg)
+    report = decide(our.get("dra"), our.get("ddec"), others, cfg=cfg)
+    report.residuals = residuals
+    report.n_obs = len(residuals)
+    return report

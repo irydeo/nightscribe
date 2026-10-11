@@ -19,8 +19,8 @@
 ############################################################
 
 # The version is passed by the CI as _version; a bare build falls back to
-# 0.0.0. The `%if 0%{?x}` idiom only works when x is a number, so a string
-# version there is a parse error (measured: "bad %if condition").
+# 0.0.0. (The usual numeric conditional idiom does not accept a string
+# version: it is a parse error, "bad condition".)
 %define version %{?_version}%{!?_version:0.0.0}
 
 Name:           nightscribe

@@ -146,7 +146,8 @@ jobs:
     steps:
       - name: Install build tools
         run: |
-          dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build
+          dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build \
+            python3-devel
 
       - name: Checkout
         uses: actions/checkout@v4

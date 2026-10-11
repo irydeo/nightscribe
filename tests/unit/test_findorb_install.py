@@ -213,3 +213,93 @@ def test_an_already_installed_fo_is_just_pointed_at(qapp, monkeypatch):
     win._install_findorb(dlg)
     assert dlg.edt_findorb_path.text() == "/opt/fo/bin/fo"
     dlg.deleteLater()
+
+
+# --------------------------------------------- bundled copy and ephemeris
+
+def test_bundled_fo_finds_the_shipped_copy(tmp_path, monkeypatch):
+    from nightscribe import paths
+    bundle = tmp_path / "findorb"
+    (bundle / "bin").mkdir(parents=True)
+    (bundle / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: bundle)
+    assert fi.bundled_fo() == str(bundle / "bin" / "fo")
+
+
+def test_bundled_fo_is_none_without_a_copy(monkeypatch):
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    assert fi.bundled_fo() is None
+
+
+def test_the_ephemeris_lives_in_the_private_findorb_home(tmp_path,
+                                                         monkeypatch):
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_home_dir", lambda: tmp_path)
+    assert fi.ephemeris_path() == tmp_path / ".find_orb" / fi.EPHEMERIS_NAME
+    assert fi.has_ephemeris() is False
+    fi.ephemeris_path().parent.mkdir(parents=True)
+    fi.ephemeris_path().write_bytes(b"x")
+    assert fi.has_ephemeris() is True
+
+
+def test_download_ephemeris_places_the_file_where_findorb_reads_it(
+        tmp_path, monkeypatch):
+    # The whole point of the download: the ~95 MB file lands STRAIGHT where
+    # Find_Orb looks, so the next check uses it (it must "save correctly").
+    import io
+    import tarfile
+    import urllib.request
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_home_dir", lambda: tmp_path)
+
+    payload = io.BytesIO()
+    with tarfile.open(fileobj=payload, mode="w:bz2") as tar:
+        data = b"EPHEMERIS-BYTES"
+        info = tarfile.TarInfo(
+            "share/findorb/jpl_eph/" + fi.EPHEMERIS_NAME)
+        info.size = len(data)
+        tar.addfile(info, io.BytesIO(data))
+    body = payload.getvalue()
+
+    class _Resp(io.BytesIO):
+        headers = {"Content-Length": str(len(body))}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda *a, **k: _Resp(body))
+    seen = []
+    out = fi.download_ephemeris(progress=lambda d, t: seen.append((d, t)))
+    assert out["ok"] is True
+    dest = tmp_path / ".find_orb" / fi.EPHEMERIS_NAME
+    assert dest.read_bytes() == b"EPHEMERIS-BYTES"
+    assert seen and seen[-1][0] == len(body)
+
+
+def test_download_ephemeris_is_idempotent(tmp_path, monkeypatch):
+    import urllib.request
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_home_dir", lambda: tmp_path)
+    dest = tmp_path / ".find_orb" / fi.EPHEMERIS_NAME
+    dest.parent.mkdir(parents=True)
+    dest.write_bytes(b"already")
+    # A second call must not touch the network at all
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("should not download")))
+    out = fi.download_ephemeris()
+    assert out["ok"] is True and out["path"] == str(dest)
+
+
+def test_the_settings_offer_the_ephemeris_download(qapp):
+    from nightscribe.gui.main_window import _load_ui
+    dlg = _load_ui("settings_dialog")
+    assert dlg.btn_findorb_eph.text()
+    assert hasattr(dlg, "lbl_findorb_eph_state")
+    assert hasattr(dlg, "edt_findorb_eph_url")
+    dlg.deleteLater()

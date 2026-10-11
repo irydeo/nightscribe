@@ -1,0 +1,176 @@
+# NightScribe - Linux packages (.deb and .rpm)
+#
+# Builds the two system-Python packages and the Find_Orb payload they ship,
+# and publishes them as a rolling pre-release, the same way the Windows
+# preview does.
+#
+# Target distros (ADR-080): Debian 13+ and Ubuntu 25.10+ (the ones that
+# package PySide6). Older ones (Ubuntu 24.04 LTS) are a documented manual
+# install, not built here.
+#
+# The unit tests run on ubuntu-latest (where the whole suite passes); the
+# build jobs run inside a minimal container that only needs the packaging
+# tools, NOT Qt: they never start the app.
+
+name: Linux packages
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: linux-packages-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # ------------------------------------------------------------------ gate
+  test:
+    name: Unit tests (amd64)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - name: Checkout (full history for setuptools-scm)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests (a red suite publishes nothing)
+        timeout-minutes: 45
+        run: python -m pytest tests/unit -n auto --dist loadfile -q
+
+      - name: Resolve the version
+        id: ver
+        run: |
+          v=$(python -c "from importlib.metadata import version; print(version('nightscribe'))")
+          echo "version=${v//+/-}" >> "$GITHUB_OUTPUT"
+
+  # ------------------------------------------------------------------ .deb
+  deb:
+    name: Build .deb (amd64)
+    needs: test
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates curl bzip2 tar dpkg-dev python3
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare the Find_Orb payload (amd64)
+        run: sh tools/fetch_findorb.sh findorb-payload
+
+      - name: Build the .deb
+        run: |
+          python3 tools/build_deb.py \
+            --version "${{ needs.test.outputs.version }}" \
+            --findorb findorb-payload --arch amd64 --out dist
+          ls -la dist
+
+      - name: Upload the .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+
+  # ------------------------------------------------------------------ .rpm
+  rpm:
+    name: Build .rpm (x86_64)
+    needs: test
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install build tools
+        run: |
+          dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare the Find_Orb payload (linux-64)
+        run: sh tools/fetch_findorb.sh findorb-payload
+
+      - name: Build the .rpm
+        run: |
+          ver="${{ needs.test.outputs.version }}"
+          top="$PWD/rpmbuild"
+          mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          # The spec is built from a source tarball that carries the payload.
+          tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \
+            --exclude=.venv --exclude=.git --exclude=dist --exclude=rpmbuild \
+            --transform "s,^\.,nightscribe-$ver," .
+          rpmbuild -bb --define "_version $ver" \
+            --define "_topdir $top" installer/rpm/nightscribe.spec
+          mkdir -p dist
+          find "$top/RPMS" -name '*.rpm' -exec cp {} dist/ \;
+          ls -la dist
+
+      - name: Upload the .rpm
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: dist/*.rpm
+
+  # -------------------------------------------------------------- publish
+  # Tolerant on purpose: publish whatever built, so a broken .rpm does not
+  # throw away a good .deb (the observer asked for the artifacts).
+  publish:
+    name: Publish the rolling pre-release
+    needs: [test, deb, rpm]
+    if: always() && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la dist || true
+          if ! ls dist/*.deb dist/*.rpm >/dev/null 2>&1; then
+            echo "no package was built; nothing to publish"
+            exit 0
+          fi
+          sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          tag="linux-preview-${{ github.ref_name }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release delete "$tag" --cleanup-tag --yes
+          fi
+          notes="Linux packages of branch **${{ github.ref_name }}** at commit \`$sha\`, built after the unit test suite passed.
+
+          - **nightscribe_*_amd64.deb**: Debian 13+ / Ubuntu 25.10+ (system Python; includes Find_Orb).
+          - **nightscribe-*.x86_64.rpm**: Fedora 42+ / openSUSE Tumbleweed (system Python; includes Find_Orb).
+
+          Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY."
+
+          gh release create "$tag" --target "${GITHUB_SHA}" --prerelease \
+            --title "Linux preview ${{ github.ref_name }} ($sha)" \
+            --notes "$notes" dist/*.deb dist/*.rpm

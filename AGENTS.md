@@ -312,12 +312,18 @@ tools/bench/         #   catálogo, inyección/recuperación, combinación, flat
 tools/i18n.py        # recompila los catálogos de traducción: lupdate + lrelease
                      #   ATÓMICO (ADR-079); nunca el lrelease crudo con la app
                      #   abierta
+tools/fetch_findorb.sh # prepara el Find_Orb que se empaqueta (micromamba,
+                     #   sin la efeméride DE430t); lo usan el CI y build_deb
+tools/build_deb.py   # construye el .deb (Python del sistema, ADR-080)
 website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
                      #   README y el manual es docs/user, los mismos ficheros
                      #   que pinta la app; tools/build_site.py los convierte y
                      #   inyecta la paleta y los chips del tema; el HTML se
                      #   commitea y un test lo regenera y lo compara
-installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
+installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
+                     #   Setup, con Find_Orb dentro y su aviso de licencia);
+                     #   nightscribe.desktop, rpm/nightscribe.spec y
+                     #   arch/PKGBUILD para los paquetes de Linux (ADR-080)
 .github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
                      #   PyInstaller, zip portable + instalador Inno, pre-release
                      #   rodante preview-<rama>; push a main o manual)

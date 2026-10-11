@@ -74,6 +74,23 @@ jobs:
           "label=$v-preview.$sha7" >> $env:GITHUB_OUTPUT
           echo "version: $v / label: $v-preview.$sha7"
 
+      - name: Fetch Find_Orb (bundled with the app, ADR-079)
+        shell: pwsh
+        run: |
+          # The non-interactive `fo64.exe` plus the interactive console and
+          # its data files, into findorb-payload/. The PyInstaller spec picks
+          # the folder up and ships it as findorb/ inside the bundle, so the
+          # orbit check works with no path to set. NightScribe does not
+          # redistribute it outside this build (GPLv2 + a no-commercial
+          # clause; the installer shows the notice).
+          New-Item -ItemType Directory -Force -Path findorb-payload | Out-Null
+          Invoke-WebRequest -Uri https://www.projectpluto.com/find_c64.zip `
+            -OutFile find_c64.zip
+          Expand-Archive find_c64.zip -DestinationPath findorb-payload -Force
+          Invoke-WebRequest -Uri https://www.projectpluto.com/devel/fo64.exe `
+            -OutFile findorb-payload\fo64.exe
+          Get-ChildItem findorb-payload | Select-Object -ExpandProperty Name
+
       - name: Build with PyInstaller
         run: pyinstaller installer/nightscribe.spec --clean --noconfirm
 

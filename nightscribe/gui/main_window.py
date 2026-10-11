@@ -1846,6 +1846,106 @@ class MainWindow(QMainWindow):
                 dlg, self.tr("Find_Orb"),
                 self.tr("The installation failed:") + f" {message}")
 
+    def _findorb_eph_refresh(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The DE430t is a FACT about the disk, not a setting:
+        #          the label says whether Find_Orb will find it.
+        from ..core import findorb_install
+        lbl = getattr(dlg, "lbl_findorb_eph_state", None)
+        btn = getattr(dlg, "btn_findorb_eph", None)
+        if lbl is None:
+            return
+        if findorb_install.has_ephemeris():
+            lbl.setText(self.tr("installed"))
+            lbl.setStyleSheet(f"color: {theme.C_OK};")
+            if btn is not None:
+                btn.setText(self.tr("Re-download…"))
+        else:
+            lbl.setText(self.tr("not installed (optional)"))
+            lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+            if btn is not None:
+                btn.setText(self.tr("Download (95 MB)…"))
+
+    def _download_findorb_eph(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The ~95 MB download runs off the GUI thread and the
+        #          file lands STRAIGHT where Find_Orb reads it, so the next
+        #          check uses it (the observer asked it to save correctly).
+        from PySide6.QtWidgets import QProgressDialog
+        from .workers import FindOrbEphemerisWorker
+        url = ""
+        edt = getattr(dlg, "edt_findorb_eph_url", None)
+        if edt is not None:
+            url = edt.text().strip()
+        prog = QProgressDialog(self.tr("Downloading the DE430t ephemeris…"),
+                               self.tr("Cancel"), 0, 0, dlg)
+        prog.setWindowTitle(self.tr("DE430t ephemeris"))
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setMinimumDuration(0)
+        prog.setAutoClose(False)
+        prog.setAutoReset(False)
+        worker = FindOrbEphemerisWorker(url)
+        self._findorb_eph_worker = worker
+        self._findorb_eph_prog = prog
+        worker.progress.connect(
+            lambda done, total: self._findorb_eph_progress(prog, done, total))
+        worker.finished.connect(lambda out: self._findorb_eph_done(dlg, out))
+        worker.failed.connect(
+            lambda message: self._findorb_eph_failed(dlg, message))
+        prog.canceled.connect(worker.cancel)
+        self._keep(worker)
+        worker.start()
+        prog.show()
+
+    def _findorb_eph_progress(self, prog, done, total):
+        # @args: prog - the progress dialog, done/total - bytes so far / total
+        # @return: None. With no Content-Length the bar is indeterminate.
+        if total > 0:
+            prog.setRange(0, 100)
+            prog.setValue(int(done * 100 / total))
+            prog.setLabelText(self.tr(
+                "Downloading the DE430t ephemeris… %1 MB of %2 MB").replace(
+                    "%1", f"{done / 1e6:.0f}").replace(
+                    "%2", f"{total / 1e6:.0f}"))
+        else:
+            prog.setRange(0, 0)
+
+    def _findorb_eph_close(self):
+        # @return: None
+        prog = getattr(self, "_findorb_eph_prog", None)
+        if prog is not None:
+            prog.reset()
+            prog.close()
+        self._findorb_eph_prog = None
+        self._findorb_eph_worker = None
+
+    def _findorb_eph_done(self, dlg, out):
+        # @args: dlg - the settings dialog (maybe already destroyed), out -
+        #        the worker's report
+        # @return: None
+        self._findorb_eph_close()
+        out = out if isinstance(out, dict) else {}
+        if not Shiboken.isValid(dlg):
+            return
+        if out.get("ok"):
+            self._findorb_eph_refresh(dlg)
+            QMessageBox.information(dlg, self.tr("DE430t ephemeris"), self.tr(
+                "The ephemeris is in place: the orbit fit will use planetary "
+                "perturbations from now on."))
+            return
+        QMessageBox.warning(dlg, self.tr("DE430t ephemeris"), self.tr(
+            "The download did not finish: %1").replace(
+                "%1", str(out.get("error") or "")))
+
+    def _findorb_eph_failed(self, dlg, message):
+        # @args: dlg - the settings dialog, message - the error (English)
+        # @return: None
+        self._findorb_eph_close()
+        if Shiboken.isValid(dlg):
+            QMessageBox.warning(
+                dlg, self.tr("DE430t ephemeris"),
+                self.tr("The download failed:") + f" {message}")
+
     def _pick_exotic_python(self, dlg):
         # Browse for the Python <=3.10 interpreter that will host EXOTIC.
         from PySide6.QtWidgets import QFileDialog
@@ -2251,6 +2351,8 @@ class MainWindow(QMainWindow):
 
         # every simple field, one table both ways (ADR-071)
         settings_spec.load(dlg, config)
+        # the DE430t state is not a config field: it is a fact about the disk
+        self._findorb_eph_refresh(dlg)
 
         # combos with an index or a data mapping of their own
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
@@ -2319,6 +2421,8 @@ class MainWindow(QMainWindow):
         dlg.btn_findorb_test.clicked.connect(lambda: self._test_findorb(dlg))
         dlg.btn_findorb_install.clicked.connect(
             lambda: self._install_findorb(dlg))
+        dlg.btn_findorb_eph.clicked.connect(
+            lambda: self._download_findorb_eph(dlg))
         dlg.btn_exotic_py_browse.clicked.connect(
             lambda: self._pick_exotic_python(dlg))
         dlg.btn_exotic_dir_browse.clicked.connect(

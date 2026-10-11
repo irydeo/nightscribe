@@ -152,6 +152,15 @@ automatic lookup comes up empty (the MPC's list of just-confirmed NEOCP objects
 is short), type the current designation in **Check against** and press
 **Re-check**.
 
+### Find_Orb comes with the app
+
+You do not install Find_Orb by hand: it travels inside NightScribe, so the
+check works out of the box. The optional **DE430t ephemerides** (public domain,
+about 95 MB) give the orbit fit finer planetary perturbations; download them
+from **Settings → Measurement → Find_Orb** if you want them (they are not
+bundled). If you already keep your own Find_Orb, point the path field at it and
+the app uses that copy instead.
+
 ## The MPC report
 
 **Manage MPC report** opens the report in its own window: the full submission

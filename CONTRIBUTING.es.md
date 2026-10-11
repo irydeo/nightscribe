@@ -40,6 +40,27 @@ otra app que lo tenga mapeado.
 El inglés es el idioma base del código; el español es una traducción. Los tests
 fallan si queda alguna cadena `unfinished`.
 
+## Empaquetado
+
+```bash
+# Windows: Inno Setup sobre el onedir de PyInstaller (el workflow hace ambos)
+pyinstaller installer/nightscribe.spec --clean --noconfirm
+
+# Linux (.deb): Python del sistema, Find_Orb dentro (ADR-080)
+sh tools/fetch_findorb.sh findorb-payload
+.venv/bin/python tools/build_deb.py --version 0.1.0 --findorb findorb-payload
+
+# Linux (.rpm): installer/rpm/nightscribe.spec   (rpmbuild -bb)
+# Arch:         installer/arch/PKGBUILD
+```
+
+Los tres paquetes de Linux usan el Python y el Qt de la DISTRO (ADR-080):
+`.deb` para Debian 13+ / Ubuntu 25.10+, `.rpm` para Fedora 42+ / openSUSE
+Tumbleweed y un PKGBUILD para Arch. Find_Orb viaja dentro (programa separado,
+agregación legal para esta app GPLv3 no comercial); la efeméride DE430t no, se
+descarga desde Ajustes. Las distros sin PySide6 empaquetado (Ubuntu 24.04 LTS)
+son instalación manual documentada.
+
 ## Tests
 
 ```bash

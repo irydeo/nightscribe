@@ -85,6 +85,44 @@ def docs_dir():
     return Path(__file__).resolve().parent.parent / "docs"
 
 
+def findorb_bundle_dir():
+    # @return: the folder of the Find_Orb copy NightScribe ships (the `fo`
+    #          binary plus its share/findorb data), or None when there is
+    #          none (a source tree without it). This is what makes the check
+    #          work out of the box: install NightScribe and Find_Orb is
+    #          already there, no path to set.
+    # The three places a running copy looks, in order: the PyInstaller bundle
+    # (Windows installer and portable build), a system install (the .deb and
+    # the .rpm drop it in /usr/lib/nightscribe/findorb) and a checkout that
+    # has one next to the package.
+    candidates = []
+    if getattr(sys, "frozen", False):
+        candidates.append(Path(sys._MEIPASS) / "findorb")
+    candidates += [
+        Path("/usr/lib/nightscribe/findorb"),
+        Path("/usr/share/nightscribe/findorb"),
+        Path(__file__).resolve().parent.parent / "findorb",
+    ]
+    for cand in candidates:
+        if cand.is_dir():
+            return cand
+    return None
+
+
+def findorb_home_dir():
+    # @return: a PRIVATE home for the Find_Orb subprocess.
+    # Find_Orb copies its data to `$HOME/.find_orb` on the first run, and it
+    # reads the JPL ephemeris from there. Pointing HOME at this folder keeps
+    # all of that inside NightScribe's own data dir instead of the observer's
+    # real home, and it is what makes the copy we SHIP work: that `fo` was
+    # built with its package manager's prefix baked in, so on its own it
+    # would try to copy data from a path that no longer exists. We seed
+    # `.find_orb` from the shipped data instead (see core/findorb).
+    p = data_dir() / "findorb" / "home"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def project_dir(project_id, slug="", root=""):
     # @args: project_id - int, slug - object name (sanitised to a safe folder
     #        name; non-alphanumeric chars become _, capped at 50 chars),

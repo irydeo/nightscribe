@@ -806,7 +806,21 @@
                <item><widget class="QPushButton" name="btn_findorb_install"><property name="text"><string>Install…</string></property><property name="toolTip"><string>Install Find_Orb for me: it looks for micromamba, mamba or conda, creates a private environment with the conda-forge package "findorb" (the precompiled fo plus the DE430t ephemerides) and fills the path. With no package manager it tells you what to install and what to type: the app never downloads one on its own</string></property></widget></item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_findorb"><property name="text"><string>Optional: the NON-interactive Find_Orb ("fo" on Linux/macOS, "fo64.exe" on Windows) checks our measurements against the published ones before the report; the interactive one is refused. An empty path looks for "fo" on PATH. Without it the check is not available, and it says so</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_findorb_eph">
+               <item><widget class="QLabel" name="lbl_findorb_eph"><property name="text"><string>DE430t ephemeris:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLabel" name="lbl_findorb_eph_state"><property name="text"><string/></property></widget></item>
+               <item><spacer name="hsp_findorb_eph"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+               <item><widget class="QPushButton" name="btn_findorb_eph"><property name="text"><string>Download (95 MB)…</string></property><property name="toolTip"><string>Download the JPL DE430t ephemerides (public domain, about 95 MB) into Find_Orb's own folder, so the orbit fit includes planetary perturbations. It is optional: without it Find_Orb still runs, with coarser planetary positions. The download goes straight to the folder Find_Orb reads, so the next check uses it</string></property></widget></item>
+              </layout>
+             </item>
+             <item>
+              <layout class="QHBoxLayout" name="row_findorb_eph_url">
+               <item><widget class="QLabel" name="lbl_findorb_eph_url"><property name="text"><string>Ephemeris source:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_findorb_eph_url"><property name="placeholderText"><string notr="true">https://conda.anaconda.org/conda-forge/…</string></property><property name="toolTip"><string>The URL the DE430t download comes from. Leave it empty for the default (the conda-forge package); point it elsewhere if you keep the file on your own server or mirror</string></property></widget></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_findorb"><property name="text"><string>Optional: the NON-interactive Find_Orb ("fo" on Linux/macOS, "fo64.exe" on Windows) checks our measurements against the published ones before the report; the interactive one is refused. The app SHIPS a copy and uses it when the path is empty; an empty path with no shipped copy looks for "fo" on PATH. Without it the check is not available, and it says so</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item><widget class="QLabel" name="lblH_findorb_install"><property name="text"><string>Install… first checks whether fo is already on PATH and points the path at it, because that is the common case: the program was installed and the app was never told. If it is not there, the install runs with the package manager it finds, and the environment is private, inside the folder you choose, so nothing of your existing setup is touched</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>

@@ -103,11 +103,90 @@ def probe(findorb_path=None):
         if Path(candidate).exists():
             return candidate, f"Find_Orb at {candidate}"
         return None, f"not found: {candidate}"
+    # No configured path: use the copy NightScribe SHIPS before looking at
+    # PATH. Installing the app brings Find_Orb with it, so the check works
+    # out of the box and there is no path to set.
+    from .. import paths
+    bundle = paths.findorb_bundle_dir()
+    if bundle is not None:
+        from .findorb_install import find_fo
+        found = find_fo(bundle)
+        if found:
+            return found, f"Find_Orb at {found} (bundled with NightScribe)"
     for name in FO_NAMES:
         found = shutil.which(name)
         if found:
             return found, f"Find_Orb at {found}"
     return None, "Find_Orb is not configured (Settings > Measurement)"
+
+
+def _seed_findorb_home(home):
+    # @args: home - the private HOME (paths.findorb_home_dir)
+    # @return: None. On the first run, copy the data NightScribe ships into
+    #          `<home>/.find_orb`, which is where Find_Orb looks for it, and
+    #          place the JPL ephemeris if the bundle carries one.
+    # This is the piece that makes a RELOCATED `fo` work. The `fo` we ship
+    # was built with its package manager's prefix baked into the binary and
+    # copies `share/findorb/data` to `$HOME/.find_orb` on the first run; on a
+    # machine where that prefix does not exist the copy throws and the run
+    # dies before reading a single observation (measured 2026-10-11). Seeding
+    # the folder first means the copy is a no-op and `fo` starts.
+    # Two layouts: the conda one (share/findorb/data) and the Project Pluto
+    # zip, which unpacks its data files flat next to the executable.
+    cfg = Path(home) / ".find_orb"
+    from .. import paths
+    bundle = paths.findorb_bundle_dir()
+    if bundle is None:
+        return
+    data = bundle / "share" / "findorb" / "data"
+    flat = not data.is_dir()
+    if flat and (bundle / "ObsCodes.htm").is_file():
+        data = bundle
+    if data.is_dir() and not (cfg / "ObsCodes.htm").exists():
+        cfg.mkdir(parents=True, exist_ok=True)
+        for item in data.iterdir():
+            if not item.is_file():
+                continue
+            if flat and item.suffix.lower() in (".exe", ".dll", ".zip"):
+                continue      # the zip's programs stay where they are
+            dest = cfg / item.name
+            if not dest.exists():
+                try:
+                    shutil.copy2(item, dest)
+                except OSError:
+                    pass
+    # The JPL ephemeris (DE430t) is optional and large: it may come with the
+    # package or be downloaded from Settings. Find_Orb reads it from
+    # `.find_orb` too, so a bundled one is linked (or copied on Windows).
+    for eph in (bundle / "share" / "findorb" / "jpl_eph", bundle):
+        if not eph.is_dir():
+            continue
+        for item in eph.iterdir():
+            if item.suffix.lower() != ".430t":
+                continue
+            cfg.mkdir(parents=True, exist_ok=True)
+            dest = cfg / item.name
+            if dest.exists():
+                continue
+            try:
+                dest.symlink_to(item)
+            except OSError:
+                try:
+                    shutil.copy2(item, dest)
+                except OSError:
+                    pass
+
+
+def _private_env():
+    # @return: os.environ with HOME (and USERPROFILE, for Windows) pointed at
+    #          the private Find_Orb home, seeded on the way.
+    from .. import paths
+    home = paths.findorb_home_dir()
+    _seed_findorb_home(home)
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["USERPROFILE"] = str(home)
+    return env
 
 
 def _lines(value):
@@ -177,8 +256,13 @@ def run(input_path, binary, env_file=None, cpu_limit=DEFAULT_CPU_LIMIT,
     if cpu_limit:
         args += ["-r", cpu_limit]
     try:
+        # A PRIVATE home (paths.findorb_home_dir) keeps Find_Orb's own
+        # `~/.find_orb` inside NightScribe's data folder and, seeded with the
+        # shipped data, is what lets the `fo` we ship run at all (see
+        # _seed_findorb_home).
         proc = subprocess.run(args, cwd=workdir, capture_output=True,
-                              text=True, timeout=timeout)
+                              text=True, timeout=timeout,
+                              env=_private_env())
     except (subprocess.TimeoutExpired, OSError) as err:
         return False, workdir, f"Find_Orb failed: {err}"
     log = (proc.stdout or "") + (proc.stderr or "")

@@ -324,9 +324,11 @@ installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
                      #   Setup, con Find_Orb dentro y su aviso de licencia);
                      #   nightscribe.desktop, rpm/nightscribe.spec y
                      #   arch/PKGBUILD para los paquetes de Linux (ADR-080)
-.github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
-                     #   PyInstaller, zip portable + instalador Inno, pre-release
-                     #   rodante preview-<rama>; push a main o manual)
+.github/workflows/   # preview.yml: el build de preview de las DOS plataformas
+                     #   (tests unitarios en ubuntu y en Windows, PyInstaller +
+                     #   zip portable + instalador Inno, .deb y .rpm) y un solo
+                     #   pre-release rodante preview-<rama> con los cuatro
+                     #   artefactos; push a main o manual (ADR-080)
                      # windows-tests.yml: la suite unitaria en Windows, en cada PR
                      # pages.yml: construye la web y la publica en GitHub Pages
                      #   (push a main o release/v0.1, y manual)

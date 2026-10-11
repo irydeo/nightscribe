@@ -55,7 +55,9 @@ Hechos medidos (2026-10-11):
    - **PKGBUILD** para Arch (con `python-photutils` e `python-imageio-ffmpeg` del
      AUR).
    El build de cada uno está en `tools/build_deb.py`, `installer/rpm/nightscribe.spec`
-   e `installer/arch/PKGBUILD`, y el CI en `.github/workflows/linux-packages.yml`.
+   e `installer/arch/PKGBUILD`, y el CI en `.github/workflows/preview.yml` (un
+   solo workflow que, al mergear a `main`, construye Windows y Linux y publica
+   los cuatro artefactos juntos).
 4. **`imageio-ffmpeg` es opcional** (Recomienda): solo alimenta la exportación
    MP4. Sin él, el GIF y el montaje siguen, y el MP4 dice qué falta en vez de
    reventar.
@@ -133,7 +135,8 @@ Measured facts (2026-10-11):
      the AUR).
    The build of each lives in `tools/build_deb.py`,
    `installer/rpm/nightscribe.spec` and `installer/arch/PKGBUILD`, and the CI in
-   `.github/workflows/linux-packages.yml`.
+   `.github/workflows/preview.yml` (one workflow that, on a merge to `main`,
+   builds Windows and Linux and publishes all four artifacts together).
 4. **`imageio-ffmpeg` is optional** (Recommends): it only feeds the MP4 export.
    Without it the GIF and the montage keep working, and the MP4 says what is
    missing instead of crashing.

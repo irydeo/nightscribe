@@ -1,18 +1,16 @@
-# NightScribe - Linux packages (.deb and .rpm)
+# NightScribe - Rolling preview builds (Windows + Linux)
 #
-# Builds the two system-Python packages and the Find_Orb payload they ship,
-# and publishes them as a rolling pre-release, the same way the Windows
-# preview does.
+# One workflow, one rolling pre-release per branch. On a push to main it
+# builds the Windows app (portable zip + Inno Setup installer) AND the Linux
+# packages (.deb + .rpm), after the unit suite passes, and publishes them
+# TOGETHER as preview-<branch>. Testers always download the latest build from
+# the Releases page, no GitHub account needed.
 #
-# Target distros (ADR-080): Debian 13+ and Ubuntu 25.10+ (the ones that
-# package PySide6). Older ones (Ubuntu 24.04 LTS) are a documented manual
-# install, not built here.
-#
-# The unit tests run on ubuntu-latest (where the whole suite passes); the
-# build jobs run inside a minimal container that only needs the packaging
-# tools, NOT Qt: they never start the app.
+# The Windows and Linux builds keep their own jobs, and the Windows one keeps
+# its own unit-test run (it catches Windows-only failures). The gate is the
+# ubuntu run; a red suite publishes nothing.
 
-name: Linux packages
+name: Preview
 
 on:
   workflow_dispatch:
@@ -21,19 +19,21 @@ on:
       - main
 
 permissions:
-  contents: write
+  contents: write   # needed to publish the pre-release
 
 concurrency:
-  group: linux-packages-${{ github.ref_name }}
+  group: preview-${{ github.ref_name }}
   cancel-in-progress: true
 
 jobs:
   # ------------------------------------------------------------------ gate
   test:
-    name: Unit tests (amd64)
+    name: Unit tests
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.ver.outputs.version }}
+      suffix: ${{ steps.ver.outputs.suffix }}
+      label: ${{ steps.ver.outputs.label }}
     steps:
       - name: Checkout (full history for setuptools-scm)
         uses: actions/checkout@v4
@@ -50,8 +50,7 @@ jobs:
         # PySide6's wheel links a few system libraries the headless runner
         # does not carry (libEGL/libGL and the xcb set). Without them the GUI
         # test modules fail to import at all ("libEGL.so.1: cannot open
-        # shared object file"), which is exactly what happened the first time
-        # this suite ran on ubuntu-latest.
+        # shared object file").
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -71,19 +70,8 @@ jobs:
         run: |
           python -m pytest tests/unit -n auto --dist loadfile -q 2>&1 | tee pytest.log
           code=${PIPESTATUS[0]}
-          # Surface the failure in the run's step summary: the log itself is
-          # not readable without admin rights, and a red suite that says
-          # nothing is useless.
-          {
-            echo "### pytest exit ${code}"
-            echo '```'
-            grep -E "FAILED|ERROR|assert|Error" pytest.log | head -80
-            tail -25 pytest.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          # Annotations ARE readable without admin rights (the raw log is
-          # not): turn each failure line into one so a red run can be
-          # diagnosed from outside.
+          # The raw log is not readable without admin rights; surface the
+          # failure as annotations, which ARE readable from outside.
           grep -E "^(FAILED|ERROR) " pytest.log | head -40 | while IFS= read -r line; do
             echo "::error::${line}"
           done
@@ -92,11 +80,90 @@ jobs:
           done
           exit $code
 
-      - name: Resolve the version
+      - name: Resolve the package version
         id: ver
         run: |
           v=$(python -c "from importlib.metadata import version; print(version('nightscribe'))")
-          echo "version=${v//+/-}" >> "$GITHUB_OUTPUT"
+          v="${v//+/-}"                 # '+' is legal but awkward in file names
+          sha7=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "suffix=-preview.$sha7" >> "$GITHUB_OUTPUT"
+          echo "label=$v-preview.$sha7" >> "$GITHUB_OUTPUT"
+          echo "version: $v / label: $v-preview.$sha7"
+
+  # ------------------------------------------------------------- windows
+  windows:
+    name: Build Windows preview
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (full history for setuptools-scm)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests on Windows (a red suite publishes nothing)
+        timeout-minutes: 45
+        run: python -m pytest tests/unit -n auto --dist loadfile -v
+
+      - name: Fetch Find_Orb (bundled with the app, ADR-080)
+        shell: pwsh
+        run: |
+          # The non-interactive `fo64.exe` plus the interactive console and
+          # its data files, into findorb-payload/. The PyInstaller spec picks
+          # the folder up and ships it as findorb/ inside the bundle, so the
+          # orbit check works with no path to set. NightScribe does not
+          # redistribute it outside this build (GPLv2 + a no-commercial
+          # clause; the installer shows the notice).
+          New-Item -ItemType Directory -Force -Path findorb-payload | Out-Null
+          Invoke-WebRequest -Uri https://www.projectpluto.com/find_c64.zip `
+            -OutFile find_c64.zip
+          Expand-Archive find_c64.zip -DestinationPath findorb-payload -Force
+          Invoke-WebRequest -Uri https://www.projectpluto.com/devel/fo64.exe `
+            -OutFile findorb-payload\fo64.exe
+          Get-ChildItem findorb-payload | Select-Object -ExpandProperty Name
+
+      - name: Build with PyInstaller
+        run: pyinstaller installer/nightscribe.spec --clean --noconfirm
+
+      - name: Smoke test the frozen binary
+        run: dist\nightscribe\nightscribe.exe --help
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: |
+          $zip = "dist\NightScribe-${{ needs.test.outputs.label }}-windows-x64.zip"
+          Compress-Archive -Path dist\nightscribe -DestinationPath $zip
+          echo "zip: $zip"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile the installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ needs.test.outputs.version }} "/DAppSuffix=${{ needs.test.outputs.suffix }}" installer\nightscribe.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload the Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/NightScribe-*-windows-x64.zip
+            dist/NightScribeSetup-*.exe
 
   # ------------------------------------------------------------------ .deb
   deb:
@@ -155,7 +222,6 @@ jobs:
           ver="${ver//-/.}"
           top="$PWD/rpmbuild"
           mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-          # The spec is built from a source tarball that carries the payload.
           tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \
             --exclude=.venv --exclude=.git --exclude=dist --exclude=rpmbuild \
             --transform "s,^\.,nightscribe-$ver," .
@@ -164,8 +230,6 @@ jobs:
             --define "_topdir $top" installer/rpm/nightscribe.spec > rpm.log 2>&1
           code=$?
           if [ $code -ne 0 ]; then
-            # The log is not readable without admin rights: surface the LAST
-            # lines, where rpmbuild prints its "RPM build errors" summary.
             tail -12 rpm.log | while IFS= read -r line; do echo "::error::${line}"; done
             exit $code
           fi
@@ -180,11 +244,11 @@ jobs:
           path: dist/*.rpm
 
   # -------------------------------------------------------------- publish
-  # Tolerant on purpose: publish whatever built, so a broken .rpm does not
-  # throw away a good .deb (the observer asked for the artifacts).
+  # Tolerant on purpose: publish whatever built, so a broken Windows build
+  # does not throw away a good .deb (and vice versa).
   publish:
     name: Publish the rolling pre-release
-    needs: [test, deb, rpm]
+    needs: [test, windows, deb, rpm]
     if: always() && needs.test.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -202,25 +266,29 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ls -la dist || true
-          # Publish whatever exists: a broken .rpm must not throw away a good
-          # .deb (the earlier guard demanded BOTH and published nothing).
-          files=$(ls dist/*.deb dist/*.rpm 2>/dev/null || true)
+          files=$(ls dist/* 2>/dev/null || true)
           if [ -z "$files" ]; then
-            echo "no package was built; nothing to publish"
+            echo "nothing was built; nothing to publish"
             exit 0
           fi
           sha=$(echo "${GITHUB_SHA}" | cut -c1-7)
-          tag="linux-preview-${{ github.ref_name }}"
+          label="${{ needs.test.outputs.label }}"
+          ver="${{ needs.test.outputs.version }}"
+          tag="preview-${{ github.ref_name }}"
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release delete "$tag" --cleanup-tag --yes
           fi
-          notes="Linux packages of branch **${{ github.ref_name }}** at commit \`$sha\`, built after the unit test suite passed.
+          notes="Preview build of branch **${{ github.ref_name }}** at commit \`$sha\` (version \`$ver\`), built by GitHub Actions after the unit test suite passed.
 
-          - **nightscribe_*_amd64.deb**: Debian 13+ / Ubuntu 25.10+ (system Python; includes Find_Orb).
+          - **NightScribeSetup-$label.exe**: Windows installer (per-user, no admin rights needed).
+          - **NightScribe-$label-windows-x64.zip**: Windows portable build; unzip and run \`nightscribe.exe gui\`.
+          - **nightscribe_${ver}_amd64.deb**: Debian 13+ / Ubuntu 25.10+ (system Python; includes Find_Orb).
           - **nightscribe-*.x86_64.rpm**: Fedora 42+ / openSUSE Tumbleweed (system Python; includes Find_Orb).
 
-          Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY."
+          The Windows binaries are unsigned, so SmartScreen will warn: choose *More info -> Run anyway*. Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY.
+
+          Report issues at https://github.com/irydeo/nightscribe/issues"
 
           gh release create "$tag" --target "${GITHUB_SHA}" --prerelease \
-            --title "Linux preview ${{ github.ref_name }} ($sha)" \
+            --title "Preview ${{ github.ref_name }} ($sha)" \
             --notes "$notes" $files

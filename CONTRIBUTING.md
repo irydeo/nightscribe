@@ -20,19 +20,21 @@ Thanks for your interest! These rules keep the project maintainable by humans.
 ## Translations (GUI)
 
 ```bash
-# note: list sources explicitly — scanning the directory silently skips .py files
-# (and the chart widgets live in gui/widgets/ — leaving them out makes
-# lupdate mark their strings "vanished" and the i18n tests fail)
-# core/kinds.py and core/db.py carry runtime strings (NSKinds, NSMigrations),
-# not widget tr() calls, so they must be named here too
-pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
-    nightscribe/core/kinds.py nightscribe/core/db.py \
-    nightscribe/gui/ui/*.ui \
-    -ts nightscribe/gui/i18n/nightscribe_es.ts \
-    nightscribe/gui/i18n/nightscribe_en.ts
+# rebuild the catalogues: lupdate + ATOMIC lrelease (see below)
+.venv/bin/python tools/i18n.py
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # translate
-pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compile .qm
+.venv/bin/python tools/i18n.py --release-only              # recompile the .qm
 ```
+
+`tools/i18n.py` runs `lupdate` with the same source list as before (the `.py`
+files of `gui/` and `gui/widgets/`, `core/kinds.py`, `core/db.py` and the `.ui`
+files) and then compiles each `.qm` **atomically**: it writes a sibling temp file
+and renames it over the target. Never use the raw `lrelease` command while the
+app is open: `QTranslator` **memory-maps the `.qm`**, and rewriting it in place
+invalidates an open session's mapping, which then crashes on the next
+translation (that was a real GUI core dump, 2026-10-10). The app also loads the
+`.qm` **from memory** (no mmap), so a rebuild can no longer take it down; the
+atomic rename protects any other app that has it mapped.
 
 English is the base language in code; Spanish is a translation. Tests fail if any
 string is left `unfinished`.

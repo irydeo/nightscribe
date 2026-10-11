@@ -152,6 +152,8 @@ class UfeDialog(QWidget):
         self._astrometry_undo_hook = None      # "undo this run"
         self._astrometry_result_hook = None    # what the visit already holds
                                                # (ADR-065: reopen and SEE it)
+        self._point_excluded_hook = None       # an observation left out of
+                                               # the report (2026-10-10)
         self._add_masters_hook = None          # the library is filled from
                                                # the Calibration tab (ADR-061)
         # ADR-044 rev: the tools that used to be tabs (Blink, Calibration,
@@ -1579,6 +1581,29 @@ class UfeDialog(QWidget):
             logger.warning("manual magnitude hook failed: %s", err)
             return False
 
+    def set_point_excluded_hook(self, fn):
+        # @args: fn - callable(run_id, group_index, excluded) -> True when the
+        #        observation took it, or None
+        # @return: None. The observer excluded an observation from the report
+        #          and the check (or put it back): the host writes the flag
+        #          into astrometry_points (the point is never deleted), so the
+        #          tab never touches the database and a reopened run keeps the
+        #          decision.
+        self._point_excluded_hook = fn if callable(fn) else None
+
+    def set_point_excluded(self, run_id, group_index, excluded):
+        # @args: run_id - the execution, group_index - the observation,
+        #        excluded - True to leave it out, False to put it back
+        # @return: True when the observation took it
+        if self._point_excluded_hook is None:
+            return False
+        try:
+            return bool(self._point_excluded_hook(run_id, group_index,
+                                                  excluded))
+        except Exception as err:
+            logger.warning("set-point-excluded hook failed: %s", err)
+            return False
+
     # ----------------------------------------------------- visit frames
 
     def _wire_frame_nav(self):
@@ -2493,7 +2518,8 @@ class UfeDialog(QWidget):
             measured_pos=facts.get("measured_pos"),
             predicted_mag=facts.get("predicted"),
             detection=facts.get("detection"),
-            equipment=chart_annotate.equipment_from_header(header, config),
+            equipment=chart_annotate.camera_from_header(header, config),
+            telescope=chart_annotate.telescope_from_header(header, config),
             site=chart_annotate.site_from_config(config))
 
     def set_status(self, text, level="info"):

@@ -129,6 +129,11 @@ qué residual tienen las nuestras. Eso es exactamente lo que hace Tycho-Tracker.
 
 ## 5. Qué verás en la pantalla
 
+- **La lista entera**: todas las observaciones publicadas que usó Find_Orb, con
+  el instante, la estación, la dirección y su residuo en ascensión recta y
+  declinación (dRA / dDec). Tus propias filas aparecen resaltadas, así que ves
+  tu error junto al de los demás, tal como lo muestra el propio listado de
+  Find_Orb.
 - **Residual propio**: cuánto se separa nuestra medida de lo que predice la
   órbita, en segundos de arco.
 - **Dispersión de los demás**: cuánto se separan ellos. Es la escala justa:
@@ -137,8 +142,15 @@ qué residual tienen las nuestras. Eso es exactamente lo que hace Tycho-Tracker.
 - **Observatorios distintos** que han visto el objeto y **fecha de la última
   observación** (esto se ve también en la ficha del objeto).
 - **Veredicto**: `ok`, `outlier` (bloquea, se puede forzar), `sin referencia`
-  (no hay otras observaciones con las que comparar) o `no disponible` (no hay
-  Find_Orb configurado).
+  (no hay otras observaciones con las que comparar), `sin órbita aún` (el arco
+  publicado es demasiado corto para ajustar) o `no disponible` (no hay Find_Orb
+  configurado).
+- **Un aviso de renombrado** cuando el objeto se observó mientras seguía en la
+  página de confirmación y se confirmó después: la designación nueva y la
+  circular (MPEC) que lo publicó, diciendo que tus observaciones están en ella.
+  La app encuentra el nombre nuevo sola; si no puede, escribe la designación
+  actual en **Comprobar con** y pulsa **Recomprobar** para repetir el chequeo
+  sobre los puntos ya medidos, sin apilar otra vez los fotogramas.
 
 ## 6. Solución de problemas
 

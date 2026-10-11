@@ -129,6 +129,10 @@ of ours. That is exactly what Tycho-Tracker does.
 
 ## 5. What you will see on screen
 
+- **The whole list**: every published observation Find_Orb used, with the
+  instant, the station, the direction and its residual in right ascension and
+  declination (dRA / dDec). Your own rows are highlighted, so you see your error
+  next to everyone else's, the way Find_Orb's own listing shows it.
 - **Our residual**: how far our measurement is from what the orbit predicts, in
   arcseconds.
 - **Scatter of the others**: how far they are. It is the fair scale: with a bad
@@ -137,8 +141,14 @@ of ours. That is exactly what Tycho-Tracker does.
 - **Distinct observatories** that have seen the object and the **date of the
   last observation** (this is also shown on the object card).
 - **Verdict**: `ok`, `outlier` (blocks, can be forced), `no reference` (there
-  are no other observations to compare with) or `not available` (no Find_Orb
-  configured).
+  are no other observations to compare with), `no orbit yet` (the published arc
+  is too short to fit) or `not available` (no Find_Orb configured).
+- **A rename notice** when the object was observed while still on the
+  confirmation page and confirmed since: the new designation and the circular
+  (MPEC) that published it, with the note that your observations are in it. The
+  app finds the new name on its own; if it cannot, type the current designation
+  in **Check against** and press **Re-check** to repeat the check on the points
+  already measured, without stacking the frames again.
 
 ## 6. Troubleshooting
 

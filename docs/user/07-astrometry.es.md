@@ -119,7 +119,14 @@ velocidad es la de la efeméride, sin barrido.
 
 Tras el run, NightScribe compara tus puntos con las observaciones ya
 publicadas del objeto (la API del MPC, o el NEOCP si aún no está confirmado)
-y da un veredicto: si tu punto encaja o destaca.
+y da un veredicto: si tu punto encaja o destaca. Además **te enseña la lista
+entera**: todas las observaciones publicadas que usó Find_Orb, con el instante,
+la estación, la dirección y su residuo en ascensión recta y declinación
+(dRA / dDec), y **tus propias filas resaltadas**. Eso es tu error junto al de
+los demás, tal como lo muestran Find_Orb y Tycho-Tracker. La lista vive en su
+propia ventana no modal: el bloque del chequeo es una columna estrecha, así que
+se abre con el botón **Observaciones publicadas…** y se queda abierta mientras
+trabajas.
 
 > **¿Por qué «el chequeo filtra, no prueba»?** Porque ajustar a un arco
 > corto no demuestra una detección: demuestra que no la contradices. El
@@ -128,28 +135,96 @@ y da un veredicto: si tu punto encaja o destaca.
 > reporte se bloquea por defecto; **Forzar el reporte** lo fuerza dejando
 > constancia en la propia nota del reporte.
 
+Cuando el chequeo no puede correr lo dice con palabras llanas, y nunca finge:
+no hay Find_Orb configurado, aún no hay observaciones publicadas, o el arco de
+referencia es demasiado corto para que Find_Orb ajuste una órbita. Nada de eso
+bloquea el reporte.
+
+**Comprobar con** fija la designación con la que el chequeo pregunta al MPC, y
+**Recomprobar** repite el chequeo sobre los puntos ya medidos, **sin apilar otra
+vez los fotogramas**.
+
+### Tu objeto se confirmó con un nombre nuevo
+
+Un objeto observado mientras seguía en la página de confirmación (una designación
+del NEOCP) y confirmado después recibe una designación nueva, y sus observaciones
+se van con ella. NightScribe lo encuentra solo y lo muestra **muy visible**: el
+nombre nuevo y la circular (MPEC) que lo publicó, en el chequeo, en la ficha del
+proyecto y en la visita. Cuando tu estación ya aparece entre las observaciones
+publicadas, lo dice: **tus datos están en esa circular**. Si la búsqueda
+automática no lo encuentra (la lista del MPC de objetos recién confirmados es
+corta), escribe la designación actual en **Comprobar con** y pulsa
+**Recomprobar**.
+
 ## El reporte al MPC
 
-**Generar** escribe el reporte con los instantes de media exposición, las
-incertidumbres propagadas y la magnitud solo cuando hay comparadas. Toda
-observación por debajo del **listón de envío** (SNR ≥ 20, configurable en
-Configuración) queda fuera, con su razón.
+**Gestionar reporte MPC** abre el reporte en su propia ventana: la sumisión
+completa que espera el MPC, con los instantes de media exposición, las
+incertidumbres propagadas y la magnitud solo cuando hay comparadas. Entran todas
+las observaciones; el **listón recomendado** (SNR ≥ 20, configurable en
+Configuración) solo avisa: por debajo, la app dice que no recomienda enviar esa
+observación, y **tú decides**. Desmarca una observación en la tabla «Medida por
+observación» para dejarla fuera del reporte y del chequeo (la medida nunca se
+borra, y puedes recuperarla).
 
 > **¿Por qué un listón de SNR?** Porque el MPC archiva tus medidas para
 > siempre y las usa para órbitas: un punto con SNR 8 tiene una incertidumbre
-> de posición que estropea el ajuste de los demás. Mejor no enviar que
-> enviar ruido. El listón es tuyo: bájalo si sabes lo que haces, pero el
-> defecto es el que la experiencia marca.
+> de posición que estropea el ajuste de los demás. Por eso la app avisa en vez
+> de enviarla en silencio: el aviso es su consejo, y la decisión de enviarla es
+> tuya.
 
-- **Formato**: **ADES PSV** es el formato moderno, legible por máquina, que
-  el MPC prefiere; el de **80 columnas** es el clásico, legible por todo
-  programa. Si dudas: ADES.
-- **Enviar al bloque MPC** rellena la caja de pegado de la visita; el
-  validador de esa ventana tiene la última palabra antes de guardar.
+El reporte no son solo las medidas: lleva el **encabezado** que exige el MPC
+(tu código de observatorio, el observador, el telescopio, el catálogo y el
+acuse), para que el lote se reconozca. Rellena tus datos una vez en
+**Configuración → Observatorio** (nombre, email de contacto, tipo de telescopio
+y relación focal); la app construye con ellos la línea del telescopio.
+
+- **Formato**: **ADES XML** es el formato que prefiere el MPC, luego **ADES
+  PSV** y luego el clásico de **80 columnas**. Los tres llevan el encabezado.
+  Si dudas: ADES XML.
+- **Copiar al portapapeles** y **Guardar en fichero…** sacan el reporte tal
+  como se lee.
 - Si configuraste **Find_Orb** en Configuración…, la app cruza tus medidas contra
   la órbita que él mismo calcula y te muestra los residuos antes de enviar.
 - **Deshacer esta ejecución** quita las observaciones de esta ejecución del proyecto
   (el run queda marcado como deshecho, para el rastro de auditoría); lo
   demás no se toca.
+
+### Enviarlo al MPC: las opciones
+
+**Enviar al MPC…** abre el diálogo de envío. Pide cuatro cosas y luego manda el
+lote al MPC; la respuesta del propio servidor (el CurlID o los errores) aparece
+en el registro del diálogo. Sin email de contacto el envío queda bloqueado: el
+MPC lo necesita.
+
+- **Email de acuse**: dónde manda el MPC su acuse y las designaciones. Es el
+  email de contacto que pusiste en Configuración, y puedes cambiarlo aquí.
+- **Acuse**: un texto corto que el MPC te devuelve, para distinguir un lote de
+  otro («Noche 1, campo B»). Opcional.
+
+**Objetivo** le dice al MPC cómo encaminar el lote. No es decoración: un lote
+cuya palabra clave falta o está mal puede encaminarse mal o no procesarse como
+esperas. La app la coloca en la línea ACK del reporte (80 columnas) o en el
+campo `obj_type` (ADES).
+
+| Objetivo | Qué significa | Cuándo usarlo |
+|---|---|---|
+| **Unclassified** | El objeto ya está clasificado (tiene designación definitiva): envío normal. No hace falta palabra clave. | Asteroides y cometas conocidos |
+| **NEOCP** | El objeto está ahora en la página de confirmación (NEOCP, Near-Earth Object Confirmation Page). El MPC necesita la palabra «NEOCP». | Un candidato sin confirmar |
+| **PCCP** | Está en la página de confirmación de posibles cometas (PCCP). | Un candidato a cometa |
+| **NEW NEO** | Candidato a objeto cercano a la Tierra nuevo. | Recién descubierto, sin confirmar |
+| **NEW COMET** | Candidato a cometa nuevo. | Ídem |
+| **NEW NATURAL SATELLITE** | Candidato a satélite natural nuevo. | Ídem |
+| **NEW TNO / NEW KBO / NEW DISTANT / NEW CENTAUR** | Candidato a TNO, KBO, objeto distante o centauro nuevo. | Ídem |
+
+Por defecto es **NEOCP** cuando el proyecto está en el NEOCP y **Unclassified**
+en los demás casos.
+
+**Modo** decide si el lote es de verdad o un ensayo:
+
+- **Normal**: el lote se envía de verdad; el MPC lo procesa y lo publica.
+- **Prueba**: usa el endpoint de prueba del MPC, que hace **las mismas
+  comprobaciones** de formato y validez pero **no procesa** el lote. Es el
+  ensayo: úsalo para comprobar que el reporte está bien sin comprometerlo.
 
 Siguiente: [08. Contarlo](08-posts.es.md).

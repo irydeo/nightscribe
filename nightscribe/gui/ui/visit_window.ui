@@ -12,7 +12,7 @@
  <class>VisitWindow</class>
  <widget class="QWidget" name="VisitWindow">
   <layout class="QVBoxLayout" name="vbox_visit"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
-   <property name="layoutStretch"><string notr="true">0,1,0,0</string></property>
+   <property name="layoutStretch"><string notr="true">0,0,1,0,0</string></property>
    <item>
     <layout class="QHBoxLayout" name="row_head">
      <property name="layoutStretch"><string notr="true">1,0,0,0</string></property>
@@ -21,6 +21,17 @@
      <item><widget class="QPushButton" name="vp_btn_pin"><property name="text"><string notr="true">📌</string></property><property name="toolTip"><string>Pin the visit: it floats to the top of the list</string></property><property name="checkable"><bool>true</bool></property></widget></item>
      <item><widget class="QPushButton" name="vp_btn_delete"><property name="text"><string>Delete visit…</string></property></widget></item>
     </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="vp_lbl_confirm">
+     <property name="visible"><bool>false</bool></property>
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="textFormat"><enum>Qt::RichText</enum></property>
+     <property name="openExternalLinks"><bool>true</bool></property>
+     <property name="textInteractionFlags"><set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set></property>
+     <property name="toolTip"><string>An object observed while it was still on the confirmation page and confirmed since: its new name and the circular that published it, so you can find your data in it</string></property>
+     <property name="styleSheet"><string notr="true">background-color: #1e2a3a; color: #8fd0ff; border: 1px solid #2f4a66; border-radius: 4px; padding: 6px;</string></property>
+    </widget>
    </item>
    <item>
     <widget class="QGroupBox" name="grp_res">

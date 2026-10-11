@@ -325,3 +325,34 @@ def test_the_small_glyph_buttons_paint_their_glyph(window):
                  if b.text() == "✕")
     assert _paints_glyph(close), "the drawer close ✕ is clipped to an empty box"
     window._drawer_open(False)
+
+
+# ------------------------------------------------ the confirmation banner
+
+def test_the_confirmation_banner_names_the_new_designation(window):
+    # An object visited while still on the confirmation page and confirmed
+    # since is shown, very visibly, with the circular that published it.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    project.update_context(coredb.db, p["id"], {
+        "neocp": True,
+        "confirmed": {"designation": "2026 TQ8", "mpec": "MPEC 2026-T201",
+                      "mpec_url": "https://www.minorplanetcenter.net/"
+                                  "mpec/K26/K26TK1.html"}})
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    lbl = window.projects.lbl_confirm
+    assert not lbl.isHidden()
+    assert "2026 TQ8" in lbl.text() and "MPEC 2026-T201" in lbl.text()
+
+
+def test_no_confirmation_banner_without_a_rename(window):
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    assert window.projects.lbl_confirm.isHidden()

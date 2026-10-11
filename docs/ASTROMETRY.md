@@ -199,7 +199,15 @@ project). No visit, no series: that is the house rule.
    the NEOCP ones if it is not confirmed), runs them through **Find_Orb**
    together with yours (excluding yours from the fit) and compares your
    residual with the others' cloud. Outside the cloud, the report is
-   blocked by default.
+   blocked by default. It also **shows the whole list**: every published
+   observation Find_Orb used, with the instant, the station, the direction
+   and its residual in right ascension and declination, **your rows
+   highlighted**. When the check cannot run it says why in plain words (no
+   Find_Orb, no published observations yet, or a reference arc too short to
+   fit), and none of those blocks the report. If the object was **confirmed
+   under a new name** since the visit, the app finds it on its own, checks
+   under the new name and shows the new designation and the circular that
+   published it, with the note that your data is in it.
 9. **Report.** It is generated in **ADES PSV** and **MPC 80-column**,
    validated with the same validator as always and sent to the visit's MPC
    block. You do the sending.
@@ -279,7 +287,9 @@ project). No visit, no series: that is the house rule.
   number and where it is set, and the button that sends the report stays
   disabled: a report with no observations is not a report.
 - **Residual**: how far your measurement is from what the orbit predicts,
-  in arcseconds.
+  in arcseconds. The block also lists **every published observation** with
+  its own residual (dRA / dDec), so your figure sits next to everyone
+  else's; your rows are highlighted.
 - **Scatter of the others**: how far they are. It is the fair scale: with a
   bad orbit every residual is large, and what matters is whether you are
   **outside the cloud**, not how far you are from zero.

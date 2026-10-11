@@ -43,10 +43,12 @@ class _CachingDb:
         self.fetches = 0
 
     def http_get(self, key, source, fetch_fn, force=False):
-        # @args: key - cache key, source - ignored here, fetch_fn - the
+        # @args: key - cache key, source - the source name (the module uses
+        #        "mpc_obs" for the observation endpoints and "mpc_neocp_prev"
+        #        for the rolling cross-reference page), fetch_fn - the
         #        module's network closure, force - bypass the cache read
         # @return: (body bytes, content_type)
-        assert source == "mpc_obs"
+        assert source in ("mpc_obs", "mpc_neocp_prev")
         if not force and key in self.store:
             return self.store[key]
         self.fetches += 1
@@ -228,3 +230,126 @@ def test_network_error_returns_empty_without_raising(monkeypatch):
     assert mpc_obs.observations_80("99942") == ""
     assert mpc_obs.history("99942") == {
         "n_obs": 0, "n_stations": 0, "last_obs": None}
+
+
+# ------------------------------------------ the missing NEOCP reference path
+
+# A trimmed slice of the MPC's rolling "Previous NEOCP Objects" table: the
+# first row is a confirmed object (temp -> designation + MPEC), the second
+# left the page WITHOUT a designation (moved to the PCCP) and must be
+# skipped, or the check would fetch an object that does not exist.
+_NEOCP_PREV_HTML = """
+<table><tbody>
+<tr>
+<td>A11HPKO</td>
+<td><a href="https://www.minorplanetcenter.net/db_search/show_object?
+utf8=True&amp;object_id=2026+TQ8" target="_blank">2026 TQ8</a></td>
+<td>None</td>
+<td><a href="https://www.minorplanetcenter.net/mpec/K26/K26TK1.html"
+target="_blank">MPEC 2026-T201</a></td>
+<td>2026-10-10T00:07:53</td>
+</tr>
+<tr>
+<td>A11HQSs</td>
+<td>None</td>
+<td>None</td>
+<td>None</td>
+<td>2026-10-10T06:12:42</td>
+</tr>
+</tbody></table>
+"""
+
+
+def test_parse_neocp_prev_maps_a_temp_designation_to_the_confirmed_one():
+    table = mpc_obs.parse_neocp_prev(_NEOCP_PREV_HTML)
+    assert table["A11HPKO"] == {
+        "designation": "2026 TQ8",
+        "mpec": "MPEC 2026-T201",
+        "mpec_url": "https://www.minorplanetcenter.net/mpec/K26/K26TK1.html",
+        "confirmed_at": "2026-10-10T00:07:53"}
+    # a row that left the page without a designation is not a mapping
+    assert "A11HQSs" not in table
+
+
+def test_parse_neocp_prev_accepts_bytes_and_empty_input():
+    assert mpc_obs.parse_neocp_prev(_NEOCP_PREV_HTML.encode()) == \
+        mpc_obs.parse_neocp_prev(_NEOCP_PREV_HTML)
+    assert mpc_obs.parse_neocp_prev("") == {}
+    assert mpc_obs.parse_neocp_prev(None) == {}
+
+
+def test_neocp_observations_80_uses_the_trksub_endpoint(monkeypatch):
+    calls = []
+
+    def fake_get(url, json=None, timeout=None):
+        calls.append({"url": url, "json": json})
+        return _Resp(b'[{"ADES_DF": null, '
+                     b'"OBS80": "LINE-1\\nLINE-2"}, 200]')
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    monkeypatch.setattr(mpc_obs.db, "http_get", _CachingDb().http_get)
+    text = mpc_obs.neocp_observations_80("A11HQSz")
+    assert text.splitlines() == ["LINE-1", "LINE-2"]
+    assert calls[0]["url"] == mpc_obs.URL_NEOCP
+    assert calls[0]["json"] == {"trksubs": ["A11HQSz"],
+                                "output_format": ["OBS80"]}
+
+
+def test_resolve_neocp_alias_reads_the_rolling_page(monkeypatch):
+    monkeypatch.setattr(mpc_obs, "neocp_prev",
+                        lambda force=False: {"A11HPKO": {
+                            "designation": "2026 TQ8",
+                            "mpec": "MPEC 2026-T201",
+                            "confirmed_at": "2026-10-10T00:07:53"}})
+    hit = mpc_obs.resolve_neocp_alias("A11HPKO")
+    assert hit["designation"] == "2026 TQ8" and hit["mpec"] == "MPEC 2026-T201"
+    assert mpc_obs.resolve_neocp_alias("NOT-THERE") is None
+
+
+def test_reference_80_tries_confirmed_then_neocp_then_alias(monkeypatch):
+    # The whole strategy in one place: a designated object comes from the
+    # confirmed endpoint; one still on the NEOCP from the trksub endpoint;
+    # and a temporary name confirmed SINCE THE VISIT (A11HPKO -> 2026 TQ8)
+    # is resolved and fetched under its real name.
+    monkeypatch.setattr(
+        mpc_obs, "observations_80",
+        lambda d, force=False: "LINE-A\n" if d == "2026 TQ8" else "")
+    monkeypatch.setattr(
+        mpc_obs, "neocp_observations_80",
+        lambda d, force=False: "LINE-N\n" if d == "A11HQSs" else "")
+    monkeypatch.setattr(
+        mpc_obs, "resolve_neocp_alias",
+        lambda d, force=False: ({"designation": "2026 TQ8",
+                                 "mpec": "MPEC 2026-T201",
+                                 "confirmed_at": "2026-10-10T00:07:53"}
+                                if d == "A11HPKO" else None))
+    confirmed = mpc_obs.reference_80("2026 TQ8")
+    assert confirmed.source == "MPC" and confirmed.lines == "LINE-A\n"
+    neocp = mpc_obs.reference_80("A11HQSs")
+    assert neocp.source == "NEOCP" and neocp.lines == "LINE-N\n"
+    renamed = mpc_obs.reference_80("A11HPKO")
+    assert renamed.source == "MPC" and renamed.designation == "2026 TQ8"
+    assert renamed.mpec == "MPEC 2026-T201" and renamed.lines == "LINE-A\n"
+
+
+def test_reference_80_says_so_when_there_is_nothing(monkeypatch):
+    monkeypatch.setattr(mpc_obs, "observations_80", lambda d, force=False: "")
+    monkeypatch.setattr(mpc_obs, "neocp_observations_80",
+                        lambda d, force=False: "")
+    monkeypatch.setattr(mpc_obs, "resolve_neocp_alias",
+                        lambda d, force=False: None)
+    ref = mpc_obs.reference_80("ZZZ9999")
+    assert ref.source == "" and not ref.lines
+    assert "no published observations" in ref.note
+
+
+def test_reference_80_flags_when_our_station_is_already_published(monkeypatch):
+    # "Tus datos están en ese MPEC": our station already among the published
+    # lines is the fact the rename notice leans on.
+    line = " " * 77 + "Z41"
+    monkeypatch.setattr(mpc_obs, "observations_80",
+                        lambda d, force=False: line + "\n")
+    monkeypatch.setattr(mpc_obs, "neocp_observations_80",
+                        lambda d, force=False: "")
+    assert mpc_obs.reference_80("X", obs_code="Z41").ours_present is True
+    assert mpc_obs.reference_80("X", obs_code="W99").ours_present is False

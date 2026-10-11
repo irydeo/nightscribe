@@ -39,6 +39,7 @@ from ..config import config
 from . import theme
 from .ufe_state import UfeImageState
 from .ufe_host import host_of
+from .ufe_published_obs_dialog import UfePublishedObsDialog
 from .ui_loader import adopt_ui, drop_in
 from .widgets.ufe_image_view import (UfeImageView, cross_marker_items,
                                      mark_cross_items)
@@ -155,7 +156,8 @@ class UfeTrackStackTab(QWidget):
         # The headers are short because the column is 380 px wide: the long
         # name travels in the tooltip, where there is room for it.
         for col, tip in enumerate((
-                self.tr("Which observation"),
+                self.tr("Which observation: uncheck it to leave it out of the "
+                        "report and of the check"),
                 self.tr("Middle-of-exposure instant (UT)"),
                 self.tr("Right ascension, from the stack's own centroid"),
                 self.tr("Declination, from the stack's own centroid"),
@@ -168,11 +170,67 @@ class UfeTrackStackTab(QWidget):
                 header.setToolTip(tip)
         self.txt_check = self._ui.txt_check
         self.chk_force = self._ui.chk_force
-        self.cmb_format = self._ui.cmb_format
+        # the rename notice, the residual listing and the manual re-check
+        # (the object confirmed under a new name since the visit, and the
+        # whole published list with our rows in it): the observer asked to
+        # SEE their error next to the others', the way Find_Orb shows it.
+        self.lbl_rename = self._ui.lbl_rename
+        # The published listing lives in its own NON-MODAL window (ADR-077):
+        # the check block is a 380 px column and the whole table, with its
+        # seven columns, does not fit there without pushing the rest of the
+        # panel out. The block keeps the button that opens it.
+        self._residuals_dialog = UfePublishedObsDialog(self)
+        self.tbl_residuals = self._residuals_dialog.tbl_residuals
+        self.btn_residuals = self._ui.btn_residuals
+        self.btn_residuals.clicked.connect(self._show_residuals)
+        self.lbl_desig_check = self._ui.lbl_desig_check
+        self.edt_desig_check = self._ui.edt_desig_check
+        self.btn_recheck = self._ui.btn_recheck
+        self.btn_recheck.clicked.connect(self._on_recheck)
+        self._recheck = None          # the re-check worker, while it runs
+        # Excluding an observation (2026-10-10): the first column of the
+        # points table is a checkbox. Unchecking it takes the observation out
+        # of the report and the check; the decision is the observer's and it
+        # is reversible (the point is never deleted). The check is re-run
+        # automatically, debounced, so the published listing never shows a
+        # set we no longer submit.
+        self.tbl_points.itemChanged.connect(self._on_point_toggled)
+        self._recheck_timer = QTimer(self)
+        self._recheck_timer.setSingleShot(True)
+        self._recheck_timer.setInterval(600)
+        self._recheck_timer.timeout.connect(self._auto_recheck)
+        self._build_residuals_table()
+        # The MPC report lives in its own non-modal window (ADR-080): the
+        # Astrometry tab keeps only the "Report…" button and the note. The
+        # window's widgets are aliased here so the tab's own code (and its
+        # tests) keep speaking of cmb_format / txt_report / btn_send_mpc.
+        from .ufe_report_dialog import UfeReportDialog
+        from .mpc_send_dialog import MpcSendDialog
+        self._report_dialog = UfeReportDialog(self)
+        self._send_dialog = MpcSendDialog(self)
+        self.cmb_format = self._report_dialog.cmb_format
+        self.txt_report = self._report_dialog.txt_report
+        self.btn_send_mpc = self._report_dialog.btn_send
+        self.btn_copy_report = self._report_dialog.btn_copy
+        self.btn_save_report = self._report_dialog.btn_save
+        self.btn_close_report = self._report_dialog.btn_close
         self.btn_report = self._ui.btn_report
-        self.btn_send_mpc = self._ui.btn_send_mpc
+        self.btn_report.clicked.connect(self._open_report_window)
+        self.cmb_format.currentIndexChanged.connect(
+            lambda _i: self._on_report(quiet=True))
+        self.btn_copy_report.clicked.connect(self._copy_report)
+        self.btn_save_report.clicked.connect(self._save_report)
+        self.btn_send_mpc.clicked.connect(self._open_send_dialog)
+        self.btn_close_report.clicked.connect(self._report_dialog.hide)
+        self._send_dialog.btn_close.clicked.connect(self._send_dialog.hide)
+        self._send_dialog.btn_send.clicked.connect(self._on_mpc_submit)
+        from ..core.sources import mpc_submit
+        self._send_dialog.set_targets(mpc_submit.TARGETS)
+        self._submit_worker = None
+        # the submission parameters the report's ACK line carries; the send
+        # dialog refines them and the report is rebuilt with them
+        self._submission = {"ack": "", "obj_type": ""}
         self.btn_undo = self._ui.btn_undo
-        self.txt_report = self._ui.txt_report
         self.lbl_report_note = self._ui.lbl_report_note
         self._report_kept = None      # observations the last report carried
         # The group's stack is shown in the MAIN stage (the shared state),
@@ -463,8 +521,6 @@ class UfeTrackStackTab(QWidget):
         self.cmb_warp_order.currentIndexChanged.connect(
             lambda _i: config.set("astrometry_warp_order",
                                   int(self.cmb_warp_order.currentData() or 1)))
-        self.cmb_format.addItem(self.tr("ADES PSV"), "ades")
-        self.cmb_format.addItem(self.tr("MPC 80 columns"), "mpc80")
         self._btn_stack_label = self.btn_stack.text()
         # the hero fits the width the panel really has: a 380 px column can
         # be dragged down to 280 and the label used to run over the button's
@@ -474,9 +530,7 @@ class UfeTrackStackTab(QWidget):
         self.btn_stack.clicked.connect(self._on_stack)
         self.cmb_group.currentIndexChanged.connect(self._show_group)
         self.chk_force.toggled.connect(lambda _on: self._sync_report_buttons())
-        self.btn_report.clicked.connect(self._on_report)
         self.btn_undo.clicked.connect(self._on_undo)
-        self.btn_send_mpc.clicked.connect(self._on_send_mpc)
         self._sync_report_buttons()
 
     def _show_result_area(self, flag):
@@ -945,6 +999,7 @@ class UfeTrackStackTab(QWidget):
             self.spn_nobs.setEnabled(False)
             self.tbl_snr.setRowCount(0)
             self._hide_manual()
+            self._hide_residuals()
             self._anim_stop()
             self._sync_animate_button()
             self.lbl_object.setText(self.tr(
@@ -970,6 +1025,7 @@ class UfeTrackStackTab(QWidget):
             self.txt_report.clear()
             self.txt_notes.setVisible(False)
             self._hide_manual()
+            self._hide_residuals()
             self._show_result_area(False)
             self._sync_report_buttons()
             self._sync_animate_button()
@@ -1037,8 +1093,8 @@ class UfeTrackStackTab(QWidget):
                 if col == 3 and row["snr_est"] is not None \
                         and row["snr_est"] < floor:
                     item.setToolTip(self.tr(
-                        "Below the MPC submission floor of %1: this "
-                        "observation would be left out of the report"
+                        "Below the recommended MPC floor of %1: the app will "
+                        "not recommend sending this observation (you decide)"
                     ).replace("%1", f"{floor:.0f}"))
                 tbl.setItem(i, col, item)
         # The plan row shows the same number in one line: the table is the
@@ -1051,8 +1107,8 @@ class UfeTrackStackTab(QWidget):
         self._sync_plan_line()
 
     def _snr_text(self, est, floor):
-        # @args: est - the expected SNR or None, floor - the submission
-        #        floor (D26)
+        # @args: est - the expected SNR or None, floor - the recommended
+        #        floor (D26, now advisory)
         # @return: the cell text; the ⚠ marks a group below the floor, so
         #          it is seen before stacking, not after
         if est is None:
@@ -1107,6 +1163,9 @@ class UfeTrackStackTab(QWidget):
         # over a stack that is being rebuilt is a mark over nothing). The
         # caller that came FROM the mark has already taken what it needs.
         self._hide_manual()
+        # the previous listing belonged to the previous run too: the block's
+        # door goes with it, or a stale table reads as the current comparison
+        self._hide_residuals()
         # ...and it invalidates the animation: a loop over the previous run's
         # frames while the new ones are being built is a loop over a lie
         self._anim_stop()
@@ -1249,6 +1308,7 @@ class UfeTrackStackTab(QWidget):
         self._thumbs.clear()
         self.btn_blink.setEnabled(False)
         self._hide_manual()
+        self._hide_residuals()
         self._show_result_area(False)
         self._sync_report_buttons()
         self._sync_animate_button()
@@ -1460,10 +1520,22 @@ class UfeTrackStackTab(QWidget):
                 available=bool(check.get("available", True)),
                 blocked=bool(check.get("blocked")),
                 no_reference=bool(check.get("no_reference")),
+                no_fit=bool(check.get("no_fit")),
                 our_residual=(tuple(check["our_residual"])
                               if check.get("our_residual") else None),
                 n_stations=int(check.get("n_stations") or 0),
-                note=str(check.get("note") or "")),
+                note=str(check.get("note") or ""),
+                # the listing and the identity facts come back with the run,
+                # so a reopened visit shows the same table and the same
+                # rename notice without another network call
+                residuals=list(check.get("residuals") or []),
+                reference=str(check.get("reference") or ""),
+                resolved_desig=str(check.get("resolved_desig") or ""),
+                mpec=str(check.get("mpec") or ""),
+                mpec_url=str(check.get("mpec_url") or ""),
+                confirmed_at=str(check.get("confirmed_at") or ""),
+                ours_published=bool(check.get("ours_published")),
+                n_obs=int(check.get("n_obs") or 0)),
         }
 
     def _restored_point(self, row):
@@ -3651,6 +3723,10 @@ class UfeTrackStackTab(QWidget):
         tbl = self.tbl_points
         points = self._result.get("points") or []
         mids = self._result.get("mids") or []
+        # The fill sets the checkbox states, which would fire itemChanged as
+        # if the observer had toggled them: the signal is blocked while the
+        # table is built, and only a real click reaches _on_point_toggled.
+        tbl.blockSignals(True)
         tbl.setRowCount(len(points))
         for i, (sp, fp, flags) in enumerate(points):
             delta = ""
@@ -3670,9 +3746,22 @@ class UfeTrackStackTab(QWidget):
                      f"{sp.snr:.1f}" if sp.snr else "–",
                      f"{sp.mag:.3f}" if sp.mag is not None else "–",
                      warn)
+            excluded = "user_excluded" in (flags or [])
             for col, text in enumerate(cells):
                 item = QTableWidgetItem(text)
-                item.setFlags(Qt.ItemIsEnabled)
+                if col == 0:
+                    # The include/exclude checkbox (2026-10-10): checked = the
+                    # observation goes into the report and the check. It is
+                    # the observer's decision, and it is reversible: the point
+                    # is flagged, never deleted.
+                    item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+                    item.setCheckState(Qt.Unchecked if excluded else Qt.Checked)
+                    item.setToolTip(self.tr(
+                        "Uncheck it to leave this observation out of the "
+                        "report and of the check; check it again to put it "
+                        "back. The measurement is never deleted"))
+                else:
+                    item.setFlags(Qt.ItemIsEnabled)
                 if col == 4:
                     item.setToolTip(self.tr(
                         "Separation between the stack measurement and the "
@@ -3710,6 +3799,67 @@ class UfeTrackStackTab(QWidget):
                         "The two measurements disagree: the point is "
                         "flagged, nothing is chosen in silence"))
                 tbl.setItem(i, col, item)
+        tbl.blockSignals(False)
+
+    def _on_point_toggled(self, item):
+        # @args: item - the changed cell (only the checkbox column matters)
+        # @return: None. The observer excluded or restored an observation:
+        #          the flag travels with the point (never deleted), the report
+        #          is rebuilt at once and the check is re-run, debounced.
+        if item.column() != 0 or self._result is None:
+            return
+        points = self._result.get("points") or []
+        row = item.row()
+        if not (0 <= row < len(points)):
+            return
+        excluded = item.checkState() != Qt.Checked
+        sp, fp, flags = points[row]
+
+        def _without(fl):
+            out = [f for f in (fl or []) if f != "user_excluded"]
+            if excluded:
+                out.append("user_excluded")
+            return out
+
+        flags = _without(flags)
+        if sp is not None:
+            sp.flags = _without(sp.flags)
+        points[row] = (sp, fp, flags)
+        self._result["points"] = points
+        self._persist_point_excluded(sp, excluded)
+        self._fill_points()          # repaint: the row shows the exclusion
+        self._on_report(quiet=True)
+        # the check's "ours" changed: re-run it, coalescing quick toggles
+        self._recheck_timer.start()
+
+    def _persist_point_excluded(self, sp, excluded):
+        # @args: sp - the observation's stack point, excluded - True/False
+        # @return: None. The decision is written into the saved run (the flags
+        #          of its stack point) through the host, so a reopened run
+        #          keeps it. Without a host (an ad-hoc open) it lives in
+        #          memory only.
+        if self._run_id is None or sp is None:
+            return
+        host = host_of(self)
+        save = getattr(host, "set_point_excluded", None)
+        if not callable(save):
+            return
+        try:
+            save(self._run_id, getattr(sp, "group_index", 0), bool(excluded))
+        except Exception as err:
+            logger.warning("the exclusion could not be saved: %s", err)
+
+    def _auto_recheck(self):
+        # @return: None. Re-runs the check after the observer changed which
+        #          observations are submitted. A re-check already in flight
+        #          wins: this one waits (the timer is restarted) so a burst of
+        #          toggles ends in ONE check, not one per click.
+        if self._recheck is not None:
+            self._recheck_timer.start()
+            return
+        if not (self._result or {}).get("points"):
+            return
+        self._on_recheck()
 
     def _mag_role(self, index, mag):
         # @args: index - the observation, mag - the magnitude it shows
@@ -3751,6 +3901,8 @@ class UfeTrackStackTab(QWidget):
                 "The object did not clear the detection gate: it was "
                 "measured at the ephemeris' position and is not to be "
                 "published without looking at it")
+        if flag == "user_excluded":
+            return self.tr("Excluded from the report by you")
         return str(flag)
 
     def _findorb_ready_now(self):
@@ -3765,6 +3917,153 @@ class UfeTrackStackTab(QWidget):
             return bool(path)
         except Exception:
             return False
+
+    def _current_object_name(self):
+        # @return: the object name the visit is about ("" when no host)
+        return ((self._context() or {}).get("object_name") or "").strip()
+
+    def _check_desig(self):
+        # @return: the designation the check field should carry: the name
+        #          the object is known by NOW (the confirmed one when the
+        #          run resolved a rename), else the visit's own name
+        check = (self._result or {}).get("check")
+        resolved = getattr(check, "resolved_desig", "") if check else ""
+        return resolved or self._current_object_name()
+
+    def _build_residuals_table(self):
+        # @return: None. The published observations' table: the columns are
+        #          the ones Find_Orb's own listing shows, so an observer who
+        #          knows that listing reads this one at once.
+        from PySide6.QtWidgets import QHeaderView
+        self.tbl_residuals.setColumnCount(7)
+        self.tbl_residuals.setHorizontalHeaderLabels([
+            self.tr("#"), self.tr("Date"), self.tr("Stn"), self.tr("RA"),
+            self.tr("Dec"), self.tr("dRA (″)"), self.tr("dDec (″)")])
+        self.tbl_residuals.verticalHeader().setVisible(False)
+        head = self.tbl_residuals.horizontalHeader()
+        head.setSectionResizeMode(QHeaderView.ResizeToContents)
+        head.setStretchLastSection(True)
+
+    def _sex(self, value, hours):
+        # @args: value - degrees or None, hours - True for RA (printed in
+        #        hours), False for Dec (degrees)
+        # @return: the sexagesimal string, or "–" when there is no value
+        if value is None:
+            return "–"
+        v = float(value)
+        if hours:
+            v /= 15.0
+        sign = "-" if v < 0 else ("+" if not hours else "")
+        v = abs(v)
+        deg = int(v)
+        minutes = int((v - deg) * 60)
+        secs = (v - deg - minutes / 60.0) * 3600.0
+        return f"{sign}{deg:02d} {minutes:02d} {secs:04.1f}"
+
+    def _resid_text(self, value):
+        # @args: value - arcseconds or None
+        # @return: the signed residual, or "–": the sign is the whole point
+        #          (which way the measurement missed), so it is never lost
+        if value is None:
+            return "–"
+        return f"{float(value):+.2f}"
+
+    def _fill_residuals(self, check):
+        # @args: check - a CheckReport
+        # @return: None. Fills the WHOLE published list, ours highlighted,
+        #          and shows the button that opens it (ADR-077). With no list
+        #          the button is hidden: an empty table says nothing and
+        #          would read as "no observations".
+        from PySide6.QtGui import QColor, QFont
+        from PySide6.QtWidgets import QTableWidgetItem
+        rows = list(getattr(check, "residuals", None) or [])
+        self.tbl_residuals.setRowCount(0)
+        if not rows:
+            self._hide_residuals()
+            return
+        ours_color = QColor(theme.C_ACCENT)
+        self.tbl_residuals.setRowCount(len(rows))
+        for i, r in enumerate(rows):
+            cells = [
+                str(i + 1),
+                (r.get("iso") or "")[:19].replace("T", " "),
+                str(r.get("stn") or ""),
+                self._sex(r.get("ra"), hours=True),
+                self._sex(r.get("dec"), hours=False),
+                self._resid_text(r.get("dra")),
+                self._resid_text(r.get("ddec")),
+            ]
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(text)
+                if r.get("ours"):
+                    item.setForeground(ours_color)
+                    font = QFont(item.font())
+                    font.setBold(True)
+                    item.setFont(font)
+                    item.setToolTip(self.tr(
+                        "This row is our own observation: its residual is the "
+                        "one the verdict is about"))
+                self.tbl_residuals.setItem(i, col, item)
+        self.tbl_residuals.resizeRowsToContents()
+        # there is a list to read: the door appears (it is not opened on its
+        # own, the observer asked to open it with the button)
+        self.btn_residuals.setVisible(True)
+
+    def _show_residuals(self):
+        # @return: None. Opens the published listing, or brings it back to
+        #          the front when it is already open: it is a NON-MODAL
+        #          window (ADR-077), so the observer can keep reading it
+        #          while working, and re-clicking the button must not stack a
+        #          second copy.
+        self._residuals_dialog.show()
+        self._residuals_dialog.raise_()
+        self._residuals_dialog.activateWindow()
+
+    def _hide_residuals(self):
+        # @return: None. The published listing is CLOSED and its button
+        #          hidden: the list belonged to the run being replaced (a
+        #          new run, a new visit or an undo), and a stale table reads
+        #          as the current comparison.
+        self._residuals_dialog.setVisible(False)
+        self.btn_residuals.setVisible(False)
+
+    def _fill_rename(self, check):
+        # @args: check - a CheckReport
+        # @return: None. The rename notice: an object observed while on the
+        #          NEOCP and CONFIRMED SINCE is shown as such, very visibly,
+        #          with the MPEC that published it and, when our station is
+        #          already among the published observations, the fact that
+        #          our data is in it.
+        resolved = getattr(check, "resolved_desig", "") or ""
+        current = self._current_object_name()
+        if not resolved or not current or resolved == current:
+            self.lbl_rename.setVisible(False)
+            return
+        mpec = getattr(check, "mpec", "") or ""
+        url = getattr(check, "mpec_url", "") or ""
+        obj_url = ("https://www.minorplanetcenter.net/db_search/"
+                   "show_object?utf8=True&object_id="
+                   + resolved.replace(" ", "+"))
+        parts = [self.tr("Confirmed as <b>%1</b>").replace("%1", resolved)]
+        if mpec and url:
+            parts.append(self.tr('published in <a href="%1">%2</a>')
+                         .replace("%1", url).replace("%2", mpec))
+        elif mpec:
+            parts.append(self.tr("published in %1").replace("%1", mpec))
+        if getattr(check, "ours_published", False):
+            parts.append(self.tr(
+                "your observations are among them: your data is in that "
+                "MPEC"))
+        else:
+            parts.append(self.tr('<a href="%1">see the object at the MPC</a>')
+                         .replace("%1", obj_url))
+        self.lbl_rename.setText("★ " + " · ".join(parts) + ".")
+        self.lbl_rename.setStyleSheet(
+            "QLabel { background: "
+            + theme.composite(theme.C_ACCENT, "22", over=theme.C_PANEL)
+            + "; border: 1px solid " + theme.C_ACCENT
+            + "; border-radius: 8px; padding: 8px; }")
+        self.lbl_rename.setVisible(True)
 
     def _fill_check(self):
         # The verdict in plain language (D25/D29): available or not,
@@ -3783,13 +4082,13 @@ class UfeTrackStackTab(QWidget):
                         "Find_Orb was not configured when this stack was "
                         "made; it is now. Re-run the track & stack to check "
                         "this visit; meanwhile the centred sequence and the "
-                        "submission floor are the safety net.")
+                        "warnings on the report are the safety net.")
                 else:
                     text = self.tr(
                         "Find_Orb is not configured: the check is not "
                         "available. Set it up in Settings; meanwhile the "
-                        "centred sequence and the submission floor are the "
-                        "safety net.")
+                        "centred sequence and the warnings on the report are "
+                        "the safety net.")
             else:
                 text = self.tr("The check is not available:") \
                     + f" {check.note}"
@@ -3797,7 +4096,14 @@ class UfeTrackStackTab(QWidget):
             text = self.tr(
                 "No other observations to compare with: nothing is blocked "
                 "(a real discovery has no reference); the centred sequence "
-                "and the submission floor decide.")
+                "and your own review of the report decide.")
+            if check.note:
+                text += " " + check.note
+        elif getattr(check, "no_fit", False):
+            text = self.tr(
+                "The published observations are too few or too short an arc "
+                "for Find_Orb to fit an orbit, so there is nothing to compare "
+                "our point with yet. Nothing is blocked.")
         elif check.blocked:
             text = self.tr(
                 "Our point is an outlier against the other observers: the "
@@ -3814,12 +4120,18 @@ class UfeTrackStackTab(QWidget):
                 "%2", f"{check.our_residual[1]:.2f}").replace(
                 "%3", str(check.n_stations))
         self.txt_check.setPlainText(text)
+        # the whole list with our rows, and the rename notice when the
+        # object was confirmed since the visit
+        self._fill_residuals(check)
+        self._fill_rename(check)
         # the verdict rides the block's header, so it is read WITHOUT
         # opening it (the block is folded by default)
         if not check.available:
             badge = self.tr("not available")
         elif check.no_reference:
             badge = self.tr("nothing to compare")
+        elif getattr(check, "no_fit", False):
+            badge = self.tr("no orbit yet")
         elif check.blocked:
             badge = self.tr("blocked")
         else:
@@ -3829,6 +4141,62 @@ class UfeTrackStackTab(QWidget):
         self.chk_force.setEnabled(bool(check.blocked))
         if not check.blocked and self.chk_force.isChecked():
             self.chk_force.setChecked(False)
+        # the manual re-check: prefilled with the name the object is known
+        # by now, and armed only when there is a measured point to check
+        if not self.edt_desig_check.text().strip():
+            self.edt_desig_check.setText(self._check_desig())
+        self.btn_recheck.setEnabled(
+            bool((self._result or {}).get("points"))
+            and self._recheck is None)
+
+    def _on_recheck(self):
+        # @return: None. Re-runs the check with the designation in the field,
+        #          WITHOUT stacking the frames again: only the MPC round trip
+        #          and Find_Orb run. This is the door for an object that was
+        #          confirmed after the rolling NEOCP list forgot it.
+        from .workers import FindOrbRecheckWorker, hold
+        result = self._result or {}
+        points = result.get("points") or []
+        if not points:
+            self._say(self.tr(
+                "There is no measured point to check: run the track & stack "
+                "first."))
+            return
+        desig = self.edt_desig_check.text().strip() or self._current_object_name()
+        if not desig:
+            return
+        from ..core import mpc_astrometry
+        kept, _excluded, _warnings = mpc_astrometry.submittable(
+            [sp for sp, _fp, _fl in points], config)
+        if not kept:
+            self._say(self.tr(
+                "There is no observation to check: you have excluded them "
+                "all. Mark one again to check it."))
+            return
+        ours = mpc_astrometry.to_mpc80(
+            kept, str(config.get("mpc_code", "")), desig, config)
+        self._recheck = hold(FindOrbRecheckWorker(
+            ours, desig, cfg=config,
+            obs_code=str(config.get("mpc_code", ""))))
+        self._recheck.finished.connect(self._on_recheck_done)
+        self.btn_recheck.setEnabled(False)
+        self._say(self.tr("Checking against other observers…"))
+        self._recheck.start()
+
+    def _on_recheck_done(self, report):
+        # @args: report - the CheckReport, or None on failure
+        # @return: None. A fresh verdict replaces the run's, and the report
+        #          gate follows it: an outlier blocks again, a pass clears.
+        self._recheck = None
+        if report is None:
+            self._say(self.tr("The re-check failed: no answer from Find_Orb."))
+            self.btn_recheck.setEnabled(bool((self._result or {}).get("points")))
+            return
+        if self._result is not None:
+            self._result["check"] = report
+        self._say("")
+        self._fill_check()
+        self._sync_report_buttons()
 
     # ------------------------------------------------------------ report
 
@@ -3857,11 +4225,11 @@ class UfeTrackStackTab(QWidget):
         refresh_door(self.btn_more)
 
     def _on_report(self, quiet=False):
-        # The generator applies the submission floor itself (D26) and the
-        # round trip through the validator (the generator that cannot pass
-        # its own judge is our bug). The dropped groups are re-explained
-        # here from the DATA, in the GUI's language: the core's notes are
-        # internal English and never reach the user verbatim.
+        # The generator keeps every observation the observer did not exclude
+        # and the round trip through the validator (the generator that cannot
+        # pass its own judge is our bug). The floor only WARNS now; the notes
+        # are re-explained here from the DATA, in the GUI's language: the
+        # core's notes are internal English and never reach the user verbatim.
         # @args: quiet - True when the report is rebuilt while a visit is
         #        reopened: the text belongs in the box, but it is not news
         #        (the restore already said where the run came from)
@@ -3875,46 +4243,53 @@ class UfeTrackStackTab(QWidget):
                 self._say(self.tr("Measure the sequence first."))
             return
         fmt = self.cmb_format.currentData() or "ades"
-        rep = mpc_astrometry.generate(points, fmt,
-                                      str(config.get("mpc_code", "")),
-                                      ctx.get("object_name") or "", config)
+        context = mpc_astrometry.report_context(config)
+        kind = "neocp" if ctx.get("neocp") else None
+        rep = mpc_astrometry.generate(
+            points, fmt, context.obs_code or str(config.get("mpc_code", "")),
+            ctx.get("object_name") or "", config,
+            context=context, submission=self._submission, kind=kind)
         self.txt_report.setPlainText(rep["text"])
         floor = float(config.get("astrometry_submit_snr", 20.0))
-        kept_n = len(rep.get("kept") or [])
-        total_n = kept_n + len(rep.get("dropped") or [])
+        kept = list(rep.get("kept") or [])
+        excluded = list(rep.get("excluded") or [])
+        kept_n = len(kept)
+        total_n = kept_n + len(excluded)
         self._report_kept = kept_n
-        # WHAT CAME OUT, where the observer is looking (measured 2026-10-06:
-        # a visit whose two observations were both below the floor produced a
-        # report with the header and NOTHING else, and the reason was in a
-        # group that is closed by default: it read as "the app generates
-        # nothing").
+        # WHAT CAME OUT, where the observer is looking. The report carries
+        # EVERY observation unless the observer excluded one (2026-10-10): the
+        # floor only recommends, so the note counts what is in and what the
+        # observer left out, never what the app decided.
         if kept_n:
             self.lbl_report_note.setText(self.tr(
                 "%1 of %2 observations are in the report.").replace(
                     "%1", str(kept_n)).replace("%2", str(total_n)))
         else:
             self.lbl_report_note.setText(self.tr(
-                "None of the %1 observations clears the submission floor "
-                "you have set (SNR %2, in Settings → Astrometry; the MPC "
-                "recommends 20): the report has no lines to send. Lower it "
-                "there if you take the risk of a marginal detection.").replace(
-                    "%1", str(total_n)).replace("%2", f"{floor:.0f}"))
+                "You have excluded every observation: the report has no lines "
+                "to send. Mark one again to put it back."))
         notes = []
-        for point in rep.get("dropped") or []:
+        for point in kept:
             snr = getattr(point, "snr", None)
-            g = str(getattr(point, "group_index", "?"))
+            g = str(int(getattr(point, "group_index", 0) or 0) + 1)
             if snr is None:
                 notes.append(self.tr(
-                    "Observation %1 left out: no SNR was measured, so it "
-                    "cannot be shown to clear the floor of %2").replace(
-                        "%1", g).replace("%2", f"{floor:.0f}"))
-            else:
+                    "Observation %1: no SNR was measured, so the app cannot "
+                    "recommend it; sending it is your decision").replace(
+                        "%1", g))
+            elif float(snr) < floor:
                 notes.append(self.tr(
-                    "Observation %1 left out: SNR %2 is below the MPC "
-                    "submission floor of %3 (a marginal detection risks a "
-                    "false tracklet)").replace("%1", g).replace(
-                        "%2", f"{float(snr):.1f}").replace(
+                    "Observation %1: SNR %2 is below the recommended floor of "
+                    "%3, so the app does not recommend sending it (a marginal "
+                    "detection risks a false tracklet)").replace(
+                        "%1", g).replace("%2", f"{float(snr):.1f}").replace(
                         "%3", f"{floor:.0f}"))
+        for point in excluded:
+            g = str(int(getattr(point, "group_index", 0) or 0) + 1)
+            notes.append(self.tr(
+                "Observation %1: excluded by you; it is left out of the "
+                "report and of the check, and you can put it back").replace(
+                    "%1", g))
         validation = rep.get("validation") or {}
         if not validation.get("valid", True):
             notes.extend(str(e) for e in (validation.get("errors") or [])[:3])
@@ -3943,22 +4318,124 @@ class UfeTrackStackTab(QWidget):
             self._say(self.tr("Report generated: %1 observations kept."
                               ).replace("%1", str(kept)))
 
-    def _on_send_mpc(self):
-        # The report lands in the visit's MPC paste box; ADR-022's
-        # validator there has the last word (the round trip is the point:
-        # our own output goes through the same judge as a pasted report).
-        # @return: None
-        text = self.txt_report.toPlainText().strip()
-        if not text:
-            self._say(self.tr("Generate the report first."))
+    def _open_report_window(self):
+        # @return: None. Opens the MPC report window (ADR-080): the report is
+        #          rebuilt first, so the window always shows the current one.
+        self._on_report(quiet=True)
+        self._report_dialog.show()
+        self._report_dialog.raise_()
+        self._report_dialog.activateWindow()
+
+    def _copy_report(self):
+        # @return: None. The report as it reads, on the clipboard.
+        text = self.txt_report.toPlainText()
+        if not text.strip():
             return
-        dlg = host_of(self)
-        send = getattr(dlg, "send_to_mpc_block", None)
-        if callable(send) and send(text):
-            self._say(self.tr(
-                "Report sent to the visit's MPC block: its validator has "
-                "the last word before saving."))
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(text)
+        self._say(self.tr("Report copied to the clipboard."))
+
+    def _save_report(self):
+        # @return: None. Writes the report into the project's folder and
+        #          registers it as a resource of the visit, so the file is
+        #          found again from the project.
+        from PySide6.QtWidgets import QFileDialog
+        text = self.txt_report.toPlainText()
+        if not text.strip():
+            return
+        ctx = self._context() or {}
+        obj = ctx.get("object_name") or "report"
+        suffix = {"mpc80": "obs80.txt", "ades": "ades.psv", "xml": "ades.xml"}
+        fmt = self.cmb_format.currentData() or "ades"
+        default = str(Path.home() / f"{obj}_{suffix.get(fmt, 'report.txt')}")
+        out, _sel = QFileDialog.getSaveFileName(
+            self, self.tr("Save MPC report"), default,
+            self.tr("All files (*)"))
+        if not out:
+            return
+        try:
+            Path(out).write_text(text.rstrip() + "\n", encoding="utf-8")
+        except OSError as err:
+            self._say(self.tr("The report could not be written:") + f" {err}")
+            return
+        self._say(self.tr("Report saved:") + f" {out}")
+
+    def _open_send_dialog(self):
+        # @return: None. Sending is never silent (ADR-080): the dialog asks
+        #          for the acknowledgement email, the target and the mode.
+        if not self.txt_report.toPlainText().strip():
+            self._say(self.tr("There is no report to send."))
+            return
+        self._send_dialog.edt_ack_email.setText(
+            self._send_dialog.edt_ack_email.text()
+            or str(config.get("observer_email", "") or ""))
+        ctx = self._context() or {}
+        default_target = "NEOCP" if ctx.get("neocp") else "Unclassified"
+        idx = self._send_dialog.cmb_target.findData(default_target)
+        if idx >= 0 and not self._send_dialog.cmb_target.currentText():
+            self._send_dialog.cmb_target.setCurrentIndex(idx)
+        self._refresh_send_gate()
+        self._send_dialog.show()
+        self._send_dialog.raise_()
+        self._send_dialog.activateWindow()
+
+    def _refresh_send_gate(self):
+        # @return: None. What the submission header still needs, said in the
+        #          dialog, and the Send button blocked while anything is
+        #          missing (ADR-080: the app never sends a half report).
+        from ..core import mpc_astrometry
+        ctx = mpc_astrometry.report_context(config)
+        # the dialog's own field is the AC2 that will be sent, so it is the
+        # one that decides: the config's email is only its prefill
+        missing = [m for m in ctx.missing() if m != "the contact email"]
+        email = self._send_dialog.edt_ack_email.text().strip()
+        if not email:
+            missing.append("the contact email")
+        self._send_dialog.lbl_missing.setText(
+            self.tr("Missing: %1. Set it in Settings → Observer, then send.")
+            .replace("%1", ", ".join(missing)) if missing else "")
+        self._send_dialog.btn_send.setEnabled(not missing)
+
+    def _on_mpc_submit(self):
+        # @return: None. Builds the report with the chosen acknowledgement
+        #          and target, then submits it off the GUI thread. The
+        #          server's own answer lands in the dialog's log.
+        from .workers import MpcSubmitWorker
+        dlg = self._send_dialog
+        email = dlg.edt_ack_email.text().strip()
+        ack = dlg.edt_ack.text().strip()
+        target = dlg.cmb_target.currentData() or ""
+        test = bool(dlg.cmb_mode.currentData())
+        self._submission = {"ack": ack, "obj_type": target}
+        # rebuild with the chosen ACK/target so the header carries them
+        self._on_report(quiet=True)
+        text = self.txt_report.toPlainText()
+        if not text.strip():
+            dlg.log(self.tr("Nothing to send: the report is empty."))
+            return
+        fmt = self.cmb_format.currentData() or "ades"
+        mode = self.tr("Test") if test else self.tr("Normal")
+        dlg.log(self.tr("Submitting (%1, %2)…").replace("%1", fmt)
+                .replace("%2", mode))
+        dlg.btn_send.setEnabled(False)
+        self._submit_worker = MpcSubmitWorker(
+            fmt, text, ack=ack, email=email, obj_type=target, test=test)
+        self._submit_worker.finished.connect(self._on_mpc_submit_done)
+        self._submit_worker.start()
+
+    def _on_mpc_submit_done(self, out):
+        # @args: out - mpc_submit.submit's dict
+        # @return: None. The server's own words, and the button armed again.
+        dlg = self._send_dialog
+        self._submit_worker = None
+        ok = bool(out.get("ok"))
+        dlg.log((self.tr("The MPC accepted the batch:") if ok else
+                 self.tr("The MPC did NOT accept the batch:")))
+        dlg.log(str(out.get("text") or "").strip()[:2000])
+        dlg.log(self.tr("URL: %1").replace("%1", str(out.get("url") or "")))
+        if ok:
+            self._say(self.tr("Report submitted to the MPC."))
         else:
-            self._say(self.tr(
-                "The visit window is not open: open the visit to send the "
-                "report to its MPC block."))
+            self._say(self.tr("The MPC did not accept the report: see the "
+                              "send window."))
+        self._refresh_send_gate()

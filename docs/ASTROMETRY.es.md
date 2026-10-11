@@ -202,6 +202,15 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
    del NEOCP si no está confirmado), las pasa por **Find_Orb** junto con las
    tuyas (excluyendo las tuyas del ajuste) y compara tu residuo con la nube
    de los demás. Si estás fuera de la nube, bloquea el reporte por defecto.
+   Además **te enseña la lista entera**: todas las observaciones publicadas
+   que usó Find_Orb, con el instante, la estación, la dirección y su residuo
+   en ascensión recta y declinación, **tus filas resaltadas**. Cuando el
+   chequeo no puede correr lo dice con palabras llanas (no hay Find_Orb, aún
+   no hay observaciones publicadas, o el arco de referencia es demasiado
+   corto para ajustar), y nada de eso bloquea el reporte. Si el objeto se
+   **confirmó con un nombre nuevo** desde la visita, la app lo encuentra
+   sola, chequea con el nombre nuevo y muestra la designación nueva y la
+   circular que lo publicó, diciendo que tus datos están en ella.
 9. **Reporte.** Se genera en **ADES PSV** y en **MPC 80 columnas**, se valida
    con el mismo validador de siempre y se envía al bloque MPC de la visita.
    El envío lo haces tú.
@@ -282,7 +291,9 @@ PCCP). Sin visita no hay serie: es la regla de la casa.
   dice, con el número del listón y dónde se ajusta, y el botón que envía el
   reporte queda deshabilitado: un reporte sin observaciones no es un reporte.
 - **Residual**: cuánto se separa tu medida de lo que predice la órbita, en
-  segundos de arco.
+  segundos de arco. El bloque lista además **todas las observaciones
+  publicadas** con su propio residuo (dRA / dDec), para que tu cifra quede
+  junto a la de los demás; tus filas aparecen resaltadas.
 - **Dispersión de los demás**: cuánto se separan ellos. Es la escala justa:
   con una órbita mala todos los residuos son grandes, y lo que importa es si
   estás **fuera de la nube**, no a qué distancia estás de cero.

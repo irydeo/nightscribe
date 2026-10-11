@@ -29,9 +29,11 @@ documenta para el apilado de objetos débiles (synthetic tracking).
    velocidad teórica, con score **SNR × redondez** (segundos momentos). Se hace
    **una vez** sobre la secuencia y se aplica a todos los grupos.
 5. **Dos umbrales, no uno**: la puerta de **detección** (3,5σ, configurable)
-   decide si hay algo y si se barre; el listón de **envío** es **SNR ≥ 20 por
-   observación** (configurable), que es la recomendación explícita del MPC. Por
-   debajo, no se genera el reporte y se explica por qué.
+   decide si hay algo y si se barre; el listón de **envío** (SNR ≥ 20 por
+   observación, configurable) es la recomendación explícita del MPC y **avisa,
+   no filtra** (revisión 2026-10-10, ADR-078): toda observación entra en el
+   reporte salvo que el observador la excluya, y por debajo del listón la app
+   dice que **no recomienda enviarla**. La decisión es del observador.
 6. **Varias observaciones por secuencia**: el usuario dice cuántas quiere y el
    software reparte la secuencia en grupos contiguos de igual número de frames.
    Cada grupo es una observación con su `T_mid` y su `q_g` propios (la posición
@@ -48,6 +50,13 @@ documenta para el apilado de objetos débiles (synthetic tracking).
    si es outlier, con opción de forzar. **El chequeo filtra, no demuestra** (el
    propio MPC avisa de que en un arco corto una observación errónea encaja
    igual), y **sin referencia no bloquea**.
+   **Revisión (ADR-077)**: la referencia se pide por la estrategia confirmado →
+   NEOCP → alias de la lista rodante del MPC (un objeto observado en el NEOCP y
+   confirmado después, `A11HPKO → 2026 TQ8`, se consulta por su nombre nuevo), los
+   estados del chequeo se dicen sin fingir (sin binario / sin observaciones
+   publicadas / no pudo ajustar), y el chequeo devuelve además el **listado
+   completo de residuos** con nuestras filas resaltadas, con el aviso de
+   renombrado cuando el objeto cambió de nombre.
 9. **Find_Orb es externo y se instala guiado** (patrón de ADR-052): en
    Linux/macOS, micromamba privado + `findorb` de conda-forge; en Windows, los
    binarios de Project Pluto. **No se empaqueta en el instalador** (GPLv2 con una
@@ -224,8 +233,11 @@ calibrate, stack following the motion, measure and report. The field's reference
    sequence and applied to all groups.
 5. **Two thresholds, not one**: the **detection** gate (3.5σ, configurable)
    decides whether anything is there and whether to sweep; the **submission** bar
-   is **SNR ≥ 20 per observation** (configurable), which is the MPC's explicit
-   recommendation. Below it, no report is generated and the reason is explained.
+   (SNR ≥ 20 per observation, configurable) is the MPC's explicit recommendation
+   and it **warns, it does not filter** (revision 2026-10-10, ADR-078): every
+   observation goes into the report unless the observer excludes it, and below
+   the bar the app says it **does not recommend sending it**. The decision is the
+   observer's.
 6. **Several observations per sequence**: the user says how many and the software
    splits the sequence into contiguous groups of equal frame count. Each group is
    an observation with its own `T_mid` and `q_g` (the ephemeris position **of its
@@ -242,6 +254,13 @@ calibrate, stack following the motion, measure and report. The field's reference
    to force. **The check filters, it does not prove** (the MPC itself warns that
    on a short arc a wrong observation fits just as well), and **without a
    reference it does not block**.
+   **Revision (ADR-077)**: the reference is fetched through the strategy
+   confirmed → NEOCP → alias from the MPC's rolling list (an object observed on
+   the NEOCP and confirmed later, `A11HPKO → 2026 TQ8`, is queried under its new
+   name), the check's states are stated without faking (no binary / no published
+   observations / could not fit), and the check also returns the **whole residual
+   listing** with our rows highlighted, plus the rename notice when the object
+   changed its name.
 9. **Find_Orb is external and installed guided** (ADR-052 pattern): the
    Settings **Install…** button walks the shortest road first (point the path
    at an `fo` already on PATH), then offers the exact private-environment

@@ -133,7 +133,7 @@
          </property>
          <property name="maximumSize"><size><width>16777215</width><height>120</height></size></property>
          <property name="toolTip">
-          <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the submission floor set in Settings is left out of the report, with its reason</string>
+          <string>One row per observation: its frames, its middle-of-exposure instant (UTC) and the SNR it is expected to reach. A group below the recommended floor set in Settings is marked with a warning: the app will not recommend sending it, and the decision is yours</string>
          </property>
          <column><property name="text"><string>Obs.</string></property></column>
          <column><property name="text"><string>Frames</string></property></column>
@@ -506,6 +506,51 @@
        </widget>
       </item>
       <item>
+       <widget class="QLabel" name="lbl_rename">
+        <property name="visible"><bool>false</bool></property>
+        <property name="textFormat"><enum>Qt::RichText</enum></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="openExternalLinks"><bool>true</bool></property>
+        <property name="textInteractionFlags"><set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btn_residuals">
+        <property name="visible"><bool>false</bool></property>
+        <property name="text"><string>Published observations…</string></property>
+        <property name="toolTip">
+         <string>Open the whole list of published observations the check compared us with, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination, with our own rows highlighted</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_recheck">
+        <item>
+         <widget class="QLabel" name="lbl_desig_check">
+          <property name="text"><string>Check against:</string></property>
+          <property name="toolTip">
+           <string>The designation the check asks the MPC for. It is prefilled with the object's name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLineEdit" name="edt_desig_check">
+          <property name="toolTip">
+           <string>The designation the check asks the MPC for. It is prefilled with the object's name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_recheck">
+          <property name="text"><string>Re-check</string></property>
+          <property name="toolTip">
+           <string>Run the check again with the designation above, without stacking the frames again: it only asks the MPC for the published observations and compares our measured points with them</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
        <widget class="QLabel" name="lbl_check_hint">
         <property name="text"><string>The check filters, it does not prove: fitting a short arc is not proof of a detection.</string></property>
         <property name="wordWrap"><bool>true</bool></property>
@@ -531,38 +576,22 @@
       <property name="rightMargin"><number>0</number></property>
       <property name="bottomMargin"><number>0</number></property>
       <item>
-       <layout class="QHBoxLayout" name="row_format">
-        <item>
-         <widget class="QLabel" name="lbl_format">
-          <property name="text"><string>Format:</string></property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QComboBox" name="cmb_format">
-          <property name="toolTip">
-           <string>ADES PSV is the modern machine-readable format the MPC prefers; the 80-column format is the classic one, readable by every program</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
+       <widget class="QLabel" name="lbl_report_note">
+        <property name="text"><string/></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="toolTip">
+         <string>What came out of the report: how many observations it carries, which ones you excluded and which the app does not recommend sending. Open the report window to read it and to send it to the MPC</string>
+        </property>
+       </widget>
       </item>
       <item>
        <layout class="QHBoxLayout" name="row_report">
         <item>
          <widget class="QPushButton" name="btn_report">
           <property name="enabled"><bool>false</bool></property>
-          <property name="text"><string>Generate</string></property>
+          <property name="text"><string>Manage MPC report</string></property>
           <property name="toolTip">
-           <string>Generate the report with the middle-of-exposure instants, the propagated uncertainties and the magnitude only when there are comparison stars; every observation below the submission floor is left out with its reason</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btn_send_mpc">
-          <property name="enabled"><bool>false</bool></property>
-          <property name="text"><string>Send to the MPC block</string></property>
-          <property name="toolTip">
-           <string>Fill the visit's MPC paste box with the report; the validator there has the last word before saving</string>
+           <string>Open the MPC report in its own window: the format (ADES XML, ADES PSV or 80 columns), the full submission header, and the actions to copy, save or send it to the MPC</string>
           </property>
          </widget>
         </item>
@@ -575,40 +604,13 @@
           </property>
          </widget>
         </item>
+        <item>
+         <spacer name="hsp_report">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+         </spacer>
+        </item>
        </layout>
-      </item>
-      <item>
-       <widget class="QWidget" name="sec_report_content" native="true">
-        <layout class="QVBoxLayout" name="vbox_report_text">
-         <property name="leftMargin"><number>0</number></property>
-         <property name="topMargin"><number>0</number></property>
-         <property name="rightMargin"><number>0</number></property>
-         <property name="bottomMargin"><number>0</number></property>
-         <item>
-          <widget class="QLabel" name="lbl_report_note">
-           <property name="text"><string/></property>
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="toolTip">
-            <string>What came out of the report: how many observations it carries and, when some were left out, why and where the submission floor is set. A report with no observations is not a report: the button that sends it stays disabled</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPlainTextEdit" name="txt_report">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Expanding" vsizetype="Maximum">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize"><size><width>0</width><height>80</height></size></property>
-           <property name="maximumSize"><size><width>16777215</width><height>140</height></size></property>
-           <property name="readOnly"><bool>true</bool></property>
-           <property name="font"><font><family>Monospace</family></font></property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
       </item>
      </layout>
     </widget>

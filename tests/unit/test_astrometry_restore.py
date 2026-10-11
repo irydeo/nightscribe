@@ -346,6 +346,32 @@ def test_the_run_verdicts_travel_in_its_points(window, visit):
     assert {"below_gate", "manual"} <= flags
 
 
+def test_an_excluded_observation_is_written_into_its_flags(window, visit):
+    # 2026-10-10: the observer can leave an observation out of the report and
+    # the check. The flag rides in the stack point's own flags (never a
+    # deletion), so the audit keeps the measurement and a reopened run keeps
+    # the observer's decision.
+    from nightscribe.core import astrometry_store as store
+    import nightscribe.gui.main_window as mw
+    pid, sid, _path = visit
+    run_id = window._ufe_astrometry_persist(pid, sid, _payload2())
+    assert run_id
+
+    def stack_flags(gi):
+        rows = store.points_for_run(mw.db, run_id)
+        by = {(r["group_index"], r["source"]): r for r in rows}
+        return by[(gi, "stack")]["flags"] or []
+
+    assert "user_excluded" not in stack_flags(1)
+    assert store.set_point_excluded(mw.db, run_id, 1, True) == 1
+    assert "user_excluded" in stack_flags(1)
+    # only the observation the observer touched, never its neighbours
+    assert "user_excluded" not in stack_flags(0)
+    # and it is reversible: the point was never deleted
+    assert store.set_point_excluded(mw.db, run_id, 1, False) == 1
+    assert "user_excluded" not in stack_flags(1)
+
+
 def test_the_tab_paints_the_verdicts_and_the_bad_frames_again(window, visit,
                                                               tmp_path, qapp):
     # The whole seam: the host writes a run below the gate, measured from a

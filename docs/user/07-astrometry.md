@@ -117,7 +117,13 @@ ephemeris', with no sweep.
 
 After the run, NightScribe compares your points with the object's already
 published observations (the MPC API, or the NEOCP if not yet confirmed) and
-gives a verdict: whether your point fits or stands out.
+gives a verdict: whether your point fits or stands out. It also **shows you the
+whole list**: every published observation Find_Orb used, with the instant, the
+station, the direction and its residual in right ascension and declination
+(dRA / dDec), and **your own rows highlighted**. That is your error next to
+everyone else's, the way Find_Orb and Tycho-Tracker show it. The list lives in
+its own non-modal window: the check block is a narrow column, so it is opened
+with the **Published observations…** button and stays open beside your work.
 
 > **Why "the check filters, it does not prove"?** Because fitting a short
 > arc does not prove a detection: it proves you do not contradict it. The
@@ -126,29 +132,95 @@ gives a verdict: whether your point fits or stands out.
 > blocked by default; **Force the report** forces it while leaving the fact
 > on record in the report's own note.
 
+When the check cannot run it says why, in plain words, and never pretends: no
+Find_Orb configured, no published observations yet, or a reference arc too short
+for Find_Orb to fit an orbit. None of those blocks the report.
+
+**Check against** sets the designation the check asks the MPC for, and
+**Re-check** repeats the check on the points already measured, **without
+stacking the frames again**.
+
+### Your object was confirmed under a new name
+
+An object observed while it was still on the confirmation page (a NEOCP
+designation) and confirmed since gets a new designation, and its observations
+move with it. NightScribe finds it on its own and shows it **very visibly**: the
+new name and the circular (MPEC) that published it, in the check, on the
+project's card and in the visit. When your station already appears among the
+published observations, it says so: **your data is in that circular**. If the
+automatic lookup comes up empty (the MPC's list of just-confirmed NEOCP objects
+is short), type the current designation in **Check against** and press
+**Re-check**.
+
 ## The MPC report
 
-**Generate** writes the report with the middle-of-exposure instants, the
-propagated uncertainties and the magnitude only when there are comparison
-stars. Every observation below the **submission floor** (SNR ≥ 20, settable
-in Settings) is left out, with its reason.
+**Manage MPC report** opens the report in its own window: the full submission
+the MPC expects, with the middle-of-exposure instants, the propagated
+uncertainties and the magnitude only when there are comparison stars. Every
+observation goes in; the **recommended floor** (SNR ≥ 20, settable in Settings)
+only warns: below it the app says it does not recommend sending that
+observation, and **you decide**. Uncheck an observation in the "Measurement per
+observation" table to leave it out of the report and of the check (the
+measurement is never deleted, and you can put it back).
 
 > **Why an SNR floor?** Because the MPC archives your measurements forever
 > and uses them for orbits: a point with SNR 8 carries a position
-> uncertainty that spoils everyone else's fit. Better not to submit than to
-> submit noise. The floor is yours: lower it if you know what you are doing,
-> but the default is what experience dictates.
+> uncertainty that spoils everyone else's fit. That is why the app warns
+> instead of sending it silently: the warning is its advice, and the decision
+> to send it is yours.
 
-- **Format**: **ADES PSV** is the modern, machine-readable format the MPC
-  prefers; **80-column** is the classic one, readable by every program. If
-  in doubt: ADES.
-- **Send to the MPC block** fills the visit's paste box; the validator in
-  that window has the last word before saving.
+The report is not just the measurements: it carries the **header** the MPC
+requires (your observatory code, the observer, the telescope, the catalogue and
+the acknowledgement), so the batch is recognized. Fill your details once in
+**Settings → Observatory** (name, contact email, telescope type and focal
+ratio); the app builds the telescope line from them.
+
+- **Format**: **ADES XML** is the format the MPC prefers, then **ADES PSV**,
+  then the classic **80-column** one. All three carry the header. If in doubt:
+  ADES XML.
+- **Copy to clipboard** and **Save to file…** take the report out as it reads.
 - If you configured **Find_Orb** in Settings, the app cross-checks your
   measurements against the orbit it computes itself and shows you the
   residuals before you submit.
 - **Undo this run** removes this execution's observations from the project
   (the run stays, marked undone, for the audit trail); everything else is
   untouched.
+
+### Sending it to the MPC: the options
+
+**Send to MPC…** opens the submission dialog. It asks for four things and then
+sends the batch to the MPC; the server's own answer (the CurlID or the errors)
+appears in the dialog's log. Without a contact email the send is blocked: the
+MPC needs it.
+
+- **Ack. email**: where the MPC sends its acknowledgement and any designations.
+  It is the contact email you set in Settings, and you can change it here.
+- **Ack.**: a short text the MPC echoes back, so you can tell one batch from
+  another ("Night 1, field B"). Optional.
+
+**Target** tells the MPC how to route the batch. It is not decoration: a batch
+whose target keyword is missing or wrong can be misrouted or not processed as
+you expect. The app puts the keyword in the report's ACK line (80 columns) or
+in the `obj_type` field (ADES).
+
+| Target | What it means | When to use it |
+|---|---|---|
+| **Unclassified** | The object is already classified (it has a definitive designation): a normal submission. No keyword is needed. | Known asteroids and comets |
+| **NEOCP** | The object is on the confirmation page right now (Near-Earth Object Confirmation Page). The MPC needs the word "NEOCP". | A candidate not yet confirmed |
+| **PCCP** | It is on the Possible Comet Confirmation Page. | A comet candidate |
+| **NEW NEO** | A candidate for a new near-Earth object. | Just discovered, unconfirmed |
+| **NEW COMET** | A candidate for a new comet. | Same |
+| **NEW NATURAL SATELLITE** | A candidate for a new natural satellite. | Same |
+| **NEW TNO / NEW KBO / NEW DISTANT / NEW CENTAUR** | A candidate for a new TNO, KBO, distant object or centaur. | Same |
+
+The default is **NEOCP** when the project is on the NEOCP and **Unclassified**
+otherwise.
+
+**Mode** decides whether the batch is real or a rehearsal:
+
+- **Normal**: the batch is sent for real; the MPC processes it and publishes it.
+- **Test**: it uses the MPC's test endpoint, which runs the **same format and
+  validity checks** but does **not** process the batch. It is the rehearsal: use
+  it to check the report is right without committing it.
 
 Next: [08. Reporting it](08-posts.md).

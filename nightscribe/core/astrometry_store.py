@@ -128,6 +128,33 @@ def set_manual_magnitude(db, run_id, group_index, mag, band=None):
     return cur.rowcount
 
 
+def set_point_excluded(db, run_id, group_index, excluded):
+    # The observer excluded an observation from the report and the check (or
+    # put it back, 2026-10-10). The point is NEVER deleted: the flag
+    # `user_excluded` is added to (or taken out of) the flags of the STACK
+    # point, which is the one the report and the check use. So a reopened run
+    # keeps the observer's decision and the audit keeps the measurement.
+    # @args: db - Database, run_id - the execution, group_index - which
+    #        observation, excluded - True to leave it out, False to put it back
+    # @return: how many points were updated (0 or 1)
+    row = db.execute(
+        "SELECT flags FROM astrometry_points WHERE run_id=? AND group_index=?"
+        " AND source='stack'",
+        (int(run_id), int(group_index))).fetchone()
+    if row is None:
+        return 0
+    flags = [f for f in _flags_in(row[0]) if f != "user_excluded"]
+    if excluded:
+        flags.append("user_excluded")
+    cur = db.execute(
+        "UPDATE astrometry_points SET flags=? WHERE run_id=? AND"
+        " group_index=? AND source='stack'",
+        (json.dumps(flags, ensure_ascii=False), int(run_id),
+         int(group_index)))
+    db.commit()
+    return cur.rowcount
+
+
 def add_frames(db, run_id, rows):
     # The manifest of the frames a run consumed (phase 9). It is written
     # once per run: the run already says how many frames it used, and this

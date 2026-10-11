@@ -982,3 +982,29 @@ def test_astap_solves_the_sample_plate():
     plate = Path(__file__).parents[1] / "fixtures" / "hatp32_sample.fits"
     cards = astap.solve(plate)
     assert cards and 30.0 < float(cards["CRVAL1"]) < 32.0
+
+
+# ---------------- the Find_Orb check reference (ADR-077) ----------------
+
+def test_mpc_obs_reference_80_for_a_confirmed_object():
+    # The check's reference, end to end: a designated object comes back from
+    # the confirmed endpoint as an 80-column block, ready for Find_Orb.
+    from nightscribe.core.sources import mpc_obs
+    ref = mpc_obs.reference_80("2025 UR", obs_code=MPC, force=True)
+    assert ref.source == "MPC" and ref.lines
+    assert ref.designation == "2025 UR"
+    assert ref.lines.splitlines()[0][77:80].strip()
+
+
+def test_mpc_obs_resolves_a_confirmed_neocp_alias():
+    # The rolling "Previous NEOCP Objects" list is the only place that maps a
+    # temporary designation to the confirmed one. Any object on it works; if
+    # nothing was confirmed in the last days the test says so, not fails.
+    from nightscribe.core.sources import mpc_obs
+    table = mpc_obs.neocp_prev(force=True)
+    if not table:
+        pytest.skip("the MPC's previous-NEOCP list is empty right now")
+    temp, hit = next(iter(table.items()))
+    assert hit["designation"]
+    resolved = mpc_obs.resolve_neocp_alias(temp, force=True)
+    assert resolved and resolved["designation"] == hit["designation"]

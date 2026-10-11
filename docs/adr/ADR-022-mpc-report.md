@@ -1,6 +1,18 @@
 # ADR-022: MPC report — paste and validate, never generate measurements
 
-**Estado / Status**: Reopened · **Fecha / Date**: 2026-08-24 · **Reabierto / Reopened**: 2026-10-04 por ADR-062
+**Estado / Status**: Reopened · **Fecha / Date**: 2026-08-24 · **Reabierto / Reopened**: 2026-10-04 por ADR-062 · 2026-10-11 por ADR-080
+
+> **Reapertura (2026-10-11)**: ADR-080 completa el reporte (cabecera de envío
+> y designación en su columna) y **la app ya lo envía** al MPC desde su propio
+> diálogo (email de acuse, objetivo, modo), con modo Test. Lo que ADR-022
+> decidió **se conserva**: el validador sigue siendo la puerta, y el envío lo
+> dispara el usuario, que ve y elige antes de mandar.
+>
+> **Reopening (2026-10-11)**: ADR-080 completes the report (submission header
+> and the designation in its column) and **the app now sends it** to the MPC
+> from its own dialog (ACK email, target, mode), with a Test mode. What ADR-022
+> decided **is kept**: the validator remains the gate, and the user triggers
+> the send, seeing and choosing before submitting.
 
 > **Reapertura (2026-10-04)**: ADR-062 hace que NightScribe **sí genere medidas**
 > de astrometría para objetos con efemérides (track & stack). Lo que ADR-022

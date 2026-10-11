@@ -116,7 +116,12 @@ def test_observatory_page(qapp):
     names = _page_widgets(dlg, 0)
     for w in ("grp_site", "edt_mpc_code", "btn_resolve", "btn_map_pick",
               "edt_obs_name", "spn_lat", "spn_lon", "spn_height",
-              "edt_aavso_code"):
+              "edt_aavso_code",
+              # the observer's own details are NOT visual: they build the MPC
+              # report's header and the band, so they live here (2026-10-11)
+              "edt_observer", "edt_measurer", "edt_observer_email",
+              "edt_telescope", "cmb_telescope_type", "spn_telescope_fratio",
+              "edt_camera_model", "edt_mpc_comment"):
         assert w in names, f"{w} expected on the Observatory page"
     dlg.deleteLater()
 
@@ -194,13 +199,14 @@ def test_integrations_page(qapp):
 
 def test_interface_page_absorbs_development(qapp):
     # the Development tab is gone: its only switch (the UFE top bar) lives
-    # with the Interface preferences now, as the guide already said
+    # with the Interface preferences now, as the guide already said. Only the
+    # VISUAL switches are here: the observer's own details moved to the
+    # Observatory page (2026-10-11).
     dlg = _dlg()
     names = _page_widgets(dlg, 5)
     for w in ("grp_language", "cmb_language", "grp_motion", "chk_animations",
               "grp_ufe", "chk_ufe_bar_icons", "grp_chartann",
-              "edt_observer", "edt_measurer", "edt_telescope",
-              "edt_camera_model", "cmb_marker_style", "cmb_mark_color",
+              "cmb_marker_style", "cmb_mark_color",
               "chk_annot_visible", "chk_chart_data", "chk_chart_boxes"):
         assert w in names, f"{w} expected on the Interface page"
     dlg.deleteLater()

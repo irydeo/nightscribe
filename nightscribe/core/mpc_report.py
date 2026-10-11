@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 # user pastes them from their astrometry software (Astrometrica, etc.).
 
 # MPC 80-column format field positions (0-indexed, end-exclusive)
-_DESIG = (0, 5)      # packed designation
+_DESIG = (0, 12)     # packed number (1-5) + packed provisional (6-12)
 _DATE = (15, 32)     # packed date YYYY MM DD.dddddd
 _RA = (32, 44)       # packed RA  HH MM SS.sss
 _DEC = (44, 56)      # packed Dec sDD MM SS.ss
@@ -33,8 +33,35 @@ _STATION = (77, 80)  # observatory code
 _NUM_RE = re.compile(r"^\d+$")
 _PROV_RE = re.compile(r"^[A-Z]\d{4}[A-Z]$")  # packed provisional: CYYYY...
 
-# ADES PSV required fields (minimum for a valid observation row)
-_ADES_REQUIRED = ("objid", "mode", "stn", "obsTime", "ra", "dec")
+# MPC 1992 submission header keywords (ObsDetails.html). A batch that carries
+# them must NOT have them counted as measurements (2026-10-11): the report we
+# generate now includes the full header, and the round trip through this
+# validator has to accept our own output.
+_MPC80_HEADER = frozenset((
+    "COD", "CON", "OBS", "MEA", "TEL", "NET", "BND", "COM", "NUM", "ACK",
+    "AC2", "ACK",
+))
+
+# ADES PSV context blocks open with '#' (a section) and '!' (a sub-element).
+_ADES_HEADER = ("#", "!")
+
+
+def _is_header_line(line):
+    # @args: line - a raw report line
+    # @return: True when it is a header/context line, not a measurement
+    st = line.strip()
+    if not st:
+        return True
+    if st.startswith(_ADES_HEADER) or st.startswith("-----"):
+        return True
+    first = st.split(None, 1)[0].upper()
+    return first in _MPC80_HEADER
+
+# ADES PSV required fields (minimum for a valid observation row). The object
+# identifier is one of _ADES_ID_FIELDS, checked separately (ADES uses
+# permID/provID/trkSub, not the legacy objid).
+_ADES_REQUIRED = ("mode", "stn", "obsTime", "ra", "dec")
+_ADES_ID_FIELDS = ("objid", "permID", "provID", "trkSub", "artSat")
 
 
 def detect_format(text):
@@ -42,7 +69,9 @@ def detect_format(text):
     # @return: "mpc80" | "ades" | None
     for line in text.splitlines():
         s = line.strip()
-        if not s or s.startswith("#"):
+        if not s or s.startswith("#") or s.startswith("!"):
+            continue
+        if _is_header_line(line):
             continue
         if "|" in s and len(s.split("|")) >= 6:
             return "ades"
@@ -65,7 +94,7 @@ def first_obs_date(text):
     fmt = detect_format(text)
     for line in text.splitlines():
         s = line.rstrip()
-        if not s.strip() or s.strip().startswith("#"):
+        if _is_header_line(line):
             continue
         if fmt == "mpc80":
             if len(s) < 80:
@@ -107,7 +136,7 @@ def _validate_mpc80(text, obs_code, expected_obj):
     n = 0
     for i, line in enumerate(text.splitlines(), 1):
         s = line.rstrip()
-        if not s or s.startswith("#"):
+        if _is_header_line(line):
             continue
         n += 1
         if len(s) < 80:
@@ -153,7 +182,7 @@ def _validate_ades(text, obs_code, expected_obj):
     header = None
     for i, line in enumerate(text.splitlines(), 1):
         s = line.strip()
-        if not s or s.startswith("#"):
+        if not s or s.startswith("#") or s.startswith("!"):
             continue
         parts = s.split("|")
         if header is None:
@@ -167,7 +196,7 @@ def _validate_ades(text, obs_code, expected_obj):
         else:
             row = {f"col{j}": p.strip() for j, p in enumerate(parts)}
         # collect the object id
-        for key in ("objid", "provID", "permID"):
+        for key in ("objid", "permID", "provID", "trkSub", "artSat"):
             if key in row and row[key]:
                 desigs.add(row[key])
                 break
@@ -175,6 +204,10 @@ def _validate_ades(text, obs_code, expected_obj):
         for field in _ADES_REQUIRED:
             if field not in row or not row[field]:
                 errors.append(f"Line {i}: missing field '{field}'")
+        if not any(row.get(f) for f in _ADES_ID_FIELDS):
+            errors.append(
+                f"Line {i}: no object identifier "
+                "(permID/provID/trkSub/artSat)")
         # observatory code
         if obs_code and "stn" in row:
             if row["stn"].upper() != obs_code.upper():

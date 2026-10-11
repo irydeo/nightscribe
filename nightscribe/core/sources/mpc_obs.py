@@ -31,8 +31,10 @@ degrades (the object card simply shows no fresh history).
 """
 
 import datetime
+import html
 import json
 import logging
+import re
 from dataclasses import dataclass
 
 import requests
@@ -45,12 +47,22 @@ logger = logging.getLogger(__name__)
 
 URL_OBS = "https://data.minorplanetcenter.net/api/get-obs"
 URL_NEOCP = "https://data.minorplanetcenter.net/api/get-obs-neocp"
+# The MPC's rolling list of NEOCP objects that have LEFT the page, with the
+# designation each was given and the MPEC that published it. It is the only
+# place that maps a temporary designation (A11HPKO) to the confirmed one
+# (2026 TQ8): neither NEOfixer nor the MPC designation-identifier API know
+# the trksub. The list is short (a few days), which is exactly when it is
+# needed: right after the object is confirmed.
+URL_NEOCP_PREV = "https://minorplanetcenter.net/mpcops/neocp/neocp_prev_des/"
 
 # db keeps a per-source TTL table; this source is not in the built-in
 # defaults, so we register it from the config knob (mpc_obs_ttl_h, 6 h).
 # setdefault keeps it idempotent if the module is imported twice.
 SOURCE_TTL.setdefault(
     "mpc_obs", int(config.get("mpc_obs_ttl_h") or 6) * 3600)
+# The rolling NEOCP list moves during a night; 6 h keeps the alias lookup
+# fresh without hammering the MPC.
+SOURCE_TTL.setdefault("mpc_neocp_prev", 6 * 3600)
 
 
 @dataclass
@@ -204,6 +216,19 @@ def neocp_observations(trksub, force=False):
     return parse_ades_df(data) if data is not None else []
 
 
+def _obs80_block(data):
+    # @args: data - decoded JSON envelope of an OBS80 request
+    # @return: the 80-column block as text ("" when the payload carries none)
+    # Both endpoints answer the same envelope (a list of payload dicts with
+    # OBS80 among the keys), so the extraction lives in one place: a second
+    # copy is how one of them silently keeps answering empty after a change.
+    blocks = data if isinstance(data, list) else [data]
+    for block in blocks:
+        if isinstance(block, dict) and block.get("OBS80"):
+            return block["OBS80"]
+    return ""
+
+
 def observations_80(desig, force=False):
     # The same observations as plain 80-column MPC lines, exactly as the
     # MPC formats them. These are what gets concatenated with our own
@@ -214,11 +239,188 @@ def observations_80(desig, force=False):
     data = _get_json(URL_OBS,
                      {"desigs": [desig], "output_format": ["OBS80"]},
                      f"mpcobs:80:{desig}", force)
-    blocks = data if isinstance(data, list) else [data]
-    for block in blocks:
-        if isinstance(block, dict) and block.get("OBS80"):
-            return block["OBS80"]
-    return ""
+    return _obs80_block(data) if data is not None else ""
+
+
+def neocp_observations_80(trksub, force=False):
+    # The NEOCP observations of an object still awaiting confirmation, in
+    # 80-column form. This is the path that was MISSING: an object known
+    # only by its temporary designation (A11HPKO) is not in the confirmed
+    # endpoint (which answers HTTP 500 for it), and without this the check
+    # ran Find_Orb on our single line alone and got "0 objects" back.
+    # @args: trksub - NEOCP tracklet identifier (the temporary designation),
+    #        force - bypass the cache read
+    # @return: the block of lines as text ("" when not on the NEOCP / offline)
+    data = _get_json(URL_NEOCP,
+                     {"trksubs": [trksub], "output_format": ["OBS80"]},
+                     f"mpcobs:neocp80:{trksub}", force)
+    return _obs80_block(data) if data is not None else ""
+
+
+# A row of the rolling NEOCP list: temp -> (designation, MPEC, when). The
+# `_strip_tags` helper keeps the parser stdlib-only, like the HADS sheet.
+_TAG_RE = re.compile(r"<[^>]+>")
+_ROW_RE = re.compile(r"<tr>(.*?)</tr>", re.S)
+_CELL_RE = re.compile(r"<td[^>]*>(.*?)</td>", re.S)
+_HREF_RE = re.compile(r'href="([^"]+)"', re.I)
+
+
+def _cell_text(raw):
+    # @args: raw - one <td> inner HTML
+    # @return: the visible text, trimmed ("" for an empty cell)
+    text = html.unescape(_TAG_RE.sub("", raw or ""))
+    return " ".join(text.split())
+
+
+def _cell_href(raw):
+    # @args: raw - one <td> inner HTML
+    # @return: the first href in the cell, or "" (the MPEC link)
+    match = _HREF_RE.search(raw or "")
+    return html.unescape(match.group(1)) if match else ""
+
+
+def parse_neocp_prev(page):
+    # Parses the MPC "Previous NEOCP Objects" table into a mapping. The
+    # columns are Temp Desig / Designation / (extra) / MPEC / confirmed-at;
+    # a row whose designation is "None" is an object that left the page
+    # WITHOUT a designation (moved to the PCCP or removed) and is skipped.
+    # @args: page - the page HTML (str or bytes)
+    # @return: dict {temp_desig: {"designation", "mpec", "mpec_url",
+    #          "confirmed_at"}}
+    if isinstance(page, bytes):
+        page = page.decode("utf-8", "replace")
+    out = {}
+    for row in _ROW_RE.findall(page or ""):
+        cells = [_cell_text(c) for c in _CELL_RE.findall(row)]
+        raw_cells = _CELL_RE.findall(row)
+        if len(cells) < 2 or not cells[0]:
+            continue
+        temp = cells[0].strip()
+        desig = cells[1].strip() if len(cells) > 1 else ""
+        if not desig or desig.lower() == "none":
+            continue
+        has_mpec = len(cells) > 3 and cells[3].lower() != "none"
+        out[temp] = {
+            "designation": desig,
+            "mpec": cells[3].strip() if has_mpec else "",
+            "mpec_url": (_cell_href(raw_cells[3])
+                         if has_mpec and len(raw_cells) > 3 else ""),
+            "confirmed_at": cells[4].strip() if len(cells) > 4 else "",
+        }
+    return out
+
+
+def neocp_prev(force=False):
+    # The rolling NEOCP cross-reference, cached (6 h). Failures answer {}
+    # so a network hiccup never breaks a check: the check simply keeps
+    # using the temporary designation it was given.
+    # @args: force - True bypasses the cache read
+    # @return: dict from parse_neocp_prev ({} on failure)
+    def fetch():
+        r = requests.get(URL_NEOCP_PREV, timeout=60)
+        r.raise_for_status()
+        return r.content, "text/html"
+    try:
+        body, _ = db.http_get("mpc:neocp_prev", "mpc_neocp_prev", fetch,
+                              force=force)
+    except requests.RequestException as err:
+        logger.warning("NEOCP previous-objects fetch failed: %s", err)
+        return {}
+    return parse_neocp_prev(body)
+
+
+def resolve_neocp_alias(desig, force=False):
+    # The confirmed designation an object got after leaving the NEOCP, or
+    # None when it is not in the rolling list (still unconfirmed, or older
+    # than the list). This is what turns A11HPKO into 2026 TQ8 so the check
+    # can fetch the published observations under the right name.
+    # @args: desig - a temporary (NEOCP) designation, force - bypass cache
+    # @return: {"designation", "mpec", "confirmed_at"} or None
+    table = neocp_prev(force=force)
+    hit = table.get(str(desig).strip())
+    if hit:
+        logger.info("NEOCP %s was confirmed as %s (%s)",
+                    desig, hit["designation"], hit["mpec"] or "no MPEC yet")
+    return hit
+
+
+@dataclass
+class Reference:
+    # The published observations the check compares us against, plus the
+    # identity facts the GUI shows: which endpoint they came from, the
+    # designation they really live under, the MPEC that published the
+    # confirmation and whether OUR station already appears among them.
+    lines: str = ""
+    source: str = ""                 # "MPC" | "NEOCP" | ""
+    designation: str = ""            # the name the lines really live under
+    mpec: str = ""
+    mpec_url: str = ""
+    confirmed_at: str = ""
+    ours_present: bool = False
+    note: str = ""
+
+
+def _station_in(lines, obs_code):
+    # @args: lines - an 80-column block, obs_code - our MPC code
+    # @return: True when our station already appears among the published
+    #          observations (our data is already in the MPEC)
+    # The station is columns 77-79 (0-based 77:80) of an 80-column line.
+    if not obs_code:
+        return False
+    want = str(obs_code).strip().upper()
+    for line in _lines_block(lines):
+        if len(line) >= 80 and line[77:80].strip().upper() == want:
+            return True
+    return False
+
+
+def _lines_block(text):
+    # @args: text - an 80-column block
+    # @return: the non-empty lines
+    return [ln for ln in (text or "").splitlines() if ln.strip()]
+
+
+def reference_80(desig, obs_code="", force=False):
+    # The reference observations for the check, tried in the order that
+    # keeps the common cases cheap and honest:
+    #   1. the confirmed-object endpoint (a numbered or designated object);
+    #   2. the NEOCP endpoint (an object still awaiting confirmation);
+    #   3. resolve the temporary designation and try the confirmed endpoint
+    #      again (the object was confirmed since the visit: A11HPKO -> 2026 TQ8).
+    # An empty result is a real answer ("no published observations yet"),
+    # never an error: the caller says so instead of pretending.
+    # @args: desig - the object name as NightScribe knows it, obs_code - our
+    #        station (to flag whether our data is already published),
+    #        force - bypass the cache reads
+    # @return: Reference
+    name = str(desig or "").strip()
+    if not name:
+        return Reference(note="no object name")
+    lines = observations_80(name, force=force)
+    if _lines_block(lines):
+        return Reference(lines=lines, source="MPC", designation=name,
+                         ours_present=_station_in(lines, obs_code))
+    lines = neocp_observations_80(name, force=force)
+    if _lines_block(lines):
+        return Reference(lines=lines, source="NEOCP", designation=name,
+                         ours_present=_station_in(lines, obs_code))
+    alias = resolve_neocp_alias(name, force=force)
+    if alias and alias.get("designation") and alias["designation"] != name:
+        lines = observations_80(alias["designation"], force=force)
+        if _lines_block(lines):
+            return Reference(lines=lines, source="MPC",
+                             designation=alias["designation"],
+                             mpec=alias.get("mpec", ""),
+                             mpec_url=alias.get("mpec_url", ""),
+                             confirmed_at=alias.get("confirmed_at", ""),
+                             ours_present=_station_in(lines, obs_code))
+        return Reference(source="MPC", designation=alias["designation"],
+                         mpec=alias.get("mpec", ""),
+                         mpec_url=alias.get("mpec_url", ""),
+                         confirmed_at=alias.get("confirmed_at", ""),
+                         note=f"{name} is now {alias['designation']}, but the "
+                              "MPC has not published its observations yet")
+    return Reference(note=f"no published observations for {name}")
 
 
 def history(desig, force=False):

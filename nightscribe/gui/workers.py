@@ -390,6 +390,81 @@ class MpcResolveWorker(QThread):
         self.finished.emit(info)
 
 
+class FindOrbRecheckWorker(QThread):
+    # Re-runs the Find_Orb check on ALREADY measured points, without
+    # stacking the frames again. The observer asked for it: when the object
+    # was confirmed under a new name since the visit the automatic lookup
+    # finds it, but the rolling NEOCP list is short and the designation can
+    # also be typed by hand. Only the MPC round trip and Find_Orb run here.
+    finished = Signal(object)       # the CheckReport, or None on failure
+
+    def __init__(self, ours_lines, desig, cfg=None, obs_code=""):
+        super().__init__()
+        self._ours = ours_lines
+        self._desig = desig
+        self._cfg = cfg
+        self._obs_code = obs_code
+
+    def run(self):
+        from ..core import findorb
+        try:
+            report = findorb.check(self._ours, self._desig, self._cfg,
+                                   obs_code=self._obs_code)
+        except Exception as err:      # network never crashes the GUI
+            logger.warning("Find_Orb re-check failed: %s", err)
+            report = None
+        self.finished.emit(report)
+
+
+class MpcAliasWorker(QThread):
+    # Looks up whether a NEOCP object was CONFIRMED under a new name since
+    # the visit (A11HPKO -> 2026 TQ8), off the GUI thread. It is cached by
+    # the source, so opening the same project does not hammer the MPC.
+    finished = Signal(dict)         # {"designation","mpec","mpec_url"} or {}
+
+    def __init__(self, name):
+        super().__init__()
+        self._name = name
+
+    def run(self):
+        from ..core.sources import mpc_obs
+        try:
+            hit = mpc_obs.resolve_neocp_alias(self._name) or {}
+        except Exception as err:      # network never crashes the GUI
+            logger.warning("NEOCP alias lookup failed: %s", err)
+            hit = {}
+        self.finished.emit(hit)
+
+
+class MpcSubmitWorker(QThread):
+    # Sends the report to the MPC off the GUI thread (ADR-080). The
+    # submission is a POST to the MPC's own endpoint (submit_obs / submit_psv
+    # / submit_xml, or their _test twins): it can take seconds, so it never
+    # blocks the window, and the server's own answer is shown in the log.
+    finished = Signal(dict)         # {"ok","status","text","url"}
+
+    def __init__(self, fmt, text, ack="", email="", obj_type="", test=False):
+        super().__init__()
+        self._fmt = fmt
+        self._text = text
+        self._ack = ack
+        self._email = email
+        self._obj_type = obj_type
+        self._test = test
+
+    def run(self):
+        from ..core.sources import mpc_submit
+        try:
+            out = mpc_submit.submit(self._fmt, self._text, ack=self._ack,
+                                    email=self._email, obj_type=self._obj_type,
+                                    test=self._test)
+        except Exception as err:      # never crash the GUI thread
+            logger.warning("MPC submission failed: %s", err)
+            out = {"ok": False, "status": 0, "url": "",
+                   "text": f"Could not reach the MPC: {err}"}
+        self.finished.emit(out)
+
+
 class PositionRefreshWorker(QThread):
     # Recomputes a moving target's position from a FRESH source, off the GUI
     # thread (ADR-030): the observer asks for the latest orbit and ephemeris
@@ -398,7 +473,6 @@ class PositionRefreshWorker(QThread):
     # the next goto reuses the fresh fetch. This is a goto, not a reduction:
     # the instant asked for is the current one.
     finished = Signal(dict)         # the position dict, or {} on failure
-
     def __init__(self, name, site, fallback_target=None):
         super().__init__()
         self._name = name
@@ -1843,6 +1917,8 @@ class TrackStackWorker(QThread):
         #        (x, y) on it, w0 - the reference WCS, box_all - its cutout,
         #        frames - the sequence, base_rate/base_pa - the ephemeris'
         # @return: [(rate, pa), ...] or []
+        from ..core import track_stack
+        from ..core.wcs import Wcs
         if base_stack is None or base_rate is None or base_pa is None:
             return []
         try:
@@ -1858,9 +1934,15 @@ class TrackStackWorker(QThread):
         if len(stamps) < 2:
             return []
         span_min = (max(stamps) - min(stamps)) * 1440.0
+        # motion_from_trail speaks the series engine's own Wcs (ADR-048), whose
+        # pixel_to_sky the astropy WCS of the reference solve does NOT have:
+        # handing it the astropy object made the call return [] in silence, so
+        # the seed never moved the velocity. The conversion is the same bridge
+        # the brightness' comp windows already use (Wcs.from_astropy).
         return track_stack.motion_from_trail(
-            _shift_wcs(w0, box_all), q_box, shape.get("trail_px"),
-            shape.get("pa_deg"), span_min, base_rate, base_pa)
+            Wcs.from_astropy(_shift_wcs(w0, box_all)), q_box,
+            shape.get("trail_px"), shape.get("pa_deg"), span_min,
+            base_rate, base_pa)
 
     def _build_calibrator(self):
         # @return: a calibration.FrameCalibrator ready to be used as the
@@ -2246,12 +2328,12 @@ class TrackStackWorker(QThread):
             self.progress.emit("check", 0, 1)
             check = None
             if bool(self._cfg_get("astrometry_check_enabled", True)):
-                kept, _dropped, _notes = mpc_astrometry.submittable(
+                kept, _excluded, _warnings = mpc_astrometry.submittable(
                     [sp for sp, _fp, _fl in points], self._cfg)
                 if not kept:
                     check = findorb.CheckReport(
                         available=False,
-                        note="no observation clears the submission floor")
+                        note="no observation to check: they are all excluded")
                 else:
                     # to_mpc80 returns the 80-column BLOCK (a string);
                     # findorb.check wants that string, not a list of lines
@@ -2262,7 +2344,8 @@ class TrackStackWorker(QThread):
                                                    self._name, self._cfg)
                     check = findorb.check(ours, self._name,
                                           self._cfg,
-                                          cancel=lambda: self._cancel)
+                                          cancel=lambda: self._cancel,
+                                          obs_code=self._obs_code)
             else:
                 check = findorb.CheckReport(available=False,
                                             note="disabled in the settings")

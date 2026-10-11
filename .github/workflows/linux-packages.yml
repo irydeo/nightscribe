@@ -171,8 +171,9 @@ jobs:
             --define "_topdir $top" installer/rpm/nightscribe.spec > rpm.log 2>&1
           code=$?
           if [ $code -ne 0 ]; then
-            # The log is not readable without admin rights: surface it.
-            tail -50 rpm.log | while IFS= read -r line; do echo "::error::${line}"; done
+            # The log is not readable without admin rights: surface the LAST
+            # lines, where rpmbuild prints its "RPM build errors" summary.
+            tail -12 rpm.log | while IFS= read -r line; do echo "::error::${line}"; done
             exit $code
           fi
           mkdir -p dist

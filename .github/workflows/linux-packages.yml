@@ -77,6 +77,12 @@ jobs:
           grep -aE "ImportError|ModuleNotFoundError|cannot open shared object|No module named|libGL|libEGL|libxkb" pytest.log | sort -u | head -25 | while IFS= read -r line; do
             echo "::error::${line}"
           done
+          # A collection error under xdist hides the traceback: run ONE
+          # failing module alone and annotate the real exception.
+          if [ "$code" != "0" ]; then
+            python -m pytest tests/unit/test_ui_loader.py -q --tb=short 2>&1 \
+              | tail -30 | while IFS= read -r line; do echo "::error::${line}"; done
+          fi
           exit $code
 
       - name: Resolve the version

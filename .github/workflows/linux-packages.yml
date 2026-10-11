@@ -55,7 +55,20 @@ jobs:
 
       - name: Unit tests (a red suite publishes nothing)
         timeout-minutes: 45
-        run: python -m pytest tests/unit -n auto --dist loadfile -q
+        run: |
+          python -m pytest tests/unit -n auto --dist loadfile -q 2>&1 | tee pytest.log
+          code=${PIPESTATUS[0]}
+          # Surface the failure in the run's step summary: the log itself is
+          # not readable without admin rights, and a red suite that says
+          # nothing is useless.
+          {
+            echo "### pytest exit ${code}"
+            echo '```'
+            grep -E "FAILED|ERROR|assert|Error" pytest.log | head -80
+            tail -25 pytest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
 
       - name: Resolve the version
         id: ver

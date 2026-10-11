@@ -1858,8 +1858,8 @@ class UfeMeasureTab(QWidget):
         self.prg_series.setValue(0)
         self._series_button_running(True)
         self.btn_series_undo.setEnabled(False)
-        from .workers import SeriesWorker
-        self._series_worker = SeriesWorker(ctx["paths"], self._series_cfg)
+        from .workers import SeriesWorker, hold
+        self._series_worker = hold(SeriesWorker(ctx["paths"], self._series_cfg))
         self._series_worker.progress.connect(self._on_series_progress)
         self._series_worker.finished.connect(self._on_series_finished)
         self._series_worker.failed.connect(self._on_series_failed)
@@ -3004,7 +3004,7 @@ class UfeMeasureTab(QWidget):
         self._live_run_id = None
         self._live_run_ids = []
         self.btn_series_undo.setEnabled(self._series_run_id is not None)
-        from .workers import LiveSeriesWorker
+        from .workers import LiveSeriesWorker, hold
         # the live batch is the group: N frames (or the same time with the
         # real exposure), so a few-second sCMOS cadence still groups
         grp = max(1, int(self._advanced.spn_group_n.value()))
@@ -3015,8 +3015,8 @@ class UfeMeasureTab(QWidget):
             exp_s = float(_m.get("exptime_s") or 10.0)
         except Exception:
             pass
-        self._live_worker = LiveSeriesWorker(
-            folder, self._series_cfg, batch_n=grp, batch_s=grp * exp_s)
+        self._live_worker = hold(LiveSeriesWorker(
+            folder, self._series_cfg, batch_n=grp, batch_s=grp * exp_s))
         # every line the observer reads is translated here (the driver
         # reports stage keys and its errors, never wording: P2 #19)
         self._live_worker.progress.connect(self._on_live_progress)
@@ -3445,12 +3445,12 @@ class UfeMeasureTab(QWidget):
                 return
             self._explain_no_wcs_subtract()
             return
-        from .workers import BlinkWorker
+        from .workers import BlinkWorker, hold
         ra, dec = self._state.wcs.center()
         self._say(self.tr(
             "Fetching the reference and subtracting…"))
         self.chk_subtract.setEnabled(False)
-        self._sub_worker = BlinkWorker(self._state.path, ra=ra, dec=dec)
+        self._sub_worker = hold(BlinkWorker(self._state.path, ra=ra, dec=dec))
         # the pipeline stages (survey reference download) reach the status
         # line, as the Blink tab's prepare does (ADR-018 progress)
         self._sub_worker.progress.connect(

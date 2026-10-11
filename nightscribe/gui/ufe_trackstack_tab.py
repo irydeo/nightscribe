@@ -1098,7 +1098,7 @@ class UfeTrackStackTab(QWidget):
                 "The project has no object name: the ephemeris cannot be "
                 "fetched, and without it there is no track."))
             return
-        from .workers import TrackStackWorker
+        from .workers import TrackStackWorker, hold
         # A run invalidates the mark: the manual window closes with it (a mark
         # over a stack that is being rebuilt is a mark over nothing). The
         # caller that came FROM the mark has already taken what it needs.
@@ -1120,7 +1120,7 @@ class UfeTrackStackTab(QWidget):
         self.btn_blink.setEnabled(False)
         self._sync_animate_button()
         self._say("")
-        self._worker = TrackStackWorker(
+        self._worker = hold(TrackStackWorker(
             paths, name, self.spn_nobs.value(),
             method=self.cmb_method.currentData() or "sigma", cfg=config,
             obs_code=str(config.get("mpc_code", "")),
@@ -1132,7 +1132,8 @@ class UfeTrackStackTab(QWidget):
             phot_enabled=self.chk_brightness.isChecked(),
             save_star_stack=self.chk_starstack.isChecked(),
             calibrate=self.chk_calibrate.isChecked(),
-            manual_ref=manual_ref)
+            manual_ref=manual_ref,
+            packed=ctx.get("packed") or ctx.get("id")))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -3407,10 +3408,10 @@ class UfeTrackStackTab(QWidget):
             self._say(self.tr("Nothing to save: the observations produced no "
                               "frame to animate."))
             return None
-        from .workers import SequenceExportWorker
+        from .workers import SequenceExportWorker, hold
         self._say(self.tr("Rendering the animation…"))
-        worker = SequenceExportWorker(frames, out, fmt,
-                                      duration_ms=_ANIM_INTERVAL_MS)
+        worker = hold(SequenceExportWorker(frames, out, fmt,
+                                           duration_ms=_ANIM_INTERVAL_MS))
         worker.finished.connect(self._on_anim_exported)
         self._anim_export_workers.append(worker)
         worker.start()

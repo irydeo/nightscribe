@@ -14,7 +14,10 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   JSON-RPC. Site-specific target list with score, priority, cost (minutes), vmag,
   rate, uncertainty, NEOCP flag, impact/radar/NHATS/Yarkovsky flags.
 - `GET .../ephem/?site=<code>&object=<packed>` — public. Site-specific ephemeris
-  (alt, az, mag, motion) precomputed by NEOfixer (Bill Gray's find_orb).
+  (alt, az, mag, motion) precomputed by NEOfixer (Bill Gray's find_orb, perturbers
+  included). It is the accurate position for the fresh goto and the track & stack of
+  an unconfirmed NEOCP/PCCP object Horizons does not know, ahead of the local two-body
+  propagation. Optional `time-start`/`time-stop` window (a visit's own night).
 - `GET .../orbit/?object=<packed>` — public. **Preliminary orbital elements** for
   unconfirmed (NEOCP) objects, computed with Find_Orb from MPC astrometry: full
   Keplerian elements (`a, e, q, Q, i, asc_node, arg_per, M, Tp, epoch`) with
@@ -25,8 +28,8 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
 - `GET .../report/?key=<api key>&site=<code>&object=<id>&status=<s>` — **requires
   the user's API key** (Settings). Reports `will_observe`/`observed`/... for
   community coordination. Optional.
-- TTL: 12 h (`targets`, `ephem`); 1.5 h (`orbit` — preliminary orbits change fast).
-  Note: `object` must be a *packed* designation.
+- TTL: 12 h (`targets`); 1.5 h (`orbit` and `ephem` — a preliminary orbit and the table
+  derived from it change fast). Note: `object` must be a *packed* designation.
 
 ### Rochester Astronomy (David Bishop) — `rochester.py` — recent supernovae
 

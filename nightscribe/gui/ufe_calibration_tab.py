@@ -354,17 +354,17 @@ class UfeCalibrationTab(QWidget):
         if self.chk_pseudo_flat.isChecked():
             flat_path = str(base / "pseudo_flat.fits")
         from ..core.db import db
-        from .workers import CalibrationWorker
+        from .workers import CalibrationWorker, hold
         self.prg_calib.setVisible(True)
         self.prg_calib.setRange(0, len(paths))
         self.prg_calib.setValue(0)
         self.btn_calibrate.setText(self.tr("Cancel"))
         self.btn_flat.setEnabled(False)
         self._flat_file = None
-        self._worker = CalibrationWorker(
+        self._worker = hold(CalibrationWorker(
             paths, db, export_dir, config,
             pseudo_flat=self.chk_pseudo_flat.isChecked(),
-            flat_path=flat_path)
+            flat_path=flat_path))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

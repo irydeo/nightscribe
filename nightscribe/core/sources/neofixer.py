@@ -49,23 +49,57 @@ def targets(site, num=40):
         return []
 
 
-def ephem(site, packed):
-    # Site-specific ephemeris of an object for the coming days.
-    # @args: site - MPC code, packed - packed designation (e.g. "6HJ1A21")
+def ephem(site, packed, start=None, stop=None, force=False):
+    # Site-specific ephemeris of an object, computed by NEOfixer with Bill
+    # Gray's Find_Orb (perturbers included): the accurate route for an
+    # unconfirmed object JPL Horizons does not know. The window defaults to
+    # "from now" for the goto, but a sequence is reduced after the fact, so
+    # the caller passes the night's own start/stop.
+    # @args: site - MPC code, packed - packed designation (e.g. "6HJ1A21"),
+    #        start/stop - ISO "YYYY-MM-DD HH:MM" window (default: from now),
+    #        force - True bypasses the cache read (still writes the fresh copy)
     # @return: list of ephemeris entry dicts (alt, az, mag, motion_rate...)
     import json
-    params = {"site": site, "object": packed, "format": "json", "time-start": "now"}
+    params = {"site": site, "object": packed, "format": "json",
+              "time-start": start or "now"}
+    if stop:
+        params["time-stop"] = stop
 
     def fetch():
         return requests.get(f"{BASE}/ephem/", params=params, timeout=40).content, \
             "application/json"
+    # the window is part of the key: the goto's "from now" table and a
+    # visit's fixed night must not overwrite each other in the cache
+    key = f"neofixer:ephem:{site}:{packed}:{start or 'now'}:{stop or ''}"
     try:
-        body, _ = db.http_get(f"neofixer:ephem:{site}:{packed}", "neofixer", fetch)
+        body, _ = db.http_get(key, "neofixer-ephem", fetch, force=force)
         result = json.loads(body.decode("utf-8", "replace")).get("result", {})
         return result.get("entries") or []
     except (requests.RequestException, ValueError) as err:
         logger.warning("NEOfixer ephem failed for %s: %s", packed, err)
         return []
+
+
+def ephem_rows(entries):
+    # Normalises NEOfixer ephemeris entries into the row shape
+    # core/ephemeris interpolates (jd / ra_deg / dec_deg plus the optional
+    # rate, PA, magnitude and distance), so a NEOfixer table goes through the
+    # SAME interpolation as a Horizons one instead of a second code path.
+    # @args: entries - list from ephem()
+    # @return: list of row dicts (empty entries are skipped, not guessed)
+    rows = []
+    for e in entries or []:
+        jd, ra, dec = e.get("JD"), e.get("RA"), e.get("Dec")
+        if jd is None or ra is None or dec is None:
+            continue
+        rows.append({
+            "jd": float(jd), "ra_deg": float(ra), "dec_deg": float(dec),
+            "rate_arcsec_min": e.get("motion_rate"), "pa_deg": e.get("motionPA"),
+            "mag": e.get("mag"), "delta": e.get("delta"),
+            "alt": e.get("alt"), "az": e.get("az"),
+            "sig_pos": e.get("sigPos"), "time": e.get("ISO_time"),
+        })
+    return rows
 
 
 def best_window(entries, min_alt=30.0):

@@ -44,6 +44,9 @@ SOURCE_TTL = {
     "sdo": 1 * HOUR,
     "neofixer": 12 * HOUR,
     "neofixer-orbit": 1.5 * HOUR,
+    # the site ephemeris is computed from that same preliminary orbit: when
+    # the orbit changes the table is stale, so they share the short TTL
+    "neofixer-ephem": 1.5 * HOUR,
     "horizons": 12 * HOUR,
     "rochester": 6 * HOUR,
     "cobs": 6 * HOUR,

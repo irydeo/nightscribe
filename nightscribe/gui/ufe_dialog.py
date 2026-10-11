@@ -1636,8 +1636,8 @@ class UfeDialog(QWidget):
                                                         "failed_register": True})
         if paths == previous:
             return              # same visit: the marks above are enough
-        from .workers import FrameThumbWorker
-        worker = FrameThumbWorker(paths)
+        from .workers import FrameThumbWorker, hold
+        worker = hold(FrameThumbWorker(paths))
         worker.sampled.connect(self._on_frame_sampled)
         worker.done.connect(self._on_thumbs_done)
         self._thumb_worker = worker
@@ -1962,9 +1962,9 @@ class UfeDialog(QWidget):
         else:
             self.set_status(self.tr(
                 "Solving the visit's {0} frames…").format(len(paths)))
-        from .workers import VisitSolveWorker
-        self._visit_worker = VisitSolveWorker(
-            paths, pointing=pointing, open_path=self.state.path)
+        from .workers import VisitSolveWorker, hold
+        self._visit_worker = hold(VisitSolveWorker(
+            paths, pointing=pointing, open_path=self.state.path))
         self._visit_worker.progress.connect(self._on_visit_progress)
         self._visit_worker.finished.connect(self._on_visit_solved)
         self._visit_worker.failed.connect(self._on_visit_failed)
@@ -2772,9 +2772,9 @@ class UfeDialog(QWidget):
                         "again."))
             self._fail_wcs_pending()
             return
-        from .workers import UfeSolveWorker
-        self._solve_worker = UfeSolveWorker(Path(self.state.path),
-                                            pointing=self._pointing())
+        from .workers import UfeSolveWorker, hold
+        self._solve_worker = hold(UfeSolveWorker(Path(self.state.path),
+                                                 pointing=self._pointing()))
         self._solve_worker.progress.connect(self._on_solve_stage)
         self._solve_worker.finished.connect(self._on_solved)
         self.btn_solve.setEnabled(False)

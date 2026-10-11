@@ -55,6 +55,16 @@ def _setup_logging(verbose):
     file_handler.setFormatter(fmt)
     file_handler._nightscribe = True
     root.addHandler(file_handler)
+    # A Qt qFatal (a QThread destroyed while running aborts the whole
+    # process) prints the Python stack of EVERY thread on the fatal signal,
+    # so the next crash names the worker and the line instead of leaving only
+    # a core dump. It writes straight to the same log file.
+    try:
+        import faulthandler
+        faulthandler.enable(file=open(path, "a", encoding="utf-8",
+                                      buffering=1))
+    except OSError as err:           # diagnostics never stop the app
+        logger.warning("cannot enable faulthandler: %s", err)
 
 
 def _no_site():

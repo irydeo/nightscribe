@@ -60,8 +60,10 @@ same core; all expensive work (network, ephemerides) is cached in SQLite.
 1. `planner` asks sources for raw lists: NEOfixer targets (site = MPC code), Rochester
    supernovae, COBS active comets, MPC PCCP page, ExoClock catalogue.
 2. Each raw response is stored in `http_cache` with its TTL; repeat calls are free.
-3. Visibility per target: NEOs via NEOfixer `ephem` (site-specific); SNs/comets/PCCP via
-   own alt-az math (`coords.py`); transits computed locally (t0 + n·P) then alt-az.
+3. Visibility per target is sampled with our own alt-az math (`coords.py`) from each
+   target's position; the site-specific NEOfixer `ephem` (Find_Orb, perturbed) is the
+   position source for the fresh goto and the track & stack when Horizons does not know
+   an unconfirmed NEOCP/PCCP object; transits are computed locally (t0 + n·P) then alt-az.
 4. `suggest` scores everything 0–100, builds the Top N and the "why tonight" phrases.
 5. Observed flags and post history come from SQLite and feed back into the score
    (recently published objects lose novelty; observed-but-unposted gain urgency).

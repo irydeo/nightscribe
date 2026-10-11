@@ -157,6 +157,8 @@ jobs:
       - name: Build the .rpm
         run: |
           ver="${{ needs.test.outputs.version }}"
+          # RPM versions cannot contain '-': it separates version and release.
+          ver="${ver//-/.}"
           top="$PWD/rpmbuild"
           mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           # The spec is built from a source tarball that carries the payload.

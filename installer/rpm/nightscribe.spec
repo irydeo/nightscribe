@@ -18,11 +18,10 @@
 # GPLv3 app (see ADR-079).
 ############################################################
 
-%if 0%{?_version}
-%define version %{_version}
-%else
-%define version 0.0.0
-%endif
+# The version is passed by the CI as _version; a bare build falls back to
+# 0.0.0. The `%if 0%{?x}` idiom only works when x is a number, so a string
+# version there is a parse error (measured: "bad %if condition").
+%define version %{?_version}%{!?_version:0.0.0}
 
 Name:           nightscribe
 Version:        %{version}

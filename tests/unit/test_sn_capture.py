@@ -97,11 +97,37 @@ def test_export_nina_multi_filter(tmp_path):
     export_nina(target, plan, str(out))
     import json
     seq = json.loads(out.read_text(encoding="utf-8"))
-    exposures = seq["Sequence"]["Exposures"]
-    # 30 Clear + 20 V = 50 total exposures
-    assert len(exposures) == 50
-    filters = {e["Filter"] for e in exposures}
-    assert "Clear" in filters and "V" in filters
+    # the native sequence: one SwitchFilter + one TakeManyExposures per band
+    def types(node, acc):
+        if isinstance(node, dict):
+            t = str(node.get("$type", "")).split(".")[-1].split(",")[0]
+            if t:
+                acc.append(t)
+            for v in node.values():
+                types(v, acc)
+        elif isinstance(node, list):
+            for v in node:
+                types(v, acc)
+        return acc
+    kinds = types(seq, [])
+    assert kinds.count("SwitchFilter") == 2
+    assert kinds.count("TakeManyExposures") == 2
+    # 30 Clear + 20 V frames, as LoopCondition iterations
+    loops = [n["Iterations"] for n in _walk(seq) if n.get("Iterations")]
+    assert sorted(loops) == [20, 30]
+
+
+def _walk(node):
+    # @return: every dict in the tree (a small helper for the assertions above)
+    out = []
+    if isinstance(node, dict):
+        out.append(node)
+        for v in node.values():
+            out.extend(_walk(v))
+    elif isinstance(node, list):
+        for v in node:
+            out.extend(_walk(v))
+    return out
 
 
 # ---------------- export CCDciel multi-filter ----------------

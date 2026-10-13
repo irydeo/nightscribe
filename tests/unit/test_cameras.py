@@ -134,6 +134,21 @@ def test_profile_from_preset_is_a_full_template():
     assert out400["cam_max_exposure_s"] == 300
 
 
+def test_profile_from_preset_reads_the_readout_time():
+    # ADR-083 rev: the readout/download per frame travels with the camera and
+    # is the app's ONE per-frame overhead; a camera without the field clears
+    # the key, so the previous camera's figure does not linger
+    p = {"key": "x", "pixel_um": 3.76, "readout_s": 2.5, "regime": "normal"}
+    assert cameras.profile_from_preset(p)["cam_readout_s"] == 2.5
+    q = {"key": "y", "pixel_um": 3.76, "regime": "normal"}
+    assert cameras.profile_from_preset(q)["cam_readout_s"] is None
+    # the bundled catalogue carries an estimate per sensor (USB3)
+    assert cameras.profile_from_preset(
+        cameras.preset("imx571"))["cam_readout_s"] == 1.5
+    assert cameras.profile_from_preset(
+        cameras.preset("kaf16803"))["cam_readout_s"] == 8.0
+
+
 def test_profile_from_preset_reads_the_gain_for_the_linearity():
     p = cameras.preset("imx571")
     out = cameras.profile_from_preset(p, 1.0)

@@ -315,6 +315,32 @@ def update_context(db, project_id, context):
     return True
 
 
+def merge_confirmed(db, project_id, patch):
+    # Merge a patch into context["confirmed"] WITHOUT dropping the keys
+    # already there. update_context is a shallow merge: writing
+    # {"confirmed": {...}} would replace the whole dict, so the alias lookup
+    # (designation/mpec) and the check (ours_published) would overwrite each
+    # other (ADR-077 rev).
+    # @args: project_id, patch - keys to set (None values are ignored)
+    # @return: True if the project was found and updated
+    row = db.execute(
+        "SELECT context FROM projects WHERE id=?", (project_id,),
+    ).fetchone()
+    if not row:
+        return False
+    existing = json.loads(row[0] or "{}")
+    conf = existing.get("confirmed") or {}
+    conf.update({k: v for k, v in (patch or {}).items() if v is not None})
+    existing["confirmed"] = conf
+    db.execute(
+        "UPDATE projects SET context=?, updated=? WHERE id=?",
+        (json.dumps(existing, ensure_ascii=False, default=_json_default),
+         _now(), project_id),
+    )
+    db.commit()
+    return True
+
+
 def set_status(db, project_id, status):
     # @return: True if the project was found and updated
     cur = db.execute(

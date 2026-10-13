@@ -32,26 +32,53 @@ no geocéntrica (para Sar2911 a 0,102 AU la corrección es ~86″; para NEOCP t�
 0,1–0,2 AU, ~44–88″). Asegúrate de que el observatorio de Settings es correcto
 antes de exportar.
 
-## CCDciel — botones de la pestaña CCD (`gui/main_window.py:1635`)
+## Control del observatorio — botones del paso Captura (`gui/main_window.py`)
 
-Requieren CCDciel abierto con su JSON-RPC activo (ADR-030); lecturas cacheadas 60 s.
+Requieren el software de observatorio abierto con su API activa (ADR-030,
+ADR-081); lecturas cacheadas 60 s. Un backend a la vez, elegido en
+**Ajustes → Integraciones**: **CCDciel** (JSON-RPC) o **NINA / PINS** (Advanced
+API v2).
 
 | Botón | Qué hace | Cuándo usarlo |
 |-------|----------|---------------|
-| **Point telescope** | Guinda rápida a la **posición recién calculada** del objetivo en movimiento: `J2000_to_Apparent` + `Telescope_slewasync`, **sin plate-solve**. Rápido, pero asume que la efeméride ya es precisa. | Objetivos orbitales bien determinados (planetas, asteroides con órbita firme, objetos con solución de varios arcos). |
+| **Point telescope** | Guinda rápida a la **posición recién calculada** del objetivo en movimiento: `J2000_to_Apparent` + `Telescope_slewasync` en CCDciel, `mount/slew` en NINA, **sin plate-solve**. Rápido, pero asume que la efeméride ya es precisa. | Objetivos orbitales bien determinados (planetas, asteroides con órbita firme, objetos con solución de varios arcos). |
 | **Astrometric Goto** | Guinda + **captura + plate-solve** y corrección a la posición real del cielo. Absorbe el **error residual de la efeméride**. | **NEOCP** y **órbitas preliminares**: siempre esta vía, porque la efeméride de una órbita de 1–2 arcos lleva errores de varios segundos de arco que el plate-solve anula. |
+| **Stop goto** | Para el movimiento del telescopio **ya** (`Telescope_abortmotion` en CCDciel, `mount/slew/stop` en NINA). Se arma en cuanto empieza un apuntado, en su propio worker. | La montura se dirige a un sitio equivocado. Seguridad. |
+| **Send plan** | Prepara el plan guardado (objeto, tomas × exposición, filtro, binning, ganancia, offset, dither) y **lo lee de vuelta** (`Capture_getobjectname/exposure/count/frametype/binning/dither` en CCDciel; guardado en el cliente en NINA) para que el panel muestre lo que de verdad tiene. La **cadencia de autofocus NO se aplica en vivo** (la API de CCDciel no la expone): viaja con la secuencia exportada. | Antes de arrancar una captura. |
+| **Start / Stop capture** | Lanza la captura preparada, y el mismo botón la para mientras hay un run en marcha (`Capture_start`/`Capture_stop` en CCDciel; snapshot de una toma / `abort-exposure` en NINA). | Con el telescopio apuntado y el plan preparado. |
 
-El resto del panel CCD (conectar, filtrar, empujar plan, arrancar captura) sigue la
-lógica de ADR-021 §5 y ADR-030: el plan se **entrega en vivo** vía JSON-RPC
-(`Capture_set*`, `Wheel_setfilter`, `Capture_start`) y además se genera el fichero
-`.targets` (Light + Dark + Bias).
+La lista de filtros del plan es la que tiene la rueda de verdad (se lee al
+conectar); la lista clásica L/R/G/B/Ha/OIII/SII es solo el respaldo sin
+conexión. Además se generan los ficheros `.targets` / JSON de NINA (Light +
+Dark + Bias).
+
+**Última toma** (ADR-082): tras *Iniciar captura*, el paso muestra una miniatura
+de la última toma que tiene el programa, pedida por red (`fullimage.jpg` de
+CCDciel, el stream de imágenes de NINA), con su nombre, filtro, exposición y
+fecha, y **Abrir en el editor** (NINA descarga el FITS; CCDciel abre el fichero
+en disco cuando su ruta es accesible). Sin carpeta, funciona en remoto.
+
+**Opciones de captura** (ADR-083): un bloque plegado con dithering, autofocus,
+ganancia, offset, binning y retardos. Los valores recomendados salen de
+`core/capture_recipe.py` (por tipo de objeto y la física) y el ⓘ explica cada
+uno; viajan con la secuencia exportada y, donde la API lo permite, se aplican en
+vivo.
+
+**Valores sugeridos** (ADR-083): un proyecto sin plan se abre con las tomas,
+exposición, dither, autofocus y cámara sugeridos ya rellenos; los cambios del
+observador se mantienen, **Fijar los valores sugeridos** los vuelve a aplicar y
+el **?** de cada bloque abre un diálogo con el porqué y los números usados. La
+exposición se acorta para una cámara que satura antes (full well / linealidad,
+escala de placa) y se comprueba contra el brillo de cielo del sitio y el ruido de
+lectura.
 
 ## Secuencias de captura (`gui/main_window.py` → `_project_export_sequence`)
 
 | Formato | Fichero | Estado |
 |---------|---------|--------|
 | **CCDciel** | `<name>.targets` (CONFIG Version="5") | **Real** — fijado contra la exportación real del usuario (`docs/ccdciel_sequence_sample.targets`); pasos Light + Dark + Bias, ventana rise/set recalculable por CCDciel. |
-| **NINA** | JSON de secuencia nativa | Best-effort; validación pendiente contra la versión real del usuario. |
+| **NINA** | JSON de secuencia nativa (`SequenceRootContainer`) | Cargable por NINA vía `/sequence/load`; estructura pinada contra el corpus de test de NINA, **pendiente de confirmar contra una NINA/PINS real** (las cadenas `$type` viven en un único sitio). |
+| **NINA (resumen del plan)** | `*.plan.json` | Resumen legible del plan (objetivo, exposiciones, opciones); NO es una secuencia cargable. |
 | **CSV genérico** | `<name>.csv` | Best-effort; tablas de tiempos/exposiciones legibles por cualquier script. |
 
 Toda exportación se **registra en `project_files`** (ADR-019) para poder reabrir la

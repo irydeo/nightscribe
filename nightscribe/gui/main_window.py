@@ -28,7 +28,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QDialog,
                                 QHeaderView, QInputDialog, QLabel, QLineEdit,
                                 QListWidget, QListWidgetItem, QMainWindow,
                                 QMessageBox, QProgressBar, QProgressDialog,
-                                QPushButton, QScrollArea,
+                                QPlainTextEdit, QPushButton, QScrollArea,
                                 QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
                                 QVBoxLayout, QWidget, QTableWidget,
@@ -40,6 +40,7 @@ from ..version import full_version
 from ..core import (attention, dates, ephemeris, journal, kinds, mpc_report,
                     orbits, project, sequence, suggest)
 from ..core.db import db
+from ..core.sources import observatory
 from . import pretty, theme
 from .overview import ObjectPanel
 from .skeleton import ShimmerRow
@@ -51,9 +52,12 @@ from .widgets.project_row import ProjectRow
 from .widgets.project_row import SPARK_H as ROW_SPARK_H
 from .widgets.project_row import SPARK_W as ROW_SPARK_W
 from .widgets.sparkline import sparkline_pixmap
-from .workers import (AiPostWorker, CcdcielWorker,
-                      ExploreWorker, MpcResolveWorker, PassWorker,
+from .workers import (AiPostWorker,
+                      CaptureFitsWorker, CapturePreviewWorker,
+                      ExploreWorker, MpcResolveWorker, ObservatoryWorker,
+                      PassWorker,
                       PositionRefreshWorker, PostWorker, SunWorker,
+                      SkyBrightnessWorker,
                       TonightWorker, hold, running_workers)
 
 logger = logging.getLogger(__name__)
@@ -162,6 +166,7 @@ _CAM_PRESET_SPINS = {
     "cam_linearity_adu": "spn_cam_linearity",
     "ccd_read_noise": "spn_cam_ron",
     "cam_dark_current_e_s": "spn_cam_dark",
+    "cam_readout_s": "spn_cam_readout",
     "cam_max_exposure_s": "spn_cam_max_exp",
 }
 
@@ -416,6 +421,9 @@ class MainWindow(QMainWindow):
         # Analysis tab's list (the observer picked one), None when it was
         # opened from the visit (the newest run wins, as always).
         self._astrometry_run_pref = None
+        # the visit the observer clicked in Analysis: the astrometry runs
+        # filter to it (ADR-086 rev); None = the whole project
+        self._analysis_visit_filter = None
         # ADR-043: the CCD block lives inside the open project's Capture
         # step, so this registry dies with the page (and rebirths with it)
         self._obs_widgets = {}
@@ -426,15 +434,45 @@ class MainWindow(QMainWindow):
         self._advisor_dismissed = None  # A2: id of the project whose advisor
         #                                the user dismissed this session
 
-        # CCDciel integration (ADR-030). The connection survives project
-        # switches: the observatory does not re-connect per target.
+        # Observatory integration (ADR-030, ADR-081). The connection survives
+        # project switches: the observatory does not re-connect per target.
+        # `_ccd_backend` is the kind picked in Settings ("ccdciel"/"nina"); the
+        # widget names keep the "ccd_" prefix for history, but the block is
+        # backend-neutral now.
+        self._ccd_backend = "ccdciel"
         self._ccd_client = None
         self._ccd_connected = False
         self._ccd_filter_names = []
         self._ccd_version = ""
         self._ccd_worker = None
+        self._ccd_stop_worker = None  # the Stop-goto worker, if any
+        self._ccd_goto_running = False  # a slew/astrometry is in flight
+        self._ccd_capturing = False    # last dashboard said a capture is running
+        # ADR-084: the start-and-follow run (its worker, its cancel flag and
+        # whether it is in flight). One run at a time.
+        self._ccd_follow_worker = None
+        self._ccd_follow_running = False
+        self._ccd_gain = None          # the camera's gain setting (from the software)
+        self._ccd_offset = None        # the camera's offset setting (from the software)
+        # The last-frame preview (ADR-082): its own timer and worker; the
+        # frame comes over HTTP (CCDciel fullimage.jpg / NINA image stream),
+        # so there is no folder to watch and nothing to keep between ticks
+        # but the meta of what is on screen.
+        self._capture_preview_meta = None
+        self._capture_preview_last = None
+        self._capture_preview_worker = None
+        self._capture_fits_worker = None
+        self._capture_watching = False
+        self._capture_idle_ticks = 0
+        self._capture_timer = QTimer(self)
+        self._capture_timer.setInterval(2000)
+        self._capture_timer.timeout.connect(self._capture_preview_tick)
         self._pos_worker = None        # the position-refresh worker, if any
         self._pos_target = None        # the project a refresh was for
+        self._sky_worker = None        # the sky-brightness lookup, if any
+        self._sky_dlg = None           # the Settings dialog it belongs to
+        self._applying_suggestions = False  # the button is writing the values
+        self._plan_suggestion = None   # the last recipe suggested (ADR-083)
         self._ccd_point_target = None  # last project a goto/astrometry aimed at
         self._ccd_timer = QTimer(self)
         self._ccd_timer.setInterval(1500)
@@ -464,7 +502,11 @@ class MainWindow(QMainWindow):
         # SC2: the sky-event chips are local maths — no need to wait for
         # the network tonight computation
         QTimer.singleShot(0, self._skyevent_chips)
-        if config.get("ccdciel_auto_connect", False):
+        # ADR-081: the auto-connect flag belongs to the backend picked in
+        # Settings, so switching to NINA does not inherit CCDciel's choice.
+        self._ccd_backend = observatory.backend(config)
+        if config.get("nina_auto_connect" if self._ccd_backend == "nina"
+                      else "ccdciel_auto_connect", False):
             # ADR-030: opt-in, off by default — connecting an observatory is
             # a human decision, not something the app does silently.
             QTimer.singleShot(600, self._ccd_connect)
@@ -2203,18 +2245,30 @@ class MainWindow(QMainWindow):
         dlg = _load_ui("settings_dialog")
         settings_view.style_help_labels(dlg)
         settings_view.build_rail(dlg, settings_spec.CATEGORIES, self.tr)
-        for name in settings_spec.ADVANCED_GROUPS:
-            group = getattr(dlg, name, None)
-            if group is not None:
-                settings_view.make_collapsible(group, collapsed=True)
-        settings_view.wire_search(
-            dlg, self.tr("No setting matches that search."))
+        # ADR-071 rev: every group wears a title bar and nothing folds (the
+        # title alone separates the groups); the content is always visible.
+        settings_view.title_groups(dlg)
+        settings_view.insert_page_intros(dlg, settings_spec.CATEGORY_INTROS,
+                                         self.tr)
+        # ADR-081: the Integrations page shows only the observatory backend's
+        # own fields. The gate reads the combo, so changing it re-runs the
+        # search filter and swaps the visible group.
+        apply_search = settings_view.wire_search(
+            dlg, self.tr("No setting matches that search."),
+            eligible=settings_view.backend_gate(
+                dlg, settings_spec.BACKEND_GROUPS))
+        dlg.cmb_obs_backend.currentIndexChanged.connect(
+            lambda _i: apply_search())
         dlg.resize(max(900, dlg.sizeHint().width()),
                    max(640, dlg.sizeHint().height()))
 
         # combos whose items are built here, before the table fills them
         dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
         dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
+        # the backend combo carries the id as data, so it is filled in code
+        # (QUiLoader does not read userData from a .ui; ADR-005)
+        dlg.cmb_obs_backend.addItem(self.tr("CCDciel"), "ccdciel")
+        dlg.cmb_obs_backend.addItem(self.tr("NINA / PINS"), "nina")
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
         dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
@@ -2251,6 +2305,10 @@ class MainWindow(QMainWindow):
 
         # every simple field, one table both ways (ADR-071)
         settings_spec.load(dlg, config)
+        # reflect the saved observatory backend right away: the load only
+        # emits the combo's signal when the index actually changes, so an
+        # explicit pass guarantees the right group is the visible one
+        apply_search()
 
         # combos with an index or a data mapping of their own
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
@@ -2334,6 +2392,8 @@ class MainWindow(QMainWindow):
             lambda: self._projects_browse_into(dlg))
         dlg.btn_projects_reset.clicked.connect(
             lambda: dlg.edt_projects_root.setText(""))
+        dlg.btn_sky_lookup.clicked.connect(lambda: self._sky_lookup_into(dlg))
+        dlg.btn_sky_map.clicked.connect(lambda: self._sky_open_map(dlg))
         dlg.edt_horizon_file.textChanged.connect(
             lambda _t: self._horizon_file_preview(dlg))
         self._horizon_file_preview(dlg)
@@ -2346,6 +2406,15 @@ class MainWindow(QMainWindow):
 
         # save: the same table, one direction (ADR-071)
         settings_spec.save(dlg, config)
+
+        # ADR-081: if the observatory backend changed, drop the old connection
+        # right away. Keeping a CCDciel client after switching to NINA would
+        # drive the wrong program with the right buttons.
+        new_backend = observatory.backend(config)
+        if new_backend != getattr(self, "_ccd_backend", "ccdciel"):
+            self._ccd_disconnect()
+            self._ccd_backend = new_backend
+            self._ccd_apply_state()
 
         # the AI master switch may have changed (ADR-075): close or reopen
         # its surfaces right away, so the app acts on what was just saved
@@ -2594,6 +2663,52 @@ class MainWindow(QMainWindow):
             dlg, self.tr("Choose the projects folder"), start)
         if folder:
             dlg.edt_projects_root.setText(folder)
+
+    def _sky_lookup_into(self, dlg):
+        # Queries the light-pollution atlas for the site and fills the Sky
+        # brightness field (ADR-083). A NETWORK read, so it runs on a worker;
+        # the answer lands in a bound slot (a lambda would touch the dialog
+        # from the worker's thread).
+        # @args: dlg - the settings dialog
+        key = dlg.edt_lightpollution_key.text().strip()
+        if not key:
+            QMessageBox.information(
+                dlg, self.tr("Sky brightness"),
+                self.tr("Set the light-pollution API key first "
+                        "(Integrations), or read the value off the map."))
+            return
+        if (self._sky_worker is not None and self._sky_worker.isRunning()):
+            return
+        dlg.btn_sky_lookup.setEnabled(False)
+        self._sky_dlg = dlg
+        self._sky_worker = hold(SkyBrightnessWorker(
+            dlg.spn_lat.value(), dlg.spn_lon.value(), key))
+        self._sky_worker.finished.connect(self._sky_on_looked_up)
+        self._sky_worker.start()
+
+    def _sky_on_looked_up(self, mpsas, error):
+        # @args: mpsas - the sky brightness in mag/arcsec2 (or None),
+        #        error - message
+        dlg = getattr(self, "_sky_dlg", None)
+        self._sky_dlg = None
+        self._sky_worker = None
+        if dlg is None:
+            return
+        dlg.btn_sky_lookup.setEnabled(True)
+        if error or mpsas is None:
+            QMessageBox.warning(dlg, self.tr("Sky brightness"),
+                                error or self.tr("No answer from the atlas."))
+            return
+        dlg.spn_sky_brightness.setValue(float(mpsas))
+
+    def _sky_open_map(self, dlg):
+        # The keyless fallback: open the light-pollution map centred on the
+        # site so the observer reads the zenith brightness and types it.
+        # @args: dlg - the settings dialog (its current coordinates)
+        lat = dlg.spn_lat.value()
+        lon = dlg.spn_lon.value()
+        self._open_url(
+            f"https://www.lightpollutionmap.info/#zoom=9&lat={lat}&lon={lon}")
 
     def _horizon_file_preview(self, dlg):
         # Precedence rule made visible (ADR-020): while a horizon file loads
@@ -4200,8 +4315,9 @@ class MainWindow(QMainWindow):
                      if s["step"] == "plan"), {})
         duration = 3600.0
         if plan.get("n_frames") and plan.get("exp_s"):
+            from ..core import exposure as _exposure
             duration = float(plan["n_frames"]) * (
-                float(plan["exp_s"]) + float(config.get("overhead_s", 15.0)))
+                float(plan["exp_s"]) + _exposure.frame_overhead_s(config))
         try:
             from ..core import planner
             w = planner.safe_window_for(ra, dec, config, duration)
@@ -4742,14 +4858,35 @@ class MainWindow(QMainWindow):
         # lookup is cached and runs once, off the GUI thread.
         conf = ctx.get("confirmed") or {}
         self._paint_confirmation(conf)
-        if not conf.get("designation") and ctx.get("neocp"):
+        if not conf.get("designation") and self._could_be_renamed(p, ctx):
             self._start_alias_lookup(p)
 
+    def _could_be_renamed(self, p, ctx):
+        # @args: p - the project row, ctx - its context
+        # @return: True when the object may have been confirmed under a new
+        #          name since the visit, so the alias lookup is worth a call:
+        #          either the planner flagged it as a NEOCP object, or its
+        #          name still IS a temporary NEOCP/PCCP designation (a project
+        #          created by hand, or one whose context lost the flag). A
+        #          name that is already a confirmed designation has nothing to
+        #          announce (ADR-077 rev).
+        if ctx.get("neocp"):
+            return True
+        if p.get("kind") not in ("neo", "comet", "pccp"):
+            return False
+        from ..core.mpc_astrometry import is_temporary_designation
+        return is_temporary_designation(p.get("object_name"))
+
     def _paint_confirmation(self, conf):
-        # @args: conf - {"designation","mpec","mpec_url"} or {}
+        # @args: conf - {"designation","mpec","mpec_url","ours_published"} or {}
         # @return: None. The banner reads as data (the new name and the
         #          circular), never as a code: the observer sees what it
-        #          means without looking anything up.
+        #          means without looking anything up. Whether OUR observations
+        #          are in that circular is said ONLY when it is known (the
+        #          check block writes it into the context); otherwise the
+        #          banner links to the object at the MPC and claims nothing,
+        #          so it never asserts a participation that did not happen
+        #          (ADR-077 rev).
         lbl = self.projects.lbl_confirm
         desig = (conf or {}).get("designation")
         if not desig:
@@ -4768,8 +4905,16 @@ class MainWindow(QMainWindow):
         text = "★ " + self.tr("Confirmed as <b>%1</b>").replace("%1", desig)
         if tail:
             text += " · " + tail
-        text += ". " + self.tr(
-            "Your observations of it are in that circular.")
+        if conf.get("ours_published"):
+            text += ". " + self.tr(
+                "your observations are among them: your data is in that MPEC")
+        else:
+            obj_url = ("https://www.minorplanetcenter.net/db_search/"
+                       "show_object?utf8=True&object_id="
+                       + desig.replace(" ", "+"))
+            text += ". " + self.tr(
+                '<a href="%1">see the object at the MPC</a>').replace(
+                    "%1", obj_url)
         lbl.setText(text)
         lbl.setVisible(True)
 
@@ -4792,7 +4937,7 @@ class MainWindow(QMainWindow):
         # @return: None
         if not hit or not hit.get("designation"):
             return
-        project.update_context(db, pid, {"confirmed": hit})
+        project.merge_confirmed(db, pid, hit)
         cur = self._current_project
         if cur and cur.get("id") == pid:
             self._paint_confirmation(hit)
@@ -5185,6 +5330,11 @@ class MainWindow(QMainWindow):
         from .widgets.section_card import PanelCard
         layout = self._step_section("plan")
         accent = theme.KIND_COLORS.get(kind, theme.C_ACCENT)
+        # ADR-083: set when a kind-specific block (NEO calculator, transit,
+        # HADS, variable) picks the exposure itself, so the generic suggestion
+        # below does not override a more specific value
+        self._plan_exposure_block_set = False
+        self._plan_frames_block_set = False
 
         # the summary strip: integration, filter and the dawn verdict, the
         # three numbers the observer reads before touching anything
@@ -5214,9 +5364,26 @@ class MainWindow(QMainWindow):
         row.addWidget(spn_exp)
         row.addWidget(QLabel(self.tr("Filter:")))
         cmb_f = QComboBox()
-        for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
+        # ADR-081: the real wheel when the observatory has answered, the
+        # classic list until then (and again after a disconnect)
+        for f in self._ccd_filter_choices():
             cmb_f.addItem(f)
         row.addWidget(cmb_f)
+        row.addStretch(1)
+        # ADR-083: re-apply the suggestion and say WHY, in the SAME row (a
+        # second row would push the Capture page past the fold)
+        btn_sug = QPushButton(self.tr("Set suggested values"))
+        btn_sug.setToolTip(self.tr(
+            "Recompute the suggested frames, exposure and capture options for "
+            "this object and fill them in. It overwrites what is there."))
+        btn_sug.clicked.connect(self._apply_suggestions)
+        btn_why = QPushButton("?")
+        btn_why.setFixedWidth(28)
+        btn_why.setProperty("compact", True)   # 28 px + global padding = glyph gone
+        btn_why.setToolTip(self.tr("Why these values?"))
+        btn_why.clicked.connect(self._show_capture_explanation)
+        row.addWidget(btn_sug)
+        row.addWidget(btn_why)
         body.addLayout(row)
         self._project_widgets["plan_spins"] = (spn, spn_exp, cmb_f)
         for widget in (spn, spn_exp):
@@ -5225,6 +5392,16 @@ class MainWindow(QMainWindow):
         # the filter also feeds the summary strip
         cmb_f.currentIndexChanged.connect(
             lambda _i: self._plan_ribbon_refresh(p, ctx))
+
+        # ADR-083: suggest the numbers and pre-fill them, but ONLY when the
+        # project has no saved plan: once the observer touches them, they are
+        # theirs and are never overwritten (the button re-applies on demand).
+        # The pre-fill itself is applied AFTER the kind-specific blocks (they
+        # set the exposure too) and before the saved plan, below.
+        from ..core import capture_recipe
+        suggestion = capture_recipe.recommend(kind, self._plan_recipe_context(p),
+                                              config)
+        self._plan_suggestion = suggestion
         self._plan_ribbon_refresh(p, ctx)
 
         # NEO: exposure calculator
@@ -5235,23 +5412,35 @@ class MainWindow(QMainWindow):
                                           config.get("pixel_binning"))
             t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
             if t_max:
-                body.addWidget(QLabel(
-                    f"<small>{self.tr('Max exposure (no trail)')}: "
-                    f"{t_max:.0f}s · {self.tr('plate scale')}: "
-                    f"{scale:.2f}″/px · {self.tr('rate')}: "
-                    f"{ctx['rate_arcsec_min']:.1f}″/min</small>"))
+                text = (f"<small>{self.tr('Max exposure (no trail)')}: "
+                        f"{t_max:.0f}s · {self.tr('plate scale')}: "
+                        f"{scale:.2f}″/px · {self.tr('rate')}: "
+                        f"{ctx['rate_arcsec_min']:.1f}″/min")
+                cross = (self._plan_suggestion or {}).get("field_crossing_s")
+                if cross:
+                    # ADR-083 rev: the object crosses the camera's field, and
+                    # after that every frame loses it; show the clock so the
+                    # frame count is not read as "as many as the night allows"
+                    text += (f" · {self.tr('field crossing')}: "
+                             f"{cross / 60.0:.1f} min")
+                body.addWidget(QLabel(text + "</small>"))
                 spn_exp.setValue(min(t_max, 60.0))
+                self._plan_exposure_block_set = True
         # Track D: first-timer transit block (timeline, times, exposure,
         # cadence, pre-flight checklist). Placed before the plan restore so
         # a saved plan still overrides the heuristic exposure.
         if kind == "transit" and (ctx.get("transit") or {}):
             self._build_transit_block(layout, p, ctx, spn_exp)
+            self._plan_exposure_block_set = True
         # HADS: the 2P continuous-capture block (no event, no timeline)
         if kind == "hads" and (ctx.get("hads") or {}):
             self._build_hads_block(layout, p, ctx, spn_exp, spn)
+            self._plan_exposure_block_set = True
+            self._plan_frames_block_set = True
         # Track V: variable/campaign block (protocol, extremum, exposure)
         if kind == "variable":
             self._build_variable_block(layout, p, ctx, spn_exp)
+            self._plan_exposure_block_set = True
         # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -5266,10 +5455,14 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_nframes"] = spn
         self._project_widgets["spn_exps"] = spn_exp
         self._project_widgets["cmb_filter"] = cmb_f
-        # CCDciel calibration frames (ADR-021): the generated target list
-        # appends a Dark and a Bias step from these counts (0 = omit).
-        # UX-PC (U3): secondary to the plan itself — lives collapsed.
-        cal = self._advanced_block(layout, self.tr("Calibration"))
+        # Capture options (ADR-083) + calibration frames (ADR-021): both are
+        # the "how" of the capture, both are secondary, so they share ONE
+        # collapsed block (the Capture page must still fit without scrolling).
+        # The generated target list appends a Dark and a Bias step from these
+        # counts (0 = omit).
+        cal = self._advanced_block(
+            layout, self.tr("Capture options and calibration"))
+        self._capture_options_into(cal, p, kind, ctx)
         cal_form = QFormLayout()
         cal.addLayout(cal_form)
         spn_darks = PassiveSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
@@ -5307,7 +5500,8 @@ class MainWindow(QMainWindow):
                     f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
                     f" · {self.tr('guide, not SNR — confirm with a test shot')}"
                     f"</small>"))
-                spn_exp.setValue(min(sn_exp, 60.0))
+                # ADR-083: the exposure itself comes from the recipe (the
+                # Exposure plan card), so this hint no longer sets the spin
             # multi-filter rows: add/remove (filter × N × exp) steps.
             # The "Add filter" button shares the header row (right side),
             # so we save one full row for the button alone
@@ -5345,7 +5539,8 @@ class MainWindow(QMainWindow):
         seq_row.addWidget(QLabel(self.tr("Export format")))
         cmb_fmt = QComboBox()
         cmb_fmt.addItem(self.tr("CCDciel (targets)"))
-        cmb_fmt.addItem(self.tr("NINA (JSON)"))
+        cmb_fmt.addItem(self.tr("NINA (sequence)"))
+        cmb_fmt.addItem(self.tr("NINA (plan summary)"))
         cmb_fmt.addItem(self.tr("CSV (generic)"))
         seq_row.addWidget(cmb_fmt)
         seq_row.addStretch()
@@ -5364,6 +5559,15 @@ class MainWindow(QMainWindow):
         # itself (the Observatory tab is gone): the hardware has one home,
         # and it is the step that plans its capture
         self._build_capture_ccd_block(layout, accent)
+        # ADR-083: a project with NO saved plan opens with the suggested
+        # values in place; once the observer touches them they are theirs (the
+        # button is the way to bring the suggestion back). Applied LAST so the
+        # kind-specific blocks keep their more specific exposure, and only the
+        # frame count is always suggested.
+        if not plan_data.get("n_frames") and not self._plan_frames_block_set:
+            spn.setValue(int(suggestion["n_frames"]))
+        if not plan_data.get("exp_s") and not self._plan_exposure_block_set:
+            spn_exp.setValue(float(suggestion["exposure_s"]))
         # ADR-043: the plan auto-saves: every input writes the same payload
         # the "Save plan" button used to, silently (the project bar is the
         # visible truth). The connects sit after every build-time
@@ -5413,7 +5617,12 @@ class MainWindow(QMainWindow):
                 db, self._current_project["id"], "plan",
                 {"n_frames": spn.value(), "exp_s": spn_exp.value(),
                  "filter": cmb_f.currentText(), "n_darks": n_darks,
-                 "exp_dark": exp_dark, "n_bias": n_bias})
+                 "exp_dark": exp_dark, "n_bias": n_bias,
+                 # ADR-083: the capture options ride with the plan, and
+                 # `suggested` says whether the observer has touched them yet
+                 "capture_options": self._capture_options_from_widgets(),
+                 "suggested": bool(getattr(self, "_applying_suggestions",
+                                           False))})
             # (re)compute the safe window from this plan's duration (including
             # calibration frames) and store it in the project context so the
             # overview, narrative and sky chart all agree (ADR-020).
@@ -5424,7 +5633,7 @@ class MainWindow(QMainWindow):
             if ra is not None and dec is not None:
                 plan = sequence.make_plan(
                     spn.value(), spn_exp.value(), cmb_f.currentText(),
-                    overhead_s=float(config.get("overhead_s", 15.0)),
+                    cfg=config,
                     n_darks=n_darks, exp_dark=exp_dark, n_bias=n_bias)
                 dur = plan["duration_s"]
                 from ..core import planner as _planner
@@ -5446,6 +5655,307 @@ class MainWindow(QMainWindow):
 
     # -- CCDciel control (ADR-030) -----------------------------------------
 
+    # -- capture options (ADR-083) ----------------------------------------
+
+    def _capture_options_into(self, box, p, kind, ctx):
+        # The options that decide the quality of a capture, with the
+        # recommended value preselected and the reason one tooltip away
+        # (core/capture_recipe + core/explain). The observer can override any
+        # of them; the plan stores what they chose. `box` is the layout of the
+        # shared advanced block (see _build_plan_tab).
+        from ..core import capture_recipe, explain
+        rec = capture_recipe.recommend(kind, ctx, config)
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        saved = plan_data.get("capture_options") or {}
+
+        def _tip(entry):
+            pair = explain.short(entry)
+            return pair.get(self._lang(), pair.get("en"))
+
+        def _row(*items):
+            holder = QWidget()
+            h = QHBoxLayout(holder)
+            h.setContentsMargins(0, 0, 0, 0)
+            for x in items:
+                h.addWidget(QLabel(x) if isinstance(x, str) else x)
+            h.addStretch(1)
+            return holder
+
+        form = QFormLayout()
+        box.addLayout(form)
+        head = QHBoxLayout()
+        head.addStretch(1)
+        btn_why = QPushButton("?")
+        btn_why.setFixedWidth(28)
+        btn_why.setProperty("compact", True)   # 28 px + global padding = glyph gone
+        btn_why.setToolTip(self.tr("Why these values?"))
+        btn_why.clicked.connect(self._show_capture_explanation)
+        head.addWidget(btn_why)
+        box.addLayout(head)
+
+        # dither: on/off, every N frames, amplitude in pixels
+        d = saved.get("dither") or rec["dither"]
+        chk_dither = QCheckBox(self.tr("Dither between frames"))
+        chk_dither.setChecked(bool(d.get("on")))
+        chk_dither.setToolTip(_tip(explain.DITHER))
+        form.addRow(chk_dither)
+        spn_d_every = PassiveSpinBox()
+        spn_d_every.setRange(1, 100)
+        spn_d_every.setValue(int(d.get("every") or 3))
+        spn_d_px = PassiveSpinBox()
+        spn_d_px.setRange(1, 100)
+        spn_d_px.setValue(int(d.get("pixels") or 5))
+        form.addRow(self.tr("Dither:"),
+                    _row(self.tr("every"), spn_d_every, self.tr("frames ·"),
+                         spn_d_px, self.tr("px")))
+
+        # autofocus: on/off, every T minutes, on a temperature change
+        a = saved.get("autofocus") or rec["autofocus"]
+        chk_af = QCheckBox(self.tr("Refocus during the run"))
+        chk_af.setChecked(bool(a.get("on")))
+        chk_af.setToolTip(_tip(explain.AUTOFOCUS))
+        form.addRow(chk_af)
+        spn_af_min = PassiveSpinBox()
+        spn_af_min.setRange(0, 240)
+        spn_af_min.setValue(int(a.get("minutes") or 0))
+        spn_af_delta = PassiveDoubleSpinBox()
+        spn_af_delta.setRange(0.0, 10.0)
+        spn_af_delta.setSingleStep(0.5)
+        spn_af_delta.setValue(float(a.get("delta_c") or 0.0))
+        form.addRow(self.tr("Refocus:"),
+                    _row(self.tr("every"), spn_af_min, self.tr("min · ΔT"),
+                         spn_af_delta, self.tr("°C")))
+
+        # camera: gain, offset, binning (per plan; 0 = leave as it is). The
+        # default comes from the SAVED plan, else from what the observatory
+        # reports when connected (the camera's own gain/offset settings), so
+        # "Set suggested values" reflects the software instead of forcing 0.
+        spn_gain = PassiveSpinBox()
+        spn_gain.setRange(0, 100000)
+        gain_default = saved.get("gain")
+        if gain_default is None:
+            gain_default = self._ccd_gain
+        spn_gain.setValue(int(gain_default or 0))
+        spn_gain.setToolTip(_tip(explain.SUBEXPOSURE))
+        spn_offset = PassiveSpinBox()
+        spn_offset.setRange(0, 100000)
+        offset_default = saved.get("offset")
+        if offset_default is None:
+            offset_default = self._ccd_offset
+        spn_offset.setValue(int(offset_default or 0))
+        cmb_bin = QComboBox()
+        for b in ("1x1", "2x2", "3x3", "4x4"):
+            cmb_bin.addItem(b)
+        idx = cmb_bin.findText(str(rec.get("binning") or "1x1"))
+        cmb_bin.setCurrentIndex(idx if idx >= 0 else 0)
+        form.addRow(self.tr("Camera:"),
+                    _row(self.tr("gain"), spn_gain, self.tr("offset"),
+                         spn_offset, self.tr("binning"), cmb_bin))
+
+        spn_delay = PassiveSpinBox()
+        spn_delay.setRange(0, 3600)
+        spn_delay.setValue(int(saved.get("delay_s")
+                               or rec.get("delay_s") or 0))
+        form.addRow(self.tr("Delay between frames:"),
+                    _row(spn_delay, self.tr("s")))
+
+        self._project_widgets["capture_options"] = {
+            "dither_on": chk_dither, "dither_every": spn_d_every,
+            "dither_px": spn_d_px,
+            "af_on": chk_af, "af_minutes": spn_af_min, "af_delta": spn_af_delta,
+            "gain": spn_gain, "offset": spn_offset, "binning": cmb_bin,
+            "delay": spn_delay,
+        }
+        # the options auto-save with the plan (ADR-043)
+        for box_w in (chk_dither, chk_af):
+            box_w.toggled.connect(self._project_save_plan)
+        for spin in (spn_d_every, spn_d_px, spn_af_min, spn_af_delta,
+                     spn_gain, spn_offset, spn_delay):
+            spin.valueChanged.connect(self._project_save_plan)
+        cmb_bin.currentIndexChanged.connect(self._project_save_plan)
+
+    def _plan_recipe_context(self, p):
+        # The context the recipe reads, with the object's VISIBILITY SPAN
+        # ensured (window_start/window_end). The safe window only lands in the
+        # context once a plan is saved, so without this the frame count would
+        # depend on whether the observer had saved yet (it used to flip). The
+        # span is deterministic: same object, same night, same number.
+        # @args: p - project dict
+        # @return: a context dict (a copy)
+        ctx = dict(p.get("context") or {})
+        if ctx.get("ra_deg") is None:
+            return ctx
+        if ctx.get("window_start") and ctx.get("window_end"):
+            return ctx
+        try:
+            from ..core import planner
+            sw = planner.safe_window_for(ctx["ra_deg"], ctx.get("dec_deg"),
+                                         config, 0)
+            for key in ("window_start", "window_end", "safe_window"):
+                if sw.get(key) is not None:
+                    ctx[key] = sw[key]
+        except Exception as err:      # a window is a nicety, not a blocker
+            logger.debug("no safe window for the recipe: %s", err)
+        return ctx
+
+    def _capture_options_from_widgets(self):
+        # @return: the recipe dict the plan, the sequence export and the live
+        #          "Send plan" read ({} when the Capture step is not built)
+        w = self._project_widgets.get("capture_options") or {}
+        if not w:
+            return {}
+        return {
+            "dither": {"on": w["dither_on"].isChecked(),
+                       "every": w["dither_every"].value(),
+                       "pixels": w["dither_px"].value()},
+            "autofocus": {"on": w["af_on"].isChecked(), "every": 0,
+                          "minutes": w["af_minutes"].value(),
+                          "delta_c": w["af_delta"].value(),
+                          "on_filter": False},
+            "gain": w["gain"].value() or None,
+            "offset": w["offset"].value() or None,
+            "binning": w["binning"].currentText(),
+            "delay_s": w["delay"].value(),
+        }
+
+    def _capture_options_apply(self, rec):
+        # Writes a recipe into the Capture options widgets (ADR-083). Blocking
+        # the signals is not needed: the caller wraps the whole application in
+        # _applying_suggestions, and the plan is saved once at the end.
+        # @args: rec - dict from capture_recipe.recommend
+        w = self._project_widgets.get("capture_options") or {}
+        if not w:
+            return
+        d = rec.get("dither") or {}
+        w["dither_on"].setChecked(bool(d.get("on")))
+        w["dither_every"].setValue(int(d.get("every") or 3))
+        w["dither_px"].setValue(int(d.get("pixels") or 5))
+        a = rec.get("autofocus") or {}
+        w["af_on"].setChecked(bool(a.get("on")))
+        w["af_minutes"].setValue(int(a.get("minutes") or 0))
+        w["af_delta"].setValue(float(a.get("delta_c") or 0.0))
+        w["gain"].setValue(int(rec.get("gain")
+                               if rec.get("gain") is not None
+                               else (self._ccd_gain or 0)))
+        w["offset"].setValue(int(rec.get("offset")
+                                 if rec.get("offset") is not None
+                                 else (self._ccd_offset or 0)))
+        idx = w["binning"].findText(str(rec.get("binning") or "1x1"))
+        if idx >= 0:
+            w["binning"].setCurrentIndex(idx)
+        w["delay"].setValue(int(rec.get("delay_s") or 0))
+
+    def _apply_suggestions(self):
+        # Re-applies the suggested values to BOTH blocks (the button), and
+        # records that what is there came from the suggestion (ADR-083).
+        p = self._current_project
+        if not p:
+            return
+        from ..core import capture_recipe
+        rec = capture_recipe.recommend(p.get("kind"),
+                                       self._plan_recipe_context(p), config)
+        self._applying_suggestions = True
+        try:
+            spn = self._project_widgets.get("spn_nframes")
+            spn_exp = self._project_widgets.get("spn_exps")
+            if spn is not None:
+                spn.setValue(int(rec["n_frames"]))
+            if spn_exp is not None:
+                spn_exp.setValue(float(rec["exposure_s"]))
+            self._capture_options_apply(rec)
+            # the save must run while the flag is up, or the payload would
+            # record `suggested: False` and the provenance would be lost
+            self._project_save_plan()
+        finally:
+            self._applying_suggestions = False
+        self.statusBar().showMessage(
+            self.tr("Suggested capture values applied."), 5000)
+
+    def _show_capture_explanation(self):
+        # The "?" dialog: WHY these values, with the numbers that were used.
+        # The wording lives in core/explain (ADR-058); here only the numbers
+        # and the assembly.
+        from ..core import capture_recipe, explain, exposure
+        p = self._current_project
+        if not p:
+            return
+        cfg = config
+        rec = capture_recipe.recommend(p.get("kind"),
+                                       dict(p.get("context") or {}), cfg)
+        scale = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"),
+                                     cfg.get("pixel_binning"))
+        ceiling = capture_recipe._ceiling_e(cfg)
+
+        def _pick(entry):
+            pair = explain.long(entry)
+            return pair.get(self._lang(), pair.get("en"))
+
+        lines = [
+            f"<p><b>{self.tr('Exposure')}: {rec['exposure_s']:g} s × "
+            f"{rec['n_frames']}</b></p>",
+            f"<p>{_pick(explain.SUBEXPOSURE)}</p>",
+            f"<p>{_pick(explain.EXPOSURE_CALC)}</p>",
+        ]
+        if p.get("kind") in capture_recipe.MOVING_KINDS:
+            lines.append(f"<p>{_pick(explain.FIELD_CROSSING)}</p>")
+        numbers = [
+            f"{self.tr('plate scale')}: {scale:.2f} ″/px",
+            f"{self.tr('Sky brightness')}: "
+            f"{float(cfg.get('sky_brightness_mag') or 0):.2f} mag/arcsec²",
+            f"{self.tr('read noise')}: {cfg.get('ccd_read_noise') or '—'} e-",
+        ]
+        if ceiling:
+            numbers.append(f"{self.tr('linearity ceiling')}: "
+                           f"{ceiling:.0f} e-")
+        fov = rec.get("field_arcmin")
+        rate = (p.get("context") or {}).get("rate_arcsec_min")
+        if fov:
+            numbers.append(f"{self.tr('field of view')}: "
+                           f"{fov[0]:.1f}′ × {fov[1]:.1f}′")
+        if rate:
+            numbers.append(f"{self.tr('rate')}: {float(rate):.2f} ″/min")
+        if rec.get("field_crossing_s"):
+            numbers.append(f"{self.tr('field crossing')}: "
+                           f"{rec['field_crossing_s'] / 60.0:.1f} min")
+        numbers.append(f"{self.tr('per-frame overhead')}: "
+                       f"{exposure.frame_overhead_s(cfg):.1f} s")
+        lines.append("<p><b>" + self.tr("Numbers used") + ":</b><br>"
+                     + "<br>".join(numbers) + "</p>")
+        if rec.get("warnings"):
+            why = {"saturation": self.tr(
+                       "The target would saturate: consider a lower gain, "
+                       "binning, defocus or a neutral filter."),
+                   "read_noise": self.tr(
+                       "The sky is faint and the read noise high: longer "
+                       "exposures than saturation allows would be needed; "
+                       "binning or more frames helps."),
+                   "trail": self.tr(
+                       "The object moves: the exposure is capped so it does "
+                       "not trail."),
+                   "field": self.tr(
+                       "The object crosses the field of view before the night "
+                       "ends: the frame count is capped so the run does not "
+                       "end up full of frames without it."),
+                   "field_unknown": self.tr(
+                       "The object moves but the field of view or its rate is "
+                       "unknown: the count cannot be bounded by the field. "
+                       "Pick your camera preset and check the rate."),
+                   "field_short": self.tr(
+                       "The object crosses the field in less time than even a "
+                       "handful of frames: shorten the exposure or re-point "
+                       "during the run.")}
+            lines.append("<p><b>" + self.tr("Watch out") + ":</b><br>"
+                         + "<br>".join(why.get(w, w)
+                                       for w in rec["warnings"]) + "</p>")
+        lines.append(f"<p>{_pick(explain.DITHER)}</p>")
+        lines.append(f"<p>{_pick(explain.AUTOFOCUS)}</p>")
+        box = QMessageBox(self)
+        box.setWindowTitle(self.tr("Why these values"))
+        box.setTextFormat(Qt.RichText)
+        box.setText("".join(lines))
+        box.exec()
+
     def _build_capture_ccd_block(self, layout, accent=None):
         # ADR-043: the Observatory tab is gone; this is its whole control
         # panel, rebuilt per project page inside the Capture step. Built
@@ -5462,6 +5972,9 @@ class MainWindow(QMainWindow):
         # old three group boxes).
         # @args: layout - the Capture page layout, accent - the kind hue
         from .widgets.section_card import PanelCard
+        # a new page means the old preview (and its timer) belongs to the
+        # previous project: stop watching before the widgets are replaced
+        self._capture_preview_reset()
         grp = PanelCard(self.tr("Telescope and camera"),
                         accent or theme.C_ACCENT)
         gv = grp.body
@@ -5526,9 +6039,20 @@ class MainWindow(QMainWindow):
             "cache. A preliminary orbit improves as new astrometry arrives, "
             "so a position computed from an old one can be minutes of "
             "motion off."))
+        # Safety stop (ADR-081): enabled the moment a goto starts, so a mount
+        # heading to the wrong place can be halted at once. It stops the
+        # MOTION, not the pointing job, and it is deliberately the only
+        # button here that does not wait for the connection poll.
+        btn_stop = QPushButton(self.tr("Stop goto"))
+        btn_stop.setToolTip(self.tr(
+            "Stop the telescope movement now. Use it if a slew or an "
+            "astrometric goto is heading somewhere it should not: it halts "
+            "the mount immediately, without waiting for the pointing to "
+            "finish."))
         row.addWidget(btn_goto)
         row.addWidget(btn_sync)
         row.addWidget(btn_refresh_pos)
+        row.addWidget(btn_stop)
         row.addStretch()
         gv.addLayout(row)
 
@@ -5539,13 +6063,30 @@ class MainWindow(QMainWindow):
         cmb_f = QComboBox()
         btn_push = QPushButton(self.tr("Send plan"))
         btn_push.setToolTip(self.tr(
-            "Stage the current project's saved plan (frames × exposure) "
-            "in CCDciel's Capture module"))
+            "Prepare the current project's saved plan (object, frames × "
+            "exposure, filter, binning, gain, offset, dither) in the "
+            "observatory software and read it back to show what it is really "
+            "holding. The autofocus cadence is NOT applied live (CCDciel's API "
+            "does not expose it): it travels with the exported sequence. With "
+            "NINA the frame count is information only."))
         btn_start = QPushButton(self.tr("Start capture"))
-        btn_start.setToolTip(self.tr("Start the staged capture in CCDciel"))
+        btn_start.setToolTip(self.tr(
+            "Start the staged capture in the observatory software"))
+        # ADR-084: the driven run. The observer asks for a number of
+        # observations and the app captures each one up to the field crossing,
+        # then points again at the object at its fresh ephemeris and starts the
+        # next. It becomes "Stop following" while it runs.
+        btn_follow = QPushButton(self.tr("Start and follow…"))
+        btn_follow.setToolTip(self.tr(
+            "Run N observations of a moving object without re-pointing by "
+            "hand: each one captures as many frames as fit before the object "
+            "reaches the edge of the field, then the telescope points again at "
+            "the object's fresh position and the next one starts. Needs a "
+            "moving object and a plate solver (astrometric goto)."))
         row.addWidget(cmb_f)
         row.addWidget(btn_push)
         row.addWidget(btn_start)
+        row.addWidget(btn_follow)
         row.addStretch()
         gv.addLayout(row)
         lbl_co = QLabel("")
@@ -5555,6 +6096,44 @@ class MainWindow(QMainWindow):
         # name and hides again when it does not
         lbl_co.setVisible(False)
         gv.addWidget(lbl_co)
+        # what the observatory is REALLY holding after "Send plan": a read-back
+        # confirmation, not a promise. Empty until the observer sends one.
+        lbl_staged = QLabel("")
+        lbl_staged.setWordWrap(True)
+        lbl_staged.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
+        lbl_staged.setVisible(False)
+        gv.addWidget(lbl_staged)
+        # the last frame the observatory wrote, in the window (ADR-082). Hidden
+        # until a capture has produced one: a 200 px box of nothing would be
+        # another row asking for room it does not need yet.
+        box = QWidget()
+        box.setVisible(False)
+        bl = QHBoxLayout(box)
+        bl.setContentsMargins(0, 0, 0, 0)
+        bl.setSpacing(10)
+        lbl_prev = QLabel()
+        lbl_prev.setFixedSize(200, 200)
+        lbl_prev.setAlignment(Qt.AlignCenter)
+        lbl_prev.setStyleSheet(
+            f"background: {theme.C_PANEL}; border: 1px solid {theme.C_LINE};"
+            f" border-radius: 6px; color: {theme.C_TEXT_DIM};"
+            f" font-size: 11px;")
+        lbl_prev.setText(self.tr("Waiting for the first frame…"))
+        prev_col = QVBoxLayout()
+        lbl_prev_cap = QLabel("")
+        lbl_prev_cap.setWordWrap(True)
+        lbl_prev_cap.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
+        btn_prev_open = QPushButton(self.tr("Open in the editor"))
+        btn_prev_open.setToolTip(self.tr(
+            "Load this frame in the image workbench to measure, annotate or "
+            "calibrate it. It is the frame on disk, not a copy."))
+        prev_col.addWidget(lbl_prev_cap)
+        prev_col.addWidget(btn_prev_open)
+        prev_col.addStretch(1)
+        bl.addWidget(lbl_prev)
+        bl.addLayout(prev_col)
+        bl.addStretch(1)
+        gv.addWidget(box)
         layout.addWidget(grp)
 
         self._obs_widgets = {
@@ -5569,10 +6148,17 @@ class MainWindow(QMainWindow):
             "ccd_goto": btn_goto,
             "ccd_sync": btn_sync,
             "ccd_refresh_pos": btn_refresh_pos,
+            "ccd_stop": btn_stop,
             "cmb_ccd_filter": cmb_f,
             "ccd_push": btn_push,
             "ccd_start": btn_start,
+            "ccd_follow": btn_follow,
             "ccd_coords": lbl_co,
+            "ccd_staged": lbl_staged,
+            "capture_preview": box,
+            "capture_preview_img": lbl_prev,
+            "capture_caption": lbl_prev_cap,
+            "capture_open": btn_prev_open,
         }
         btn_c.clicked.connect(self._ccd_connect)
         btn_d.clicked.connect(self._ccd_disconnect)
@@ -5580,8 +6166,15 @@ class MainWindow(QMainWindow):
         btn_goto.clicked.connect(self._ccd_goto)
         btn_sync.clicked.connect(self._ccd_astrometry_goto)
         btn_refresh_pos.clicked.connect(self._ccd_refresh_position)
+        btn_stop.clicked.connect(self._ccd_stop_goto)
         btn_push.clicked.connect(self._ccd_send_plan)
         btn_start.clicked.connect(self._ccd_start_capture)
+        btn_follow.clicked.connect(self._ccd_follow)
+        btn_prev_open.clicked.connect(self._open_capture_frame_in_editor)
+        # a run in flight keeps its "Stop" face when the block is rebuilt
+        # (navigating between projects must not hide the way to stop it)
+        if self._ccd_follow_running:
+            btn_follow.setText(self.tr("Stop following"))
         self._ccd_apply_state()
         # the wheel combo starts on the static fallback list (a real wheel
         # replaces it on connect via _ccd_fill_filters)
@@ -5594,8 +6187,25 @@ class MainWindow(QMainWindow):
         #          consumer guard-checks its keys against that).
         return dict(getattr(self, "_obs_widgets", {}) or {})
 
+    def _ccd_backend_label(self):
+        # @return: the display name of the backend picked in Settings
+        return self.tr("NINA / PINS") if self._ccd_backend == "nina" \
+            else self.tr("CCDciel")
+
+    def _ccd_update_stop(self):
+        # The Stop-goto button is armed only while a goto is in flight: it is
+        # a safety control, and a live "stop" on an idle mount is a lie. It is
+        # also armed during a follow run (ADR-084): the loop slews, so
+        # the observer must be able to halt the mount.
+        w = self._ccd_widgets()
+        btn = w.get("ccd_stop")
+        if btn is not None:
+            btn.setEnabled(bool(self._ccd_connected)
+                           and bool(self._ccd_goto_running
+                                    or self._ccd_follow_running))
+
     def _ccd_apply_state(self):
-        # Enable/disable the CCDciel widgets after a connection change and
+        # Enable/disable the observatory widgets after a connection change and
         # refresh the status line. Safe to call even before the widgets exist.
         w = self._ccd_widgets()
         if not w.get("ccd_connect"):
@@ -5611,25 +6221,52 @@ class MainWindow(QMainWindow):
             widget = w.get(key)
             if widget is not None:
                 widget.setEnabled(on)
-        # the position refresh is a NETWORK action, not a CCDciel one: it is
-        # enabled by the project (a moving target) even with the mount off,
+        # the position refresh is a NETWORK action, not an observatory one: it
+        # is enabled by the project (a moving target) even with the mount off,
         # because the observer may want the freshest orbit before connecting
         btn_rp = w.get("ccd_refresh_pos")
         if btn_rp is not None:
             proj = self._current_project
             btn_rp.setEnabled(bool(proj)
                               and proj.get("kind") in ("neo", "comet", "pccp"))
+        # ADR-084: the start-and-follow run needs a moving object and a live
+        # connection; while it runs the button stays on (it is the Stop).
+        btn_rec = w.get("ccd_follow")
+        if btn_rec is not None:
+            proj = self._current_project
+            btn_rec.setEnabled(
+                bool(self._ccd_follow_running)
+                or (on and bool(proj)
+                    and proj.get("kind") in ("neo", "comet", "pccp")))
+        # while the run owns the client, the single-shot commands are locked so
+        # two workers never talk to the server at once (ADR-084); the safety
+        # Stop goto stays armed through _ccd_update_stop()
+        if self._ccd_follow_running:
+            for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
+                        "ccd_start", "ccd_goto", "ccd_sync"):
+                widget = w.get(key)
+                if widget is not None:
+                    widget.setEnabled(False)
         cb = w.get("cmb_ccd_filter")
         if cb is not None:
             cb.setEnabled(on)
         w["ccd_connect"].setEnabled(not on)
+        # the connect button names the program it will talk to (ADR-081)
+        w["ccd_connect"].setText(
+            self.tr("Connect %1").replace("%1", self._ccd_backend_label()))
+        self._ccd_update_stop()
+        self._ccd_update_capture()
         # Interfaz 1.8: the state is a COLOUR, not a sentence. Green with a
-        # dot when CCDciel answers, amber when it does not: it is the one
-        # thing the observer glances at before trusting anything else in
+        # dot when the observatory answers, amber when it does not: it is the
+        # one thing the observer glances at before trusting anything else in
         # this panel, and it used to be grey text like everything else.
         if not on:
-            w["ccd_status"].setText(
-                "\u25cf " + self.tr("CCDciel: not connected"))
+            if self._ccd_backend == "nina":
+                w["ccd_status"].setText(
+                    "\u25cf " + self.tr("NINA / PINS: not connected"))
+            else:
+                w["ccd_status"].setText(
+                    "\u25cf " + self.tr("CCDciel: not connected"))
             w["ccd_status"].setStyleSheet(
                 f"color: {theme.C_WARN}; font-weight: 600;")
             w["ccd_connect"].setStyleSheet(
@@ -5643,7 +6280,7 @@ class MainWindow(QMainWindow):
             w["ccd_slew"].setStyleSheet("")
         else:
             w["ccd_status"].setText(
-                "\u25cf " + f"{self.tr('CCDciel')}: "
+                "\u25cf " + f"{self._ccd_backend_label()}: "
                 f"{self._ccd_client.host}:{self._ccd_client.port}"
                 f" · {self._ccd_version}")
             w["ccd_status"].setStyleSheet(
@@ -5652,24 +6289,23 @@ class MainWindow(QMainWindow):
             self._ccd_fill_filters()
 
     def _ccd_connect(self):
-        # Manual connect button (ADR-030): build a client from config and let
-        # a worker prove it answers JSON-RPC 2.0 on the background thread.
+        # Manual connect button (ADR-030/ADR-081): build the client for the
+        # backend picked in Settings and let a worker prove it answers.
         if (self._ccd_worker is not None and self._ccd_worker.isRunning()):
             return
-        from ..core.sources import ccdciel
-        self._ccd_client = ccdciel.Client(
-            host=str(config.get("ccdciel_host", "127.0.0.1")),
-            port=int(config.get("ccdciel_port", 3277)))
+        self._ccd_backend = observatory.backend(config)
+        self._ccd_client = observatory.make_client(config)
         self._ccd_version = self.tr("—")
 
         def action(c):
             version = c.ping()
             if version is None:
-                raise ccdciel.CCDcielError("no JSON-RPC answer")
+                raise observatory.ObservatoryError("no answer from the API")
             return {"version": version, "dashboard": c.dashboard(),
-                    "filters": c.filters()}
+                    "filters": c.filters(),
+                    "gain": c.current_gain(), "offset": c.current_offset()}
 
-        self._ccd_worker = hold(CcdcielWorker(self._ccd_client, action))
+        self._ccd_worker = hold(ObservatoryWorker(self._ccd_client, action))
         self._ccd_worker.finished.connect(self._ccd_on_connect)
         self._ccd_worker.start()
 
@@ -5677,8 +6313,9 @@ class MainWindow(QMainWindow):
         # @args: result - dict with version/dashboard/filters, error - message
         self._ccd_worker = None
         if error or not result:
-            QMessageBox.warning(self, self.tr("CCDciel"),
-                                self.tr("Could not connect to CCDciel.")
+            QMessageBox.warning(self, self._ccd_backend_label(),
+                                self.tr("Could not connect to %1.")
+                                .replace("%1", self._ccd_backend_label())
                                 + f"\n{error}")
             self._ccd_connected = False
             self._ccd_apply_state()
@@ -5689,27 +6326,39 @@ class MainWindow(QMainWindow):
         if w.get("ccd_version"):
             w["ccd_version"].setText(self._ccd_version)
         self._ccd_filter_names = list(result.get("filters") or [])
+        self._ccd_gain = result.get("gain")
+        self._ccd_offset = result.get("offset")
         self._ccd_timer.start()
         self._ccd_render_dashboard(result.get("dashboard") or {})
         self._ccd_apply_state()
+        # the plan's filter combo now offers the real wheel (ADR-081)
+        self._ccd_fill_plan_filter()
         self.statusBar().showMessage(
-            f"{self.tr('CCDciel connected')} · {self._ccd_version}", 5000)
+            f"{self._ccd_backend_label()} · {self._ccd_version}", 5000)
 
     def _ccd_disconnect(self):
         self._ccd_connected = False
+        self._ccd_goto_running = False
+        self._ccd_capturing = False
+        self._ccd_gain = None
+        self._ccd_offset = None
         self._ccd_timer.stop()
+        self._capture_preview_reset()
         self._ccd_filter_names = []
         self._ccd_version = self.tr("—")
         self._ccd_apply_state()
+        # back to the fallback list, so the plan never shows a wheel that is
+        # no longer there
+        self._ccd_fill_plan_filter()
 
     def _ccd_run(self, slot, action, poll=False):
         # One worker at a time keeps slew/capture/filter commands ordered.
         # @args: slot - slot(result, error), action - callable(Client),
-        #        poll - wait for Telescope_slewing to settle before emitting
+        #        poll - wait for the mount to settle before emitting
         if (self._ccd_worker is not None and self._ccd_worker.isRunning()):
             return
-        self._ccd_worker = CcdcielWorker(self._ccd_client, action,
-                                         poll_slew=poll)
+        self._ccd_worker = ObservatoryWorker(self._ccd_client, action,
+                                             poll_slew=poll)
         hold(self._ccd_worker)
         self._ccd_worker.finished.connect(slot)
         self._ccd_worker.start()
@@ -5718,12 +6367,12 @@ class MainWindow(QMainWindow):
         # @return: re-fetches the dashboard plus a live mount snapshot
         # (slewing/tracking) on the worker thread — reads never block the UI.
         def action(c):
-            from ..core.sources import ccdciel
             payload = {"dashboard": c.dashboard()}
             try:
                 payload["slewing"] = c.slewing()
                 payload["tracking"] = c.tracking()
-            except ccdciel.CCDcielError:
+                payload["capturing"] = c.capturing()
+            except observatory.ObservatoryError:
                 # mount state is optional in the dashboard; keep the rest
                 pass
             return payload
@@ -5735,6 +6384,9 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(error, 5000)
             return
         result = result or {}
+        if result.get("capturing") is not None:
+            self._ccd_capturing = bool(result.get("capturing"))
+            self._ccd_update_capture()
         self._ccd_render_dashboard(result.get("dashboard") or {},
                                    result.get("slewing"),
                                    result.get("tracking"))
@@ -5800,23 +6452,50 @@ class MainWindow(QMainWindow):
             return
         self._ccd_refresh()
 
+    def _ccd_filter_choices(self):
+        # @return: the filters the wheel REALLY has when the observatory has
+        #          answered, else the classic fallback list. Both the
+        #          "Filter on wheel" combo and the Exposure plan combo read
+        #          from here (ADR-081), so the plan can never offer a filter
+        #          the hardware does not have.
+        names = [n for n in (self._ccd_filter_names or [])
+                 if n and n not in ("", "-", "None")]
+        return names or ["L", "R", "G", "B", "Ha", "OIII", "SII"]
+
     def _ccd_fill_filters(self):
-        # @return: fills the wheel combo from CCDciel (fallback labels when
-        #          the wheel is disconnected or slots are unnamed)
+        # @return: fills the wheel combo from the observatory (fallback labels
+        #          when the wheel is disconnected or slots are unnamed)
         w = self._ccd_widgets()
         cmb = w.get("cmb_ccd_filter")
         if not cmb:
             return
-        names = self._ccd_filter_names or ["L", "R", "G", "B", "Ha", "OIII",
-                                           "SII"]
+        names = self._ccd_filter_choices()
         before = cmb.currentText()
         cmb.blockSignals(True)
         cmb.clear()
         for name in names:
-            if name and name not in ("", "-", "None"):
-                cmb.addItem(name)
+            cmb.addItem(name)
         if cmb.count() == 0:
             cmb.addItem(self.tr("No filter"))
+        idx = cmb.findText(before)
+        if idx >= 0:
+            cmb.setCurrentIndex(idx)
+        cmb.blockSignals(False)
+
+    def _ccd_fill_plan_filter(self):
+        # @return: fills the Exposure plan's filter combo from the same list
+        #          as the wheel combo, keeping the observer's current pick
+        #          when the new list still has it. Before this the plan
+        #          offered a hardcoded L/R/G/B/Ha/OIII/SII that had nothing to
+        #          do with the real wheel (ADR-081).
+        cmb = self._project_widgets.get("cmb_filter")
+        if cmb is None:
+            return
+        before = cmb.currentText()
+        cmb.blockSignals(True)
+        cmb.clear()
+        for name in self._ccd_filter_choices():
+            cmb.addItem(name)
         idx = cmb.findText(before)
         if idx >= 0:
             cmb.setCurrentIndex(idx)
@@ -5850,7 +6529,7 @@ class MainWindow(QMainWindow):
         lbl.setVisible(bool(text.strip()))
 
     def _ccd_point_action(self, slew_fn, ctx):
-        # Builds a CcdcielWorker action that resolves a fresh position for
+        # Builds an ObservatoryWorker action that resolves a fresh position for
         # moving kinds (neo/comet/pccp) right before slewing, so the mount
         # never points at a stale snapshot. Fixed kinds (sn/transit) use the
         # stored coordinates. The action returns the position dict so the
@@ -5935,6 +6614,9 @@ class MainWindow(QMainWindow):
             return
         w["ccd_slew"].setText(self.tr("Slewing…"))
         w["ccd_goto"].setEnabled(False)
+        # arm the safety stop the moment the goto starts (ADR-081)
+        self._ccd_goto_running = True
+        self._ccd_update_stop()
         action = self._ccd_point_action(
             lambda c, ra, dec: c.slew_target(ra, dec), ctx)
         self._ccd_point_target = p
@@ -5942,6 +6624,8 @@ class MainWindow(QMainWindow):
 
     def _ccd_on_goto(self, result, error):
         w = self._ccd_widgets()
+        self._ccd_goto_running = False
+        self._ccd_update_stop()
         if w.get("ccd_goto"):
             w["ccd_goto"].setEnabled(True)
         if w.get("ccd_slew"):
@@ -5955,11 +6639,11 @@ class MainWindow(QMainWindow):
             self.tr("Telescope pointed at the object."), 5000)
 
     def _ccd_astrometry_goto(self):
-        # Astrometric pointing at the current object: CCDciel slews,
+        # Astrometric pointing at the current object: the observatory slews,
         # plate-solves and corrects. Moving kinds resolve a fresh position
         # first (the plate solve absorbs any residual ephemeris error as
-        # long as the prediction lands inside the solve field). The client
-        # polls the running flag, so no mount-state polling is needed here.
+        # long as the prediction lands inside the solve field). For CCDciel
+        # the client polls the running flag; for NINA the call itself waits.
         p = self._current_project
         if not p:
             self.statusBar().showMessage(
@@ -5976,17 +6660,67 @@ class MainWindow(QMainWindow):
         action = self._ccd_point_action(
             lambda c, ra, dec: c.astrometry_goto(ra, dec), ctx)
         self._ccd_point_target = p
+        # arm the safety stop while the astrometric goto works (ADR-081): it
+        # is the flow that captures and solves, so it is the one that can
+        # spend minutes moving the mount
+        self._ccd_goto_running = True
+        self._ccd_update_stop()
         self._ccd_run(self._ccd_on_astrometry, action, poll=False)
 
     def _ccd_on_astrometry(self, result, error):
         # @args: result - position dict the worker resolved (or None),
         #        error - error text
+        self._ccd_goto_running = False
+        self._ccd_update_stop()
         if error:
             self.statusBar().showMessage(error, 8000)
             return
         self._ccd_apply_position(result)
         self.statusBar().showMessage(
             self.tr("Astrometric pointing finished."), 5000)
+
+    def _ccd_stop_goto(self):
+        # Safety stop (ADR-081): halt the mount now. It runs on its OWN
+        # worker, never through _ccd_run: the goto owns that single slot
+        # while it moves, and a stop that queues behind the thing it is
+        # stopping is no stop at all. During a follow run it also
+        # cancels the loop (ADR-084), so the mount is not left slewing by the
+        # next observation.
+        if self._ccd_follow_running:
+            self._ccd_follow_cancel()
+        if not self._ccd_connected or self._ccd_client is None:
+            return
+        if (self._ccd_stop_worker is not None
+                and self._ccd_stop_worker.isRunning()):
+            return
+        w = self._ccd_widgets()
+        btn = w.get("ccd_stop")
+        if btn is not None:
+            btn.setEnabled(False)
+            btn.setText(self.tr("Stopping…"))
+
+        def action(c):
+            return c.abort_motion()
+
+        self._ccd_stop_worker = ObservatoryWorker(self._ccd_client, action)
+        hold(self._ccd_stop_worker)
+        self._ccd_stop_worker.finished.connect(self._ccd_on_stopped)
+        self._ccd_stop_worker.start()
+
+    def _ccd_on_stopped(self, _result, error):
+        self._ccd_stop_worker = None
+        w = self._ccd_widgets()
+        btn = w.get("ccd_stop")
+        if btn is not None:
+            btn.setText(self.tr("Stop goto"))
+        if error:
+            self.statusBar().showMessage(error, 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Telescope movement stopped."), 5000)
+        # the goto worker will settle on its own and disarm the button; if it
+        # has already finished, this keeps the button honest
+        self._ccd_update_stop()
 
     def _ccd_refresh_position(self):
         # Force a fresh orbit + ephemeris for the current moving target,
@@ -6086,30 +6820,469 @@ class MainWindow(QMainWindow):
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
                 f_idx = idx
+        f_name = cmb.currentText()
         name = p["object_name"]
+        # read the option widgets on the GUI thread: the action runs on the
+        # worker, and touching Qt widgets from there is not allowed
+        opts = self._capture_options_from_widgets()
 
         def action(c):
             c.set_filter(f_idx)
-            return c.push_plan(n_frames, exp_s, name)
+            result = c.push_plan(n_frames, exp_s, name,
+                                 dither=opts.get("dither"),
+                                 gain=opts.get("gain"),
+                                 offset=opts.get("offset"),
+                                 binning=opts.get("binning"))
+            # read back what the software is really holding (ADR-081): a
+            # "Send plan" that only fires setters cannot prove it did anything
+            st = c.staged_plan() or {}
+            st["filter"] = f_name
+            st["warnings"] = (result.get("warnings")
+                              if isinstance(result, dict) else None) or []
+            return st
 
         self._ccd_run(self._ccd_on_sent, action)
 
-    def _ccd_on_sent(self, _result, error):
+    def _ccd_render_staged(self, st):
+        # Prints the read-back plan under the live-capture row, so "Send plan"
+        # leaves a visible trace instead of a five-second status message.
+        # @args: st - dict from staged_plan() (or {} when there is nothing)
+        lbl = self._ccd_widgets().get("ccd_staged")
+        if not lbl:
+            return
+        if not st:
+            lbl.setText("")
+            lbl.setVisible(False)
+            return
+        parts = [str(st.get("object") or self.tr("—"))]
+        n, exp = st.get("count"), st.get("exposure_s")
+        if n and exp:
+            parts.append(f"{int(n)} × {float(exp):g} s")
+        if st.get("filter"):
+            parts.append(str(st["filter"]))
+        if st.get("binning"):
+            parts.append(self.tr("bin %1").replace("%1", str(st["binning"])))
+        if st.get("dither"):
+            parts.append(self.tr("dither every %1").replace(
+                "%1", str(st["dither"])))
+        text = self.tr("Staged: %1").replace("%1", " · ".join(parts))
+        if not st.get("persistent", True):
+            # NINA's snapshot has no frame count: say so instead of showing a
+            # number the program will not use
+            text += " · " + self.tr("the frame count is information only here")
+        if st.get("warnings"):
+            # an optional setter the program rejected: say it, but the plan
+            # landed (ADR-083 rev)
+            text += " · ⚠ " + self.tr("not applied: %1").replace(
+                "%1", "; ".join(str(w) for w in st["warnings"]))
+        lbl.setText(text)
+        lbl.setVisible(True)
+
+    def _ccd_on_sent(self, result, error):
         if error:
             self.statusBar().showMessage(error, 8000)
         else:
+            self._ccd_render_staged(result or {})
             self.statusBar().showMessage(
-                self.tr("Capture plan sent to CCDciel."), 5000)
+                self.tr("Capture plan sent."), 5000)
+
+    def _ccd_update_capture(self):
+        # The capture button is ONE toggle (ADR-081): "Start capture" when the
+        # camera is idle, "Stop capture" while a run is in flight. The state
+        # comes from the dashboard poll (Capture_running / IsExposing), so the
+        # button follows the program even when the run ends on its own.
+        w = self._ccd_widgets()
+        btn = w.get("ccd_start")
+        if btn is None:
+            return
+        if self._ccd_capturing:
+            btn.setText(self.tr("Stop capture"))
+            btn.setToolTip(self.tr(
+                "Stop the capture in progress. It stops the CAMERA, not the "
+                "mount (that is Stop goto)."))
+        else:
+            btn.setText(self.tr("Start capture"))
+            btn.setToolTip(self.tr(
+                "Start the staged capture in the observatory software"))
 
     def _ccd_start_capture(self):
-        self._ccd_run(self._ccd_on_started, lambda c: c.start_capture())
+        # One button, two jobs: stop while capturing, start otherwise.
+        if self._ccd_capturing:
+            self._ccd_run(self._ccd_on_stopped, lambda c: c.stop_capture())
+        else:
+            self._ccd_run(self._ccd_on_started, lambda c: c.start_capture())
 
     def _ccd_on_started(self, _result, error):
         if error:
             self.statusBar().showMessage(error, 8000)
         else:
             self.statusBar().showMessage(
-                self.tr("Capture started in CCDciel."), 5000)
+                self.tr("Capture started."), 5000)
+            # optimistic: the poll confirms, but the button must flip at once
+            self._ccd_capturing = True
+            self._ccd_update_capture()
+            # arm the last-frame preview (ADR-082): from now on, watch for a
+            # frame newer than what is already there
+            self._capture_preview_arm()
+
+    def _ccd_on_stopped(self, _result, error):
+        if error:
+            self.statusBar().showMessage(error, 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Capture stopped."), 5000)
+            self._ccd_capturing = False
+            self._ccd_update_capture()
+
+    # -- start and follow run (ADR-084) --------------------------------------
+
+    def _ccd_follow(self):
+        # Button handler: while the run is in flight it STOPS it; otherwise it
+        # asks for the number of observations and starts the driven run. The
+        # object must be moving (a fixed one does not cross the field) and the
+        # observatory must be connected.
+        if self._ccd_follow_running:
+            self._ccd_follow_cancel()
+            return
+        p = self._current_project
+        if not p:
+            self.statusBar().showMessage(
+                self.tr("Open a project first (the Capture step needs one)"),
+                6000)
+            return
+        if not self._ccd_connected or self._ccd_client is None:
+            self.statusBar().showMessage(
+                self.tr("Connect the observatory first."), 6000)
+            return
+        if p.get("kind") not in ("neo", "comet", "pccp"):
+            self.statusBar().showMessage(
+                self.tr("Start and follow is for a moving object: a fixed target "
+                        "does not cross the field."), 8000)
+            return
+        ctx = self._plan_recipe_context(p)
+        if ctx.get("ra_deg") is None:
+            self.statusBar().showMessage(
+                self.tr("This object has no coordinates yet."), 5000)
+            return
+        ctx["kind"] = p.get("kind")
+        ctx["object_name"] = p.get("object_name")
+        from ..core import follow
+        n, ok = QInputDialog.getInt(
+            self, self.tr("Start and follow"),
+            self.tr("Observations to capture:"),
+            5, 1, follow.MAX_OBSERVATIONS, 1)
+        if not ok:
+            return
+        frames, exp_s = self._plan_frames_exposure(p)
+        plan = follow.plan_run(p.get("kind"), ctx, config, n,
+                                 frames=frames, exposure_s=exp_s)
+        if not self._ccd_follow_confirm(plan):
+            return
+        self._ccd_follow_start(p, ctx, plan)
+
+    def _plan_frames_exposure(self, p):
+        # The frame count and exposure the OBSERVER set in the Plan step (the
+        # "Frames" / "Exposure" spin boxes). ADR-084: the follow run must
+        # run the observer's numbers, not the recipe's suggestion; the saved
+        # plan is the fallback when the Capture step is not built.
+        # @args: p - the project
+        # @return: (frames|None, exposure_s|None)
+        w = self._project_widgets
+        spn = w.get("spn_nframes")
+        spn_exp = w.get("spn_exps")
+        if spn is not None and spn_exp is not None:
+            return int(spn.value()), float(spn_exp.value())
+        data = next((s["data"] for s in p.get("steps", [])
+                     if s["step"] == "plan"), {})
+        return data.get("n_frames"), data.get("exp_s")
+
+    def _ccd_follow_confirm(self, plan):
+        # The numbers before it starts: how many, how big, how long, and
+        # whether the whole thing fits the visibility window.
+        # @args: plan - the dict from follow.plan_run
+        # @return: True when the observer says go
+        text = self.tr(
+            "%1 observations × %2 frames (%3 s each) · a re-point of about "
+            "%4 s between them").replace(
+                "%1", str(plan["n_obs"])).replace(
+                "%2", str(plan["frames"])).replace(
+                "%3", f"{plan['exposure_s']:g}").replace(
+                "%4", f"{plan['follow_s']:g}")
+        text += "\n" + self.tr("Total: about %1 min.").replace(
+            "%1", f"{plan['total_s'] / 60.0:.0f}")
+        if "no_window" in plan["warnings"]:
+            text += "\n\n" + self.tr(
+                "No visibility window for this object: the total cannot be "
+                "checked against the night.")
+        elif not plan["fits"]:
+            text += "\n\n" + self.tr(
+                "Warning: this does not fit the visibility window (%1 min); "
+                "the object may set before the run ends.").replace(
+                    "%1", f"{(plan['window_s'] or 0) / 60.0:.0f}")
+        if "no_crossing" in plan["warnings"]:
+            text += "\n\n" + self.tr(
+                "The per-observation size could not be bounded by the field "
+                "(no camera preset or no rate): the frames may run past the "
+                "edge.")
+        if "exceeds_crossing" in plan["warnings"]:
+            text += "\n\n" + self.tr(
+                "Your %1 frames are more than fit before the object reaches "
+                "the edge of the field (%2): it may leave the field before "
+                "the observation ends.").replace(
+                    "%1", str(plan["frames"])).replace(
+                    "%2", str(plan.get("crossing_frames") or 0))
+        # the "why" of the loop, from the one house of explanations (ADR-058)
+        from ..core import explain
+        short = explain.short(explain.FOLLOW)
+        text += "\n\n" + short.get(self._lang(), short.get("en"))
+        answer = QMessageBox.question(
+            self, self.tr("Start and follow"), text,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        return answer == QMessageBox.Yes
+
+    def _ccd_follow_start(self, p, ctx, plan):
+        # @args: p - the project, ctx - its context, plan - follow.plan_run
+        from .workers import FollowWorker, hold
+        options = self._capture_options_from_widgets()
+        site = config.get("mpc_code", "")
+        worker = FollowWorker(self._ccd_client, plan, p["object_name"],
+                                ctx, options=options, site=site)
+        self._ccd_follow_worker = hold(worker)
+        worker.progress.connect(self._ccd_follow_progress)
+        worker.finished.connect(self._ccd_follow_finished)
+        self._ccd_follow_running = True
+        # the loop owns the client: stop the dashboard poll so two workers do
+        # not talk to the same server at once (ADR-084)
+        self._ccd_timer.stop()
+        w = self._ccd_widgets()
+        if w.get("ccd_follow"):
+            w["ccd_follow"].setText(self.tr("Stop following"))
+        self._ccd_apply_state()
+        worker.start()
+        self.statusBar().showMessage(
+            self.tr("Follow run started."), 5000)
+
+    def _ccd_follow_cancel(self):
+        if self._ccd_follow_worker is not None:
+            self._ccd_follow_worker.cancel()
+            self.statusBar().showMessage(
+                self.tr("Stopping the follow run…"), 5000)
+
+    def _ccd_follow_progress(self, info):
+        # @args: info - {event, i, n, frames, ...} from the run
+        info = info or {}
+        event = info.get("event")
+        i, n = info.get("i"), info.get("n")
+        if event == "centering":
+            msg = self.tr("Observation %1 of %2: centering…").replace(
+                "%1", str(i)).replace("%2", str(n))
+        elif event == "capturing":
+            msg = self.tr("Observation %1 of %2: capturing %3 frames…").replace(
+                "%1", str(i)).replace("%2", str(n)).replace(
+                    "%3", str(info.get("frames")))
+        elif event == "capture_timeout":
+            msg = self.tr(
+                "Observation %1: the software did not report the end; going "
+                "on.").replace("%1", str(i))
+        else:
+            return
+        self.statusBar().showMessage(msg, 0)
+
+    def _ccd_follow_finished(self, status, error):
+        # @args: status - done|cancelled|failed, error - message or ""
+        self._ccd_follow_worker = None
+        self._ccd_follow_running = False
+        self._ccd_timer.start()
+        w = self._ccd_widgets()
+        if w.get("ccd_follow"):
+            w["ccd_follow"].setText(self.tr("Start and follow…"))
+        self._ccd_apply_state()
+        if error:
+            self.statusBar().showMessage(error, 10000)
+        elif status == "cancelled":
+            self.statusBar().showMessage(
+                self.tr("Follow run stopped."), 8000)
+        elif status == "done":
+            self.statusBar().showMessage(
+                self.tr("Follow run finished."), 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Follow run ended: %1").replace(
+                    "%1", str(status)), 8000)
+
+    # -- last-frame preview (ADR-082) -------------------------------------
+
+    def _capture_preview_reset(self):
+        # Stops the watch and forgets the last frame. Called when the Capture
+        # page is rebuilt or the connection drops, so a preview never outlives
+        # the project it belongs to.
+        self._capture_timer.stop()
+        self._capture_watching = False
+        self._capture_preview_meta = None
+        self._capture_preview_last = None
+        self._capture_idle_ticks = 0
+
+    def _capture_set_caption(self, text):
+        # @args: text - what the preview's caption says; the whole preview
+        #        shows or hides with it (an empty caption is no preview)
+        w = self._ccd_widgets()
+        cap, box = w.get("capture_caption"), w.get("capture_preview")
+        if cap is not None:
+            cap.setText(text)
+        if box is not None:
+            box.setVisible(bool(text))
+
+    def _capture_preview_arm(self):
+        # Called right after "Start capture" succeeds: from now on, poll the
+        # observatory for the last frame (ADR-082). No folder: the image comes
+        # over HTTP, so it works with the observatory on another machine.
+        w = self._ccd_widgets()
+        if w.get("capture_preview") is None:
+            return
+        self._capture_preview_reset()
+        img = w.get("capture_preview_img")
+        if img is not None:
+            img.clear()
+            img.setText(self.tr("Waiting for the first frame…"))
+        self._capture_set_caption(self.tr("Waiting for the first frame…"))
+        self._capture_watching = True
+        self._capture_timer.start()
+
+    def _capture_preview_tick(self):
+        # One poll: ask for the last frame and show it when it changed. The
+        # fetch runs on a worker (network never on the GUI thread); the watch
+        # stops a few ticks after the capture ends.
+        if not self._capture_watching:
+            self._capture_timer.stop()
+            return
+        if self._ccd_widgets().get("capture_preview") is None:
+            self._capture_preview_reset()
+            return
+        if (self._capture_preview_worker is None
+                or not self._capture_preview_worker.isRunning()):
+            self._capture_preview_worker = hold(
+                CapturePreviewWorker(self._ccd_client))
+            self._capture_preview_worker.loaded.connect(
+                self._capture_on_preview)
+            self._capture_preview_worker.start()
+        if self._ccd_capturing:
+            self._capture_idle_ticks = 0
+        else:
+            self._capture_idle_ticks += 1
+            if self._capture_idle_ticks >= 4:
+                self._capture_watching = False
+                self._capture_timer.stop()
+
+    def _capture_on_preview(self, frame, error):
+        # @args: frame - dict from the client (image bytes + meta) or None,
+        #        error - message when the fetch failed
+        self._capture_preview_worker = None
+        w = self._ccd_widgets()
+        img = w.get("capture_preview_img")
+        if img is None:
+            return
+        if error:
+            # a transient fetch error does not clear what is already shown
+            self.statusBar().showMessage(error, 5000)
+            return
+        if not frame or not frame.get("image"):
+            return
+        data = frame["image"]
+        if data != self._capture_preview_last:
+            self._capture_preview_last = data
+            pix = self._capture_pixmap(data)
+            if pix is not None:
+                img.setPixmap(pix)
+            else:
+                img.clear()
+                img.setText(self.tr("Could not read the frame"))
+        self._capture_preview_meta = frame
+        self._capture_set_caption(self._capture_caption(frame))
+
+    def _capture_pixmap(self, data):
+        # @args: data - the image bytes (JPEG from CCDciel, PNG from NINA)
+        # @return: a QPixmap fitted in the preview box, or None when the bytes
+        #          are not a readable image
+        from PySide6.QtGui import QPixmap
+        pix = QPixmap()
+        if not pix.loadFromData(data):
+            return None
+        return pix.scaled(200, 200, Qt.KeepAspectRatio,
+                          Qt.SmoothTransformation)
+
+    def _capture_caption(self, frame):
+        # @args: frame - the dict from the client
+        # @return: "file · filter · exposure · date", the numbers that say
+        #          whether the frame is what the observer expected. What the
+        #          observatory does not tell us is simply left out.
+        bits = []
+        if frame.get("name"):
+            bits.append(str(frame["name"]))
+        if frame.get("filter"):
+            bits.append(str(frame["filter"]))
+        if frame.get("exptime_s"):
+            bits.append(f"{float(frame['exptime_s']):g} s")
+        if frame.get("date_obs"):
+            bits.append(str(frame["date_obs"]))
+        return " · ".join(bits) or self.tr("Last frame")
+
+    def _open_capture_frame_in_editor(self):
+        # Opens the previewed frame in the unified editor with the current
+        # project's context and no visit (ADR-082 keeps it a look, not a
+        # filing). NINA returns the FITS over HTTP (raw_fits, base64), so it
+        # is downloaded to a temp file first; CCDciel only serves a JPEG, so
+        # there the file on disk is opened when the path is reachable.
+        p = self._current_project
+        frame = self._capture_preview_meta or {}
+        if not p or not frame:
+            return
+        if self._ccd_backend == "nina" and frame.get("index") is not None:
+            if (self._capture_fits_worker is not None
+                    and self._capture_fits_worker.isRunning()):
+                return
+            self._capture_fits_worker = hold(
+                CaptureFitsWorker(self._ccd_client, frame["index"]))
+            self._capture_fits_worker.loaded.connect(self._capture_on_fits)
+            self._capture_fits_worker.start()
+            return
+        path = frame.get("path")
+        if path and Path(path).exists():
+            self._open_frame_path_in_editor(path)
+        else:
+            QMessageBox.information(
+                self, self._ccd_backend_label(),
+                self.tr("This program serves the frame as a picture, not the "
+                        "FITS: to open it in the editor, NightScribe must see "
+                        "the file where the observatory saved it."))
+
+    def _capture_on_fits(self, data, error):
+        # @args: data - the FITS bytes (or None), error - message
+        self._capture_fits_worker = None
+        if error or not data:
+            QMessageBox.warning(self, self._ccd_backend_label(),
+                                error or self.tr("No FITS was received."))
+            return
+        import tempfile
+        fh = tempfile.NamedTemporaryFile(suffix=".fits", delete=False)
+        try:
+            fh.write(data)
+        except OSError as err:
+            fh.close()
+            QMessageBox.warning(self, self._ccd_backend_label(), str(err))
+            return
+        fh.close()
+        self._open_frame_path_in_editor(fh.name)
+
+    def _open_frame_path_in_editor(self, path):
+        # @args: path - a FITS path to open in the workbench with the current
+        #        project's context (no visit)
+        p = self._current_project
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=p["id"], obj=obj)
+        dlg.open_plate(path)
+        dlg.set_object(obj)
 
     def _build_analysis_tab(self, p, kind, ctx):
         # ADR-045: the Analysis tab. Its core is the visits manager, for
@@ -6125,6 +7298,7 @@ class MainWindow(QMainWindow):
         if kind in FOLLOWUP_KINDS:
             self._fu_header_blocks(layout, p, pid)
         from .widgets.visits_panel import VisitsPanel
+        from ..core import astrometry_store as _store
         panel = VisitsPanel(
             db, lang=self._lang(),
             open_in_editor=lambda path, sid:
@@ -6142,10 +7316,18 @@ class MainWindow(QMainWindow):
                 self._visit_astrometry(pid, sid),
             on_change=lambda: self._visit_data_changed(pid),
             # the curve below is the one of the visit you are looking at
-            # (reported), so the list has to say which one that is
-            on_visit_selected=lambda _sid: (
+            # (reported), so the list has to say which one that is; AND the
+            # astrometry runs filter to that visit (ADR-086 rev): one click on
+            # a visit shows ITS runs
+            on_visit_selected=lambda sid: (
+                self._set_analysis_visit_filter(pid, sid),
                 self._fu_curve_refresh(pid),
                 self._analysis_ribbon_refresh(p)),
+            # ADR-086 rev: clicking a visit shows ITS runs, and one of them
+            # opens in the editor
+            runs_for_session=lambda sid: _store.runs_for_session(db, sid),
+            open_run=lambda run_id: self._analysis_astrometry_open_run(
+                int(run_id)),
             kind=kind)
         panel.set_project(pid)
         self._project_widgets["visits_panel"] = panel
@@ -6186,6 +7368,7 @@ class MainWindow(QMainWindow):
         # observer reads them back without opening the editor
         if kind in ("neo", "pccp", "comet"):
             self._analysis_astrometry_block(layout, p, pid)
+            self._analysis_combined_block(layout, p, pid)
         if kind == "transit":
             self._analysis_transit_block(layout, pid)
         elif kind == "hads":
@@ -6240,6 +7423,9 @@ class MainWindow(QMainWindow):
         tbl.setMaximumHeight(160)
         tbl.itemSelectionChanged.connect(
             lambda: self._analysis_astrometry_sync(tbl))
+        # double-click opens the run in the editor, the same as the button
+        tbl.itemDoubleClicked.connect(
+            lambda _it: self._analysis_astrometry_open(tbl))
         v.addWidget(tbl)
         row = QHBoxLayout()
         btn_open = QPushButton(self.tr("Open in the editor"))
@@ -6267,6 +7453,427 @@ class MainWindow(QMainWindow):
         w["astrometry_runs_note"] = note
         self._analysis_astrometry_refresh(pid)
 
+    # -- combined check/report across runs (ADR-086) ----------------------
+
+    def _analysis_combined_block(self, layout, p, pid):
+        # ADR-086: the project's measurements, across its runs, in one place:
+        # tick the ones to submit, check them together against the other
+        # observers and build ONE MPC report. The section hides itself when
+        # the project has no complete run.
+        # @args: layout - the Analysis section content, p - project, pid - id
+        # @return: None
+        from .widgets.collapsible_section import CollapsibleSection
+        from ..core import astrometry_store as store
+        obs, merged = ([], 0)
+        if pid is not None:
+            obs, merged = store.dedupe_observations(
+                store.project_observations(db, pid))
+        if not obs:
+            return
+        sec = CollapsibleSection(self.tr("Combined report"))
+        inner = QWidget()
+        v = QVBoxLayout(inner)
+        v.setContentsMargins(12, 0, 0, 0)
+        sec.setContentWidget(inner)
+        layout.addWidget(sec)
+        text = self.tr(
+            "All the project's measurements in one place: tick the ones you "
+            "want, check them together against the other observers and build "
+            "ONE MPC report. Untick an observation to leave it out (nothing "
+            "is deleted).")
+        if merged:
+            text += " " + self.tr(
+                "%1 re-measured observations were merged (the newest run's "
+                "measurement is kept).").replace("%1", str(merged))
+        hint = QLabel(text)
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        tbl = QTableWidget(0, 5)
+        tbl.setHorizontalHeaderLabels([
+            self.tr("Include"), self.tr("Date"), self.tr("Magnitude"),
+            self.tr("Motion"), self.tr("Check")])
+        tbl.verticalHeader().setVisible(False)
+        tbl.setSelectionMode(QAbstractItemView.NoSelection)
+        tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        header = tbl.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setStretchLastSection(True)
+        tbl.setMaximumHeight(160)
+        tbl.itemChanged.connect(lambda _it: self._analysis_combined_saved(pid))
+        v.addWidget(tbl)
+        row = QHBoxLayout()
+        btn_check = QPushButton(self.tr("Check together"))
+        btn_check.setToolTip(self.tr(
+            "One Find_Orb check with all the ticked observations: our points "
+            "against the published ones, so you see how they line up before "
+            "sending them"))
+        btn_check.clicked.connect(lambda: self._analysis_combined_check(pid))
+        row.addWidget(btn_check)
+        btn_report = QPushButton(self.tr("Combined report…"))
+        btn_report.setToolTip(self.tr(
+            "Build ONE MPC report with the ticked observations"))
+        btn_report.clicked.connect(lambda: self._analysis_combined_report(pid))
+        row.addWidget(btn_report)
+        btn_open = QPushButton(self.tr("Open in the editor"))
+        btn_open.setToolTip(self.tr(
+            "Open the newest ticked observation's run in the editor, to work "
+            "on it there (re-measure, review, re-check)"))
+        btn_open.clicked.connect(lambda: self._analysis_combined_open(pid))
+        row.addWidget(btn_open)
+        row.addStretch()
+        v.addLayout(row)
+        lbl = QLabel("")
+        lbl.setWordWrap(True)
+        v.addWidget(lbl)
+        w = self._project_widgets
+        w["combined_sec"] = sec
+        w["combined_tbl"] = tbl
+        w["combined_btn_check"] = btn_check
+        w["combined_btn_report"] = btn_report
+        w["combined_lbl"] = lbl
+        w["combined_obs"] = obs
+        self._analysis_combined_refresh(pid)
+
+    def _analysis_combined_refresh(self, pid):
+        # @args: pid - project id
+        # @return: None. Fills the table from the project's observations and
+        #          restores the saved selection and the last verdict.
+        w = self._project_widgets
+        tbl = w.get("combined_tbl")
+        if tbl is None:
+            return
+        from ..core import astrometry_store as store
+        obs, merged = ([], 0)
+        if pid is not None:
+            obs, merged = store.dedupe_observations(
+                store.project_observations(db, pid))
+        w["combined_obs"] = obs
+        saved = store.get_combined(db, pid) or {}
+        included = set(saved.get("included") or [])
+        tbl.blockSignals(True)
+        tbl.setRowCount(len(obs))
+        for i, o in enumerate(obs):
+            item = QTableWidgetItem("")
+            item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+            # default: every observation in, unless a saved selection says
+            # otherwise (the report carries all unless you drop one, ADR-078)
+            checked = (o["id"] in included) if included else True
+            item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+            item.setData(Qt.UserRole, o["id"])
+            item.setToolTip(self.tr(
+                "Untick to leave this observation out of the combined check "
+                "and report"))
+            tbl.setItem(i, 0, item)
+            cells = (self._combined_when(o.get("run_created")),
+                     (f"{o['mag']:.2f} {o.get('band') or ''}".strip()
+                      if o.get("mag") is not None else "—"),
+                     (f"{o['rate_arcsec_min']:.2f}″/min"
+                      if o.get("rate_arcsec_min") else "—"),
+                     self._astrometry_check(o))
+            for col, text in enumerate(cells, start=1):
+                tbl.setItem(i, col, QTableWidgetItem(str(text)))
+        tbl.blockSignals(False)
+        self._paint_combined_verdict(saved.get("check") or {})
+
+    def _combined_when(self, raw):
+        # @args: raw - an epoch (string or float) from the run
+        # @return: "YYYY-MM-DD HH:MM" (or the raw text)
+        try:
+            return datetime.datetime.fromtimestamp(
+                float(raw)).strftime("%Y-%m-%d %H:%M")
+        except (TypeError, ValueError):
+            return str(raw or "")
+
+    def _analysis_combined_included(self, pid):
+        # @args: pid - project id
+        # @return: ([point dicts], [ids]) the ticked observations
+        tbl = self._project_widgets.get("combined_tbl")
+        if tbl is None:
+            return [], []
+        want = set()
+        for i in range(tbl.rowCount()):
+            item = tbl.item(i, 0)
+            if item is not None and item.checkState() == Qt.Checked:
+                want.add(item.data(Qt.UserRole))
+        obs = self._project_widgets.get("combined_obs") or []
+        kept = [o for o in obs if o["id"] in want]
+        return kept, [o["id"] for o in kept]
+
+    def _analysis_combined_saved(self, pid):
+        # @args: pid - project id
+        # @return: None. The selection changed: remember it (the check stays
+        #          until the observer re-runs it).
+        from ..core import astrometry_store as store
+        _kept, ids = self._analysis_combined_included(pid)
+        saved = store.get_combined(db, pid) or {}
+        store.save_combined(db, pid, ids, saved.get("check") or {})
+
+    def _combined_designation(self, p):
+        # @return: the object's CURRENT designation (a confirmed rename wins)
+        ctx = p.get("context") or {}
+        return (ctx.get("confirmed") or {}).get("designation") \
+            or p.get("object_name") or ""
+
+    def _analysis_combined_check(self, pid):
+        # @args: pid - project id
+        # @return: None. ONE check with all the ticked observations.
+        from .workers import FindOrbRecheckWorker, hold
+        from ..core import astrometry_store as store, mpc_astrometry
+        p = self._current_project or {}
+        kept, ids = self._analysis_combined_included(pid)
+        if not kept:
+            self._paint_combined_verdict({}, note=self.tr(
+                "Tick at least one observation to check them."))
+            return
+        desig = self._combined_designation(p)
+        obs_code = str(config.get("mpc_code", ""))
+        ours = mpc_astrometry.to_mpc80(kept, obs_code, desig, config)
+        worker = hold(FindOrbRecheckWorker(ours, desig, cfg=config,
+                                           obs_code=obs_code))
+        self._combined_worker = worker
+        worker.finished.connect(
+            lambda report: self._analysis_combined_checked(pid, ids, report))
+        self._paint_combined_verdict({}, note=self.tr(
+            "Checking the %1 ticked observations together…").replace(
+                "%1", str(len(kept))))
+        worker.start()
+
+    def _analysis_combined_checked(self, pid, ids, report):
+        # @args: report - the CheckReport, or None on failure
+        # @return: None. Saves the verdict with the selection.
+        self._combined_worker = None
+        from ..core import astrometry_store as store
+        if report is None:
+            self._paint_combined_verdict({}, note=self.tr(
+                "The combined check failed: no answer from Find_Orb."))
+            return
+        summary = {
+            "available": bool(getattr(report, "available", False)),
+            "no_reference": bool(getattr(report, "no_reference", False)),
+            "no_fit": bool(getattr(report, "no_fit", False)),
+            "blocked": bool(getattr(report, "blocked", False)),
+            "our_residual": list(getattr(report, "our_residual", ()) or ()),
+            "n_stations": int(getattr(report, "n_stations", 0) or 0),
+            "n_others": int(getattr(report, "n_others", 0) or 0),
+            "ours_published": bool(getattr(report, "ours_published", False)),
+            "note": str(getattr(report, "note", "") or ""),
+        }
+        # our OWN residuals, one row each (ADR-086 rev): with several
+        # observations the observer must see WHICH one is off, not just that
+        # the set is blocked
+        ours_rows = [r for r in (getattr(report, "residuals", None) or [])
+                     if r.get("ours")]
+        summary["ours"] = [
+            {"iso": str(r.get("iso") or ""),
+             "dra": (float(r["dra"]) if r.get("dra") is not None else None),
+             "ddec": (float(r["ddec"]) if r.get("ddec") is not None else None)}
+            for r in ours_rows]
+        store.save_combined(db, pid, ids, summary)
+        self._paint_combined_verdict(summary)
+
+    def _paint_combined_verdict(self, check, note=""):
+        # @args: check - the combined CheckReport summary, note - an extra line
+        # @return: None. Plain words: the observer reads the verdict here.
+        lbl = self._project_widgets.get("combined_lbl")
+        if lbl is None:
+            return
+        if note:
+            lbl.setText(note)
+            return
+        if not check:
+            lbl.setText("")
+            return
+        if not check.get("available"):
+            text = self.tr("The check is not available (Find_Orb not set up).")
+        elif check.get("no_reference"):
+            text = self.tr("No other observations to compare with yet.")
+        elif check.get("no_fit"):
+            text = self.tr("The published arc is too short to fit an orbit.")
+        elif check.get("blocked"):
+            text = self.tr("Our points are an outlier against the others.")
+        else:
+            text = self.tr("The combined check passes.")
+        if check.get("our_residual"):
+            text += " " + self.tr("Our residual: %1″ / %2″ · %3 stations").replace(
+                "%1", f"{check['our_residual'][0]:.2f}").replace(
+                "%2", f"{check['our_residual'][1]:.2f}").replace(
+                "%3", str(check.get("n_stations") or 0))
+        if check.get("ours_published"):
+            text += " " + self.tr(
+                "Your data is already among the published ones.")
+        # each of our observations, with its own residual (ADR-086 rev): the
+        # observer sees which one to drop, instead of a single opaque number
+        ours = check.get("ours") or []
+        if len(ours) > 1:
+            rows = []
+            for r in ours:
+                if r.get("dra") is None:
+                    continue
+                label = r.get("iso") or "?"
+                rows.append(f"{label}: {r['dra']:+.2f}″ / "
+                            f"{r['ddec']:+.2f}″")
+            if rows:
+                text += "\n" + self.tr("Each of our observations:") + " " \
+                    + " · ".join(rows)
+        lbl.setText(text)
+
+    def _analysis_combined_open(self, pid):
+        # @args: pid - project id
+        # @return: None. ADR-086 rev: loads the ticked observations as ONE
+        #          combined set in the editor (the UFE), so the observer works
+        #          them there. Each observation's own stack is read from its
+        #          run's files (NS_RUN + `_obs<N>`); a stack no longer on disk
+        #          is simply absent, never faked.
+        import re
+        from ..core import astrometry, astrometry_store as store, fits_io
+        kept, _ids = self._analysis_combined_included(pid)
+        if not kept:
+            self.statusBar().showMessage(self.tr(
+                "Tick at least one observation to open it."), 6000)
+            return
+        runs = {r["id"]: r for r in store.list_runs(db, pid)}
+        obs_re = re.compile(r"_obs(\d+)")
+        by_run = {}
+        for rid, run in runs.items():
+            sess = run.get("session_id")
+            if sess is None:
+                continue
+            table = {}
+            for f in project.files_for_session(db, sess):
+                if f.get("kind") != "stack" or not f.get("path"):
+                    continue
+                path = str(f["path"])
+                m = obs_re.search(Path(path).name)
+                if not m:
+                    continue
+                try:
+                    header = fits_io.read_header(path)
+                except Exception:
+                    continue
+                if header.get("NS_RUN") == rid:
+                    table[int(m.group(1))] = path
+            by_run[rid] = table
+        points, groups, stacks, qs, mids, boxes, paths = ([] for _ in range(7))
+        for o in kept:
+            rid = int(o.get("run_id") or 0)
+            gi = int(o.get("group_index") or 0)
+            path = (by_run.get(rid) or {}).get(gi + 1)
+            arr = None
+            if path:
+                try:
+                    _h, arr = fits_io.read_fits(path)
+                except Exception:
+                    arr = None
+            sp = astrometry.AstrometryPoint(
+                ra=o.get("ra"), dec=o.get("dec"),
+                rms_ra=o.get("rms_ra"), rms_dec=o.get("rms_dec"),
+                x=o.get("x"), y=o.get("y"), snr=o.get("snr"),
+                mag=o.get("mag"), band=o.get("band"),
+                mag_err=o.get("mag_err"), mjd=o.get("mjd"),
+                source="stack", group_index=gi,
+                flags=list(o.get("flags") or []))
+            points.append((sp, None, sp.flags))
+            groups.append((0, int(o.get("n_frames") or 1) or 1))
+            stacks.append((arr, None))
+            qs.append((float(sp.x or 0.0), float(sp.y or 0.0)))
+            mids.append(float(sp.mjd or 0.0) + 2400000.5)
+            boxes.append((0, 0, arr.shape[1], arr.shape[0]) if arr is not None
+                         else (0, 0, 0, 0))
+            paths.append(path)
+        payload = {"status": "ok", "restored": True, "combined": True,
+                   "method": "combined", "points": points, "groups": groups,
+                   "stacks": stacks, "qs": qs, "mids": mids, "boxes": boxes,
+                   "stack_paths": paths, "n_unreadable": 0,
+                   "failed_frames": []}
+        newest = max(kept, key=lambda o: (o.get("run_id") or 0))
+        run = runs.get(int(newest.get("run_id") or 0)) or {}
+        sess = run.get("session_id")
+        if sess is None:
+            self.statusBar().showMessage(self.tr(
+                "The newest ticked observation has no visit to open the "
+                "editor on."), 8000)
+            return
+        dlg = self._with_busy(
+            self.tr("Opening the combined set in the editor…"),
+            lambda: self._visit_astrometry(pid, sess, run_id=run.get("id")))
+        tab = getattr(dlg, "tab_trackstack", None)
+        if tab is not None and hasattr(tab, "show_combined"):
+            tab.show_combined(payload)
+
+    def _analysis_combined_report(self, pid):
+        # @args: pid - project id
+        # @return: None. Builds ONE report with the ticked observations and
+        #          opens it in a simple window (copy/save).
+        from ..core import mpc_astrometry
+        p = self._current_project or {}
+        kept, _ids = self._analysis_combined_included(pid)
+        if not kept:
+            self.statusBar().showMessage(self.tr(
+                "Tick at least one observation for the report."), 6000)
+            return
+        desig = self._combined_designation(p)
+        ctx = p.get("context") or {}
+        kind = "neocp" if ctx.get("neocp") else None
+        context = mpc_astrometry.report_context(config)
+        rep = mpc_astrometry.generate(
+            kept, "ades", str(config.get("mpc_code", "")), desig, config,
+            context=context, kind=kind)
+        self._show_combined_report(rep.get("text") or "")
+
+    def _show_combined_report(self, text):
+        # @args: text - the report
+        # @return: None. A minimal non-modal window: the report, a Copy and a
+        #          Save. The full send flow is the editor's (ADR-080).
+        dlg = getattr(self, "_combined_report_dlg", None)
+        if dlg is None:
+            dlg = QDialog(self)
+            dlg.setWindowTitle(self.tr("Combined MPC report"))
+            lay = QVBoxLayout(dlg)
+            edit = QPlainTextEdit()
+            edit.setReadOnly(True)
+            edit.setLineWrapMode(QPlainTextEdit.NoWrap)
+            lay.addWidget(edit)
+            row = QHBoxLayout()
+            btn_copy = QPushButton(self.tr("Copy"))
+            btn_save = QPushButton(self.tr("Save…"))
+            row.addStretch(1)
+            row.addWidget(btn_copy)
+            row.addWidget(btn_save)
+            lay.addLayout(row)
+            dlg.resize(760, 560)
+            dlg._edit = edit
+            btn_copy.clicked.connect(
+                lambda: QApplication.clipboard().setText(edit.toPlainText()))
+            btn_save.clicked.connect(lambda: self._save_combined_report(edit))
+            self._combined_report_dlg = dlg
+        dlg._edit.setPlainText(text)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _save_combined_report(self, edit):
+        # @args: edit - the report's text box
+        # @return: None
+        out, _sel = QFileDialog.getSaveFileName(
+            self, self.tr("Save MPC report"),
+            str(Path.home() / "combined_ades.psv"),
+            self.tr("All files (*)"))
+        if not out:
+            return
+        try:
+            Path(out).write_text(edit.toPlainText().rstrip() + "\n",
+                                 encoding="utf-8")
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("The report could not be written:") + f" {err}", 8000)
+
+    def _set_analysis_visit_filter(self, pid, sid):
+        # @args: pid - project id, sid - the selected visit (or None)
+        # @return: None. A single click on a visit filters the astrometry
+        #          runs to that night (ADR-086 rev).
+        self._analysis_visit_filter = sid
+        self._analysis_astrometry_refresh(pid)
+
     def _analysis_astrometry_refresh(self, pid):
         # @args: pid - project id
         # @return: None. The whole section hides itself when the project has
@@ -6278,9 +7885,20 @@ class MainWindow(QMainWindow):
             return
         from ..core import astrometry_store as store
         runs = store.list_runs(db, pid) if pid is not None else []
+        # the visit the observer clicked (None = all the project's runs)
+        flt = getattr(self, "_analysis_visit_filter", None)
+        if flt is not None:
+            runs = [r for r in runs if r.get("session_id") == flt]
         sec = w.get("astrometry_runs_sec")
         if sec is not None:
             sec.setVisible(bool(runs))
+        note = w.get("astrometry_runs_note")
+        if note is not None and flt is not None:
+            note.setText(self.tr(
+                "Showing the runs of the selected visit. Click the visit "
+                "again (or another) to change it."))
+        elif note is not None:
+            note.setText("")
         tbl.setRowCount(len(runs))
         # newest first: the run you just made is the one you are looking at
         for row, run in enumerate(reversed(runs)):
@@ -6290,8 +7908,12 @@ class MainWindow(QMainWindow):
             # check are what the report carries
             stack = next((q for q in points
                           if q.get("source") == "stack"), None)
+            undone = (run.get("status") or "") == "undone"
             cells = [self._astrometry_when(run),
-                     str(run.get("n_obs") or run.get("points") or 0),
+                     # an undone run has NO positions left (the undo removes
+                     # them): showing its old count would suggest live data
+                     ("—" if undone
+                      else str(run.get("n_obs") or run.get("points") or 0)),
                      self._astrometry_motion(run),
                      self._astrometry_magnitude(stack),
                      self._astrometry_check(stack),
@@ -6403,15 +8025,66 @@ class MainWindow(QMainWindow):
             self._analysis_astrometry_selected(tbl))
         if run is None:
             return
+        self._open_astrometry_run(run)
+
+    def _analysis_astrometry_open_run(self, run_id):
+        # @args: run_id - a run to open (the visit's runs list, ADR-086 rev)
+        # @return: None
+        run = self._analysis_astrometry_run(run_id)
+        if run is None:
+            return
+        self._open_astrometry_run(run)
+
+    def _open_astrometry_run(self, run):
+        # @args: run - the run dict
+        # @return: None. Opens the run's OWN visit in the editor, on THAT run.
+        #          A run with no visit, or an undone one (its positions are
+        #          gone), is SAID: never swapped for another run in silence
+        #          (reported 2026-10-13: "the run with two observations"
+        #          looked like it had lost one).
         if run.get("session_id") is None:
             self.statusBar().showMessage(self.tr(
                 "This run has no visit behind it: open the editor from the "
                 "visit whose frames you want to re-measure."), 8000)
             return
+        if (run.get("status") or "") == "undone":
+            self.statusBar().showMessage(self.tr(
+                "That run was undone: its positions are gone, so there is "
+                "nothing to open. Re-measure it from its visit if you want "
+                "it back."), 10000)
+            return
         # The run the observer PICKED is the one the editor must show, not
-        # the visit's newest (a visit holds many passes)
-        self._visit_astrometry(run["project_id"], run["session_id"],
-                               run_id=run["id"])
+        # the visit's newest (a visit holds many passes). Opening it loads the
+        # UFE, the visit's frames and the saved run, so a busy dialog is shown
+        # while it happens.
+        self._with_busy(
+            self.tr("Opening the run in the editor…"),
+            lambda: self._visit_astrometry(run["project_id"],
+                                           run["session_id"], run_id=run["id"]))
+
+    def _with_busy(self, label, fn):
+        # @args: label - the message, fn - the work to run (on this thread)
+        # @return: whatever fn returns. A modal, indeterminate busy dialog
+        #          shown BEFORE the work and painted at once: the work runs on
+        #          the GUI thread, so a delayed show (a QTimer) would never
+        #          fire while the loop is blocked. It is static (the bar cannot
+        #          animate without yielding), which is what opening a run
+        #          needs: the observer sees that something is happening.
+        from PySide6.QtWidgets import QProgressDialog
+        prog = QProgressDialog(label, "", 0, 0, self)
+        prog.setWindowTitle(self.tr("Please wait"))
+        prog.setWindowModality(Qt.WindowModal)
+        prog.setCancelButton(None)
+        prog.setMinimumDuration(0)
+        prog.setAutoClose(False)
+        prog.setAutoReset(False)
+        prog.show()
+        QApplication.processEvents()          # paint it before the work
+        try:
+            return fn()
+        finally:
+            prog.close()
+            prog.deleteLater()
 
     def _analysis_astrometry_undo(self, tbl):
         # @args: tbl - the runs table
@@ -6939,6 +8612,7 @@ class MainWindow(QMainWindow):
         show = getattr(dlg, "show_tab", None)
         if callable(show):
             show("trackstack")
+        return dlg
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -7322,7 +8996,8 @@ class MainWindow(QMainWindow):
             self._project_widgets["transit_cadence"] = lbl_cad
 
             def _refresh_cadence():
-                overhead = float(config.get("overhead_s", 15.0))
+                from ..core import exposure as _exposure
+                overhead = _exposure.frame_overhead_s(config)
                 exp = spn_exp.value()
                 per = exp + overhead
                 txt = self.tr(
@@ -7498,7 +9173,8 @@ class MainWindow(QMainWindow):
             spn_exp.setValue(float(exp_rec))
             # default the frames count so the run covers the 2P session
             if spn_frames is not None and h.get("session_req_h"):
-                overhead = float(config.get("overhead_s", 15.0))
+                from ..core import exposure as _exposure
+                overhead = _exposure.frame_overhead_s(config)
                 n = int(float(h["session_req_h"]) * 3600
                         / (float(exp_rec) + overhead))
                 spn_frames.setValue(max(1, n))
@@ -7511,7 +9187,8 @@ class MainWindow(QMainWindow):
             self._project_widgets["hads_cadence"] = lbl_cad
 
             def _refresh_cadence():
-                overhead = float(config.get("overhead_s", 15.0))
+                from ..core import exposure as _exposure
+                overhead = _exposure.frame_overhead_s(config)
                 exp = spn_exp.value()
                 per_point = exp + overhead
                 txt = self.tr(
@@ -9252,13 +10929,15 @@ class MainWindow(QMainWindow):
                 n_total, steps[0][2], steps[0][0], cfg=config,
                 n_darks=n_darks,
                 exp_dark=spn_darkexp.value() if n_darks else None,
-                n_bias=spn_bias.value(), steps=steps)
+                n_bias=spn_bias.value(), steps=steps,
+                recipe=self._capture_options_from_widgets())
         else:
             plan = sequence.make_plan(
                 spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
                 n_darks=n_darks,
                 exp_dark=spn_darkexp.value() if n_darks else None,
-                n_bias=spn_bias.value())
+                n_bias=spn_bias.value(),
+                recipe=self._capture_options_from_widgets())
         ctx = self._current_project.get("context") or {}
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
@@ -9283,9 +10962,10 @@ class MainWindow(QMainWindow):
                     target["capture_advisory"] = True
                 except (TypeError, ValueError):
                     pass
-        fmt_map = {0: "ccdciel", 1: "nina", 2: "csv"}
+        fmt_map = {0: "ccdciel", 1: "nina", 2: "nina_summary", 3: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
-        ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
+        ext = {"nina": ".json", "nina_summary": ".plan.json",
+               "ccdciel": ".targets", "csv": ".csv"}[fmt]
         outdir = project.storage_dir(self._current_project)
         default = outdir / f"{target['name']}_sequence{ext}"
         out, _ = QFileDialog.getSaveFileName(
@@ -10774,6 +12454,12 @@ class MainWindow(QMainWindow):
             excluded_hook = getattr(dlg, "set_point_excluded_hook", None)
             if callable(excluded_hook):
                 excluded_hook(self._ufe_set_point_excluded)
+            # ADR-085: the observer re-selects an observation's centroid on
+            # the saved stack; the host writes the new position and the
+            # `centroid_source` flag, and the check runs again.
+            centroid_hook = getattr(dlg, "set_manual_centroid_hook", None)
+            if callable(centroid_hook):
+                centroid_hook(self._ufe_set_manual_centroid)
             # the sequence is kept in the project: reopening the visit
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
@@ -10849,6 +12535,9 @@ class MainWindow(QMainWindow):
             excluded_hook = getattr(dlg, "set_point_excluded_hook", None)
             if callable(excluded_hook):
                 excluded_hook(None)
+            centroid_hook = getattr(dlg, "set_manual_centroid_hook", None)
+            if callable(centroid_hook):
+                centroid_hook(None)
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
@@ -11450,6 +13139,22 @@ class MainWindow(QMainWindow):
         if status == "complete" and not points:
             return None
         p = project.get(db, pid) or {}
+        # ADR-077 rev: when the check resolved the object under a NEW name,
+        # the project keeps the identity facts (the card and the visit read
+        # them from here) AND whether our station already appears among the
+        # published observations, so the notice never claims a participation
+        # it cannot prove. merge_confirmed keeps the alias lookup's keys.
+        check = payload.get("check")
+        if check is not None:
+            resolved = getattr(check, "resolved_desig", "") or ""
+            if resolved and resolved != (p.get("object_name") or ""):
+                project.merge_confirmed(db, pid, {
+                    "designation": resolved,
+                    "mpec": getattr(check, "mpec", "") or "",
+                    "mpec_url": getattr(check, "mpec_url", "") or "",
+                    "confirmed_at": getattr(check, "confirmed_at", "") or "",
+                    "ours_published": bool(
+                        getattr(check, "ours_published", False))})
         det = payload.get("detection")
         sweep = payload.get("sweep")
         dither = payload.get("dither")
@@ -11512,6 +13217,7 @@ class MainWindow(QMainWindow):
                     "mag": pt.mag, "band": pt.band, "x": pt.x, "y": pt.y,
                     "n_frames": pt.n_frames, "snr": pt.snr, "source": source,
                     "method": payload.get("method"),
+                    "mag_err": getattr(pt, "mag_err", None),
                     "flags": list(pt.flags or [])})
         store.add_points(db, rows)
         frame_rows = []
@@ -11639,6 +13345,31 @@ class MainWindow(QMainWindow):
                                                  bool(excluded)))
         except Exception as err:
             logger.warning("the exclusion could not be stored: %s", err)
+            return False
+        if done:
+            run = self._analysis_astrometry_run(int(run_id))
+            if run is not None and self._project_widgets.get(
+                    "astrometry_runs_tbl") is not None:
+                self._analysis_astrometry_refresh(run["project_id"])
+        return done
+
+    def _ufe_set_manual_centroid(self, run_id, group_index, ra, dec, rms_ra,
+                                 rms_dec, x, y, snr=None, source="manual"):
+        # ADR-085: the observer re-selected an observation's centroid on the
+        # saved stack (or asked the app to pick it again, source="auto"). The
+        # STACK point's position and error bar move and the point is SIGNED
+        # with where the centroid came from; the per-frame point is left alone.
+        # @args: run_id, group_index, the new position + error + pixel, snr,
+        #        source - "manual" | "auto"
+        # @return: True when the observation took it
+        from ..core import astrometry_store as store
+        try:
+            done = bool(store.set_manual_centroid(
+                db, int(run_id), int(group_index), float(ra), float(dec),
+                float(rms_ra), float(rms_dec), float(x), float(y), snr,
+                source=source))
+        except Exception as err:
+            logger.warning("the manual centroid could not be stored: %s", err)
             return False
         if done:
             run = self._analysis_astrometry_run(int(run_id))

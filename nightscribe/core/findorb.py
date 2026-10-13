@@ -371,15 +371,17 @@ def _our_jds(ours_lines):
 def _match_ours(residuals, our_jds, want_code):
     # @args: residuals - the parsed records, our_jds - our submitted JDs,
     #        want_code - our station code
-    # @return: (ours, others) with the chosen record's `ours` flag set
+    # @return: (ours, others) with EVERY record that is ours flagged
     # Four identities, strongest first, because the same station can appear
     # more than once and our line can be MERGED by Find_Orb into an already
     # published near-duplicate (same station, seconds apart):
-    #   1. the exact instant we submitted AND our station (the real answer);
-    #   2. the exact instant, any station (our line accepted, station blank);
+    #   1. the exact instants we submitted AND our station (the real answer);
+    #   2. the exact instants, any station (our line accepted, station blank);
     #   3. our station, the record nearest our instant (Find_Orb merged our
     #      near-duplicate into a published point: our data is already there);
     #   4. the first line, which is ours because write_input puts ours first.
+    # ALL of ours are flagged (ADR-086 rev): a combined run submits several
+    # observations, and the check must see each one, not just the first.
     tol = 1e-6   # ~0.09 s: the 80-column time carries ~0.9 ms
     for r in residuals:      # every row carries the flag the table reads
         r["ours"] = False
@@ -393,22 +395,24 @@ def _match_ours(residuals, our_jds, want_code):
         return bool(want_code) and \
             str(r.get("stn") or "").strip().upper() == want_code
 
-    chosen = next((r for r in residuals if time_ok(r) and stn_ok(r)), None)
-    if chosen is None:
-        chosen = next((r for r in residuals if time_ok(r)), None)
-    if chosen is None and want_code:
+    ours = [r for r in residuals if time_ok(r) and (not want_code or stn_ok(r))]
+    if not ours:
+        ours = [r for r in residuals if time_ok(r)]
+    if not ours and want_code:
         near = [r for r in residuals if stn_ok(r)]
         if near:
-            chosen = min(near, key=lambda r: min(
+            ours = [min(near, key=lambda r: min(
                 (abs(float(r["time"]) - o) for o in our_jds), default=0.0)
-                if r.get("time") is not None else 0.0)
-    if chosen is None and residuals:
-        chosen = residuals[0]
-    if chosen is None:
+                if r.get("time") is not None else 0.0)]
+    if not ours and residuals:
+        ours = [residuals[0]]
+    if not ours:
         return [], []
-    chosen["ours"] = True
-    others = [r for r in residuals if r is not chosen]
-    return [chosen], others
+    for r in ours:
+        r["ours"] = True
+    ids = {id(r) for r in ours}
+    others = [r for r in residuals if id(r) not in ids]
+    return ours, others
 
 
 def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
@@ -506,7 +510,21 @@ def _decide_from_residuals(residuals, cfg, obs_code="", ours_lines=None):
     ours, others = _match_ours(residuals, our_jds, obs_code)
     if not ours:
         return CheckReport(no_reference=True, note="no residual for ours")
-    our = ours[0]
+    # The verdict is about the WORST of ours, not the first one (ADR-086
+    # rev): a combined run submits several observations, and reporting the
+    # first one hid a spurious point behind a good one (measured 2026-10-13:
+    # a combined check blocked at 255" because ours[0] was the bad one).
+    if len(ours) > 1 and others:
+        med_ra, _ = robust_scatter([o.get("dra") for o in others])
+        med_dec, _ = robust_scatter([o.get("ddec") for o in others])
+
+        def _sep(r):
+            return math.hypot((r.get("dra") or 0.0) - (med_ra or 0.0),
+                              (r.get("ddec") or 0.0) - (med_dec or 0.0))
+
+        our = max(ours, key=_sep)
+    else:
+        our = ours[0]
     report = decide(our.get("dra"), our.get("ddec"), others, cfg=cfg)
     report.residuals = residuals
     report.n_obs = len(residuals)

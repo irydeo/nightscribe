@@ -49,10 +49,13 @@ secuencias, detrend, multinoche, ExoClock y modo en vivo) está en
    horizonte real y «inicio seguro hasta HH:MM». El usuario define N tomas × exposición
    y filtro; la app comprueba que la sesión termina dentro del rango de seguridad.
 2. **Captura**: exportar secuencia (NINA JSON / CCDciel / CSV) con nombre, coords J2000
-   y tiempos; el fichero queda registrado en el proyecto. **Con CCDciel conectado**
-    (ADR-030) también se puede: apuntar el telescopio, hacer un **ajuste astrométrico**
-    (plate solve + corrección), enviar el plan (objeto, exposición, nº de tomas, filtro)
-    e iniciar la captura desde la misma pestaña.
+   y tiempos; el fichero queda registrado en el proyecto. **Con el observatorio
+   conectado** (ADR-030, ADR-081: CCDciel **o** NINA/PINS) también se puede: apuntar el
+   telescopio, hacer un **ajuste astrométrico** (plate solve + corrección), **detener el
+   movimiento** (seguridad), enviar el plan (objeto, exposición, nº de tomas, filtro) e
+   iniciar la captura desde la misma pestaña. La lista de filtros del plan es la real de
+   la rueda; el snapshot de NINA toma una exposición, así que su nº de tomas es solo
+   informativo.
 3. **Procesado** (externo): el usuario calibra/apila con sus programas; al volver,
    «Importar FITS resultado» — **sin preguntar objeto ni coordenadas** (ya están en el
    contexto) — y confirma con el blink, casado con PS1-g (pipeline ADR-018

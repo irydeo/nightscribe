@@ -9,9 +9,10 @@ amateur que cubre el ciclo completo de un proyecto de observación:
    razón de cada propuesta.
 2. **Entender cada objeto**: traduce los parámetros orbitales y físicos a
    explicaciones claras, para que sepas qué estás mirando y por qué importa.
-3. **Capturar y reducir**: habla con CCDciel para lanzar tus capturas y, en su
-   editor FITS, calibra, apila y mide tus imágenes: fotometría (variables,
-   exoplanetas, supernovas) y astrometría de cuerpos menores lista para el MPC.
+3. **Capturar y reducir**: habla con CCDciel o NINA/PINS para lanzar tus
+   capturas y, en su editor FITS, calibra, apila y mide tus imágenes: fotometría
+   (variables, exoplanetas, supernovas) y astrometría de cuerpos menores lista
+   para el MPC.
 4. **Contarlo**: genera borradores bilingües (ES/EN) de posts y tuits, con
    gráficos listos para redes sociales.
 
@@ -31,7 +32,7 @@ puedes leerlos de principio a fin o saltar al que necesites:
 | [02. Planificar la noche](02-tonight.es.md) | La vista Esta noche, la puntuación, el calendario del cielo |
 | [03. Proyectos](03-projects.es.md) | Crear y seguir proyectos: de la ficha a la publicación |
 | [04. Campañas y vigilias](04-campaigns.es.md) | Campañas de seguimiento y vigilias de variables |
-| [05. Captura](05-capture.es.md) | CCDciel, secuencias y calibración de imágenes |
+| [05. Captura](05-capture.es.md) | CCDciel o NINA/PINS, secuencias y calibración de imágenes |
 | [06. Fotometría](06-photometry.es.md) | Medir brillo, series, curvas de luz y períodos |
 | [07. Astrometría](07-astrometry.es.md) | Posiciones de asteroides y cometas, y el reporte al MPC |
 | [08. Contarlo](08-posts.es.md) | Posts, tuits y gráficos |

@@ -101,6 +101,15 @@
              </item>
              <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Optional; written into the EXOTIC inits.json handoff (transit projects)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
+              <layout class="QHBoxLayout" name="row_sky">
+               <item><widget class="QLabel" name="lbl_sky"><property name="text"><string>Sky brightness (mag/arcsec²):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QDoubleSpinBox" name="spn_sky_brightness"><property name="minimum"><double>10.0</double></property><property name="maximum"><double>25.0</double></property><property name="singleStep"><double>0.1</double></property><property name="decimals"><number>2</number></property><property name="value"><double>20.5</double></property></widget></item>
+               <item><widget class="QPushButton" name="btn_sky_lookup"><property name="text"><string>Look up</string></property></widget></item>
+               <item><widget class="QPushButton" name="btn_sky_map"><property name="text"><string>Open the light pollution map</string></property></widget></item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_sky"><property name="text"><string>How bright your zenith sky is; it sets the suggested sub-exposure. Look up fills it from the light-pollution atlas (needs the key in Integrations), or read it off the map. ~18 city, ~20 suburban, ~21.5 dark sky.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
               <layout class="QHBoxLayout" name="row_observer">
                <item><widget class="QLabel" name="lbl_observer"><property name="text"><string>Observer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
                <item><widget class="QLineEdit" name="edt_observer"/></item>
@@ -338,6 +347,19 @@
                <item><widget class="QDoubleSpinBox" name="spn_cam_max_exp"><property name="toolTip"><string>Working maximum exposure (per gain). 0 = no cap. For an sCMOS (GSENSE400) it is a few seconds and grouping adds the rest</string></property><property name="maximum"><double>36000.000000000000000</double></property><property name="decimals"><number>0</number></property></widget></item>
               </layout>
              </item>
+             <item>
+              <layout class="QHBoxLayout" name="row_camreadout">
+               <item><widget class="QLabel" name="lbl_camreadout"><property name="text"><string>Readout + download (s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QDoubleSpinBox" name="spn_cam_readout"><property name="toolTip"><string>Readout plus download of one frame, seconds. It is the app's one per-frame overhead: the preset fills it from the sensor (type and size), and it bounds a moving object's run, so a slow one means fewer frames before the object drifts out of the field. Raise it if your mount also needs to settle between frames. 0 = unknown</string></property><property name="maximum"><double>600.000000000000000</double></property><property name="decimals"><number>1</number></property></widget></item>
+               <item>
+                <spacer name="hsp_camreadout">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_cam_readout"><property name="text"><string>Readout plus download of one frame, seconds. It is the app&apos;s one per-frame overhead (the preset fills it from the sensor, by type and size), and it decides how many frames fit before a fast object leaves the field and how long a sequence takes. Raise it if your mount also needs to settle between frames.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
              <item><widget class="QLabel" name="lbl_cam_gain_note"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
              <item>
@@ -508,19 +530,6 @@
            <widget class="QGroupBox" name="grp_session">
             <property name="title"><string>Session defaults</string></property>
             <layout class="QVBoxLayout" name="vbox_session">
-             <item>
-              <layout class="QHBoxLayout" name="row_overhead">
-               <item><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property></widget></item>
-               <item>
-                <spacer name="hsp_overhead">
-                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
-                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
-                </spacer>
-               </item>
-              </layout>
-             </item>
-             <item><widget class="QLabel" name="lblH_overhead"><property name="text"><string>Readout/slew seconds added to every exposure when sizing the transit capture sequence</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_sncadence">
                <item><widget class="QLabel" name="lbl_sn_cadence"><property name="text"><string>SN revisit reminder (days):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -931,6 +940,28 @@
         <widget class="QWidget" name="page_integrations">
          <layout class="QVBoxLayout" name="vbox_integrations">
           <item>
+           <widget class="QGroupBox" name="grp_obs_backend">
+            <property name="title"><string>Observatory software</string></property>
+            <layout class="QVBoxLayout" name="vbox_obs_backend">
+             <item>
+              <layout class="QHBoxLayout" name="row_obs_backend">
+               <item><widget class="QLabel" name="lbl_obs_backend"><property name="text"><string>Drive the mount and camera with:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item>
+                <widget class="QComboBox" name="cmb_obs_backend"/>
+               </item>
+               <item>
+                <spacer name="hsp_obs_backend">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_obs_backend"><property name="text"><string>Only the fields of the program you pick here are shown. NINA (Windows) and PINS (Linux) share the same Advanced API v2 plugin, so they use the same settings.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+            </layout>
+           </widget>
+          </item>
+          <item>
            <widget class="QGroupBox" name="grp_ccdciel">
             <property name="title"><string>CCDciel (JSON-RPC connection)</string></property>
             <layout class="QVBoxLayout" name="vbox_ccdciel">
@@ -977,6 +1008,52 @@
            </widget>
           </item>
           <item>
+           <widget class="QGroupBox" name="grp_nina">
+            <property name="title"><string>NINA / PINS (Advanced API v2)</string></property>
+            <layout class="QVBoxLayout" name="vbox_nina">
+             <item>
+              <layout class="QHBoxLayout" name="row_ninahost">
+               <item><widget class="QLabel" name="lbl_ninahost"><property name="text"><string>Host:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_nina_host"/></item>
+               <item>
+                <spacer name="hsp_ninahost">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ninahost"><property name="text"><string>Where NINA or PINS is running; localhost by default. Control only works while the program and its Advanced API plugin are open.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ninaport">
+               <item><widget class="QLabel" name="lbl_ninaport"><property name="text"><string>Port:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QSpinBox" name="spn_nina_port"><property name="minimum"><number>1</number></property><property name="maximum"><number>65535</number></property><property name="value"><number>1888</number></property></widget></item>
+               <item>
+                <spacer name="hsp_ninaport">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ninaport"><property name="text"><string>Junction point of the Advanced API plugin. The default (1888) is the plugin's own.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ninaauto">
+               <item><widget class="QLabel" name="lbl_ninaauto"><property name="text"><string>Auto-connect on start:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_nina_auto"/></item>
+               <item>
+                <spacer name="hsp_ninaauto">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ninaauto"><property name="text"><string>Connect to NINA / PINS as soon as the app starts (off by default)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+            </layout>
+           </widget>
+          </item>
+          <item>
            <widget class="QGroupBox" name="grp_apikeys">
             <property name="title"><string>API keys (all optional)</string></property>
             <layout class="QVBoxLayout" name="vbox_misc">
@@ -1006,6 +1083,19 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_astrokey"><property name="text"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_lpkey">
+               <item><widget class="QLabel" name="lbl_lpkey"><property name="text"><string>Light pollution API key:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QLineEdit" name="edt_lightpollution_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+               <item>
+                <spacer name="hsp_lpkey">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_lpkey"><property name="text"><string>Optional; request one from lightpollutionmap.info. With it, Observatory → Sky brightness can look up your site's zenith brightness; without it you type the value from the map.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_tnsbot">
                <item><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

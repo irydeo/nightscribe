@@ -1725,7 +1725,267 @@ def test_a_manual_run_says_the_detection_was_the_observers(qapp, tmp_path):
     text = tab.txt_notes.toPlainText()
     assert "HUMAN MARK" in text and "manual mode" in text
     # and the point's flag reaches the table as words, never as a code
-    assert "mark" in tab.tbl_points.item(0, 7).text()
+    assert "mark" in tab.tbl_points.item(0, 8).text()
+
+
+def test_the_photometric_error_column_toggles_and_persists(qapp, tmp_path):
+    # ADR-085: the "±" column is hidden by default (the table is narrow) and
+    # shown with the context menu; the choice is remembered.
+    from nightscribe.config import config
+    tab, _host = _tab(qapp, tmp_path)
+    config.set("ufe_points_magerr", False)
+    tab.tbl_points.setColumnHidden(7, True)
+    tab._toggle_magerr()
+    assert tab.tbl_points.isColumnHidden(7) is False
+    assert config.get("ufe_points_magerr") is True
+    tab._toggle_magerr()
+    assert tab.tbl_points.isColumnHidden(7) is True
+
+
+def test_adjusting_the_centroid_needs_the_stack(qapp, tmp_path):
+    # Without the observation's stack on stage there is nothing to re-measure:
+    # the action says so instead of crashing.
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"points": [(None, None, [])], "stacks": [(None, None)]}
+    tab._adjust_centroid(0)
+    assert "stack" in tab.lbl_status.toPlainText().lower()
+
+
+def test_the_star_stack_is_kept_by_default(qapp, tmp_path):
+    # The star stack is what the Photometry tab needs to measure by hand, so
+    # it is on unless the observer turns it off.
+    tab, _host = _tab(qapp, tmp_path)
+    assert tab.chk_starstack.isChecked() is True
+
+
+def test_the_image_context_menu_reaches_the_tab(qapp, tmp_path):
+    # ADR-085: the SAME menu on the image. The view carries the policy and
+    # the signal reaches the tab (the position is mapped from the viewport).
+    from PySide6.QtCore import QPoint, Qt
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"points": [(astrometry.AstrometryPoint(
+        ra=30.0, dec=10.0, x=8.0, y=8.0), None, [])], "stacks": [(None, None)]}
+    tab._shown_group = 0
+    seen = []
+    tab._show_points_menu = lambda pos: seen.append(pos)
+    view = tab._view if tab._view is not None else tab._stack_view
+    assert view is not None
+    assert view.contextMenuPolicy() == Qt.CustomContextMenu
+    view.customContextMenuRequested.emit(QPoint(10, 10))
+    assert seen
+
+
+def test_show_combined_paints_several_runs_as_one(qapp, tmp_path):
+    # ADR-086 rev: the combined set is worked in the editor; the tab paints
+    # several runs' observations as one run-like result.
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    pts = []
+    for i in range(2):
+        sp = astrometry.AstrometryPoint(ra=30.0 + i, dec=10.0, x=8.0, y=8.0,
+                                        mjd=60600.5 + i, group_index=i,
+                                        source="stack")
+        pts.append((sp, None, []))
+    payload = {"status": "ok", "restored": True, "combined": True,
+               "points": pts, "groups": [(0, 30), (0, 30)],
+               "stacks": [(None, None), (None, None)],
+               "qs": [(8.0, 8.0), (8.0, 8.0)],
+               "mids": [60600.5 + 2400000.5, 60601.5 + 2400000.5],
+               "boxes": [(0, 0, 0, 0)] * 2,
+               "stack_paths": [None, None], "n_unreadable": 0,
+               "failed_frames": []}
+    tab.show_combined(payload)
+    assert tab._result.get("combined") is True
+    assert tab.cmb_group.count() == 2
+    assert tab.tbl_points.rowCount() == 2
+
+
+def test_hiding_the_photometric_error_drops_it_from_the_band(qapp, tmp_path):
+    # ADR-085: the toggle affects the band over the image too, not only the
+    # "±" column: hiding it makes the band read "Mag: X (V)".
+    from nightscribe.config import config
+    tab, _host = _tab(qapp, tmp_path)
+    header = {"NS_STACK": "object", "NS_RUN": 7, "NS_MAG": 19.3,
+              "NS_MAGER": 0.04, "NS_MAGB": "G", "NS_MAGOK": 1}
+    config.set("ufe_points_magerr", True)
+    assert tab.band_facts(header)["measured"]["err"] == 0.04
+    config.set("ufe_points_magerr", False)
+    assert tab.band_facts(header)["measured"]["err"] is None
+
+
+def test_adjusting_the_centroid_arms_a_stage_click(qapp, tmp_path):
+    # ADR-085 rev: the adjust is a one-click mode on the editor's OWN stage
+    # (zoom, stretch, histogram), not a bare window.
+    import numpy as np
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"points": [(sp, None, [])],
+                   "stacks": [(np.zeros((40, 40)), None)]}
+    shown = []
+    tab._show_group = lambda i: shown.append(i)
+    tab._adjust_centroid(0)
+    assert tab._centroid_row == 0
+    assert shown == [0]
+    # the SAME pick reticle the Photometry tab uses is on
+    assert tab._stack_view._pick_mode is True
+
+
+def test_arming_the_centroid_keeps_the_current_view(qapp, tmp_path):
+    # ADR-085 rev: if the observation is already on stage there is nothing to
+    # reload, so the zoom, the stretch and the histogram stay as they were.
+    import numpy as np
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"points": [(sp, None, [])],
+                   "stacks": [(np.zeros((40, 40)), None)]}
+    shown = []
+    tab._show_group = lambda i: shown.append(i)
+    tab._shown_group = 0
+    tab._adjust_centroid(0)
+    assert shown == []                 # already on stage: no reload
+    assert tab._centroid_row == 0
+
+
+def test_a_stage_click_in_the_centroid_mode_re_measures(qapp, tmp_path):
+    import numpy as np
+    from PySide6.QtCore import QPointF
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"points": [(sp, None, [])],
+                   "stacks": [(np.zeros((40, 40)), None)]}
+
+    class _State:
+        has_image = True
+        data = np.zeros((40, 40))
+
+        def scene_to_data(self, x, y):
+            return (10.0, 12.0)
+    tab._view = None
+    tab._stack_state = _State()
+    seen = []
+    tab._recentroid = lambda row, x, y: seen.append((row, x, y))
+    tab._centroid_row = 0
+    tab._on_manual_click(QPointF(0.0, 0.0))
+    assert seen == [(0, 10.0, 12.0)]
+    assert tab._centroid_row is None          # the mode disarms itself
+    assert tab._stack_view._pick_mode is False  # and the reticle is off
+
+
+def test_the_centroid_mark_is_drawn_on_the_stage(qapp, tmp_path):
+    # ADR-085 rev: after re-measuring, the mark is drawn (the manual mode's own
+    # cross) so it is clear where the centroid landed.
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+
+    class _View:
+        def __init__(self):
+            self.overlays = []
+
+        def clear_overlays(self):
+            self.overlays = []
+
+        def add_overlay(self, item):
+            self.overlays.append(item)
+
+    class _State:
+        has_image = True
+        plate_shape = (40, 40)
+        wcs = None
+        path = "x.fits"
+
+        def data_to_scene(self, x, y):
+            return (x, y)
+
+    tab._view = _View()
+    tab._state = _State()
+    tab._shown_stack_path = "x.fits"
+    tab._shown_group = 0
+    tab._result = {"points": [(astrometry.AstrometryPoint(
+        ra=30.0, dec=10.0, x=8.0, y=8.0), None, [])]}
+    tab._centroid_mark = (12.0, 13.0)
+    tab._draw_marks()
+    assert tab._view.overlays            # the mark is on the stage
+
+
+def test_arming_the_centroid_disarms_the_manual_mark(qapp, tmp_path):
+    # the two marks share the stage and the click: arming one disarms the other
+    import numpy as np
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"points": [(sp, None, [])],
+                   "stacks": [(np.zeros((40, 40)), None)]}
+    tab._show_group = lambda i: None
+    tab.chk_manual.setChecked(True)
+    tab._manual_armed = True
+    tab._adjust_centroid(0)
+    assert tab.chk_manual.isChecked() is False
+    assert tab._manual_armed is False
+
+
+def test_a_finished_recheck_does_not_block_the_next(qapp, tmp_path):
+    # a worker that ended without clearing must not freeze every later check
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=8.0)
+    tab._result = {"points": [(sp, None, [])], "stacks": [(None, None)]}
+
+    class _Done:
+        def isFinished(self):
+            return True
+
+    tab._recheck = _Done()
+    called = []
+    tab._on_recheck = lambda: called.append(1)
+    tab._auto_recheck()
+    assert called == [1]
+    assert tab._recheck is None
+
+
+def test_switching_observations_keeps_the_stretch(qapp, tmp_path):
+    # ADR-085 rev: moving from one observation to the next keeps the observer's
+    # histogram level (the stretch), instead of re-deriving the auto limits.
+    import numpy as np
+    tab, _host = _tab(qapp, tmp_path)
+    state = tab._stack_state
+    seen = {}
+
+    def fake_load(path):
+        seen["keep"] = state.keep_stretch
+
+    state.load = fake_load
+    tab._result = {"stacks": [(np.zeros((4, 4)), None), (np.zeros((4, 4)), None)],
+                   "stack_paths": ["/tmp/a.fits", "/tmp/b.fits"]}
+    tab._show_group(1)
+    assert seen.get("keep") is True
+
+
+def test_auto_centroid_re_measures_at_the_point(qapp, tmp_path):
+    # ADR-085 rev: "Auto centroid" lets the app pick it, seeded at the point's
+    # current position, and signs it auto.
+    import numpy as np
+    from nightscribe.core import astrometry
+    tab, _host = _tab(qapp, tmp_path)
+    sp = astrometry.AstrometryPoint(ra=30.0, dec=10.0, x=8.0, y=9.0)
+    tab._result = {"points": [(sp, None, [])],
+                   "stacks": [(np.zeros((40, 40)), None)]}
+    seen = []
+    tab._recentroid = lambda row, x, y, auto=False: seen.append(
+        (row, x, y, auto))
+    tab._auto_centroid(0)
+    assert seen == [(0, 8.0, 9.0, True)]
+
+
+def test_the_published_listing_opens_from_the_tab(qapp, tmp_path):
+    # the context menu's "Published observations…" and the check block's button
+    # both go through _show_residuals (a non-modal window)
+    tab, _host = _tab(qapp, tmp_path)
+    tab._show_residuals()
+    assert not tab._residuals_dialog.isHidden()
 
 
 def test_the_manual_flag_travels_with_the_point():
@@ -1995,7 +2255,7 @@ def test_a_restored_run_can_be_marked_by_hand(qapp, tmp_path, monkeypatch):
                                       "stacks": stacks}
     tab.refresh_context()
     assert tab.tbl_points.item(0, 6).text() == "18.900"
-    assert "hand" in tab.tbl_points.item(0, 7).text()
+    assert "hand" in tab.tbl_points.item(0, 8).text()
 
 
 def test_the_restore_pairs_a_stack_with_its_observation_number(qapp, tmp_path):
@@ -2369,6 +2629,44 @@ def test_the_send_builds_the_report_with_the_ack_and_target(
     # the report that goes out carries the target keyword on its ACK line
     assert "NEOCP" in started["args"][1]
     assert tab._submission == {"ack": "batch 1", "obj_type": "NEOCP"}
+
+
+def test_the_send_dialog_says_what_is_about_to_be_sent(
+        qapp, tmp_path, monkeypatch):
+    # The window opened with an empty box and no explanation (2026-10-13): an
+    # empty dialog reads as broken. The intro line names the count, the format,
+    # the target and the mode before anything is sent, and it follows the mode
+    # so it never becomes a stale claim.
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    tab._on_report()
+    tab._open_send_dialog()
+    intro = tab._send_dialog.lbl_intro.text()
+    assert "1 observation(s)" in intro
+    assert "MPC 1992" in intro
+    assert "Unclassified" in intro
+    assert "Normal" in intro
+    tab._send_dialog.cmb_mode.setCurrentIndex(
+        tab._send_dialog.cmb_mode.findData(True))
+    assert "Test" in tab._send_dialog.lbl_intro.text()
+    # the log box explains itself while it is still empty
+    assert "MPC" in tab._send_dialog.txt_log.placeholderText()
+
+
+def test_a_neocp_project_opens_the_send_dialog_on_the_neocp_target(
+        qapp, tmp_path, monkeypatch):
+    # The manual promises "NEOCP when the project is on the NEOCP". The old
+    # guard also asked for an EMPTY combo, and set_targets had already filled
+    # it, so the default never applied (measured 2026-10-13: a NEOCP project
+    # opened on Unclassified).
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab._context = lambda: {"pid": 1, "session_id": 2, "paths": [],
+                            "object_name": "2026 QX", "neocp": True}
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    tab._on_report()
+    tab._open_send_dialog()
+    assert tab._send_dialog.cmb_target.currentText() == "NEOCP"
+    assert "NEOCP" in tab._send_dialog.lbl_intro.text()
 
 
 def test_the_run_says_which_method_measured_the_brightness(qapp, tmp_path):

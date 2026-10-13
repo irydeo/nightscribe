@@ -244,6 +244,51 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
   licencia del survey lo permite (ZTF/ATLAS con crédito). Si no, enlazamos a la
   página TNS del objeto. Ver ADR-016.
 
+## Calidad del sitio (brillo de cielo)
+
+### Atlas de contaminación lumínica — `lightpollution.py` — brillo cenital del sitio (ADR-083)
+
+- `GET https://www.lightpollutionmap.info/QueryRaster/?ql=wa_2015&qt=point&qd=<lon>,<lat>&key=<clave>`
+  — el New World Atlas of Artificial Night Sky Brightness (Falchi et al. 2016) y
+  su sucesor Sky brightness (NASA Black Marble 2.0), por punto. **Requiere una
+  clave** que se pide a lightpollutionmap.info (opcional: sin ella el observador
+  escribe el valor).
+- Devuelve el brillo cenital ARTIFICIAL en mcd/m2; el sitio documenta la
+  conversión exacta a mag/arcsec2 (total = artificial + 0.171168465 mcd/m2 para el
+  cielo natural de 22.0; `MPSAS = log10(total / 108000000) / -0.4`). Guardamos
+  mag/arcsec2.
+- TTL: 30 días (el atlas es estático). El valor es el brillo CENITAL modelado,
+  «mejor caso»: VIIRS es casi ciego al azul, así que un cielo con LEDs blancos
+  puede ser más brillante de lo que predice. Crédito: «Jurij Stare,
+  lightpollutionmap.info» y «NASA's Black Marble nighttime lights product».
+
+## Integraciones locales con el observatorio (no son fuentes externas)
+
+El paso Captura habla con el software de observatorio del propio observador en
+`localhost`, con una ruta de lectura cacheada (TTL de la fuente 60 s) para que
+el dashboard no machaque al programa, y comandos directos (slew, paro, filtro,
+captura) que nunca se cachean. Un backend a la vez, elegido en Ajustes
+(ADR-081):
+
+- **CCDciel** — `ccdciel.py` — JSON-RPC 2.0 en `http://host:3277/jsonrpc`
+  (ADR-030). Lecturas: `CCDciel_Version`, `status`, `Wheel_GetfiltersName`,
+  `Devices_connected`, `Telescope_slewing`/`Telescope_tracking`. Comandos:
+  `Telescope_slewasync`, `Astrometry_Goto_Async`/`_Running`/`_Result`,
+  `Telescope_abortmotion`, `Wheel_setfilter`, `Capture_set*`/`Capture_get*`,
+  `Capture_start`.
+- **NINA / PINS** — `nina.py` — REST Advanced API v2 en
+  `http://host:1888/v2/api` (ADR-081). Cada respuesta es una envoltura
+  `{Response, Error, StatusCode, Success, Type}`; `Success: false` se convierte
+  en error, nunca en un no-op silencioso. Lecturas: `/version/nina`,
+  `/equipment/info`, `/equipment/filterwheel/info`. Comandos:
+  `/equipment/mount/slew` (`center=true&waitForResult=true` es el goto
+  astrométrico), `/equipment/mount/slew/stop` (el paro de seguridad),
+  `/equipment/filterwheel/change-filter`, `/equipment/camera/capture`. Sin
+  token.
+
+`requests` vive solo en `core/sources/` (AGENTS.md); los dos clientes lanzan
+`ObservatoryError`, así que la GUI no ramifica por backend.
+
 ## Enlaces externos (nunca incrustados — copyright)
 
 Mapas solares de Raben, SolarMonitor, SIDC/uset, universemonitor, ETD (var.astro.cz),

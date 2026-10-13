@@ -310,6 +310,12 @@ def profile_from_preset(p, gain_e_per_adu=None):
         if p.get("dark_current_e_s") is not None else None)
     out["cam_dark_temp_c"] = (
         float(p["dark_temp_c"]) if p.get("dark_temp_c") is not None else None)
+    # the readout/download time per frame, when the datasheet publishes it
+    # (ADR-083 rev): it is what the run's frame count is bounded by, together
+    # with the mount settle. A camera without it clears the key, so switching
+    # away does not leave the previous camera's figure behind.
+    out["cam_readout_s"] = (
+        float(p["readout_s"]) if p.get("readout_s") is not None else None)
     lin = suggested_linearity_adu(p, gain_e_per_adu)
     if lin is not None:
         out["cam_linearity_adu"] = float(lin)

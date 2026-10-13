@@ -971,6 +971,31 @@ def test_ccdciel_jsonrpc_ping():
     assert "connected" in devs or "camera" in dash
 
 
+# ---------------- NINA / PINS Advanced API v2 (local, ADR-081) ---------
+
+def _nina_up(host="127.0.0.1", port=1888):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def test_nina_advanced_api_v2_ping():
+    # NINA/PINS is a local observatory program too: skip when the Advanced
+    # API plugin is not listening (the GUI connect button is the manual path).
+    if not _nina_up():
+        pytest.skip("no NINA/PINS Advanced API v2 on localhost:1888")
+    from nightscribe.core.sources import nina
+    client = nina.Client()
+    version = client.ping()
+    assert version  # NINA's own version, friendly form
+    assert client.filters() or True  # wheel is optional on real setups
+    dash = client.dashboard()
+    assert isinstance(dash, dict) and "mount" in dash
+
+
 # ---------------- local plate solving (ASTAP, needs the binary) --------
 
 def test_astap_solves_the_sample_plate():

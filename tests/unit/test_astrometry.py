@@ -194,3 +194,19 @@ def test_magnitude_with_a_zero_point():
     assert got is not None
     mag, band, n = got
     assert 5.0 < mag < 25.0 and n == 0
+
+
+def test_pixel_scale_handles_a_pc_cdelt_wcs():
+    # A stack written with CD is read back by astropy as PC+CDELT, and
+    # `wcs.wcs.cd` then raises ("No cd is present", reported 2026-10-13 while
+    # adjusting a centroid). The scale must still come out.
+    from astropy.wcs import WCS
+    w = WCS(naxis=2)
+    w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+    w.wcs.crpix = [10.0, 10.0]
+    w.wcs.crval = [30.0, 10.0]
+    w.wcs.cdelt = [-0.001, 0.001]          # 0.001 deg/px = 3.6 arcsec/px
+    w.wcs.pc = [[1.0, 0.0], [0.0, 1.0]]
+    assert abs(ast.pixel_scale_arcsec(w) - 3.6) < 1e-6
+    # and the CD form still works (0.000296 deg/px = 1.0656 arcsec/px)
+    assert abs(ast.pixel_scale_arcsec(_wcs()) - 1.0656) < 1e-3

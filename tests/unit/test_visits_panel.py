@@ -428,6 +428,59 @@ def test_visit_window_analysis_action_follows_the_kind(qapp, tmp_path):
     db.close()
 
 
+def test_visit_window_lists_its_runs_and_opens_one(qapp, tmp_path):
+    # ADR-086 rev: clicking a visit shows ITS runs; one opens in the editor.
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitWindow
+    db = Database(tmp_path / "v.db")
+    p = project.create(db, "neo", "A11HPKO")
+    sid = fu.create_session(db, p["id"], obs_date="2026-09-20")
+    opened = []
+    runs = [{"id": 7, "created": 1791707743.0, "status": "complete",
+             "n_obs": 2, "points": 4},
+            {"id": 8, "created": 1791708000.0, "status": "undone",
+             "n_obs": 2, "points": 0}]
+    w = VisitWindow(db, p["id"], sid, lang="en", kind="neo",
+                    runs_for_session=lambda s: runs,
+                    open_run=lambda rid: opened.append(rid))
+    tbl = w._ui.vp_tbl_runs
+    assert tbl.rowCount() == 2
+    assert tbl.item(0, 1).text() == "2"          # a live run says its count
+    assert tbl.item(1, 1).text() == "—"          # an undone one does not
+    assert tbl.item(1, 2).text() == "undone"
+    tbl.selectRow(0)
+    w._on_open_run()
+    assert opened == [7]
+    w.close()
+    db.close()
+
+
+def test_visit_banner_wording_follows_what_is_known(qapp, tmp_path):
+    # ADR-077 rev: the visit's header notice claims our observations are in
+    # the circular ONLY when the check proved it; otherwise it links to the
+    # object at the MPC.
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitWindow
+    db = Database(tmp_path / "v.db")
+    p = project.create(db, "neo", "A11HPKO")
+    sid = fu.create_session(db, p["id"], obs_date="2026-09-20")
+    project.merge_confirmed(db, p["id"], {
+        "designation": "2026 TQ8", "mpec": "MPEC 2026-T201"})
+    w = VisitWindow(db, p["id"], sid, lang="en", kind="neo")
+    text = w._ui.vp_lbl_confirm.text()
+    assert "2026 TQ8" in text
+    assert "your observations are among them" not in text
+    assert "see the object at the MPC" in text
+    w.close()
+    project.merge_confirmed(db, p["id"], {"ours_published": True})
+    w2 = VisitWindow(db, p["id"], sid, lang="en", kind="neo")
+    assert "your observations are among them" in w2._ui.vp_lbl_confirm.text()
+    w2.close()
+    db.close()
+
+
 # ---------------- batch FITS attach (review: one dialog, not N) -------
 
 def _fits(path, filt="V", date="2026-09-20T23:30:00", exp=10.0):

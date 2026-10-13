@@ -144,16 +144,64 @@ bloquea el reporte.
 **Recomprobar** repite el chequeo sobre los puntos ya medidos, **sin apilar otra
 vez los fotogramas**.
 
+### Un residuo sale mal: corrige el centroide a mano
+
+Cuando un punto destaca frente a los demás, la causa habitual es el centroide:
+un vecino brillante lo arrastró, o el objeto cayó sobre un píxel malo. **Clic
+derecho en una observación** (en la tabla de puntos, o sobre la imagen) y elige
+**Ajustar el centroide…**: su stack aparece en el **escenario del propio
+editor**, así que haces **zoom, estiras y lees el histograma** con los controles
+que ya conoces; pinchas el objeto y la marca se ajusta a su centroide local. El
+punto se re-mide **sobre el stack guardado**, sin re-apilar, el chequeo se repite
+solo y ves el error nuevo al instante. El punto queda firmado («centroide
+re-seleccionado a mano»), y la app dice qué arregla: el **centroide**, no un
+**registro** malo (para eso, re-apila el run). Es la herramienta **por
+observación**: re-mide UNA observación sobre su stack guardado. La **marca
+manual** (la casilla) es la otra: marca el objeto sobre el stack de **toda la
+secuencia** y **re-ejecuta** el pipeline (un run nuevo), para un objeto por
+debajo de la puerta. Armar una desarma la otra.
+
+Ese mismo menú ofrece **Centroide automático**, que deja que la app lo elija otra
+vez (sembrado en la posición actual del punto) y quita la marca manual, abre el
+listado de **Published observations…** (los residuos del run, la misma ventana
+que el botón del bloque del chequeo), muestra u oculta el **±** (el error
+fotométrico), tanto en la banda sobre la imagen («Mag: X ± Y») como en la columna
+de la tabla de puntos, e incluye/excluye una observación del reporte y del
+chequeo sin tocar la medida. Pasar de una observación a otra **mantiene tu nivel
+del histograma** (el estirado), así que no lo reajustas para cada apilado.
+
+### Un reporte a partir de varias series
+
+Cuando un proyecto tiene varios runs (por ejemplo un objeto en movimiento
+seguido durante la noche), la sección **Reporte combinado** de **Análisis** pone
+todas las mediciones en un sitio: marca las que quieras, pulsa **Comprobar en
+conjunto** para correr **un** chequeo con todas contra los demás observadores, y
+**Reporte combinado…** para construir **un** reporte MPC. El veredicto nombra
+**cada una de tus observaciones con su propio residuo**, para que veas cuál
+descartar, y **Abrir en el editor** las carga todas como **un conjunto
+combinado** en el editor para trabajarlas allí. Desmarca una observación para
+dejarla fuera; la selección y el veredicto se guardan. Las re-medidas de la misma
+observación (los mismos fotogramas apilados otra vez) se **fusionan en una**,
+conservando la del run más nuevo.
+
+Al hacer clic en una visita en **Análisis** se filtran los **Astrometry runs** a
+esa visita, y la ventana de la visita lista **sus propios runs**: haz clic en uno
+para abrirlo en el editor. Un run deshecho ya no tiene posiciones, así que lo
+dice en vez de abrir otro distinto.
+
 ### Tu objeto se confirmó con un nombre nuevo
 
 Un objeto observado mientras seguía en la página de confirmación (una designación
 del NEOCP) y confirmado después recibe una designación nueva, y sus observaciones
 se van con ella. NightScribe lo encuentra solo y lo muestra **muy visible**: el
 nombre nuevo y la circular (MPEC) que lo publicó, en el chequeo, en la ficha del
-proyecto y en la visita. Cuando tu estación ya aparece entre las observaciones
-publicadas, lo dice: **tus datos están en esa circular**. Si la búsqueda
-automática no lo encuentra (la lista del MPC de objetos recién confirmados es
-corta), escribe la designación actual en **Comprobar con** y pulsa
+proyecto y en la visita. Lo hace para **cualquier** proyecto cuyo objeto aún
+lleve una designación temporal del NEOCP/PCCP, lo hayas observado o no: un
+proyecto creado a mano también queda cubierto. Cuando tu estación ya aparece
+entre las observaciones publicadas, lo dice: **tus datos están en esa circular**;
+cuando eso no consta, enlaza con el objeto en el MPC y no afirma nada. Si la
+búsqueda automática no lo encuentra (la lista del MPC de objetos recién
+confirmados es corta), escribe la designación actual en **Comprobar con** y pulsa
 **Recomprobar**.
 
 ## El reporte al MPC
@@ -194,8 +242,10 @@ y relación focal); la app construye con ellos la línea del telescopio.
 
 **Enviar al MPC…** abre el diálogo de envío. Pide cuatro cosas y luego manda el
 lote al MPC; la respuesta del propio servidor (el CurlID o los errores) aparece
-en el registro del diálogo. Sin email de contacto el envío queda bloqueado: el
-MPC lo necesita.
+en el registro del diálogo. El diálogo se abre diciendo qué está a punto de
+enviar (cuántas observaciones, el formato, el destino y el modo), así el lote no
+sale sin verse. Sin email de contacto el envío queda bloqueado: el MPC lo
+necesita.
 
 - **Email de acuse**: dónde manda el MPC su acuse y las designaciones. Es el
   email de contacto que pusiste en Configuración, y puedes cambiarlo aquí.

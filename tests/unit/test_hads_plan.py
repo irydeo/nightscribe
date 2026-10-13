@@ -140,16 +140,16 @@ def test_exposure_preselected_from_heuristic(window):
 
 
 def test_frames_default_covers_two_periods(window):
-    # 2.92 h session at 60 s + 15 s overhead -> 140 frames (ADR-034, D.2)
+    # 2.92 h session at 60 s + 2 s readout -> 169 frames (ADR-034, D.2)
     _select(window, "V1051 Ara", _hads_ctx())
-    assert window._project_widgets["spn_nframes"].value() == 140
+    assert window._project_widgets["spn_nframes"].value() == 169
 
 
 def test_cadence_label_and_warning(window):
     _select(window, "SZ Lyn", _hads_ctx())
     lbl = window._project_widgets["hads_cadence"]
-    # 60 s + 15 s pause -> one point every 75 s, well under the 438 s cap
-    assert "75" in lbl.text() and "438" in lbl.text()
+    # 60 s + 2 s readout -> one point every 62 s, well under the 438 s cap
+    assert "62" in lbl.text() and "438" in lbl.text()
     assert "⚠" not in lbl.text()
     window._project_widgets["spn_exps"].setValue(500.0)
     assert "⚠" in lbl.text()

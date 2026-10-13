@@ -356,3 +356,67 @@ def test_no_confirmation_banner_without_a_rename(window):
          if x["kind"] == "neo"][0]
     window.navigate(VIEW_DETAIL, pid=p["id"])
     assert window.projects.lbl_confirm.isHidden()
+
+
+def test_the_confirmation_banner_claims_no_participation_when_unknown(window):
+    # ADR-077 rev: the banner never asserts that OUR observations are in the
+    # circular unless the check proved it. Without `ours_published` it links
+    # to the object at the MPC instead.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    project.update_context(coredb.db, p["id"], {
+        "neocp": True,
+        "confirmed": {"designation": "2026 TQ8", "mpec": "MPEC 2026-T201",
+                      "mpec_url": "https://www.minorplanetcenter.net/"
+                                  "mpec/K26/K26TK1.html"}})
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    text = window.projects.lbl_confirm.text()
+    assert "2026 TQ8" in text
+    assert "your observations are among them" not in text
+    assert "see the object at the MPC" in text
+
+
+def test_the_confirmation_banner_says_participation_when_known(window):
+    # With `ours_published` in the context (written by the check), the banner
+    # says our data is in the MPEC; the link to the MPC is not needed.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    project.update_context(coredb.db, p["id"], {
+        "neocp": True,
+        "confirmed": {"designation": "2026 TQ8", "mpec": "MPEC 2026-T201",
+                      "ours_published": True}})
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    text = window.projects.lbl_confirm.text()
+    assert "your observations are among them" in text
+
+
+def test_a_temporary_designation_triggers_the_alias_lookup(window):
+    # ADR-077 rev: a NEO created by hand (no `neocp` flag) whose name is still
+    # a NEOCP/PCCP temporary designation is looked up too, so a confirmation
+    # under a new name is announced anyway.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = project.create(coredb.db, "neo", "A11HPKO", {"mag": 19.0})
+    seen = []
+    window._start_alias_lookup = lambda proj: seen.append(proj["object_name"])
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    assert seen == ["A11HPKO"]
+
+
+def test_a_confirmed_name_does_not_trigger_the_alias_lookup(window):
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    seen = []
+    window._start_alias_lookup = lambda proj: seen.append(proj["object_name"])
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    assert seen == []

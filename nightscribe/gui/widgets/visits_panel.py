@@ -40,7 +40,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
-                               QMessageBox, QWidget)
+                               QMessageBox, QTableWidgetItem, QWidget)
 
 from ..ui_loader import adopt_ui, drop_in, load_ui
 from .door_menu import build_door
@@ -114,7 +114,8 @@ class VisitsPanel(QWidget):
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
                  measure_series=None, astrometry=None,
-                 on_visit_selected=None, parent=None):
+                 on_visit_selected=None, runs_for_session=None, open_run=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -123,6 +124,8 @@ class VisitsPanel(QWidget):
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
         self._astrometry = astrometry
+        self._runs_for_session = runs_for_session
+        self._open_run = open_run
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
         self._on_visit_selected = on_visit_selected
@@ -293,6 +296,8 @@ class VisitsPanel(QWidget):
                                 on_measure_click=self._on_measure_click,
                                 measure_series=self._measure_series,
                                 astrometry=self._astrometry,
+                                runs_for_session=self._runs_for_session,
+                                open_run=self._open_run,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -347,7 +352,7 @@ class VisitWindow(QDialog):
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
                  on_measure_click=None, measure_series=None, astrometry=None,
-                 parent=None):
+                 runs_for_session=None, open_run=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -362,6 +367,8 @@ class VisitWindow(QDialog):
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
         self._astrometry = astrometry
+        self._runs_for_session = runs_for_session
+        self._open_run = open_run
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -373,6 +380,9 @@ class VisitWindow(QDialog):
         # @return: None. The rename notice in the visit's own header: the
         #          project's context already carries it (the ficha looked it
         #          up), so this reads and paints and never hits the network.
+        #          Whether OUR observations are in the circular is said only
+        #          when it is known (ADR-077 rev): otherwise it links to the
+        #          object at the MPC and claims no participation.
         lbl = getattr(self._ui, "vp_lbl_confirm", None)
         if lbl is None:
             return
@@ -398,8 +408,16 @@ class VisitWindow(QDialog):
         text = "★ " + self.tr("Confirmed as <b>%1</b>").replace("%1", desig)
         if tail:
             text += " · " + tail
-        text += ". " + self.tr(
-            "Your observations of it are in that circular.")
+        if conf.get("ours_published"):
+            text += ". " + self.tr(
+                "your observations are among them: your data is in that MPEC")
+        else:
+            obj_url = ("https://www.minorplanetcenter.net/db_search/"
+                       "show_object?utf8=True&object_id="
+                       + desig.replace(" ", "+"))
+            text += ". " + self.tr(
+                '<a href="%1">see the object at the MPC</a>').replace(
+                    "%1", obj_url)
         lbl.setText(text)
         lbl.setVisible(True)
 
@@ -465,6 +483,17 @@ class VisitWindow(QDialog):
         drop_in(self._ui.grp_res.layout(), self._ui.ph_resources,
                 self.lst_res)
         self._populate_resources()
+
+        # ---- the visit's own runs (ADR-086 rev): clicking a visit shows ITS
+        # runs, so the observer sees which passes measured this night and can
+        # open one in the editor without hunting in the project list.
+        self._runs_tbl = getattr(self._ui, "vp_tbl_runs", None)
+        self._runs_lbl = getattr(self._ui, "vp_lbl_runs", None)
+        if self._runs_tbl is not None:
+            self._runs_tbl.itemSelectionChanged.connect(self._on_run_selected)
+            self._runs_tbl.itemDoubleClicked.connect(
+                lambda _it: self._on_open_run())
+            self._populate_runs()
 
         # ---- measurements (light-curve kinds)
         if self._curve_kind:
@@ -608,6 +637,71 @@ class VisitWindow(QDialog):
             item.setData(Qt.UserRole, f["id"])
             self.lst_res.addItem(item)
 
+    def _populate_runs(self):
+        # @return: None. The visit's own astrometry runs (ADR-086 rev): one
+        #          row per run, oldest first, with its state; the observer
+        #          opens one in the editor (double click or the button).
+        tbl = self._runs_tbl
+        if tbl is None:
+            return
+        runs = []
+        if callable(self._runs_for_session):
+            try:
+                runs = self._runs_for_session(self._sid) or []
+            except Exception:
+                runs = []
+        tbl.setRowCount(len(runs))
+        for i, run in enumerate(runs):
+            when = self._run_when(run.get("created"))
+            undone = (run.get("status") or "") == "undone"
+            cells = (when,
+                     ("—" if undone else str(run.get("n_obs")
+                                             or run.get("points") or 0)),
+                     self.tr("undone") if undone
+                     else self.tr("complete"))
+            for col, text in enumerate(cells):
+                item = QTableWidgetItem(str(text))
+                if col == 0:
+                    item.setData(Qt.UserRole, run.get("id"))
+                tbl.setItem(i, col, item)
+        if self._runs_lbl is not None:
+            if runs:
+                self._runs_lbl.setText(self.tr(
+                    "This visit's runs: click one and open it in the editor."))
+            else:
+                self._runs_lbl.setText(self.tr(
+                    "This visit has no runs yet."))
+
+    def _run_when(self, raw):
+        # @args: raw - epoch seconds (string or float)
+        # @return: "YYYY-MM-DD HH:MM"
+        import datetime
+        try:
+            return datetime.datetime.fromtimestamp(
+                float(raw)).strftime("%Y-%m-%d %H:%M")
+        except (TypeError, ValueError):
+            return str(raw or "")
+
+    def _on_run_selected(self):
+        # @return: None. Nothing automatic: opening is a deliberate gesture.
+        pass
+
+    def _on_open_run(self):
+        # @return: None. Opens the selected run in the editor (the host owns
+        #          the navigation; without it the click is a no-op).
+        tbl = self._runs_tbl
+        if tbl is None or not callable(self._open_run):
+            return
+        rows = tbl.selectionModel().selectedRows()
+        if not rows:
+            return
+        item = tbl.item(rows[0].row(), 0)
+        if item is None:
+            return
+        run_id = item.data(Qt.UserRole)
+        if run_id is not None:
+            self._open_run(run_id)
+
     def _on_analyze(self):
         # The kind's own analysis (ADR-045 review): the host opens the
         # editor on the right tab for this visit, and the observer does not
@@ -720,6 +814,7 @@ class VisitWindow(QDialog):
         # misnamed filter breaks the light-curve split, so it stays
         # editable). The form is ui/visit_file_meta.ui (ADR-005).
         # @return: the meta dict, or None when cancelled
+        from ...core import fits_meta
         try:
             meta = fits_meta.read_meta(path)
         except Exception:

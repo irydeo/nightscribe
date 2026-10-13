@@ -17,7 +17,8 @@ Four missions, one loop:
    under *your* real constraints, ranked and explained.
 2. **Understand every object**: orbital and physical parameters translated
    into accurate, engaging explanations, in Spanish and English.
-3. **Capture and reduce**: it drives your mount and camera through CCDciel,
+3. **Capture and reduce**: it drives your mount and camera through CCDciel or
+   NINA/PINS,
    and it calibrates, stacks and measures your own frames: photometry
    (variables, exoplanets, supernovae) and MPC-ready astrometry of minor
    bodies, without leaving the window.
@@ -102,7 +103,7 @@ sky as context. This is what you get from each one:
 |---|---|
 | **Required** | Linux or Windows · Python 3.11+ (3.12 recommended) *or* the standalone installer (no Python needed) · ~500 MB of disk · an internet connection for the live data (everything else works offline) |
 | **Recommended** | Your **MPC observatory code** (e.g. `Z41`): the first-run wizard resolves your coordinates automatically and it unlocks the site-specific NEO list · your **local horizon file** (TheSkyX `.hrz` or simple `az alt` pairs) · your telescope aperture and camera pixel/focal length |
-| **Optional** | **CCDciel** running locally, if you want the app to drive the mount and camera (the first observatory integration; NINA and others are planned) · four free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, TNS bot, AAVSO token) · two optional external tools, **Find_Orb** (the check against other observers) and **EXOTIC** (the transit reduction); see *Optional integrations* |
+| **Optional** | **CCDciel or NINA/PINS** running locally, if you want the app to drive the mount and camera (the observatory integration; one backend at a time) · four free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, TNS bot, AAVSO token) · two optional external tools, **Find_Orb** (the check against other observers) and **EXOTIC** (the transit reduction); see *Optional integrations* |
 
 No account, no registration, no telemetry: NightScribe runs on your computer
 and talks only to the public data services listed below.
@@ -327,18 +328,25 @@ From the **Tools** menu:
   grade with the "±10 min" label always visible (validated against 22 JPL
   Horizons windows; worst case 9.6 min).
 
-### Drive your observatory (CCDciel)
+### Drive your observatory (CCDciel or NINA/PINS)
 
-The **Capture** step of each project talks to your local **CCDciel** over
-JSON-RPC, only while CCDciel is actually running: status at a glance (version,
-CCD temperature, tracking, slewing), **Point telescope** (quick slew to a
-moving target's freshly computed position), **Astrometric Goto** (slew,
-capture, plate-solve and correction) and **live capture** (stage the project's
-saved plan and start the run).
+The **Capture** step of each project talks to your observatory software, only
+while it is actually running. You pick one under **Tools → Settings →
+Integrations**: **CCDciel** over JSON-RPC, or **NINA** (Windows) / **PINS**
+(Linux) over the Advanced API v2 plugin. Both give you status at a glance
+(version, CCD temperature, tracking, slewing), **Point telescope** (quick slew
+to a moving target's freshly computed position), **Astrometric Goto** (slew,
+capture, plate-solve and correction), a **Stop goto** safety button, and
+**live capture** (stage the project's saved plan, read back to show what is
+really held, and start the run).
 
-CCDciel is the first direct observatory integration; NINA and others are on
-the roadmap. Meanwhile, file-based sequence export already covers NINA (JSON),
-CCDciel itself and generic CSV.
+The plan's filter list is the one your wheel really has, read from the program
+on connect. NINA's snapshot takes one exposure at a time, so there its frame
+count is information only; CCDciel honours the count. And the last frame the
+run wrote shows up right there as a thumbnail, with a click to open it in the
+editor. **Capture options** propose the dithering and autofocus your object
+wants, with the reason a hover away. See chapter 05 of the guide for the exact
+limits.
 
 ### Reduce and measure in the app (the editor)
 
@@ -504,7 +512,8 @@ you so. Configure them in **Tools → Settings → Integrations**.
 
 | Integration | What it unlocks |
 |---|---|
-| **CCDciel** (local, host/port) | The Capture step of each project: status, point telescope, astrometric goto, staging the saved plan, live capture. Only while CCDciel is running. First observatory integration; NINA and others are planned |
+| **CCDciel** (local, host/port) | The Capture step of each project: status, point telescope, astrometric goto, **Stop goto**, staging the saved plan (read back) and live capture. Only while CCDciel is running |
+| **NINA / PINS** (local, host/port) | The same Capture step over the **Advanced API v2** plugin: status, point telescope, astrometric goto (Center), **Stop goto**, filter wheel and a one-shot snapshot capture. NINA on Windows, PINS on Linux; one backend at a time |
 | **NEOfixer API key** | Report `will_observe` / `observed` back for community coordination |
 | **Astrometry.net key** (free) | Blind solve of WCS-less FITS in the blink |
 | **TNS bot credentials** | Discovery images shown inside the app (respecting each survey's licence) |

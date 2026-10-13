@@ -70,6 +70,14 @@ debe ver y elegir el objetivo, el acuse y el modo antes de enviar; (d) construir
 el `TEL` solo del texto libre, descartado: el observador pidió construirlo de
 los campos que ya tiene.
 
+**Revisión 2026-10-13**: el diálogo de envío se abría con la caja vacía y sin
+explicación, y eso se lee como roto. Ahora lleva encima del registro una línea de
+resumen (cuántas observaciones, el formato, el destino y el modo) y un texto de
+marcador en la caja que dice qué aparecerá ahí al pulsar Send. Y el destino por
+defecto que promete el manual (NEOCP si el proyecto está en el NEOCP,
+Unclassified si no) por fin se aplica: la condición antigua pedía además un combo
+vacío, y `set_targets` ya lo había rellenado, así que nunca entraba.
+
 ## English
 
 **Context**: the report NightScribe generated was **the data lines only**, with
@@ -138,3 +146,11 @@ click, rejected: the MPC archives measurements forever and the observer must see
 and choose the target, the ACK and the mode before sending; (d) building the
 `TEL` from the free text alone, rejected: the observer asked for it to be built
 from the fields they already have.
+
+**Revision 2026-10-13**: the send dialog opened with an empty box and no
+explanation, which reads as broken. It now carries a summary line above the log
+(how many observations, the format, the target and the mode) and a placeholder in
+the box saying what will appear there on Send. And the default target the manual
+promises (NEOCP when the project is on the NEOCP, Unclassified otherwise) now
+really applies: the old condition also asked for an empty combo, and
+`set_targets` had already filled it, so it never entered.

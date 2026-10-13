@@ -57,9 +57,36 @@ CATEGORIES = [
      QT_TRANSLATE_NOOP("MainWindow", "Interface"), "settings_interface"),
 ]
 
-# Groups that are advanced: they carry a disclosure and open collapsed, so
-# the common path is short and the rare knob is one click away.
-ADVANCED_GROUPS = ("grp_phot_adv", "grp_astro_adv", "grp_astro_work")
+# One line at the top of each page (ADR-071 rev): it gives the page a voice
+# and says what the settings on it are FOR, so the observer reads a page
+# instead of a list.
+CATEGORY_INTROS = {
+    "page_observatory": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "Your site and your name: the coordinates everything is computed from."),
+    "page_equipment": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "What you observe with; it sizes the targets and the exposure."),
+    "page_observing": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "What tonight shows and how a session is planned."),
+    "page_measurement": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "How your frames are reduced: photometry, astrometry and their tools."),
+    "page_integrations": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "The programs and keys NightScribe talks to."),
+    "page_interface": QT_TRANSLATE_NOOP(
+        "MainWindow",
+        "How the app looks and speaks."),
+}
+
+# The Settings groups that belong to ONE observatory backend (ADR-081). The
+# Integrations page shows only the group of the program picked in
+# `cmb_obs_backend`, so the observer never reads the host and port of a
+# program they are not using. One map, so the visibility rule and the tests
+# cannot drift from the combo's data.
+BACKEND_GROUPS = {"ccdciel": "grp_ccdciel", "nina": "grp_nina"}
 
 FIELDS = [
     # --- Observatory ---------------------------------------------------
@@ -69,6 +96,7 @@ FIELDS = [
     Field("spn_lon", "lon", "float"),
     Field("spn_height", "height", "int"),
     Field("edt_aavso_code", "aavso_code", "str", upper=True),
+    Field("spn_sky_brightness", "sky_brightness_mag", "float"),
     # --- Equipment -----------------------------------------------------
     Field("spn_aperture", "aperture_inches", "float"),
     Field("spn_limit_mag", "limit_mag", "float"),
@@ -79,6 +107,7 @@ FIELDS = [
     Field("spn_cam_gain", "ccd_gain", "float", zero_none=True),
     Field("spn_cam_ron", "ccd_read_noise", "float", zero_none=True),
     Field("spn_cam_dark", "cam_dark_current_e_s", "float", zero_none=True),
+    Field("spn_cam_readout", "cam_readout_s", "float", zero_none=True),
     Field("spn_cam_max_exp", "cam_max_exposure_s", "float", zero_none=True),
     # --- Observing -----------------------------------------------------
     Field("edt_horizon_file", "horizon_file", "str"),
@@ -88,7 +117,6 @@ FIELDS = [
     Field("spn_moon_sep", "moon_min_sep_deg", "float"),
     Field("spn_moon_illum", "moon_max_illum", "float"),
     Field("chk_moons_all", "show_sat_moons_unobserved", "bool"),
-    Field("spn_overhead", "overhead_s", "float"),
     Field("spn_sn_cadence", "sn_cadence_days", "int"),
     Field("spn_event_mag", "event_mag_threshold", "float"),
     Field("spn_extremum_days", "campaign_extremum_days", "int"),
@@ -120,11 +148,18 @@ FIELDS = [
     Field("edt_exotic_python", "exotic_python_path", "str"),
     Field("edt_exotic_install", "exotic_install_dir", "str"),
     # --- Integrations --------------------------------------------------
+    # Which observatory software the Capture step drives (ADR-081). The combo
+    # items carry the backend id as data (ccdciel/nina), filled in the .ui.
+    Field("cmb_obs_backend", "observatory_backend", "combo"),
     Field("edt_ccdciel_host", "ccdciel_host", "str"),
     Field("spn_ccdciel_port", "ccdciel_port", "int"),
     Field("chk_ccdciel_auto", "ccdciel_auto_connect", "bool"),
+    Field("edt_nina_host", "nina_host", "str"),
+    Field("spn_nina_port", "nina_port", "int"),
+    Field("chk_nina_auto", "nina_auto_connect", "bool"),
     Field("edt_neofixer_key", "neofixer_key", "str"),
     Field("edt_astrometry_key", "astrometry_key", "str"),
+    Field("edt_lightpollution_key", "lightpollution_key", "str"),
     Field("edt_tns_bot", "tns_bot_name", "str"),
     Field("edt_tns_bot_key", "tns_bot_key", "str"),
     Field("edt_aavso_token", "aavso_api_token", "str"),

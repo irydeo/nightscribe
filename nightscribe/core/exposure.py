@@ -14,6 +14,14 @@
 import datetime
 import math
 
+# The per-frame readout+download assumed when the camera profile does not say
+# (seconds). It is the ONE per-frame overhead of the app: the "Readout +
+# download" field (config key `cam_readout_s`, filled from the camera preset's
+# `readout_s`) is what the observer adjusts. A dict-based caller (a test, a
+# sequence) that omits the key gets this number. 2 s is a modern USB3 CMOS;
+# a CCD reads out in several seconds, and its preset says so.
+DEFAULT_READOUT_S = 2.0
+
 # Session planning maths (ADR-021): plate scale from the camera profile,
 # trailing-free exposure for fast NEOs, total session duration and the
 # "latest safe start" against the local horizon (ADR-020), plus the rough
@@ -113,6 +121,48 @@ def limit_from_aperture(aperture_in):
     return _LIMIT_ANCHOR + 5.0 * math.log10(d_mm)
 
 
+def fov_arcmin(sensor_w_mm, sensor_h_mm, focal_mm):
+    # The camera's true field of view from the active sensor area and the
+    # focal length: FOV = 206265 * sensor_mm / focal_mm (arcsec). Binning does
+    # NOT enter: it changes the sampling, not the patch of sky the sensor
+    # covers. Used to bound a moving object's run: once it crosses the field,
+    # every later frame is lost.
+    # @args: sensor_w_mm/sensor_h_mm - active sensor size in mm, focal_mm -
+    #        focal length in mm
+    # @return: (width, height) in arcmin, or None when a figure is missing
+    try:
+        f = float(focal_mm)
+        w = float(sensor_w_mm)
+        h = float(sensor_h_mm)
+    except (TypeError, ValueError):
+        return None
+    if f <= 0 or w <= 0 or h <= 0:
+        return None
+    k = 206265.0 / f            # arcsec per mm at this focal length
+    return (w * k / 60.0, h * k / 60.0)
+
+
+def frame_overhead_s(cfg):
+    # The non-exposure seconds of ONE frame: the camera's readout + download.
+    # It is the ONE per-frame overhead of the app, taken from the "Readout +
+    # download" field (`cam_readout_s`, filled from the camera preset) and
+    # adjustable there, because the download is never immediate and depends on
+    # the sensor and the interface (a slow one means fewer frames before a
+    # moving object drifts out of the field). Nothing else is added on top: if
+    # the observer's mount needs to settle between frames, that number is
+    # raised in the same field.
+    # @args: cfg - the Config (or a dict)
+    # @return: seconds (float)
+    readout = cfg.get("cam_readout_s")
+    try:
+        readout = float(readout)
+    except (TypeError, ValueError):
+        readout = 0.0
+    if readout <= 0:
+        readout = DEFAULT_READOUT_S      # unknown camera: a modern USB3 CMOS
+    return readout
+
+
 def max_exposure_no_trail(rate_arcsec_min, plate_scale_arcsec_px, tol_px=1.0):
     # Maximum single-frame exposure before the target trails more than tol_px
     # pixels. rate is arcsec/min; plate scale is arcsec/pixel.
@@ -124,11 +174,14 @@ def max_exposure_no_trail(rate_arcsec_min, plate_scale_arcsec_px, tol_px=1.0):
     return tol_px * plate_scale_arcsec_px * 60.0 / float(rate_arcsec_min)
 
 
-def session_duration_s(n_frames, exp_s, overhead_s=15.0):
+def session_duration_s(n_frames, exp_s, overhead_s=None):
     # Total wall-clock seconds of a capture sequence.
     # @args: n_frames - frame count, exp_s - exposure per frame in seconds,
-    #        overhead_s - readout/slew per frame in seconds
+    #        overhead_s - per-frame time that is not the exposure (None =
+    #        the documented default)
     # @return: seconds (float)
+    if overhead_s is None:
+        overhead_s = DEFAULT_READOUT_S
     return int(n_frames) * (float(exp_s) + float(overhead_s))
 
 

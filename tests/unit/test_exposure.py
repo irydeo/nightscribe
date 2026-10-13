@@ -132,3 +132,30 @@ def test_group_n_for_span():
     assert exposure.group_n_for_span(3, 10) == 1     # never below one
     assert exposure.group_n_for_span(0, 5) == 1
     assert exposure.group_n_for_span(None, 5) == 1
+
+
+def test_fov_arcmin_from_the_sensor_and_focal():
+    # 23.5 x 15.7 mm at 2000 mm: 206265*23.5/2000 = 2423" = 40.4'
+    fov = exposure.fov_arcmin(23.5, 15.7, 2000.0)
+    assert abs(fov[0] - 40.38) < 0.05
+    assert abs(fov[1] - 26.98) < 0.05
+
+
+def test_fov_arcmin_is_none_without_the_figures():
+    assert exposure.fov_arcmin(None, 15.7, 2000.0) is None
+    assert exposure.fov_arcmin(23.5, 15.7, 0) is None
+    assert exposure.fov_arcmin(23.5, 15.7, None) is None
+    assert exposure.fov_arcmin("junk", 15.7, 2000.0) is None
+
+
+def test_frame_overhead_is_the_readout_download():
+    # ADR-083 rev: the per-frame overhead is ONE number, the camera's readout +
+    # download (the "Readout + download" field); nothing is added on top
+    assert exposure.frame_overhead_s({"cam_readout_s": 2.0}) == 2.0
+    assert exposure.frame_overhead_s({"cam_readout_s": 8.0}) == 8.0
+    # an unknown camera (empty field) falls back to the documented default
+    assert exposure.frame_overhead_s({}) == exposure.DEFAULT_READOUT_S
+    assert exposure.frame_overhead_s({"cam_readout_s": 0}) == \
+        exposure.DEFAULT_READOUT_S
+    assert exposure.frame_overhead_s({"cam_readout_s": None}) == \
+        exposure.DEFAULT_READOUT_S

@@ -39,6 +39,7 @@ class MpcSendDialog(QDialog):
         self.setWindowTitle(self.tr("Send report to the Minor Planet Center"))
         self.setModal(False)
         self._ui = adopt_ui(self, "ufe_mpc_send_dialog")
+        self.lbl_intro = self._ui.lbl_intro
         self.txt_log = self._ui.txt_log
         self.edt_ack_email = self._ui.edt_ack_email
         self.edt_ack = self._ui.edt_ack

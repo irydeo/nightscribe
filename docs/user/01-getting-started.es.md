@@ -93,9 +93,9 @@ lo que merece una visita pronto:
 - **Solver de placa**: ASTAP local si lo tienes instalado, con
   nova.astrometry.net como respaldo. Necesario para la astrometría
   (capítulo 07).
-- **Integraciones opcionales**: CCDciel (captura, capítulo 05), claves de
-  NEOfixer, Astrometry.net, TNS y AAVSO. Ninguna es obligatoria: sin ellas la
-  función correspondiente simplemente se queda callada.
+- **Integraciones opcionales**: CCDciel o NINA/PINS (captura, capítulo 05),
+  claves de NEOfixer, Astrometry.net, TNS y AAVSO. Ninguna es obligatoria: sin
+  ellas la función correspondiente simplemente se queda callada.
 
 > **¿Por qué piden un token de AAVSO?** Las vigilias de estrellas brillantes
 > (T CrB, R CrB) comparan el estado actual con la fotometría que la comunidad

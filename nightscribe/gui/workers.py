@@ -881,11 +881,12 @@ class SequenceExportWorker(QThread):
             self.finished.emit("", str(err))
 
 
-class CcdcielWorker(QThread):
-    # Runs a single CCDciel JSON-RPC action off the GUI thread and reports
-    # the result. The action receives the Client; anything network-shaped
-    # stays out of the UI thread (ADR-030). When poll_slew is set the worker
-    # also waits for Telescope_slewing to settle before emitting.
+class ObservatoryWorker(QThread):
+    # Runs a single observatory action off the GUI thread and reports the
+    # result. The action receives the Client (CCDciel or NINA/PINS, same
+    # surface); anything network-shaped stays out of the UI thread (ADR-030).
+    # When poll_slew is set the worker also waits for the mount to settle
+    # before emitting.
     finished = Signal(object, str)  # result payload, error message
 
     def __init__(self, client, action, poll_slew=False):
@@ -896,21 +897,21 @@ class CcdcielWorker(QThread):
 
     def run(self):
         # @return: emits (result, "") on success, (None, message) on failure
-        from ..core.sources import ccdciel
+        from ..core.sources import observatory
         try:
             result = self._action(self._client)
             if self._poll_slew:
                 self._wait_slew()
             self.finished.emit(result, "")
-        except ccdciel.CCDcielError as err:
-            logger.info("ccdciel command failed: %s", err)
+        except observatory.ObservatoryError as err:
+            logger.info("observatory command failed: %s", err)
             self.finished.emit(None, str(err))
         except Exception as err:  # never crash the GUI on daft payloads
-            logger.exception("ccdciel worker failed: %s", err)
+            logger.exception("observatory worker failed: %s", err)
             self.finished.emit(None, str(err))
 
     def _wait_slew(self):
-        # Polls Telescope_slewing (live, uncached) until the mount stops.
+        # Polls the mount's slewing flag (live, uncached) until it stops.
         # The 300 s ceiling keeps a dead server from hanging the worker.
         slept = 0.0
         while slept < 300.0:
@@ -918,6 +919,113 @@ class CcdcielWorker(QThread):
                 return
             self.msleep(900)
             slept += 0.9
+
+
+# Old name kept so an existing import keeps working (the class is generic
+# now: it drives whichever observatory backend the settings picked).
+CcdcielWorker = ObservatoryWorker
+
+
+class FollowWorker(QThread):
+    # ADR-084: drives the "start and follow" loop (core/follow.FollowRun) off
+    # the GUI thread, with the real observatory client behind the injected
+    # callables. It emits one progress dict per event (the GUI owns the
+    # wording) and a final (status, error). Cancel is a flag the loop reads
+    # between steps: a Stop never leaves a half-issued command behind.
+    progress = Signal(dict)
+    finished = Signal(str, str)      # status: done|cancelled|failed, error
+
+    def __init__(self, client, plan, object_name, ctx, options=None,
+                 site=""):
+        super().__init__()
+        self._client = client
+        self._plan = plan
+        self._object_name = object_name
+        self._ctx = dict(ctx or {})
+        self._options = dict(options or {})
+        self._site = site
+        self._cancel = False
+
+    def cancel(self):
+        # @return: None. The loop checks it between steps.
+        self._cancel = True
+
+    def _cancelled(self):
+        return self._cancel
+
+    def _resolve(self):
+        # Resolve the object's CURRENT position (the whole point of the run:
+        # re-point onto an object that has moved). A network failure falls
+        # back to the stored snapshot, and says so, instead of killing a run.
+        from ..core import ephemeris
+        ctx = self._ctx
+        obj_id = ctx.get("id") or ctx.get("packed") or self._object_name
+        pos = ephemeris.position_at(obj_id, self._site, fallback_target=ctx)
+        if pos:
+            return pos
+        if ctx.get("ra_deg") is not None:
+            return {"ra_deg": ctx["ra_deg"], "dec_deg": ctx["dec_deg"],
+                    "source": "snapshot", "fell_back": True}
+        return None
+
+    def run(self):
+        from ..core import follow
+        from ..core.sources import observatory
+        client = self._client
+        opts = self._options
+
+        def _push(n, exp_s):
+            client.push_plan(n, exp_s, self._object_name,
+                             dither=opts.get("dither"),
+                             gain=opts.get("gain"),
+                             offset=opts.get("offset"),
+                             binning=opts.get("binning"))
+
+        try:
+            run = follow.FollowRun(
+                self._plan,
+                resolve_position=self._resolve,
+                center=lambda ra, dec: client.astrometry_goto(ra, dec),
+                push_plan=_push,
+                start_capture=lambda: client.start_capture(),
+                capturing=lambda: client.capturing(),
+                stop_capture=lambda: client.stop_capture(),
+                cancel=self._cancelled,
+                progress=lambda event, **info: self.progress.emit(
+                    {"event": event, **info}))
+            status = run.run()
+            self.finished.emit(status, "")
+        except observatory.ObservatoryError as err:
+            logger.info("follow run failed: %s", err)
+            self.finished.emit("failed", str(err))
+        except Exception as err:      # never crash the GUI on a daft payload
+            logger.exception("follow worker failed: %s", err)
+            self.finished.emit("failed", str(err))
+
+
+class SkyBrightnessWorker(QThread):
+    # Looks up the site's zenith sky brightness in the light-pollution atlas
+    # (ADR-083), off the GUI thread. It is a network read with a very long
+    # cache (30 days), so pressing the button twice costs one request.
+    finished = Signal(object, str)    # mpsas or None, error
+
+    def __init__(self, lat, lon, key):
+        super().__init__()
+        self._lat = lat
+        self._lon = lon
+        self._key = key
+
+    def run(self):
+        from ..core.sources import lightpollution
+        try:
+            self.finished.emit(
+                lightpollution.sky_brightness_mpsas(
+                    self._lat, self._lon, self._key), "")
+        except lightpollution.LightPollutionError as err:
+            self.finished.emit(None, str(err))
+        except Exception as err:      # never crash the GUI on a daft reply
+            logger.exception("sky brightness lookup failed: %s", err)
+            self.finished.emit(None, str(err))
 
 
 class ResolveWorker(QThread):
@@ -1690,6 +1798,9 @@ class TrackStackWorker(QThread):
                 # publishes, and the point is the observation
                 sp.mag = float(res.mag)
                 sp.band = band
+                # ... with its error bar, so the points table can show the
+                # photometric uncertainty next to the magnitude (ADR-085)
+                sp.mag_err = float(res.err_total or 0.0)
         good = [p for p in per_obs if p is not None]
         if not good:
             return None
@@ -2531,6 +2642,54 @@ class FrameThumbWorker(QThread):
                 break
             self.sampled.emit(index, sample, facts)
         self.done.emit()
+
+
+class CapturePreviewWorker(QThread):
+    # Fetches the last frame the observatory has, as a small image, off the
+    # GUI thread (ADR-082): CCDciel's fullimage.jpg over its HTTP server, or
+    # NINA's image stream. The bytes are handed over untouched; the widget
+    # turns them into a pixmap (a QPixmap may not be built off the GUI
+    # thread). Works local and remote: the image comes over HTTP, not from a
+    # folder.
+    loaded = Signal(object, str)     # dict or None, error
+
+    def __init__(self, client):
+        super().__init__()
+        self._client = client
+
+    def run(self):
+        # @return: emits (dict, "") on success, (None, message) on failure
+        from ..core.sources import observatory
+        try:
+            self.loaded.emit(self._client.last_frame_preview(), "")
+        except observatory.ObservatoryError as err:
+            self.loaded.emit(None, str(err))
+        except Exception as err:      # never crash the GUI on daft payloads
+            logger.exception("capture preview failed: %s", err)
+            self.loaded.emit(None, str(err))
+
+
+class CaptureFitsWorker(QThread):
+    # Downloads the FITS of one frame, off the GUI thread, so "Open in the
+    # editor" works against a remote observatory (ADR-082). NINA returns it
+    # base64 (raw_fits); CCDciel does not offer the FITS over HTTP, so there
+    # the editor opens the file on disk instead and this worker is not used.
+    loaded = Signal(object, str)     # bytes or None, error
+
+    def __init__(self, client, index):
+        super().__init__()
+        self._client = client
+        self._index = index
+
+    def run(self):
+        from ..core.sources import observatory
+        try:
+            self.loaded.emit(self._client.image_fits_bytes(self._index), "")
+        except observatory.ObservatoryError as err:
+            self.loaded.emit(None, str(err))
+        except Exception as err:
+            logger.exception("capture FITS fetch failed: %s", err)
+            self.loaded.emit(None, str(err))
 
 
 class StackRemeasureWorker(QThread):

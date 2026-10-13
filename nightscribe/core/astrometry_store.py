@@ -94,9 +94,10 @@ def add_points(db, rows):
             " group_index, mjd, ra, dec, rms_ra, rms_dec, mag, band, x, y,"
             " n_frames, snr, mag_limit, source, method, flags,"
             " check_residual_ra, check_residual_dec, check_scatter,"
-            " check_ok, check_note, mag_auto, mag_source)"
+            " check_ok, check_note, mag_auto, mag_source, mag_err,"
+            " centroid_source)"
             " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,"
-            " ?, ?, ?, ?, ?, ?, ?, ?)",
+            " ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (r.get("run_id"), r.get("project_id"), r.get("session_id"),
              r.get("group_index"), r.get("mjd"), r.get("ra"), r.get("dec"),
              r.get("rms_ra"), r.get("rms_dec"), r.get("mag"), r.get("band"),
@@ -104,7 +105,8 @@ def add_points(db, rows):
              r.get("mag_limit"), r.get("source"), r.get("method"), flags,
              r.get("check_residual_ra"), r.get("check_residual_dec"),
              r.get("check_scatter"), r.get("check_ok"), r.get("check_note"),
-             r.get("mag_auto", r.get("mag")), r.get("mag_source", "auto")))
+             r.get("mag_auto", r.get("mag")), r.get("mag_source", "auto"),
+             r.get("mag_err"), r.get("centroid_source", "auto")))
         ids.append(cur.lastrowid)
     db.commit()
     return ids
@@ -153,6 +155,128 @@ def set_point_excluded(db, run_id, group_index, excluded):
          int(group_index)))
     db.commit()
     return cur.rowcount
+
+
+def set_manual_centroid(db, run_id, group_index, ra, dec, rms_ra, rms_dec,
+                        x, y, snr=None, source="manual"):
+    # ADR-085: the observer re-selected the centroid of an observation on the
+    # saved stack (a bad residual, a centroid dragged by a neighbour), or asked
+    # the app to pick it again AUTOMATICALLY (source="auto"): the STACK point's
+    # position and its error bar move and the point is SIGNED with where the
+    # centroid came from; the per-frame point is left alone (it is the other
+    # half of the double measurement). Nothing is re-stacked.
+    # @args: db, run_id, group_index, ra/dec - the new position, rms_ra/dec -
+    #        its error bar, x/y - the pixel centroid, snr - optional,
+    #        source - "manual" | "auto"
+    # @return: how many points were updated (0 or 1)
+    src = "manual" if str(source) == "manual" else "auto"
+    cur = db.execute(
+        "UPDATE astrometry_points SET ra=?, dec=?, rms_ra=?, rms_dec=?,"
+        " x=?, y=?, snr=COALESCE(?, snr), centroid_source=?"
+        " WHERE run_id=? AND group_index=? AND source='stack'",
+        (float(ra), float(dec), float(rms_ra), float(rms_dec), float(x),
+         float(y), (float(snr) if snr is not None else None), src,
+         int(run_id), int(group_index)))
+    db.commit()
+    return cur.rowcount
+
+
+def project_observations(db, project_id):
+    # ADR-086: every measurement the project has, across its runs, in time
+    # order: the STACK points of the complete runs (the object's own
+    # measurement, the one the report carries). It is what the combined
+    # check/report lists, so the observer can see the whole set at once.
+    # @args: db, project_id
+    # @return: [point dicts, each carrying its run's created time and motion]
+    runs = [r for r in list_runs(db, project_id)
+            if r.get("status") == "complete"]
+    out = []
+    for run in runs:
+        for pt in points_for_run(db, run["id"]):
+            if pt.get("source") != "stack":
+                continue
+            pt = dict(pt)
+            pt["run_created"] = run.get("created")
+            pt["rate_arcsec_min"] = run.get("rate_arcsec_min")
+            out.append(pt)
+    out.sort(key=lambda q: (q.get("mjd") or 0.0, q.get("id") or 0))
+    return out
+
+
+def dedupe_observations(obs):
+    # ADR-086 rev: a project accumulates RE-MEASURES of the same observation
+    # (the same night's frames stacked again, with another method or another
+    # observation count). Feeding all of them to Find_Orb hands it several
+    # identical points at the same instant, a degenerate set that produces
+    # absurd residuals (measured 2026-10-13: four runs at mjd 61322.915954).
+    # The combined view keeps ONE point per (mjd, group_index), the one from
+    # the NEWEST run, and says how many were merged.
+    # @args: obs - [point dicts] from project_observations
+    # @return: (kept, merged): the deduped list (time order) and how many were
+    #          folded away
+    best = {}
+    for o in obs:
+        try:
+            key = (round(float(o.get("mjd") or 0.0), 6),
+                   int(o.get("group_index") or 0))
+        except (TypeError, ValueError):
+            key = (o.get("mjd"), o.get("group_index"))
+        cur = best.get(key)
+        if cur is None or (o.get("run_id") or 0) > (cur.get("run_id") or 0):
+            best[key] = o
+    kept = sorted(best.values(),
+                  key=lambda q: (q.get("mjd") or 0.0, q.get("id") or 0))
+    return kept, len(obs) - len(kept)
+
+
+def runs_for_session(db, session_id):
+    # ADR-086 rev: the astrometry runs of ONE visit, oldest first, with the
+    # numbers the visit window shows. The counterpart of the series'
+    # `followup.runs_for_session`, for the track & stack.
+    # @args: db, session_id - the visit
+    # @return: [run dicts, with their point count]
+    if session_id is None:
+        return []
+    rows = db.execute(
+        "SELECT r.id, r.created, r.status, r.object_name, r.n_obs,"
+        " r.n_frames, r.rate_arcsec_min, COUNT(p.id)"
+        " FROM astrometry_runs r"
+        " LEFT JOIN astrometry_points p ON p.run_id = r.id"
+        " WHERE r.session_id=? GROUP BY r.id ORDER BY r.id",
+        (session_id,)).fetchall()
+    return [{"id": r[0], "created": r[1], "status": r[2],
+             "object_name": r[3], "n_obs": r[4], "n_frames": r[5],
+             "rate_arcsec_min": r[6], "points": r[7] or 0} for r in rows]
+
+
+def save_combined(db, project_id, included, check):
+    # ADR-086: the project's combined check/report is SAVED (one row per
+    # project): the point ids the observer ticked and the combined
+    # CheckReport summary. A reopen shows the same set and the same verdict.
+    # @args: db, project_id, included - [point ids], check - the summary dict
+    # @return: None
+    db.execute(
+        "INSERT INTO astrometry_combined (project_id, included_json,"
+        " check_json, updated) VALUES (?, ?, ?, ?)"
+        " ON CONFLICT(project_id) DO UPDATE SET"
+        " included_json=excluded.included_json,"
+        " check_json=excluded.check_json, updated=excluded.updated",
+        (int(project_id), _json_or_none(list(included or [])),
+         _json_or_none(check), time.time()))
+    db.commit()
+
+
+def get_combined(db, project_id):
+    # @args: db, project_id
+    # @return: {"included": [ids], "check": {...}, "updated": epoch} or None
+    row = db.execute(
+        "SELECT included_json, check_json, updated FROM astrometry_combined"
+        " WHERE project_id=?", (int(project_id),)).fetchone()
+    if row is None:
+        return None
+    return {"included": _json_in(row[0]) or [],
+            "check": _json_in(row[1]) or {},
+            "updated": row[2]}
 
 
 def add_frames(db, run_id, rows):
@@ -241,7 +365,8 @@ def points_for_run(db, run_id):
         "SELECT id, run_id, project_id, session_id, group_index, mjd, ra,"
         " dec, rms_ra, rms_dec, mag, band, x, y, n_frames, snr, mag_limit,"
         " source, method, flags, check_residual_ra, check_residual_dec,"
-        " check_scatter, check_ok, check_note, mag_auto, mag_source"
+        " check_scatter, check_ok, check_note, mag_auto, mag_source,"
+        " mag_err, centroid_source"
         " FROM astrometry_points WHERE run_id=?"
         " ORDER BY group_index, id",
         (run_id,)).fetchall()
@@ -253,7 +378,8 @@ def points_for_run(db, run_id):
              "source": r[17], "method": r[18], "flags": _flags_in(r[19]),
              "check_residual_ra": r[20], "check_residual_dec": r[21],
              "check_scatter": r[22], "check_ok": _bool_in(r[23]),
-             "check_note": r[24], "mag_auto": r[25], "mag_source": r[26]}
+             "check_note": r[24], "mag_auto": r[25], "mag_source": r[26],
+             "mag_err": r[27], "centroid_source": r[28]}
             for r in rows]
 
 

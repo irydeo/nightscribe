@@ -793,3 +793,7 @@ The GIF is written with Pillow and the MP4 with `imageio-ffmpeg`; the H.264
 encoder and its rules (even dimensions, minimum duration) now live in one place,
 `core/viz/video.py`, shared by the blink and the evolution renders. The file is
 registered on the visit as `animation`.
+
+**Review (2026-10-13, the runs list opens a run with a double click and a wait)**: the Analysis "Astrometry runs" table opened a run only with its button; double-clicking a row opens it now (the visit window's "Runs" block already did). Opening a run loads the UFE, the visit's frames and the saved run, so a static modal busy dialog (`_with_busy`) is shown while it happens. The runs table also filters to the **visit clicked** in the Analysis list (`_analysis_visit_filter`), and an undone run shows "—" for its observations instead of its old count.
+
+**Revisión (2026-10-13, la lista de runs abre con doble clic y espera)**: la tabla «Astrometry runs» de Análisis abría un run solo con su botón; ahora doble clic en una fila lo abre (el bloque «Runs» de la ventana de la visita ya lo hacía). Abrir un run carga el UFE, los fotogramas de la visita y el run guardado, así que se muestra un diálogo de espera modal estático (`_with_busy`) mientras ocurre. La tabla de runs además filtra a la **visita pulsada** en la lista de Análisis (`_analysis_visit_filter`), y un run deshecho muestra «—» en sus observaciones en vez de su recuento viejo.

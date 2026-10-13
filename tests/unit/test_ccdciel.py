@@ -26,8 +26,9 @@ from nightscribe.core.sources import ccdciel
 
 class _Resp:
     # Minimal stand-in for requests.Response
-    def __init__(self, body):
+    def __init__(self, body, content=b""):
         self._body = body
+        self.content = content
 
     def raise_for_status(self):
         pass
@@ -76,6 +77,27 @@ def ccd_db(tmp_db, monkeypatch):
 def fake_post(monkeypatch):
     fake = _FakePost()
     monkeypatch.setattr(ccdciel.requests, "post", fake)
+    return fake
+
+
+class _FakeGet:
+    # The HTTP image server (fullimage.jpg): returns raw bytes.
+    def __init__(self):
+        self.calls = []
+        self.content = b""
+        self.raises = None
+
+    def __call__(self, url, timeout=None):
+        self.calls.append({"url": url, "timeout": timeout})
+        if self.raises is not None:
+            raise self.raises
+        return _Resp(None, content=self.content)
+
+
+@pytest.fixture
+def fake_get(monkeypatch):
+    fake = _FakeGet()
+    monkeypatch.setattr(ccdciel.requests, "get", fake)
     return fake
 
 
@@ -322,6 +344,49 @@ def test_push_plan_sets_settings_in_order(client, fake_post):
         ["SN 2026ziz"], [60.0], [30], ["Light"]]
 
 
+def test_push_plan_sends_binning_as_text(client, fake_post):
+    # CCDciel's Capture_setbinning sets the Binning combo TEXT, so it wants
+    # "1x1", not an integer (cmd_Capture_SetBinning)
+    client.push_plan(30, 60.0, "X", binning="2x2")
+    assert fake_post.methods[-1] == "Capture_setbinning"
+    assert fake_post.calls[-1]["json"]["params"] == ["2x2"]
+
+
+def test_push_plan_optional_failure_is_a_warning_not_a_stop(client, fake_post):
+    # the core plan must land even if an optional setter is rejected
+    fake_post.bodies = [_cmd_ok(), _cmd_ok(), _cmd_ok(), _cmd_ok(),
+                        _ok({"status": "Failed!", "error": "bad binning"})]
+    result = client.push_plan(30, 60.0, "X", binning="2x2")
+    assert fake_post.methods[:4] == ["Capture_setobjectname",
+                                     "Capture_setexposure", "Capture_setcount",
+                                     "Capture_setframetype"]
+    assert result["warnings"] and "binning" in result["warnings"][0]
+
+
+def test_push_plan_gain_only_when_it_differs(client, fake_post):
+    # current gain 100: setting 100 is a no-op, 50 is sent. The four core
+    # setters run first, then Camera_GetGain reads the current value.
+    fake_post.bodies = [_cmd_ok(), _cmd_ok(), _cmd_ok(), _cmd_ok(), _ok(100)]
+    client.push_plan(30, 60.0, "X", gain=100)
+    assert "Camera_SetGain" not in fake_post.methods
+    fake_post.bodies = [_cmd_ok(), _cmd_ok(), _cmd_ok(), _cmd_ok(), _ok(100)]
+    client.push_plan(30, 60.0, "X", gain=50)
+    assert fake_post.methods[-1] == "Camera_SetGain"
+    assert fake_post.calls[-1]["json"]["params"] == [50]
+
+
+def test_current_gain_and_offset(client, fake_post):
+    fake_post.bodies = [_ok(120), _ok(30)]
+    assert client.current_gain() == 120
+    assert client.current_offset() == 30
+    assert fake_post.methods == ["Camera_GetGain", "Camera_GetOffset"]
+
+
+def test_stop_capture(client, fake_post):
+    assert client.stop_capture() is True
+    assert fake_post.methods == ["Capture_stop"]
+
+
 def test_start_capture(client, fake_post):
     client.start_capture()
     assert fake_post.methods == ["Capture_start"]
@@ -330,6 +395,66 @@ def test_start_capture(client, fake_post):
 def test_wheel_getcurrent_filter(client, fake_post):
     fake_post.bodies = [_ok(3)]
     assert client.current_filter() == 3
+
+
+def test_abort_motion_calls_the_documented_method(client, fake_post):
+    # ADR-081: the Stop-goto button rides on Telescope_abortmotion.
+    client.abort_motion()
+    assert fake_post.methods == ["Telescope_abortmotion"]
+
+
+def test_capturing_live_state(client, fake_post):
+    # ADR-082: the last-frame preview stops watching when the run ends.
+    fake_post.bodies = [_ok(True), _ok("False")]
+    assert client.capturing() is True
+    assert client.capturing() is False
+    assert fake_post.methods == ["Capture_running", "Capture_running"]
+
+
+def test_last_frame_name(client, fake_post):
+    fake_post.bodies = [_ok("/home/obs/Capture/M13_Red_1.fits")]
+    assert client.last_frame_name() == "/home/obs/Capture/M13_Red_1.fits"
+
+
+def test_last_frame_preview_is_a_jpeg_over_http(client, fake_post,
+                                                fake_get):
+    # ADR-082: CCDciel serves the last image as a JPEG on its HTTP server
+    # (fullimage.jpg, same host:port as the JSON-RPC), not over JSON-RPC.
+    fake_post.bodies = [_ok("/home/obs/Capture/M13_Red_1.fits")]
+    fake_get.content = b"\xff\xd8jpeg"
+    frame = client.last_frame_preview()
+    assert frame["image"] == b"\xff\xd8jpeg"
+    assert frame["name"] == "M13_Red_1.fits"
+    assert frame["path"] == "/home/obs/Capture/M13_Red_1.fits"
+    assert fake_get.calls[0]["url"] == "http://127.0.0.1:3277/fullimage.jpg"
+
+
+def test_last_frame_preview_none_when_no_image(client, fake_post, fake_get):
+    fake_get.content = b""
+    assert client.last_frame_preview() is None
+
+
+def test_staged_plan_reads_back_what_ccdciel_holds(client, fake_post):
+    # "Send plan" proves itself: the getters report the real state.
+    fake_post.bodies = [_ok("SN 2026ziz"), _ok(45.0), _ok(30),
+                        _ok("Light"), _ok("1x1"), _ok("5"), _ok(2)]
+    st = client.staged_plan()
+    assert st["object"] == "SN 2026ziz"
+    assert st["exposure_s"] == 45.0
+    assert st["count"] == 30
+    assert st["frame_type"] == "Light"
+    assert st["binning"] == "1x1"
+    assert st["dither"] == "5"
+    assert st["filter"] == 2
+    assert fake_post.methods == ["Capture_getobjectname", "Capture_getexposure",
+                                 "Capture_getcount", "Capture_getframetype",
+                                 "Capture_getbinning", "Capture_getdither",
+                                 "Wheel_getfilter"]
+
+
+def test_staged_plan_none_when_the_getters_fail(client, fake_post):
+    fake_post.bodies = [_ok({"status": "Failed!", "error": "not connected"})]
+    assert client.staged_plan() is None
 
 
 # ---------------- CcdcielWorker (offscreen) ----------------

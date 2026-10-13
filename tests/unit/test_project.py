@@ -113,6 +113,31 @@ def test_update_context_merges(tmp_db):
     assert p["context"]["rate_arcsec_min"] == 12.5
 
 
+def test_merge_confirmed_keeps_the_alias_lookup_keys(tmp_db):
+    # ADR-077 rev: the alias lookup writes the designation and the check
+    # writes ours_published; a shallow update_context would let one wipe the
+    # other, so merge_confirmed merges inside context["confirmed"].
+    p = project.create(tmp_db, "neo", "A11HPKO", {})
+    project.merge_confirmed(tmp_db, p["id"], {
+        "designation": "2026 TQ8", "mpec": "MPEC 2026-T201"})
+    project.merge_confirmed(tmp_db, p["id"], {"ours_published": True})
+    conf = project.get(tmp_db, p["id"])["context"]["confirmed"]
+    assert conf["designation"] == "2026 TQ8"
+    assert conf["mpec"] == "MPEC 2026-T201"
+    assert conf["ours_published"] is True
+
+
+def test_merge_confirmed_ignores_none_values(tmp_db):
+    # A check that does not know ours_published must not blank a known True.
+    p = project.create(tmp_db, "neo", "A11HPKO", {})
+    project.merge_confirmed(tmp_db, p["id"], {"ours_published": True})
+    project.merge_confirmed(tmp_db, p["id"], {"ours_published": None,
+                                              "mpec": "MPEC 2026-T201"})
+    conf = project.get(tmp_db, p["id"])["context"]["confirmed"]
+    assert conf["ours_published"] is True
+    assert conf["mpec"] == "MPEC 2026-T201"
+
+
 def test_set_status(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
     assert project.set_status(tmp_db, p["id"], "archived")
@@ -215,7 +240,7 @@ def test_delete_cascades(tmp_db):
 
 def test_migration_user_version_is_current(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 19
+    assert v == 20
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -250,8 +275,8 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -300,8 +325,8 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
@@ -380,7 +405,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
 
     file, pid = _build_v3_db(tmp_path / "v3.db")
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
 
     # the project itself is intact (kind/name/status/context unchanged)
     row = db.execute(
@@ -415,7 +440,7 @@ def test_migration_v4_is_idempotent(tmp_path):
     file, _pid = _build_v3_db(tmp_path / "v3.db")
     Database(str(file))               # migrates 3 -> 4
     db = Database(str(file))          # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 19
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols

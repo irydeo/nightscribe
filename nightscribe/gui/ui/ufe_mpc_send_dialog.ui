@@ -15,10 +15,12 @@
    <property name="topMargin"><number>11</number></property>
    <property name="rightMargin"><number>11</number></property>
    <property name="bottomMargin"><number>11</number></property>
+   <item><widget class="QLabel" name="lbl_intro"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="toolTip"><string>What the batch about to be sent carries: how many observations, the format, the target and the mode. It is read from the report the moment the window opens, and it follows the target and the mode if you change them here</string></property></widget></item>
    <item>
     <widget class="QPlainTextEdit" name="txt_log">
      <property name="minimumSize"><size><width>560</width><height>140</height></size></property>
      <property name="readOnly"><bool>true</bool></property>
+     <property name="placeholderText"><string>Here the MPC's own answer will appear (the CurlID or the errors) once you press Send.</string></property>
      <property name="font"><font><family>Monospace</family></font></property>
     </widget>
    </item>

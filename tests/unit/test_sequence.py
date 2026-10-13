@@ -33,7 +33,7 @@ def test_make_plan():
 
 def test_make_plan_defaults_overhead():
     p = sequence.make_plan(10, 120.0, "R")
-    assert p["overhead_s"] == 15.0
+    assert p["overhead_s"] == 2.0        # the readout+download fallback
 
 
 def test_make_plan_calibration():
@@ -67,17 +67,106 @@ def test_export_csv(tmp_path):
     assert rows[4]["frame"] == "5"
 
 
-def test_export_nina(tmp_path):
+def _find_type(node, name):
+    # @return: the first object whose $type ends with ".<name>", or None
+    if isinstance(node, dict):
+        t = str(node.get("$type", "")).split(",")[0]
+        if t.endswith("." + name):
+            return node
+        for v in node.values():
+            found = _find_type(v, name)
+            if found is not None:
+                return found
+    elif isinstance(node, list):
+        for v in node:
+            found = _find_type(v, name)
+            if found is not None:
+                return found
+    return None
+
+
+def _ids_and_refs(node):
+    ids, refs = [], []
+
+    def walk(n):
+        if isinstance(n, dict):
+            if "$id" in n:
+                ids.append(n["$id"])
+            if "$ref" in n:
+                refs.append(n["$ref"])
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    walk(node)
+    return ids, refs
+
+
+def test_export_nina_is_the_native_sequence(tmp_path):
+    # ADR-021 rev: the native NINA sequence (SequenceRootContainer), the one
+    # SequenceJsonConverter can load, not the old bespoke shape.
     t = _target()
     plan = sequence.make_plan(3, 120.0, "Ha")
     out = sequence.export_nina(t, plan, tmp_path / "seq.json")
     data = json.loads(open(out, encoding="utf-8").read())
+    assert data["$type"].startswith(
+        "NINA.Sequencer.Container.SequenceRootContainer")
+    areas = [i["$type"] for i in data["Items"]["$values"]]
+    assert any("StartAreaContainer" in a for a in areas)
+    assert any("TargetAreaContainer" in a for a in areas)
+    assert any("EndAreaContainer" in a for a in areas)
+    dso = _find_type(data, "DeepSkyObjectContainer")
+    assert dso["Target"]["TargetName"] == "SN 2026ziz"
+    coords = dso["Target"]["InputCoordinates"]
+    assert coords["RAHours"] == 12
+    assert coords["DecDegrees"] == 40 and coords["NegativeDec"] is False
+    kinds = [i["$type"].split(".")[-1].split(",")[0]
+             for i in dso["Items"]["$values"]]
+    assert "SwitchFilter" in kinds and "TakeManyExposures" in kinds
+    tme = _find_type(dso, "TakeManyExposures")
+    assert tme["Conditions"]["$values"][0]["Iterations"] == 3
+    exposure = _find_type(tme, "TakeExposure")
+    assert exposure["ExposureTime"] == 120.0
+    assert exposure["ImageType"] == "LIGHT"
+    # every $ref must point to an existing $id (a broken one breaks the load)
+    ids, refs = _ids_and_refs(data)
+    assert refs and all(r in ids for r in refs)
+    assert len(ids) == len(set(ids))
+
+
+def test_export_nina_writes_dither_and_autofocus_triggers(tmp_path):
+    # ADR-083: dither and autofocus are NINA TRIGGERS on the target container
+    t = _target()
+    recipe = {"dither": {"on": True, "every": 4, "pixels": 5},
+              "autofocus": {"on": True, "minutes": 45, "delta_c": 1.0,
+                            "on_filter": True}}
+    plan = sequence.make_plan(3, 120.0, "L", recipe=recipe)
+    out = sequence.export_nina(t, plan, tmp_path / "seq.json")
+    data = json.loads(open(out, encoding="utf-8").read())
+    dso = _find_type(data, "DeepSkyObjectContainer")
+    triggers = [t["$type"] for t in dso["Triggers"]["$values"]]
+    assert any("DitherAfterExposures" in t for t in triggers)
+    assert any("AutofocusAfterTimeTrigger" in t for t in triggers)
+    assert any("AutofocusAfterTemperatureChangeTrigger" in t for t in triggers)
+    assert any("AutofocusAfterFilterChange" in t for t in triggers)
+    dither = _find_type(dso, "DitherAfterExposures")
+    assert dither["AfterExposures"] == 4
+    # each trigger's runner holds the instruction that runs
+    assert _find_type(dither, "Dither") is not None
+
+
+def test_export_nina_summary_keeps_the_plan_shape(tmp_path):
+    # the human-readable plan summary (not a loadable sequence) keeps its shape
+    t = _target()
+    plan = sequence.make_plan(3, 120.0, "Ha")
+    out = sequence.export_nina_summary(t, plan, tmp_path / "seq.plan.json")
+    data = json.loads(open(out, encoding="utf-8").read())
     assert data["Name"] == "SN 2026ziz"
     assert data["Target"]["TargetCoordinates"]["RAHours"] == 12
-    assert data["Target"]["TargetCoordinates"]["Sign"] == "+"
     assert data["Target"]["TargetCoordinates"]["DecDegrees"] == 40
     assert len(data["Sequence"]["Exposures"]) == 3
-    assert data["Sequence"]["Exposures"][0]["ExposureTime"] == 120.0
     assert data["Sequence"]["Exposures"][0]["Filter"] == "Ha"
     assert data["Metadata"]["Generator"] == "NightScribe"
 
@@ -143,6 +232,41 @@ def test_export_ccdciel_no_calibration(tmp_path):
     steps = root.findall(".//Plan/Steps/*")
     assert [s.tag for s in steps] == ["Step1"]
     assert steps[0].get("FrameType") == "Light"
+
+
+def test_export_ccdciel_writes_the_capture_options(tmp_path):
+    # ADR-083: the recipe (dither, autofocus, gain, offset, binning, delay)
+    # reaches the real .targets format.
+    t = _target()
+    recipe = {"dither": {"on": False, "every": 0, "pixels": 5, "settle_s": 0},
+              "autofocus": {"on": True, "every": 0, "minutes": 45,
+                            "delta_c": 1.0, "on_filter": True},
+              "gain": 120, "offset": 30, "binning": "2x2", "delay_s": 10}
+    plan = sequence.make_plan(4, 90.0, "R", recipe=recipe)
+    out = sequence.export_ccdciel(t, plan, tmp_path / "opt.targets")
+    root = _parse_targets(out).getroot()
+    tgt = root.find("Targets/Target1")
+    assert tgt.get("Delay") == "10"
+    assert tgt.get("AutofocusTemp") == "True"
+    light = root.find(".//Plan/Steps/Step1")
+    assert light.get("Dither") == "False"
+    assert light.get("Gain") == "120"
+    assert light.get("Offset") == "30"
+    assert light.get("Binning") == "2x2"
+
+
+def test_export_nina_summary_carries_the_capture_options(tmp_path):
+    t = _target()
+    recipe = {"dither": {"on": True, "every": 3, "pixels": 5},
+              "autofocus": {"on": True, "minutes": 45, "delta_c": 1.0},
+              "gain": 120, "offset": None, "binning": "2x2", "delay_s": 0}
+    plan = sequence.make_plan(3, 120.0, "Ha", recipe=recipe)
+    out = sequence.export_nina_summary(t, plan, tmp_path / "opt.plan.json")
+    data = json.loads(open(out, encoding="utf-8").read())
+    cap = data["Metadata"]["Capture"]
+    assert cap["Dither"] is True and cap["DitherEvery"] == 3
+    assert cap["AutofocusDeltaC"] == 1.0
+    assert cap["Gain"] == 120 and cap["Binning"] == "2x2"
 
 
 def test_export_ccdciel_times_fallback(tmp_path):
@@ -250,16 +374,16 @@ def test_ccdciel_safe_window_stays_soft(tmp_path):
 
 def test_nina_transit_window_metadata(tmp_path):
     t = _transit_target()
-    out = sequence.export_nina(t, sequence.make_plan(2, 60.0, "L"),
-                               tmp_path / "seq.json")
+    out = sequence.export_nina_summary(t, sequence.make_plan(2, 60.0, "L"),
+                                       tmp_path / "seq.plan.json")
     data = json.loads(open(out, encoding="utf-8").read())
     assert data["Metadata"]["StartTime"] == "2026-08-21T22:50:00+00:00"
     assert data["Metadata"]["EndTime"] == "2026-08-22T01:50:00+00:00"
 
 
 def test_nina_without_window_has_no_times(tmp_path):
-    out = sequence.export_nina(_target(), sequence.make_plan(1, 60.0, "L"),
-                               tmp_path / "seq.json")
+    out = sequence.export_nina_summary(
+        _target(), sequence.make_plan(1, 60.0, "L"), tmp_path / "seq.plan.json")
     data = json.loads(open(out, encoding="utf-8").read())
     assert "StartTime" not in data["Metadata"]
 

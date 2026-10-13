@@ -363,6 +363,21 @@ def test_push_plan_optional_failure_is_a_warning_not_a_stop(client, fake_post):
     assert result["warnings"] and "binning" in result["warnings"][0]
 
 
+def test_push_plan_filter_failure_does_not_lose_the_plan(client, fake_post):
+    # reported 2026-10-13: the wheel's set_filter ran in the GUI BEFORE the
+    # plan and, on failure, the whole plan was lost ("Send plan receives
+    # nothing"; the log said Wheel_setfilter: Failed!). Now it is best-effort
+    # inside push_plan.
+    fake_post.bodies = [_cmd_ok(), _cmd_ok(), _cmd_ok(), _cmd_ok(),
+                        _ok({"status": "Failed!", "error": "no wheel"})]
+    result = client.push_plan(30, 60.0, "X", filter_index=2)
+    assert fake_post.methods[:4] == ["Capture_setobjectname",
+                                     "Capture_setexposure", "Capture_setcount",
+                                     "Capture_setframetype"]
+    assert "Wheel_setfilter" in fake_post.methods
+    assert result["warnings"] and "filter" in result["warnings"][0]
+
+
 def test_push_plan_gain_only_when_it_differs(client, fake_post):
     # current gain 100: setting 100 is a no-op, 50 is sent. The four core
     # setters run first, then Camera_GetGain reads the current value.

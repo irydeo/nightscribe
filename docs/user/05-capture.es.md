@@ -32,7 +32,10 @@ Desde el paso **Captura** de un proyecto:
 - **Enviar plan** prepara el plan (objeto, tomas × exposición, filtro, binning,
   ganancia, offset, dither) en el software y **lo lee de vuelta** (incluidos el
   binning y el dither que de verdad tiene), así que el panel muestra lo que
-  aterrizó. Un ajuste opcional rechazado se avisa sin abortar el plan.
+  aterrizó. Un ajuste opcional rechazado (el binning, una ganancia fuera de
+  rango, una rueda que rechaza la ranura) se avisa **sin abortar el plan**: el
+  objeto, la exposición y el recuento llegan siempre. Si el filtro del plan no
+  está en tu rueda, el filtro se deja como está y la lectura de vuelta lo dice.
 - **Iniciar captura** lo lanza, y **el mismo botón la para** mientras el run
   está en marcha («Parar captura»): para la **cámara**, no la montura (eso es
   Detener goto).

@@ -331,22 +331,24 @@ class Client:
     # -- capture settings ----------------------------------------------------------
 
     def push_plan(self, n_frames, exp_s, object_name, dither=None, gain=None,
-                  offset=None, binning=None):
+                  offset=None, binning=None, filter_index=None):
         # Stage a capture plan inside CCDciel: object name, exposure, count
         # and Light frame type, plus the capture options that CCDciel can take
-        # live (ADR-083): binning, gain, offset and the dither count. The
-        # autofocus cadence is not a live setting in CCDciel (only "focus
-        # now"), so it stays in the sequence file.
+        # live (ADR-083): the wheel filter, binning, gain, offset and the
+        # dither count. The autofocus cadence is not a live setting in CCDciel
+        # (only "focus now"), so it stays in the sequence file.
         #
         # The CORE plan (object/exposure/count/type) must always land; the
         # OPTIONAL setters are best-effort: a rejected one (a binning CCDciel
-        # does not know, a gain out of range) is collected as a warning and the
-        # plan goes on, so "Send plan" never stops half-way. And CCDciel's
-        # `Capture_setbinning` wants an INTEGER ("1x1" is rejected), unlike
-        # NINA's string form, so the binning is converted here.
+        # does not know, a gain out of range, a wheel that refuses the slot)
+        # is collected as a warning and the plan goes on, so "Send plan" never
+        # stops half-way. And CCDciel's `Capture_setbinning` wants an INTEGER
+        # ("1x1" is rejected), unlike NINA's string form, so the binning is
+        # converted here.
         # @args: n_frames - exposure count, exp_s - exposure (s),
         #        object_name - FITS OBJNAME, dither - recipe dict (or None),
-        #        gain/offset/binning - recipe values (None = leave as is)
+        #        gain/offset/binning - recipe values (None = leave as is),
+        #        filter_index - wheel slot to move to (None = leave as is)
         # @return: {"warnings": [str, ...]} (empty when everything landed)
         warnings = []
         self.call("Capture_setobjectname", object_name or "NightScribe")
@@ -363,6 +365,12 @@ class Client:
             except CCDcielError as err:
                 warnings.append(f"{label}: {err}")
 
+        # the wheel FIRST, best-effort: it used to run in the GUI BEFORE this
+        # call, so a refused slot (a wheel that rejects the index, or one not
+        # connected) raised and the whole plan was lost (reported 2026-10-13:
+        # "Send plan receives nothing"; the log said Wheel_setfilter: Failed!)
+        if filter_index is not None:
+            _try("filter", lambda: self.set_filter(int(filter_index)))
         if binning:
             # CCDciel's Capture_setbinning sets the Binning combo's TEXT
             # (cmd_Capture_SetBinning -> Capture.Binning.Text := bin), so it

@@ -1165,12 +1165,12 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
             self.filter_idx = None
             self.plan = None
 
-        def set_filter(self, i):
-            self.filter_idx = i
-
         def push_plan(self, n, e, name, **kw):
             self.plan = (n, e, name)
-            return True
+            # the wheel slot now rides INSIDE push_plan (best-effort), so a
+            # refused slot cannot lose the plan (ADR-081 revision, 2026-10-13)
+            self.filter_idx = kw.get("filter_index")
+            return {"warnings": []}
 
         def staged_plan(self):
             return {"object": self.plan[2], "count": self.plan[0],
@@ -1185,6 +1185,47 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     # the wheel index follows the plan's filter ("R")
     assert client.filter_idx == \
         window._obs_widgets["cmb_ccd_filter"].findText("R")
+
+
+def test_send_plan_does_not_invent_a_wheel_slot(window, panel, monkeypatch):
+    # ADR-081 revision (2026-10-13): when the plan's filter is NOT in the
+    # wheel, no made-up index is sent (the old code sent slot 0 and a refused
+    # slot lost the whole plan); the filter is left as it is and a warning
+    # reaches the read-back.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _create_and_select(window, "sn", "SN2099nofilter", {"kind": "sn"})
+    _open_tab(window, p, "plan")
+    project.update_step_data(dbmod.db, p["id"], "plan",
+                             {"n_frames": 5, "exp_s": 10.0,
+                              "filter": "NotInWheel"})
+    window._ccd_filter_names = []
+    window._ccd_fill_filters()
+    sent = {}
+    monkeypatch.setattr(window, "_ccd_run",
+                        lambda slot, action, **kw: sent.update(action=action))
+
+    class _FakeClient:
+        def __init__(self):
+            self.filter_idx = "unset"
+            self.plan = None
+
+        def push_plan(self, n, e, name, **kw):
+            self.plan = (n, e, name)
+            self.filter_idx = kw.get("filter_index")
+            return {"warnings": []}
+
+        def staged_plan(self):
+            return {"object": self.plan[2], "count": self.plan[0],
+                    "exposure_s": self.plan[1], "frame_type": "Light",
+                    "persistent": True}
+
+    client = _FakeClient()
+    window._ccd_send_plan()
+    staged = sent["action"](client)
+    assert client.plan == (5, 10.0, "SN2099nofilter")
+    assert client.filter_idx is None
+    assert any("NotInWheel" in w for w in staged["warnings"])
 
 
 def test_send_plan_without_saved_plan_asks_for_one(window, panel,

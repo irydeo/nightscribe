@@ -30,7 +30,10 @@ From a project's **Capture** step:
 - **Send plan** prepares the plan (object, frames × exposure, filter, binning,
   gain, offset, dither) in the software and **reads it back** (including the
   binning and dither it is really holding), so the panel shows what actually
-  landed. A rejected optional setting is reported without aborting the plan.
+  landed. A rejected optional setting (the binning, a gain out of range, a wheel
+  that refuses the slot) is reported **without aborting the plan**: the object,
+  the exposure and the frame count always land. If the plan's filter is not in
+  your wheel, the filter is left as it is and the read-back says so.
 - **Start capture** fires it, and the **same button stops it** while the run is
   in flight ("Stop capture"): it stops the **camera**, not the mount (that is
   Stop goto).

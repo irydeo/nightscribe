@@ -267,6 +267,15 @@ def test_push_plan_then_start_capture(client, fake_get):
     assert params["save"] == "true"
 
 
+def test_start_capture_survives_a_refused_filter(client, fake_get):
+    # a refused wheel slot must not lose the capture (ADR-081/083)
+    client.push_plan(1, 5.0, "X", filter_index=2)
+    fake_get.bodies = [_err("filterwheel not connected"),
+                       _ok("Capture started")]
+    assert client.start_capture() is True
+    assert "/equipment/camera/capture" in fake_get.paths
+
+
 def test_staged_plan_is_a_copy(client):
     client.push_plan(5, 10.0, "X")
     copy = client.staged_plan()

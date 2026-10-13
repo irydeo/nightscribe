@@ -6812,14 +6812,22 @@ class MainWindow(QMainWindow):
         cmb = self._ccd_widgets().get("cmb_ccd_filter")
         if not cmb:
             return
-        f_idx = cmb.currentIndex()
-        # prefer the plan's own filter when the wheel knows the name
+        # prefer the plan's own filter when the wheel knows the name. If the
+        # wheel does NOT have it, do NOT send a made-up index: a refused slot
+        # used to abort the whole plan (reported 2026-10-13). The filter is
+        # left as it is and the read-back says so.
         pf = plan.get("filter")
+        filter_index = None
+        filter_warn = None
         if pf:
             idx = cmb.findText(pf)
             if idx >= 0:
                 cmb.setCurrentIndex(idx)
-                f_idx = idx
+                filter_index = idx
+            else:
+                filter_warn = self.tr(
+                    "the wheel has no '%1': the filter is left as it is"
+                ).replace("%1", str(pf))
         f_name = cmb.currentText()
         name = p["object_name"]
         # read the option widgets on the GUI thread: the action runs on the
@@ -6827,18 +6835,21 @@ class MainWindow(QMainWindow):
         opts = self._capture_options_from_widgets()
 
         def action(c):
-            c.set_filter(f_idx)
             result = c.push_plan(n_frames, exp_s, name,
                                  dither=opts.get("dither"),
                                  gain=opts.get("gain"),
                                  offset=opts.get("offset"),
-                                 binning=opts.get("binning"))
+                                 binning=opts.get("binning"),
+                                 filter_index=filter_index)
             # read back what the software is really holding (ADR-081): a
             # "Send plan" that only fires setters cannot prove it did anything
             st = c.staged_plan() or {}
             st["filter"] = f_name
-            st["warnings"] = (result.get("warnings")
-                              if isinstance(result, dict) else None) or []
+            warns = list((result.get("warnings")
+                          if isinstance(result, dict) else None) or [])
+            if filter_warn:
+                warns.append(filter_warn)
+            st["warnings"] = warns
             return st
 
         self._ccd_run(self._ccd_on_sent, action)

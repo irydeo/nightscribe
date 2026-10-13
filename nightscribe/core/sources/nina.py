@@ -350,7 +350,7 @@ class Client:
     # -- capture ------------------------------------------------------------------
 
     def push_plan(self, n_frames, exp_s, object_name, dither=None, gain=None,
-                  offset=None, binning=None):
+                  offset=None, binning=None, filter_index=None):
         # NINA's snapshot endpoint has no persistent "staged capture" the way
         # CCDciel's Capture module does, and no frame count at all: it takes
         # one exposure and fires. So "staging" means remembering the plan
@@ -360,7 +360,8 @@ class Client:
         # camera options ride along and start_capture applies what it can.
         # @args: n_frames - exposure count (advisory on NINA), exp_s -
         #        exposure (s), object_name - FITS OBJNAME, dither/gain/
-        #        offset/binning - recipe values (None = leave as is)
+        #        offset/binning - recipe values (None = leave as is),
+        #        filter_index - wheel slot to move to (None = leave as is)
         # @return: dict describing the staged plan
         self._staged = {"object": object_name or "NightScribe",
                         "exposure_s": float(exp_s),
@@ -370,7 +371,8 @@ class Client:
                         "dither": dict(dither or {}),
                         "gain": gain,
                         "offset": offset,
-                        "binning": binning}
+                        "binning": binning,
+                        "filter_index": filter_index}
         return dict(self._staged)
 
     def staged_plan(self):
@@ -386,6 +388,12 @@ class Client:
         st = self._staged
         if not st:
             raise NinaError("stage a plan first (Send plan)")
+        # the wheel is best-effort: a refused slot must not lose the capture
+        if st.get("filter_index") is not None:
+            try:
+                self.set_filter(int(st["filter_index"]))
+            except (NinaError, TypeError, ValueError):
+                pass
         if st.get("binning"):
             self.call("/equipment/camera/set-binning",
                       {"binning": str(st["binning"])})

@@ -119,6 +119,31 @@ def _fake_solve_worker(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _fake_alias_worker(monkeypatch):
+    # ADR-077 rev: opening a project whose object still carries a NEOCP/PCCP
+    # temporary designation now starts the alias lookup by itself. In unit
+    # tests it is stubbed: no network, and no thread finishing during the
+    # NEXT test (a test that cares patches `_start_alias_lookup` on top).
+    from PySide6.QtCore import QObject, Signal
+    import nightscribe.gui.workers as workers
+
+    class _FakeAliasWorker(QObject):
+        finished = Signal(dict)
+
+        def __init__(self, name):
+            super().__init__()
+            self._name = name
+
+        def start(self):
+            pass
+
+        def isRunning(self):
+            return False
+
+    monkeypatch.setattr(workers, "MpcAliasWorker", _FakeAliasWorker)
+
+
+@pytest.fixture(autouse=True)
 def _no_modal_boxes(monkeypatch):
     # A modal box waits for a click that a test run never gives. The Windows
     # run of 2026-10-01 sat 45 minutes on

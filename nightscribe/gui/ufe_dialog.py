@@ -1604,6 +1604,31 @@ class UfeDialog(QWidget):
             logger.warning("set-point-excluded hook failed: %s", err)
             return False
 
+    def set_manual_centroid_hook(self, fn):
+        # @args: fn - callable(run_id, group_index, ra, dec, rms_ra, rms_dec,
+        #        x, y, snr) -> True when the observation took it, or None
+        # @return: None. The observer re-selected an observation's centroid
+        #          on the saved stack (ADR-085): the host writes the new
+        #          position and the `centroid_source` flag into
+        #          astrometry_points, so the tab never touches the database.
+        self._manual_centroid_hook = fn if callable(fn) else None
+
+    def set_manual_centroid(self, run_id, group_index, ra, dec, rms_ra,
+                            rms_dec, x, y, snr=None, source="manual"):
+        # @args: run_id - the execution, group_index - the observation, the
+        #        new position and its error bar, x/y - the pixel centroid,
+        #        source - "manual" | "auto"
+        # @return: True when the observation took it
+        if self._manual_centroid_hook is None:
+            return False
+        try:
+            return bool(self._manual_centroid_hook(
+                run_id, group_index, ra, dec, rms_ra, rms_dec, x, y, snr,
+                source))
+        except Exception as err:
+            logger.warning("set-manual-centroid hook failed: %s", err)
+            return False
+
     # ----------------------------------------------------- visit frames
 
     def _wire_frame_nav(self):

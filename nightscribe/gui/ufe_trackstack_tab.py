@@ -164,6 +164,7 @@ class UfeTrackStackTab(QWidget):
                 self.tr("Separation between the two measurements (″)"),
                 self.tr("Signal-to-noise of the measured point"),
                 self.tr("Calibrated magnitude"),
+                self.tr("Photometric error of the magnitude (its ± bar)"),
                 self.tr("Warnings and flags of the point"))):
             header = self.tbl_points.horizontalHeaderItem(col)
             if header is not None:
@@ -224,6 +225,17 @@ class UfeTrackStackTab(QWidget):
         self.btn_close_report.clicked.connect(self._report_dialog.hide)
         self._send_dialog.btn_close.clicked.connect(self._send_dialog.hide)
         self._send_dialog.btn_send.clicked.connect(self._on_mpc_submit)
+        # set before the combo signals below: set_targets() fills the combo and
+        # fires currentIndexChanged, and the intro reads this count
+        self._report_kept = None      # observations the last report carried
+        # The dialog opened with an empty box and no explanation (2026-10-13):
+        # an empty window reads as broken. The intro line says what is about
+        # to be sent, and it follows the target and the mode so it never goes
+        # stale (the app talks first, ADR-038).
+        self._send_dialog.cmb_target.currentIndexChanged.connect(
+            lambda _i: self._refresh_send_intro())
+        self._send_dialog.cmb_mode.currentIndexChanged.connect(
+            lambda _i: self._refresh_send_intro())
         from ..core.sources import mpc_submit
         self._send_dialog.set_targets(mpc_submit.TARGETS)
         self._submit_worker = None
@@ -232,7 +244,6 @@ class UfeTrackStackTab(QWidget):
         self._submission = {"ack": "", "obj_type": ""}
         self.btn_undo = self._ui.btn_undo
         self.lbl_report_note = self._ui.lbl_report_note
-        self._report_kept = None      # observations the last report carried
         # The group's stack is shown in the MAIN stage (the shared state),
         # so the histogram, the stretch and the marks work on it and the
         # other tabs can operate on top. The private viewer is only a
@@ -369,6 +380,10 @@ class UfeTrackStackTab(QWidget):
         self._nudge = [0.0, 0.0]
         self._manual_base = None       # the snapped centroid, base-stack px
         self._manual_armed = False     # the next click marks the object
+        self._centroid_row = None      # the observation whose centroid the
+                                       # next click re-selects (ADR-085 rev)
+        self._centroid_mark = None     # where the last centroid landed (that
+                                       # stack's pixels), drawn on the stage
         self._shown_group = None      # the observation whose stack is on stage
         self._shown_stack_path = None  # its file, to tell the plate apart
         self._restore_asked = False   # the visit's saved run was looked for
@@ -406,6 +421,9 @@ class UfeTrackStackTab(QWidget):
         # the manual window follows the stage: leaving the tab hides it
         # without unchecking the box, so coming back shows it again
         self._sync_manual_dialog(self.chk_manual.isChecked())
+        # ADR-085: the same context menu on the observations and on the image
+        self._menu_row = None
+        self._wire_context_menus()
         from .widgets.door_menu import build_door
         build_door(self.btn_more, [self.btn_blink, self.btn_undo])
         # the animation's swap timer: owned by the tab, stopped wherever the
@@ -1362,6 +1380,28 @@ class UfeTrackStackTab(QWidget):
         if result.get("points"):
             self._on_report(quiet=True)
 
+    def show_combined(self, payload):
+        # @args: payload - a run-like dict the host builds from several runs'
+        #        ticked observations (points, groups, stacks, qs, mids, boxes)
+        # @return: None. ADR-086 rev: the combined set is worked HERE, in the
+        #          editor. The strip, the points table and the check see all
+        #          the ticked observations as ONE run; the measurement is not
+        #          re-done (a point is re-measured on its own stack with the
+        #          context menu).
+        if not payload or not payload.get("points"):
+            return
+        self._hide_manual()
+        self._result = dict(payload)
+        self._result.setdefault("status", "ok")
+        self._result["combined"] = True
+        self._run_id = None
+        self._restore_asked = True
+        self._sync_report_buttons()
+        self._paint_run()
+        self._say(self.tr(
+            "Combined set: %1 observations from several runs, shown as one."
+        ).replace("%1", str(len(self._result.get("points") or []))))
+
     def _restored_payload(self, data):
         # @args: data - {"run", "points", "stacks"} from the host
         # @return: the payload `_paint_run` knows how to paint, rebuilt from
@@ -1551,6 +1591,7 @@ class UfeTrackStackTab(QWidget):
             rms_ra=row.get("rms_ra"), rms_dec=row.get("rms_dec"),
             x=row.get("x"), y=row.get("y"), snr=row.get("snr"),
             mag=row.get("mag"), band=row.get("band"),
+            mag_err=row.get("mag_err"),
             mjd=row.get("mjd"), n_frames=row.get("n_frames"),
             source=row.get("source") or "stack",
             group_index=row.get("group_index"), flags=list(row.get("flags")
@@ -1656,6 +1697,14 @@ class UfeTrackStackTab(QWidget):
                                            float(h), self._mark_color(),
                                            10.0):
                 view.add_overlay(item)
+        # the centroid the observer just placed (ADR-085 rev): the SAME mark
+        # cross the manual mode uses, at the observation's own stack pixels, so
+        # it is unmistakable where the centroid landed
+        if self._centroid_mark is not None and self._is_shown_stack(state):
+            sx, sy = state.data_to_scene(self._centroid_mark[0],
+                                         self._centroid_mark[1])
+            for item in mark_cross_items(sx, sy, palette.ACCENT):
+                view.add_overlay(item)
         if self._manual_armed and self._manual_base is not None \
                 and self._manual.chk_show_cross.isChecked():
             sx, sy = state.data_to_scene(
@@ -1717,6 +1766,11 @@ class UfeTrackStackTab(QWidget):
         # @return: None. Brings the whole-sequence stack to the main view and
         #          arms the mark (writing the stack only when it is missing:
         #          the run writes it, see _save_base_stack).
+        # arming the whole-sequence mark cancels a pending per-observation
+        # centroid adjust (ADR-085): they share the stage and the click
+        if getattr(self, "_centroid_row", None) is not None:
+            self._centroid_row = None
+            self._centroid_mark = None
         result = self._result or {}
         path = self._ensure_base_stack(result)
         if path is None:
@@ -1913,7 +1967,11 @@ class UfeTrackStackTab(QWidget):
         # @args: scene_pt - the click in scene coordinates (the shared
         #        view's scene_clicked)
         # @return: None. Only while the mark is armed: the click becomes the
-        #          object's position, refined to the local centroid.
+        #          object's position, refined to the local centroid. The
+        #          centroid-adjust mode (ADR-085 rev) is handled FIRST: it is
+        #          also a one-click mode on this same stage.
+        if self._on_centroid_click(scene_pt):
+            return
         if not self._manual_armed:
             return
         state = self._state if self._view is not None else self._stack_state
@@ -2576,6 +2634,13 @@ class UfeTrackStackTab(QWidget):
         if path is None:
             return
         state = self._state if self._view is not None else self._stack_state
+        # keep the observer's STRETCH (the histogram level) when moving from
+        # one observation to the next: the runs are the same night, the same
+        # camera and the same sky, so re-deriving the auto limits on every
+        # thumbnail throws away the level the observer just set (asked for
+        # 2026-10-13). Other loads (a frame, a fresh run) keep their behaviour.
+        keep = getattr(state, "keep_stretch", False)
+        state.keep_stretch = True
         try:
             state.load(str(path))
         except Exception as err:
@@ -2583,12 +2648,15 @@ class UfeTrackStackTab(QWidget):
             self._say(self.tr("The group's stack could not be shown:")
                       + f" {err}")
             return
+        finally:
+            state.keep_stretch = keep
         # the measured position, marked: the observation on stage is
         # remembered so the mark can be repainted later (a new plate of the
         # visit, a return to the tab), and the mark itself is drawn from the
         # SKY position with this plate's WCS (_draw_marks)
         self._shown_group = index
         self._shown_stack_path = str(path)
+        self._centroid_mark = None      # another observation: forget the mark
         self._draw_marks()
 
     def _group_stack_path(self, index, result):
@@ -2865,6 +2933,11 @@ class UfeTrackStackTab(QWidget):
             return None
         chk = header.get("NS_MAGOK")
         err = header.get("NS_MAGER")
+        # the observer can hide the photometric error from the band over the
+        # image (the context menu): dropping it here is what makes the band
+        # read "Mag: X (V)" instead of "Mag: X ± Y (V)"
+        if not self._magerr_shown():
+            err = None
         comps = header.get("NS_MAGNC")
         return {"mag": float(mag),
                 "err": (float(err) if err is not None else None),
@@ -3736,6 +3809,7 @@ class UfeTrackStackTab(QWidget):
                 ddec = (sp.dec - fp.dec) * 3600.0
                 delta = f"{math.hypot(dra, ddec):.2f}"
             warn = ", ".join(self._flag_text(f) for f in (flags or []))
+            mag_err = getattr(sp, "mag_err", None)
             cells = (str(sp.group_index + 1),
                      self._t_mid_text(mids[i] if i < len(mids) else None),
                      coords.ra_deg_to_hms(sp.ra) if not math.isnan(sp.ra)
@@ -3745,6 +3819,7 @@ class UfeTrackStackTab(QWidget):
                      delta,
                      f"{sp.snr:.1f}" if sp.snr else "–",
                      f"{sp.mag:.3f}" if sp.mag is not None else "–",
+                     f"±{mag_err:.3f}" if mag_err else "–",
                      warn)
             excluded = "user_excluded" in (flags or [])
             for col, text in enumerate(cells):
@@ -3794,11 +3869,14 @@ class UfeTrackStackTab(QWidget):
                             "Green: a clean measurement. Orange: usable, but "
                             "not clean. Red: not to be published without "
                             "looking at it (see the notes)."))
-                if col == 7 and text:
+                if col == 8 and text:
                     item.setToolTip(self.tr(
                         "The two measurements disagree: the point is "
                         "flagged, nothing is chosen in silence"))
                 tbl.setItem(i, col, item)
+        # the photometric error column: shown by default, hidden with the
+        # right-click menu (ADR-085)
+        tbl.setColumnHidden(7, not self._magerr_shown())
         tbl.blockSignals(False)
 
     def _on_point_toggled(self, item):
@@ -3849,14 +3927,310 @@ class UfeTrackStackTab(QWidget):
         except Exception as err:
             logger.warning("the exclusion could not be saved: %s", err)
 
+    # -- context menu on the observations and on the image (ADR-085) ------
+
+    def _wire_context_menus(self):
+        # @return: None. The SAME menu on the points table and on the image
+        #          stage: right-click an observation to adjust its centroid,
+        #          include/exclude it or show/hide the photometric error.
+        #          One builder, so the two never drift (ADR-081/071).
+        self.tbl_points.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tbl_points.customContextMenuRequested.connect(self._on_points_menu)
+        for view in (self._view, self._stack_view):
+            if view is not None:
+                view.setContextMenuPolicy(Qt.CustomContextMenu)
+                view.customContextMenuRequested.connect(self._on_image_menu)
+
+    def _on_points_menu(self, pos):
+        row = self.tbl_points.indexAt(pos).row()
+        if row < 0:
+            return
+        self.tbl_points.selectRow(row)
+        self._menu_row = row
+        self._show_points_menu(self.tbl_points.viewport().mapToGlobal(pos))
+
+    def _on_image_menu(self, pos):
+        view = self._view if self._view is not None else self._stack_view
+        if view is None:
+            return
+        self._menu_row = self._shown_group
+        # a QGraphicsView is a scroll area: `customContextMenuRequested` gives
+        # the position in the VIEWPORT's coordinates, so mapping from the view
+        # put the menu off-screen (reported: the image menu "did not appear")
+        target = view.viewport() if hasattr(view, "viewport") else view
+        self._show_points_menu(target.mapToGlobal(pos))
+
+    def _show_points_menu(self, global_pos):
+        from PySide6.QtWidgets import QMenu
+        row = getattr(self, "_menu_row", None)
+        points = (self._result or {}).get("points") or []
+        if row is None or not (0 <= row < len(points)):
+            return
+        _sp, _fp, flags = points[row]
+        excluded = "user_excluded" in (flags or [])
+        menu = QMenu(self)
+        act_centroid = menu.addAction(self.tr("Adjust the centroid…"))
+        act_auto = menu.addAction(self.tr("Auto centroid"))
+        # the published listing is the RUN's (not this observation's): the same
+        # door the check block's button opens
+        act_resid = menu.addAction(self.tr("Published observations…"))
+        act_resid.setEnabled(self.btn_residuals.isVisible())
+        act_excl = menu.addAction(
+            self.tr("Include in the report and the check") if excluded
+            else self.tr("Exclude from the report and the check"))
+        menu.addSeparator()
+        act_err = menu.addAction(
+            self.tr("Hide the photometric error") if self._magerr_shown()
+            else self.tr("Show the photometric error"))
+        chosen = menu.exec(global_pos)
+        if chosen is act_centroid:
+            self._adjust_centroid(row)
+        elif chosen is act_auto:
+            self._auto_centroid(row)
+        elif chosen is act_resid:
+            self._show_residuals()
+        elif chosen is act_excl:
+            self._set_row_excluded(row, not excluded)
+        elif chosen is act_err:
+            self._toggle_magerr()
+
+    def _auto_centroid(self, row):
+        # @args: row - the observation
+        # @return: None. Lets the APP pick the centroid again: re-measures the
+        #          stack point with the automatic routine, seeded at the point's
+        #          current position, signs it "auto" (dropping the manual mark)
+        #          and re-checks. The counterpart of "Adjust the centroid…".
+        result = self._result or {}
+        points = result.get("points") or []
+        if not (0 <= row < len(points)):
+            return
+        sp = points[row][0]
+        if sp is None or sp.x is None or sp.y is None:
+            return
+        self._recentroid(row, float(sp.x), float(sp.y), auto=True)
+
+    def _magerr_shown(self):
+        # @return: True when the photometric error is shown (the band over the
+        #          image and the "±" column). Shown by DEFAULT: the band always
+        #          said "Mag: X ± Y" and hiding it is the deliberate act.
+        value = config.get("ufe_points_magerr")
+        return True if value is None else bool(value)
+
+    def _toggle_magerr(self):
+        # @return: None. Show/hide the photometric error (ADR-085): the "±"
+        #          column of the table AND the ± in the band over the image
+        #          (the band is rebuilt on every render, so the view is asked
+        #          to repaint). The choice is remembered in the config.
+        shown = not self._magerr_shown()
+        config.set("ufe_points_magerr", shown)
+        self.tbl_points.setColumnHidden(7, not shown)
+        view = self._view if self._view is not None else self._stack_view
+        refresh = getattr(view, "refresh_frame", None)
+        if callable(refresh):
+            refresh()
+
+    def _set_row_excluded(self, row, excluded):
+        # @args: row - the observation, excluded - True to leave it out
+        # @return: None. Same effect as the checkbox, from the menu.
+        points = (self._result or {}).get("points") or []
+        if not (0 <= row < len(points)):
+            return
+        sp, fp, flags = points[row]
+
+        def _without(fl):
+            out = [f for f in (fl or []) if f != "user_excluded"]
+            if excluded:
+                out.append("user_excluded")
+            return out
+
+        flags = _without(flags)
+        if sp is not None:
+            sp.flags = _without(sp.flags)
+        points[row] = (sp, fp, flags)
+        self._result["points"] = points
+        self._persist_point_excluded(sp, excluded)
+        self._fill_points()
+        self._on_report(quiet=True)
+        self._recheck_timer.start()
+
+    def _adjust_centroid(self, row):
+        # @args: row - the observation whose centroid is re-selected
+        # @return: None. ADR-085 rev: it is a ONE-CLICK mode on the editor's
+        #          own stage, not a bare window: the observation's stack is
+        #          shown there and the observer has the full zoom, stretch and
+        #          histogram to find the object; the click then snaps to the
+        #          local gaussian centroid. Nothing is re-stacked.
+        result = self._result or {}
+        points = result.get("points") or []
+        stacks = result.get("stacks") or []
+        if not (0 <= row < len(points)) or row >= len(stacks):
+            return
+        array = stacks[row][0] if stacks[row] else None
+        if array is None:
+            self._say(self.tr(
+                "The observation's stack is not on disk: re-stack the run to "
+                "adjust its centroid."))
+            return
+        # the two marks share the stage and the click: arming this one disarms
+        # the whole-sequence manual mark (ADR-065), so a click is never stolen
+        if self._manual_armed or self.chk_manual.isChecked():
+            self._manual_armed = False
+            self._manual_base = None
+            self.chk_manual.blockSignals(True)
+            self.chk_manual.setChecked(False)
+            self.chk_manual.blockSignals(False)
+            self._sync_manual_dialog(False)
+        # Show the observation WITHOUT throwing away the observer's view: if it
+        # is already on stage there is nothing to reload (the zoom, the
+        # stretch and the histogram stay exactly as they were); if another one
+        # has to come on stage, the stretch is kept and the zoom restored.
+        if self._shown_group != row:
+            state = self._state if self._view is not None else self._stack_state
+            view = self._view if self._view is not None else self._stack_view
+            keep = getattr(state, "keep_stretch", False) if state else False
+            factor = (view.current_factor()
+                      if view is not None
+                      and hasattr(view, "current_factor") else None)
+            if state is not None:
+                state.keep_stretch = True
+            try:
+                self._show_group(row)
+            finally:
+                if state is not None:
+                    state.keep_stretch = keep
+            if factor is not None and hasattr(view, "fit_to_factor"):
+                view.fit_to_factor(factor)
+        self._centroid_row = row
+        self._centroid_mark = None
+        # the SAME crosshair the Photometry and Compare tabs use to pick a
+        # star: the view's own snapping reticle (UfeImageView.set_pick_cursor),
+        # which follows the mouse and shows where the mark will land
+        view = self._view if self._view is not None else self._stack_view
+        if view is not None and hasattr(view, "set_pick_cursor"):
+            view.set_pick_cursor(True)
+        self._say(self.tr(
+            "Adjust the centroid: zoom and stretch to find the object, then "
+            "click it. The mark snaps to its local centroid."))
+
+    def _on_centroid_click(self, scene_pt):
+        # @args: scene_pt - the click in scene coordinates
+        # @return: True when it was handled (the mode was armed)
+        row = getattr(self, "_centroid_row", None)
+        if row is None:
+            return False
+        self._centroid_row = None
+        view = self._view if self._view is not None else self._stack_view
+        if view is not None and hasattr(view, "set_pick_cursor"):
+            view.set_pick_cursor(False)      # the reticle is done
+        state = self._state if self._view is not None else self._stack_state
+        if state is None or not state.has_image:
+            return True
+        col, row_px = state.scene_to_data(scene_pt.x(), scene_pt.y())
+        # the observer's pixel IS the centroid to fix: no snapping to a nearby
+        # source (a star or a hot pixel would steal the mark and move it away
+        # from the click). measure_stack still refines WITHIN the window
+        # centred here, which is the measurement, not a jump elsewhere.
+        self._recentroid(row, float(col), float(row_px))
+        return True
+
+    def _recentroid(self, row, x, y, auto=False):
+        # @args: row - the observation, x/y - the new centroid in ITS stack,
+        #        auto - True when the APP picked it (the "Auto centroid" menu),
+        #        False when the observer marked it by hand
+        # @return: None. Re-measures ONLY that stack point, keeps the
+        #          brightness, signs where the centroid came from and re-runs
+        #          the check. The per-frame point is left alone (it is the
+        #          other half of the double measurement).
+        from ..core import astrometry
+        result = self._result or {}
+        points = result.get("points") or []
+        if not (0 <= row < len(points)):
+            return
+        sp, fp, flags = points[row]
+        array = result["stacks"][row][0]
+        wcs = self._stack_wcs(row)
+        if wcs is None:
+            self._say(self.tr(
+                "This stack carries no WCS: the centroid cannot be turned "
+                "into a position."))
+            return
+        new = astrometry.measure_stack(
+            array, (x, y), wcs, mjd=sp.mjd,
+            scale_arcsec=astrometry.pixel_scale_arcsec(wcs),
+            velocity_arcsec_min=result.get("rate_arcsec_min"))
+        new.mag, new.band, new.mag_err = sp.mag, sp.band, sp.mag_err
+        new.group_index = sp.group_index
+        new.source = "stack"
+        keep = [f for f in (flags or []) if f != "centroid_manual"]
+        if "below_gate" in (sp.flags or []) and "below_gate" not in keep:
+            keep.append("below_gate")
+        if not auto:
+            keep.append("centroid_manual")
+        new.flags = keep
+        points[row] = (new, fp, keep)
+        result["points"] = points
+        self._persist_manual_centroid(new, source="auto" if auto else "manual")
+        self._fill_points()
+        self._on_report(quiet=True)
+        self._say(self.tr(
+            "Centroid picked again by the app; the check runs again.") if auto
+            else self.tr(
+                "Centroid re-measured from your mark; the check runs again."))
+        # show WHERE it landed: the mark is remembered (its own stack's pixels)
+        # and the crosses are repainted, so the measured cross moves to the new
+        # centroid instead of staying on the old one (reported 2026-10-13: there
+        # was no way to see where the centroid had been placed)
+        self._centroid_mark = (float(x), float(y))
+        self._draw_marks()
+        self._recheck_timer.start()
+
+    def _stack_wcs(self, row):
+        # @args: row - the observation
+        # @return: the astropy WCS of that observation's stack, or None
+        paths = (self._result or {}).get("stack_paths") or []
+        if not (0 <= row < len(paths)) or not paths[row]:
+            return None
+        try:
+            from astropy.io import fits
+            from astropy.wcs import WCS
+            with fits.open(str(paths[row])) as hdul:
+                return WCS(hdul[0].header)
+        except Exception as err:
+            logger.warning("the stack WCS could not be read: %s", err)
+            return None
+
+    def _persist_manual_centroid(self, sp, source="manual"):
+        # @args: sp - the re-measured stack point, source - "manual" | "auto"
+        # @return: None. The host writes the new position and the
+        #          `centroid_source` flag; without a host (an ad-hoc open) it
+        #          lives in memory only.
+        if self._run_id is None or sp is None:
+            return
+        host = host_of(self)
+        save = getattr(host, "set_manual_centroid", None)
+        if not callable(save):
+            return
+        try:
+            save(self._run_id, getattr(sp, "group_index", 0), sp.ra, sp.dec,
+                 sp.rms_ra, sp.rms_dec, sp.x, sp.y, sp.snr, source)
+        except Exception as err:
+            logger.warning("the manual centroid could not be saved: %s", err)
+
     def _auto_recheck(self):
         # @return: None. Re-runs the check after the observer changed which
         #          observations are submitted. A re-check already in flight
         #          wins: this one waits (the timer is restarted) so a burst of
         #          toggles ends in ONE check, not one per click.
         if self._recheck is not None:
-            self._recheck_timer.start()
-            return
+            if self._recheck.isFinished():
+                # a worker that ended without clearing (or a lost reference)
+                # must not block every later re-check for ever: the message
+                # stayed at "Checking against other observers…" (reported
+                # 2026-10-13, after a manual centroid mark)
+                self._recheck = None
+            else:
+                self._recheck_timer.start()
+                return
         if not (self._result or {}).get("points"):
             return
         self._on_recheck()
@@ -3903,6 +4277,8 @@ class UfeTrackStackTab(QWidget):
                 "published without looking at it")
         if flag == "user_excluded":
             return self.tr("Excluded from the report by you")
+        if flag == "centroid_manual":
+            return self.tr("Centroid re-selected by hand on the saved stack")
         return str(flag)
 
     def _findorb_ready_now(self):
@@ -4155,6 +4531,8 @@ class UfeTrackStackTab(QWidget):
         #          and Find_Orb run. This is the door for an object that was
         #          confirmed after the rolling NEOCP list forgot it.
         from .workers import FindOrbRecheckWorker, hold
+        if self._recheck is not None and not self._recheck.isFinished():
+            return                      # one check at a time
         result = self._result or {}
         points = result.get("points") or []
         if not points:
@@ -4162,7 +4540,7 @@ class UfeTrackStackTab(QWidget):
                 "There is no measured point to check: run the track & stack "
                 "first."))
             return
-        desig = self.edt_desig_check.text().strip() or self._current_object_name()
+        desig = self.edt_desig_check.text().strip() or self._check_desig()
         if not desig:
             return
         from ..core import mpc_astrometry
@@ -4313,6 +4691,10 @@ class UfeTrackStackTab(QWidget):
         # and the report's own group opens: there IS something to read in it
         self._sections["report"].setCollapsed(False)
         self._sync_report_buttons()
+        # the send dialog's intro quotes the count and the format, so it is
+        # rebuilt with the report it describes (the format combo lives in the
+        # report window: changing it there must not leave a stale claim here)
+        self._refresh_send_intro()
         kept = len(rep.get("kept") or [])
         if not quiet:
             self._say(self.tr("Report generated: %1 observations kept."
@@ -4370,14 +4752,39 @@ class UfeTrackStackTab(QWidget):
             self._send_dialog.edt_ack_email.text()
             or str(config.get("observer_email", "") or ""))
         ctx = self._context() or {}
+        # The target starts at the project's own kind, as the manual promises:
+        # NEOCP for a project on the confirmation page, Unclassified otherwise.
+        # The old guard also asked for an EMPTY combo, and set_targets had
+        # already filled it, so the default never applied (measured
+        # 2026-10-13: a NEOCP project opened on Unclassified). It is set on
+        # every open, and the observer can still change it for this batch.
         default_target = "NEOCP" if ctx.get("neocp") else "Unclassified"
         idx = self._send_dialog.cmb_target.findData(default_target)
-        if idx >= 0 and not self._send_dialog.cmb_target.currentText():
+        if idx >= 0:
             self._send_dialog.cmb_target.setCurrentIndex(idx)
         self._refresh_send_gate()
+        self._refresh_send_intro()
         self._send_dialog.show()
         self._send_dialog.raise_()
         self._send_dialog.activateWindow()
+
+    def _refresh_send_intro(self):
+        # @return: None. Says, above the log, what the batch carries: how many
+        #          observations, the format, the target and the mode. Without
+        #          it the window opened empty and looked broken; the target and
+        #          the mode refresh it, so the line is never a stale claim
+        #          about what is about to go out (the app talks first, ADR-038).
+        kept = int(self._report_kept or 0)
+        if not kept:
+            self._send_dialog.lbl_intro.setText("")
+            return
+        self._send_dialog.lbl_intro.setText(self.tr(
+            "Ready to send: %1 observation(s), format %2, target %3, "
+            "mode %4. The MPC's own answer will appear below.").replace(
+                "%1", str(kept)).replace(
+                "%2", self.cmb_format.currentText()).replace(
+                "%3", self._send_dialog.cmb_target.currentText()).replace(
+                "%4", self._send_dialog.cmb_mode.currentText()))
 
     def _refresh_send_gate(self):
         # @return: None. What the submission header still needs, said in the

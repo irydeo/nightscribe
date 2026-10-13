@@ -59,6 +59,7 @@ class AstrometryPoint:
     y: float = 0.0
     mag: float | None = None
     band: str | None = None
+    mag_err: float | None = None          # the magnitude's error bar
     snr: float = 0.0
     fwhm: float | None = None
     roundness: float = 0.0
@@ -193,7 +194,17 @@ def _roundness(clean, cx, cy, r_ap):
 def pixel_scale_arcsec(wcs):
     # @args: wcs - astropy WCS
     # @return: the plate scale in arcsec/px
-    cd = wcs.wcs.cd
+    # A WCS carries its linear part as CD or as PC * CDELT, and astropy reads
+    # a stack written with CD back as PC+CDELT: reading `wcs.wcs.cd` directly
+    # crashed with "No cd is present" (reported 2026-10-13, adjusting a
+    # centroid). `pixel_scale_matrix` answers both.
+    cd = None
+    try:
+        cd = wcs.wcs.cd
+    except Exception:
+        cd = None
+    if cd is None:
+        cd = wcs.pixel_scale_matrix
     return math.sqrt(abs(cd[0][0] * cd[1][1] - cd[0][1] * cd[1][0])) * 3600.0
 
 

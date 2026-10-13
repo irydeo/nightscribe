@@ -212,3 +212,109 @@ modes: Qt paints the bright one on the active row by itself, with no state
 code. A missing asset falls back to the text, so the rail never goes mute.
 The rail is a `QListWidget` in vertical `IconMode`, borderless, with an
 accent bar marking the active section.
+
+**Review (2026-10-13, every group folds)**: with six pages and 29 groups, the
+settings dialog now makes **every** group a disclosure (`settings_view.collapse_groups`,
+the same `make_collapsible` the advanced groups already used) and they **all
+start closed**, so each page reads as a compact list of headings the observer
+opens as needed. The search keeps working: it opens the groups that match and
+returns the rest to closed; the backend gate still hides the whole group.
+
+**Revisión (2026-10-13, todos los grupos se pliegan)**: con seis páginas y 29
+grupos, el diálogo de Ajustes convierte **todos** los grupos en desplegables
+(`settings_view.collapse_groups`, el mismo `make_collapsible` que ya usaban los
+avanzados) y **todos empiezan cerrados**, así que cada página se lee como una
+lista compacta de títulos que el observador abre cuando los necesita. El
+buscador sigue funcionando: abre los grupos que coinciden y devuelve el resto a
+cerrado; el gate del backend sigue ocultando el grupo entero.
+
+**Review (2026-10-13, the rows inform, the page has a voice)**: folding every
+group made each page a wall of identical titles (reported: saturated and
+monotonous). So (1) every group header wears the **card voice**
+(`theme.block_header_style` + a value **chip**, `settings_view.Section`) and the
+closed row shows the **current value** ("Observatory software · CCDciel", "Sky
+brightness · 20.5 mag/arcsec²", "API keys · 2/4"): a closed page is a dashboard
+of the settings, not a list of bare titles; (2) the groups the observer touches
+on a normal night (`settings_spec.PRIMARY_GROUPS`) start **open** and the rest
+folded; (3) each page carries a one-line **intro** (`CATEGORY_INTROS`) so it
+reads as a page and says what its settings are for. The search and the backend
+gate are unchanged. Merging sibling groups into sections (Measurement 11 → 5,
+Observing 6 → 4, …) is the next step.
+
+**Revisión (2026-10-13, las filas informan y la página tiene voz)**: plegar todos
+los grupos dejaba cada página como una pared de títulos idénticos (reportado:
+satura y es monótona). Así que (1) cada cabecera viste la **voz de tarjeta**
+(`theme.block_header_style` + un **chip** de valor, `settings_view.Section`) y la
+fila cerrada muestra el **valor actual** («Observatory software · CCDciel»,
+«Sky brightness · 20.5 mag/arcsec²», «API keys · 2/4»): una página cerrada es un
+cuadro de mando, no una lista de títulos; (2) los grupos que se tocan en una
+noche normal (`settings_spec.PRIMARY_GROUPS`) empiezan **abiertos** y el resto
+plegados; (3) cada página lleva una **introducción** de una línea
+(`CATEGORY_INTROS`) para que se lea como página y diga para qué son sus ajustes.
+El buscador y el gate del backend no cambian. Fusionar grupos hermanos en
+secciones (Measurement 11 → 5, Observing 6 → 4, …) es el paso siguiente.
+
+**Review (2026-10-13, phase 2: the pages merge)**: sibling groups are merged
+into a few sections per page (`settings_spec.SECTIONS` +
+`settings_view.merge_sections`): the first group of each section keeps its
+objectName (so the search, the backend gate and the primary list still work),
+becomes the section and absorbs the others under a small sub-heading, which are
+hidden. Measurement reads as **five** sections (Photometry, Astrometry, Plate
+solver, Tools, Calibration masters) instead of eleven; Observing as four
+(Site and horizon, Tonight, Session, Files); Interface as three. The backend
+groups are not merged (the Integrations gate hides them individually). And the
+folded card's header now hugs the top of the box (the group's dead title space,
+`margin-top`/`padding-top`, is dropped): folded, it looked ugly.
+
+**Revisión (2026-10-13, fase 2: las páginas se fusionan)**: los grupos hermanos
+se fusionan en unas pocas secciones por página (`settings_spec.SECTIONS` +
+`settings_view.merge_sections`): el primer grupo de cada sección conserva su
+objectName (así el buscador, el gate del backend y la lista de primarios siguen
+funcionando), pasa a ser la sección y absorbe a los demás bajo un sub-título,
+que quedan ocultos. Measurement se lee como **cinco** secciones (Fotometría,
+Astrometría, Resolución de placa, Herramientas, Masters de calibración) en vez
+de once; Observing como cuatro; Interface como tres. Los grupos del backend no
+se fusionan (el gate de Integraciones los oculta por separado). Y la cabecera
+del grupo plegado ahora pega al **borde superior** (se elimina el espacio muerto
+del título, `margin-top`/`padding-top`): plegado quedaba feísimo.
+
+**Review (2026-10-13, the grouping is reverted: the headers separate)**: merging
+sibling groups into sections (the previous phase 2) did not read well, so it is
+**reverted** (`settings_spec.SECTIONS` and `settings_view.merge_sections` are
+gone; each group is its own block again). What makes the pages readable is the
+**header BAR**: every group's header is now a filled strip (a soft tint of the
+accent over the panel) with the title in the accent and the value chip on the
+right, and each group carries a bottom margin, so two groups never touch and
+the start of each one is obvious. The folding (primary open, the rest with
+their value), the per-page intros, the search and the backend gate stay.
+
+**Revisión (2026-10-13, se revierte la agrupación: las cabeceras separan)**:
+fusionar grupos hermanos en secciones (la fase 2 anterior) no se leía bien, así
+que se **revierte** (`settings_spec.SECTIONS` y `settings_view.merge_sections`
+desaparecen; cada grupo es su propio bloque otra vez). Lo que hace legibles las
+páginas es la **barra de cabecera**: la cabecera de cada grupo es ahora una
+franja con fondo (un tinte suave del acento sobre el panel) con el título en el
+acento y el chip de valor a la derecha, y cada grupo lleva un margen inferior,
+así que dos grupos nunca se tocan y el inicio de cada uno es evidente. Se
+mantienen el plegado (primario abierto, el resto con su valor), las
+introducciones por página, el buscador y el gate del backend.
+
+**Review (2026-10-13, no folding: only the title)**: the folding itself is
+dropped. Every group now shows **only its title**, as a filled bar (a soft tint
+of the accent with the title in the accent and bold), and its content is
+**always visible**; there is no disclosure arrow and no value chip. What
+separates one group from the next is the bar plus a bottom margin, which is
+enough. `settings_view.make_collapsible`/`collapse_groups` and
+`settings_spec.PRIMARY_GROUPS`/`SUMMARY_WORDS`/`ADVANCED_GROUPS` are gone, and
+the new `settings_view.title_groups` only paints the bar. The per-page intros,
+the search and the backend gate stay.
+
+**Revisión (2026-10-13, sin plegado: sólo el título)**: se elimina el plegado.
+Cada grupo muestra ahora **sólo su título**, como una barra con fondo (un tinte
+suave del acento, título en acento y negrita), y su contenido está **siempre
+visible**; no hay flecha de despliegue ni chip de valor. Lo que separa un grupo
+del siguiente es la barra más un margen inferior, y con eso basta.
+`settings_view.make_collapsible`/`collapse_groups` y
+`settings_spec.PRIMARY_GROUPS`/`SUMMARY_WORDS`/`ADVANCED_GROUPS` desaparecen, y
+la nueva `settings_view.title_groups` sólo pinta la barra. Se mantienen las
+introducciones por página, el buscador y el gate del backend.

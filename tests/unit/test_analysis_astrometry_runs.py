@@ -75,6 +75,7 @@ def _run(window, p, **kwargs):
     # @return: the run id, with one stack point and one frames point
     import nightscribe.gui.main_window as mw
     from nightscribe.core import astrometry_store as store
+    mjd = kwargs.pop("mjd", 60600.5)
     run = store.create_run(
         mw.db, p["id"], None, {"method": "sum"}, status="complete",
         object_name="2025 UR", method="sum", n_frames=30, n_obs=1,
@@ -83,7 +84,7 @@ def _run(window, p, **kwargs):
     for source, mag in (("stack", 18.18), ("frames", 18.24)):
         store.add_points(mw.db, [{
             "run_id": run, "project_id": p["id"], "session_id": None,
-            "group_index": 0, "mjd": 60600.5, "ra": 10.0, "dec": 20.0,
+            "group_index": 0, "mjd": mjd, "ra": 10.0, "dec": 20.0,
             "rms_ra": 0.2, "rms_dec": 0.2, "mag": mag, "band": "G",
             "n_frames": 30, "snr": 12.0, "source": source,
             "method": "sum", "check_ok": True,
@@ -122,6 +123,128 @@ def test_the_run_is_listed_with_its_motion_check_and_state(window):
     assert tbl.item(0, 4).toolTip() == \
         "residual within the published path"
     assert tbl.item(0, 5).text() == "complete"
+
+
+def test_double_click_opens_the_run(window, monkeypatch):
+    # ADR-062 rev: double-clicking a run row opens it in the editor, like the
+    # "Open in the editor" button.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import astrometry_store as store
+    from PySide6.QtWidgets import QVBoxLayout
+    p = _project(window)
+    sid = mw.db.execute(
+        "INSERT INTO project_sessions (project_id, obs_date, notes, created)"
+        " VALUES (?, '2026-10-13', '', 1.0)", (p["id"],)).lastrowid
+    mw.db.commit()
+    rid = store.create_run(mw.db, p["id"], sid, {}, status="complete",
+                           object_name="A", n_obs=1)
+    window._analysis_astrometry_block(QVBoxLayout(), p, p["id"])
+    tbl = window._project_widgets["astrometry_runs_tbl"]
+    opened = []
+    monkeypatch.setattr(window, "_open_astrometry_run",
+                        lambda run: opened.append(run["id"]))
+    tbl.selectRow(0)
+    tbl.itemDoubleClicked.emit(tbl.item(0, 0))
+    assert opened == [rid]
+
+
+def test_with_busy_runs_the_work_and_returns_it(window):
+    # the static busy dialog wraps the work and hands its result back
+    assert window._with_busy("x", lambda: 42) == 42
+
+
+def test_opening_a_run_uses_the_busy_dialog(window, monkeypatch):
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import astrometry_store as store
+    p = _project(window)
+    sid = mw.db.execute(
+        "INSERT INTO project_sessions (project_id, obs_date, notes, created)"
+        " VALUES (?, '2026-10-13', '', 1.0)", (p["id"],)).lastrowid
+    mw.db.commit()
+    rid = store.create_run(mw.db, p["id"], sid, {}, status="complete",
+                           object_name="A", n_obs=1)
+    run = next(r for r in store.list_runs(mw.db, p["id"]) if r["id"] == rid)
+    called = []
+    monkeypatch.setattr(window, "_with_busy",
+                        lambda label, fn: (called.append(label), fn())[1])
+    monkeypatch.setattr(window, "_visit_astrometry",
+                        lambda *a, **k: called.append(("open", a, k)))
+    window._open_astrometry_run(run)
+    assert ("open", (p["id"], sid), {"run_id": rid}) in called
+
+
+def test_a_visit_click_filters_the_runs(window):
+    # ADR-086 rev: one click on a visit shows only ITS runs.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import astrometry_store as store
+    from PySide6.QtWidgets import QVBoxLayout
+    p = _project(window)
+    sid = mw.db.execute(
+        "INSERT INTO project_sessions (project_id, obs_date, notes, created)"
+        " VALUES (?, '2026-10-13', '', 1.0)", (p["id"],)).lastrowid
+    mw.db.commit()
+    store.create_run(mw.db, p["id"], sid, {}, status="complete",
+                     object_name="A", n_obs=1)
+    store.create_run(mw.db, p["id"], None, {}, status="complete",
+                     object_name="A", n_obs=1)
+    window._analysis_astrometry_block(QVBoxLayout(), p, p["id"])
+    tbl = window._project_widgets["astrometry_runs_tbl"]
+    assert tbl.rowCount() == 2
+    window._set_analysis_visit_filter(p["id"], sid)
+    assert tbl.rowCount() == 1
+    window._set_analysis_visit_filter(p["id"], None)
+    assert tbl.rowCount() == 2
+
+
+def test_combined_block_lists_and_persists_the_selection(window):
+    # ADR-086: all the project's measurements in one place, ticked by the
+    # observer; the selection is saved (per observation).
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import astrometry_store as store
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QVBoxLayout
+    p = _project(window)
+    _run(window, p, mjd=60600.5)
+    _run(window, p, mjd=60601.5, rate=15.0)          # a different night
+    window._analysis_combined_block(QVBoxLayout(), p, p["id"])
+    tbl = window._project_widgets["combined_tbl"]
+    assert tbl.rowCount() == 2
+    assert tbl.item(0, 0).checkState() == Qt.Checked     # all in by default
+    tbl.item(0, 0).setCheckState(Qt.Unchecked)
+    saved = store.get_combined(mw.db, p["id"])
+    assert len(saved["included"]) == 1
+
+
+def test_combined_block_merges_re_measures_of_the_same_observation(window):
+    # ADR-086 rev: four runs at the same instant are ONE observation, not four
+    # (feeding Find_Orb duplicate points produced absurd residuals).
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import astrometry_store as store
+    from PySide6.QtWidgets import QVBoxLayout
+    p = _project(window)
+    _run(window, p, mjd=60600.5)
+    _run(window, p, mjd=60600.5)
+    _run(window, p, mjd=60600.5)
+    obs, merged = store.dedupe_observations(store.project_observations(
+        mw.db, p["id"]))
+    assert len(obs) == 1 and merged == 2
+    window._analysis_combined_block(QVBoxLayout(), p, p["id"])
+    assert window._project_widgets["combined_tbl"].rowCount() == 1
+
+
+def test_combined_report_needs_a_tick(window):
+    from PySide6.QtWidgets import QVBoxLayout
+    p = _project(window)
+    _run(window, p)
+    window._analysis_combined_block(QVBoxLayout(), p, p["id"])
+    tbl = window._project_widgets["combined_tbl"]
+    tbl.item(0, 0).setCheckState(tbl.item(0, 0).checkState())   # no-op
+    # unticking everything leaves nothing to report
+    from PySide6.QtCore import Qt
+    tbl.item(0, 0).setCheckState(Qt.Unchecked)
+    window._analysis_combined_report(p["id"])
+    assert "tick" in window._project_widgets["combined_lbl"].text().lower() \
+        or window.statusBar().currentMessage() != ""
 
 
 def test_the_date_is_a_date_and_not_an_epoch(window):

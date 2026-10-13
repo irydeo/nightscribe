@@ -471,24 +471,6 @@ def _hads_facts(d):
                           "you would be among the first."})
     return out
 
-    # Transit depth and duration in a short bilingual clause, from the
-    # ExoClock "transit" sub-dict. The star goes in the hook sentence, so it
-    # is not repeated here.
-    # @args: tr - the planner target's "transit" sub-dict
-    # @return: {"es": str, "en": str} or None when there is nothing to add
-    bits_es, bits_en = [], []
-    depth = tr.get("depth_mmag")
-    dur = tr.get("duration_h")
-    if depth:
-        bits_es.append(f"profundidad {depth:.0f} miligram")
-        bits_en.append(f"depth {depth:.0f} millimags")
-    if dur:
-        bits_es.append(f"duración {dur:.1f} h")
-        bits_en.append(f"duration {dur:.1f} h")
-    if not bits_es:
-        return None
-    return {"es": ", ".join(bits_es), "en": ", ".join(bits_en)}
-
 
 def _variable_hook(name, v, camp):
     # The variable hook: the campaign that watches it and its next extremum.

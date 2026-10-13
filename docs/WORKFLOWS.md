@@ -49,10 +49,12 @@ ADR-052).
    horizon and "safe start until HH:MM". The user sets N frames × exposure and filter;
    the app checks the session ends inside the safety range.
 2. **Capture**: export sequence (NINA JSON / CCDciel / CSV) with name, J2000 coords
-   and times; the file is registered in the project. **With CCDciel connected**
-    (ADR-030) the same tab can also: point the telescope, run an **astrometric goto**
-    (plate-solve + correction), send the plan (target, exposure, frame count, filter)
-    and start the capture live.
+   and times; the file is registered in the project. **With the observatory
+   connected** (ADR-030, ADR-081: CCDciel **or** NINA/PINS) the same tab can also:
+   point the telescope, run an **astrometric goto** (plate-solve + correction),
+   **stop the movement** (safety), send the plan (target, exposure, frame count,
+   filter) and start the capture live. The plan's filter list is the wheel's real
+   one; NINA's snapshot takes one exposure, so its frame count is information only.
 3. **Process** (external): the user calibrates/stacks with their own tools; back in
    NightScribe, "Import result FITS" — **without asking for target or coordinates**
    (already in context) — then confirm with the blink, matched against PS1-g

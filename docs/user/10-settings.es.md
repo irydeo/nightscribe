@@ -5,9 +5,10 @@ El diálogo es un raíl de seis categorías a la izquierda (un icono en cada
 una: pasa el ratón para leer el nombre), una página a la derecha y un
 **buscador** arriba: escribe una palabra (el nombre de un
 campo o la primera línea de su ayuda) y solo queda en pantalla lo que
-coincide, en todas las páginas. Cada campo lleva su ayuda justo debajo, y
-los mandos raros se esconden tras una sección **avanzada** que se abre con
-un clic, para que el camino común sea corto.
+coincide, en todas las páginas. Cada campo lleva su ayuda justo debajo. Cada
+grupo muestra su **título en una barra** que lo separa claramente, y los campos
+de debajo están siempre a la vista: nada se pliega, así que la página es una
+lista corta de bloques con título, uno tras otro.
 
 Nada de aquí es obligatorio salvo el sitio; cada integración que falte
 simplemente deja su función en silencio.
@@ -21,6 +22,10 @@ Dónde y quién eres.
   identidad de tus informes MPC: si envías astrometría, usa el código.
 - **Código AAVSO**: tu código de observador; se escribe en el traspaso a
   EXOTIC de los proyectos de tránsito.
+- **Brillo de cielo** (mag/arcsec²): cuán brillante es tu cielo cenital; fija la
+  sub-exposición sugerida (capítulo 05). **Consultar** la rellena desde el atlas
+  de contaminación lumínica si tienes la clave (Integraciones), o léela del mapa
+  que abre el botón en tu sitio.
 
 ## Equipo
 
@@ -32,14 +37,19 @@ Con qué observas.
   medido.
 - **Cámara**: manda el **preset**, que rellena el tamaño de píxel y un
   perfil de partida de una vez. Elegir un preset carga **los datos de esa
-  cámara** (full well, ruido de lectura, corriente de oscuridad, linealidad)
-  por encima del perfil; la ganancia del sistema nunca se toca, porque es
-  tuya. El tamaño de píxel y la focal se devuelven
+  cámara** (full well, ruido de lectura, corriente de oscuridad, lectura y
+  descarga, linealidad) por encima del perfil; la ganancia del sistema nunca
+  se toca, porque es tuya. El tamaño de píxel y la focal se devuelven
   como la **escala de placa** (arcosegundos por píxel), que es lo que usan
   de verdad el consejo de exposición de NEOs, la fotometría y el informe
   MPC. El perfil medido (full well, ganancia del sistema, ruido de lectura,
-  corriente de oscuridad, linealidad, exposición máxima de trabajo) está a
-  un clic.
+  corriente de oscuridad, lectura y descarga, linealidad, exposición máxima de
+  trabajo) está a un clic. La **lectura y descarga** es el **único overhead por
+  toma** de la app (el preset la rellena según el sensor, por tipo y tamaño; un
+  CCD lee en segundos): dimensiona una secuencia y acota la serie de un objeto
+  rápido, así que una descarga lenta significa menos tomas antes de que el
+  objeto salga del campo. Súbela si tu montura también necesita asentarse entre
+  tomas.
 
 > **¿Por qué medir la magnitud límite en vez de fiarse de la ficha?** Porque
 > el límite real depende de tu cielo, tu cámara, tus exposiciones y tu
@@ -102,15 +112,20 @@ calibración y astrometría juntas, para que quien mide no salte de página.
 
 ## Integraciones
 
-El mundo exterior: un servidor de captura y las claves opcionales.
+El mundo exterior: tu software de observatorio y las claves opcionales.
 
-- **CCDciel**: host, puerto (3277 por defecto) y auto-conexión. El control
-  solo funciona mientras CCDciel está abierto (capítulo 05).
-- **NEOfixer**, **Astrometry.net**, **bot TNS**, **token de API de AAVSO**:
-  claves opcionales para, respectivamente, el reporte a la comunidad, la
-  resolución a ciegas de placas sin WCS, las imágenes de descubrimiento de
-  transitorios y la fotometría de la comunidad que alimenta las vigilias de
-  estrellas brillantes (capítulo 04).
+- **Software del observatorio**: elige **CCDciel** o **NINA / PINS** (de uno en
+  uno). Solo se muestran los campos del programa elegido. Cada uno guarda su
+  host, su puerto (3277 para CCDciel, 1888 para NINA/PINS) y su auto-conexión.
+  El control solo funciona mientras el programa está abierto, y para NINA/PINS
+  su plugin Advanced API v2 tiene que estar instalado y activo (capítulo 05).
+  Cambiar la elección desconecta el otro programa.
+- **NEOfixer**, **Astrometry.net**, **bot TNS**, **token de API de AAVSO**,
+  **contaminación lumínica**: claves opcionales para, respectivamente, el reporte
+  a la comunidad, la resolución a ciegas de placas sin WCS, las imágenes de
+  descubrimiento de transitorios, la fotometría de la comunidad que alimenta las
+  vigilias de estrellas brillantes (capítulo 04) y el brillo de cielo del sitio
+  (capítulo 05).
 - **Modelo de lenguaje (IA, opcional, experimental)**: para redactar el post y
   el asistente (capítulos 08 y 11). El endpoint es compatible con OpenAI: sirve
   un servicio de la nube (OpenRouter, Groq, Google AI Studio) o uno local

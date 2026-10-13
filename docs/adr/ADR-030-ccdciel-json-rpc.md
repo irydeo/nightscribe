@@ -236,3 +236,19 @@ ephemeris bypassing the cache (`force=True`) on its own worker; it is a network
 action, so it is enabled even with CCDciel disconnected. Source
 `neofixer-ephem`, TTL 1.5 h (the table derives from the preliminary orbit,
 which changes fast).
+
+**Review (2026-10-13, ADR-081)**: CCDciel stops being "the integration" and
+becomes one of two observatory backends. The Capture step now drives CCDciel
+**or** NINA/PINS (Advanced API v2), chosen in Settings, through a common
+surface (`core/sources/observatory.py`); it gains the safety **Stop goto**
+(`Telescope_abortmotion`), "Send plan" reads the staged plan back
+(`Capture_get*`) so it proves it did something, and the Exposure plan's filter
+combo is filled from the real wheel instead of the hardcoded list. See ADR-081.
+
+**Revisión (2026-10-13, ADR-081)**: CCDciel deja de ser «la integración» y pasa
+a ser uno de dos backends de observatorio. El paso Captura maneja CCDciel **o**
+NINA/PINS (Advanced API v2), elegido en Ajustes, con una superficie común
+(`core/sources/observatory.py`); gana el **Stop goto** de seguridad
+(`Telescope_abortmotion`), «Send plan» lee de vuelta el plan preparado
+(`Capture_get*`) para probar que hizo algo, y el combo de filtros de «Exposure
+plan» se rellena de la rueda real en vez de la lista hardcodeada. Ver ADR-081.

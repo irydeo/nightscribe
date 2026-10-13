@@ -32,7 +32,8 @@ logger = logging.getLogger(__name__)
 
 
 def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
-              n_darks=0, exp_dark=None, n_bias=0, steps=None):
+              n_darks=0, exp_dark=None, n_bias=0, steps=None,
+              recipe=None):
     # Builds a capture plan dict from parameters + config defaults.
     # Calibration frames are optional: Dark (count + exposure) and Bias
     # (count) steps get appended to the sequence and their wall-clock time
@@ -40,17 +41,29 @@ def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
     # B8: multi-filter — pass steps=[(filter, n, exp), ...] for interleaved
     # bands. Retrocompatible: a single-filter call (n_frames, exp_s,
     # filter_name) is equivalent to steps=[(filter_name, n_frames, exp_s)].
+    # ADR-083: `recipe` carries the capture options (dither, autofocus, gain,
+    # offset, binning, delay_s) that the sequence file writes; without it the
+    # step keeps the sample's conventions (dither and autofocus on).
     # @args: n_frames - light frame count (ignored when steps is given),
     #        exp_s - exposure per light frame (ignored when steps is given),
     #        filter_name - filter wheel slot name (ignored when steps),
-    #        overhead_s - readout/slew per frame (defaults to config),
+    #        overhead_s - per-frame time that is not the exposure (the camera's
+    #        readout/download plus the mount settle); defaults to
+    #        exposure.frame_overhead_s(cfg) when cfg is given,
     #        cfg - Config, n_darks - dark count, exp_dark - dark exp,
     #        n_bias - bias count,
-    #        steps - list of (filter, n_frames, exp_s) tuples for multi-filter
+    #        steps - list of (filter, n_frames, exp_s) tuples for multi-filter,
+    #        recipe - dict from capture_recipe.recommend (or None)
     # @return: {"n_frames", "exp_s", "filter", "overhead_s", "darks",
-    #           "bias", "duration_s", "steps"}
+    #           "bias", "duration_s", "steps"} + the recipe fields
+    recipe = dict(recipe or {})
     if overhead_s is None:
-        overhead_s = float(cfg.get("overhead_s", 15.0)) if cfg else 15.0
+        # ADR-083 rev: the per-frame overhead is the camera's readout/download
+        # PLUS the mount settle, from ONE helper, so the plan's wall clock and
+        # the recipe's frame count can never disagree.
+        from . import exposure as _exposure
+        overhead_s = (_exposure.frame_overhead_s(cfg) if cfg is not None
+                      else _exposure.DEFAULT_READOUT_S)
     if steps:
         light_steps = []
         total_light = 0.0
@@ -79,7 +92,13 @@ def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
             "darks": {"count": n_darks, "exp_s": exp_dark},
             "bias": {"count": n_bias},
             "duration_s": total,
-            "steps": light_steps}
+            "steps": light_steps,
+            "dither": recipe.get("dither") or {},
+            "autofocus": recipe.get("autofocus") or {},
+            "gain": recipe.get("gain"),
+            "offset": recipe.get("offset"),
+            "binning": recipe.get("binning"),
+            "delay_s": recipe.get("delay_s") or 0}
 
 
 def export_csv(target, plan, out):
@@ -96,7 +115,7 @@ def export_csv(target, plan, out):
     ra = target.get("ra_deg", 0.0)
     dec = target.get("dec_deg", 0.0)
     tw = _transit_window(target)
-    overhead = float(plan.get("overhead_s", 15.0))
+    overhead = float(plan.get("overhead_s", 2.0))
     rows = []
     elapsed = 0.0
     for s in plan.get("steps", [{"filter": plan["filter"],
@@ -136,10 +155,11 @@ def _transit_window(target):
     return s, e
 
 
-def export_nina(target, plan, out):
-    # NINA sequence JSON. Basic structure with target coordinates and a
-    # flat list of exposure items. B8: multi-filter plans emit
-    # one exposure entry per filter step.
+def export_nina_summary(target, plan, out):
+    # The human-readable PLAN SUMMARY for NINA: a bespoke JSON that says what
+    # the plan is (target, exposures, capture options) for a person or another
+    # tool to read. It is NOT a loadable NINA sequence (that is export_nina);
+    # the two are separate so the summary can stay simple and stable.
     # @args: target - dict with name, ra_deg, dec_deg, plan - make_plan dict,
     #        out - output path (.json)
     # @return: the output path
@@ -156,7 +176,7 @@ def export_nina(target, plan, out):
                         "Binning": 1}] * s["n_frames"]
     seq = {
         "Name": name,
-        "Description": f"NightScribe sequence for {name}",
+        "Description": f"NightScribe plan summary for {name}",
         "Target": {
             "TargetName": name,
             "TargetCoordinates": {
@@ -176,15 +196,276 @@ def export_nina(target, plan, out):
             "TotalDuration_s": plan["duration_s"],
         },
     }
-    # Track D: a transit capture window becomes best-effort start/end
-    # metadata (NINA's own scheduler owns the actual clock).
+    # ADR-083: the capture options travel with the summary too.
+    d = plan.get("dither") or {}
+    a = plan.get("autofocus") or {}
+    seq["Metadata"]["Capture"] = {
+        "Dither": bool(d.get("on")),
+        "DitherEvery": int(d.get("every") or 0),
+        "DitherPixels": int(d.get("pixels") or 0),
+        "Autofocus": bool(a.get("on")),
+        "AutofocusEveryMinutes": int(a.get("minutes") or 0),
+        "AutofocusDeltaC": float(a.get("delta_c") or 0.0),
+        "AutofocusOnFilter": bool(a.get("on_filter")),
+        "Gain": plan.get("gain"),
+        "Offset": plan.get("offset"),
+        "Binning": plan.get("binning"),
+        "Delay_s": plan.get("delay_s") or 0,
+    }
     tw = _transit_window(target)
     if tw:
         seq["Metadata"]["StartTime"] = tw[0].isoformat()
         seq["Metadata"]["EndTime"] = tw[1].isoformat()
     Path(out).write_text(json.dumps(seq, indent=2, ensure_ascii=False),
                          encoding="utf-8")
-    logger.info("NINA sequence written to %s", out)
+    logger.info("NINA plan summary written to %s", out)
+    return str(out)
+
+
+# ---- NINA native sequence (SequenceJsonConverter) ------------------------
+#
+# NINA loads a sequence with SequenceJsonConverter: JSON.NET with
+# TypeNameHandling.All + PreserveReferencesHandling.All, i.e. every object
+# carries a `$type` (assembly-qualified) and an `$id`, and references use
+# `$ref`. The shape is fixed against NINA's own test corpus
+# (master-3.2-all-sequence-entities.sequence.json): a `SequenceRootContainer`
+# with Start/Target/End areas, a `DeepSkyObjectContainer` for the target, and
+# `SwitchFilter` + `TakeManyExposures`/`TakeExposure` per band; dither and
+# autofocus are TRIGGERS on the container. The assembly suffix `, NINA` is
+# accepted and migrated by NINA to `, NINA.Sequencer`, so it is the most
+# version-stable spelling; Core/Astrometry types keep their own assembly.
+#
+# PENDING: pin the exact `$type` strings against a real NINA/PINS (ADR-021/030
+# philosophy). The structure is validated against the corpus; a real instance
+# may need a `$type` adjustment, and those strings live in ONE place.
+
+_NINA_SEQ = "NINA.Sequencer"
+_NINA_CORE = "NINA.Core"
+_NINA_ASTRO = "NINA.Astrometry"
+_NINA_COLL = "System.Collections.ObjectModel.ObservableCollection`1[[{}]], System.ObjectModel"
+_COLL_ITEM = _NINA_COLL.format(
+    "NINA.Sequencer.SequenceItem.ISequenceItem, NINA")
+_COLL_COND = _NINA_COLL.format(
+    "NINA.Sequencer.Conditions.ISequenceCondition, NINA")
+_COLL_TRIG = _NINA_COLL.format(
+    "NINA.Sequencer.Trigger.ISequenceTrigger, NINA")
+_STRAT_SEQ = "NINA.Sequencer.Container.ExecutionStrategy.SequentialStrategy, NINA"
+_STRAT_PAR = "NINA.Sequencer.Container.ExecutionStrategy.ParallelStrategy, NINA"
+
+
+class _NinaIds:
+    # A deterministic $id allocator: PreserveReferencesHandling.All needs
+    # unique ids and matching $ref, and a wrong one breaks the load.
+    def __init__(self):
+        self._n = 0
+
+    def next(self):
+        # @return: the next id as a string
+        self._n += 1
+        return str(self._n)
+
+
+def _nina_coll(ids, coll_type, values):
+    # @return: a JSON.NET collection object ($id + $type + $values)
+    return {"$id": ids.next(), "$type": coll_type, "$values": values}
+
+
+def _nina_container(ids, container_type, name, items, parent_id,
+                    strategy=_STRAT_SEQ, conditions=None, triggers=None,
+                    expanded=True):
+    # @return: a container object (Start/Target/End area, TakeManyExposures or
+    #          a TriggerRunner), wired to its parent by $ref
+    return {
+        "$id": ids.next(), "$type": container_type,
+        "Strategy": {"$type": strategy},
+        "Name": name,
+        "Conditions": _nina_coll(ids, _COLL_COND, conditions or []),
+        "IsExpanded": expanded,
+        "Items": _nina_coll(ids, _COLL_ITEM, items),
+        "Triggers": _nina_coll(ids, _COLL_TRIG, triggers or []),
+        "Parent": {"$ref": parent_id} if parent_id else None,
+        "ErrorBehavior": 0, "Attempts": 1,
+    }
+
+
+def _nina_trigger_runner(ids, parent_id, item):
+    # Every trigger carries a TriggerRunner: a SequentialContainer holding the
+    # instruction that actually runs (Dither / RunAutofocus).
+    return _nina_container(
+        ids, f"NINA.Sequencer.Container.SequentialContainer, NINA",
+        None, [item], parent_id, expanded=True)
+
+
+def _nina_filter(ids, name, position):
+    # A FilterInfo (the SwitchFilter target). Only the fields that matter are
+    # written; JSON.NET fills the rest from the type's defaults.
+    return {
+        "$id": ids.next(),
+        "$type": f"NINA.Core.Model.Equipment.FilterInfo, {_NINA_CORE}",
+        "_name": name, "_focusOffset": 0, "_position": position,
+        "_autoFocusExposureTime": -1.0, "_autoFocusFilter": False,
+    }
+
+
+def _nina_binning(ids, binning):
+    # @args: binning - "2x2" | 2 | None -> (X, Y) as a BinningMode object
+    factor = 1
+    text = str(binning or "").strip().lower()
+    if "x" in text:
+        parts = text.split("x")
+        try:
+            factor = int(parts[0])
+        except ValueError:
+            factor = 1
+    elif text.isdigit():
+        factor = int(text)
+    return {"$id": ids.next(),
+            "$type": f"NINA.Core.Model.Equipment.BinningMode, {_NINA_CORE}",
+            "X": factor, "Y": factor}
+
+
+def _nina_light_steps(plan):
+    # @return: [(filter, count, exposure_s), ...] from the plan's steps
+    steps = plan.get("steps")
+    if steps:
+        return [(s["filter"], int(s["n_frames"]), float(s["exp_s"]))
+                for s in steps]
+    return [(plan["filter"], int(plan["n_frames"]), float(plan["exp_s"]))]
+
+
+def _nina_triggers(ids, dso_id, plan):
+    # Dither and autofocus as NINA TRIGGERS on the target container, from the
+    # recipe (ADR-083): they fire every N frames / on time / on temperature /
+    # on filter change, exactly as NINA models them.
+    d = plan.get("dither") or {}
+    a = plan.get("autofocus") or {}
+    out = []
+    if d.get("on") and int(d.get("every") or 0) > 0:
+        runner = _nina_trigger_runner(ids, None, {
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.SequenceItem.Guider.Dither, NINA",
+            "Parent": None, "ErrorBehavior": 0, "Attempts": 1})
+        out.append({
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.Trigger.Guider.DitherAfterExposures, NINA",
+            "AfterExposures": int(d["every"]),
+            "Parent": {"$ref": dso_id}, "TriggerRunner": runner})
+    if a.get("on"):
+        def _af(label, extra):
+            runner = _nina_trigger_runner(ids, None, {
+                "$id": ids.next(),
+                "$type": "NINA.Sequencer.SequenceItem.Autofocus.RunAutofocus, NINA",
+                "Parent": None, "ErrorBehavior": 0, "Attempts": 1})
+            trig = {"$id": ids.next(), "$type": label,
+                    "Parent": {"$ref": dso_id}, "TriggerRunner": runner}
+            trig.update(extra)
+            return trig
+        if int(a.get("every") or 0) > 0:
+            out.append(_af("NINA.Sequencer.Trigger.Autofocus.AutofocusAfterExposures, NINA",
+                           {"AfterExposures": int(a["every"])}))
+        if int(a.get("minutes") or 0) > 0:
+            out.append(_af("NINA.Sequencer.Trigger.Autofocus.AutofocusAfterTimeTrigger, NINA",
+                           {"Amount": float(a["minutes"])}))
+        if float(a.get("delta_c") or 0.0) > 0:
+            out.append(_af("NINA.Sequencer.Trigger.Autofocus.AutofocusAfterTemperatureChangeTrigger, NINA",
+                           {"Amount": float(a["delta_c"])}))
+        if a.get("on_filter"):
+            out.append(_af("NINA.Sequencer.Trigger.Autofocus.AutofocusAfterFilterChange, NINA", {}))
+    return out
+
+
+def export_nina(target, plan, out):
+    # The NATIVE NINA sequence JSON (SequenceRootContainer), loadable by NINA
+    # via /sequence/load. PENDING confirmation against a real NINA/PINS: the
+    # structure is pinned against NINA's test corpus, the $type strings may
+    # need a tweak per version.
+    # @args: target - dict with name, ra_deg, dec_deg, plan - make_plan dict,
+    #        out - output path (.json)
+    # @return: the output path
+    name = target.get("name") or target.get("id") or "target"
+    ra_h, ra_m, ra_s = _deg_to_hms(target.get("ra_deg", 0.0))
+    sign, dec_d, dec_m, dec_s = _deg_to_dms(target.get("dec_deg", 0.0))
+    ids = _NinaIds()
+
+    root = _nina_container(
+        ids, f"NINA.Sequencer.Container.SequenceRootContainer, NINA",
+        name, [], None)
+    root_id = root["$id"]
+    start = _nina_container(
+        ids, f"NINA.Sequencer.Container.StartAreaContainer, NINA",
+        "Start", [], root_id, strategy=_STRAT_PAR)
+    end = _nina_container(
+        ids, f"NINA.Sequencer.Container.EndAreaContainer, NINA",
+        "End", [], root_id, strategy=_STRAT_PAR)
+    target_area = _nina_container(
+        ids, f"NINA.Sequencer.Container.TargetAreaContainer, NINA",
+        "Target", [], root_id)
+
+    # the target itself
+    coords = {"$id": ids.next(),
+              "$type": f"NINA.Astrometry.InputCoordinates, {_NINA_ASTRO}",
+              "RAHours": ra_h, "RAMinutes": ra_m, "RASeconds": ra_s,
+              "NegativeDec": sign < 0,
+              "DecDegrees": dec_d, "DecMinutes": dec_m, "DecSeconds": dec_s}
+    input_target = {"$id": ids.next(),
+                    "$type": f"NINA.Astrometry.InputTarget, {_NINA_ASTRO}",
+                    "Expanded": True, "TargetName": name,
+                    "PositionAngle": 0.0, "InputCoordinates": coords}
+    dso = {
+        "$id": ids.next(),
+        "$type": "NINA.Sequencer.Container.DeepSkyObjectContainer, NINA",
+        "Target": input_target, "ExposureInfoListExpanded": False,
+        "ExposureInfoList": {
+            "$id": ids.next(),
+            "$type": ("NINA.Core.Utility.AsyncObservableCollection`1"
+                      f"[[NINA.Sequencer.Utility.ExposureInfo, NINA]], {_NINA_CORE}"),
+            "$values": []},
+        "Strategy": {"$type": _STRAT_SEQ}, "Name": name,
+        "Conditions": _nina_coll(ids, _COLL_COND, []),
+        "IsExpanded": True, "Items": None, "Triggers": None,
+        "Parent": {"$ref": target_area["$id"]},
+        "ErrorBehavior": 0, "Attempts": 1,
+    }
+    dso_id = dso["$id"]
+
+    # per band: SwitchFilter + TakeManyExposures(LoopCondition) -> TakeExposure
+    gain = int(plan["gain"]) if plan.get("gain") not in (None, "") else -1
+    offset = int(plan["offset"]) if plan.get("offset") not in (None, "") else -1
+    binning = _nina_binning(ids, plan.get("binning"))
+    items = []
+    for position, (filter_name, count, exposure) in enumerate(
+            _nina_light_steps(plan)):
+        items.append({
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA",
+            "Filter": _nina_filter(ids, filter_name, position),
+            "Parent": {"$ref": dso_id}, "ErrorBehavior": 0, "Attempts": 1})
+        tme = _nina_container(
+            ids, "NINA.Sequencer.SequenceItem.Imaging.TakeManyExposures, NINA",
+            f"{filter_name} x{count}", [], dso_id, expanded=False)
+        loop = {"$id": ids.next(),
+                "$type": "NINA.Sequencer.Conditions.LoopCondition, NINA",
+                "CompletedIterations": 0, "Iterations": int(count),
+                "Parent": {"$ref": tme["$id"]}}
+        tme["Conditions"]["$values"] = [loop]
+        tme["Items"]["$values"] = [{
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.SequenceItem.Imaging.TakeExposure, NINA",
+            "ExposureTime": float(exposure), "Gain": gain, "Offset": offset,
+            "Binning": binning, "ImageType": "LIGHT", "ExposureCount": 0,
+            "Parent": {"$ref": tme["$id"]},
+            "ErrorBehavior": 0, "Attempts": 1}]
+        items.append(tme)
+
+    dso["Items"] = _nina_coll(ids, _COLL_ITEM, items)
+    dso["Triggers"] = _nina_coll(ids, _COLL_TRIG,
+                                 _nina_triggers(ids, dso_id, plan))
+    target_area["Items"] = _nina_coll(ids, _COLL_ITEM, [dso])
+    root["Items"] = _nina_coll(ids, _COLL_ITEM, [start, target_area, end])
+
+    Path(out).write_text(json.dumps(root, indent=2, ensure_ascii=False),
+                         encoding="utf-8")
+    logger.info("NINA native sequence written to %s", out)
     return str(out)
 
 
@@ -204,7 +485,8 @@ def _ccdciel_target(attrs):
     # start (attrs "mandatory"/"start_rise").
     return (
         ("PA", "-"), ("RA", attrs["ra"]), ("Dec", attrs["dec"]),
-        ("Path", ""), ("Plan", ""), ("Skip", "False"), ("Delay", "0"),
+        ("Path", ""), ("Plan", ""), ("Skip", "False"),
+        ("Delay", str(attrs.get("delay", "0"))),
         ("EndSet", "True"), ("EndTime", attrs["end"]),
         ("Preview", "False"), ("FlatBinX", "0"), ("FlatBinY", "0"),
         ("FlatGain", "0"), ("DarkNight", "False"), ("FlatCount", "0"),
@@ -213,7 +495,8 @@ def _ccdciel_target(attrs):
         ("FlatOffset", "0"), ("ObjectName", attrs["name"]),
         ("RepeatDone", "0"), ("ScriptArgs", ""), ("EndMeridian", "-9999"),
         ("FlatFilters", ""), ("HFM_Enabled", "True"), ("RepeatCount", "1"),
-        ("UpdateCoord", "False"), ("AutofocusTemp", "False"),
+        ("UpdateCoord", "False"),
+        ("AutofocusTemp", attrs.get("autofocus_temp", "False")),
         ("SolarTracking", "False"), ("StartMeridian", "-9999"),
         ("PreviewExposure", "0.001"), ("InplaceAutofocus", "True"),
         ("AstrometryPointing", "True"),
@@ -224,12 +507,17 @@ def _ccdciel_target(attrs):
 
 def _ccdciel_step(index, spec):
     # Ordered attribute list for the <StepN> element of one capture step.
+    # ADR-083: gain, offset and binning come from the step spec (the plan's
+    # recipe), so a capture option chosen in the app reaches the file.
     # @args: index - step number (1-based), spec - dict with the values
     # @return: the attribute tuples
     return (
-        ("Done", "0"), ("Gain", "1"), ("Type", "0"), ("Count", spec["count"]),
+        ("Done", "0"), ("Gain", spec.get("gain", "1")), ("Type", "0"),
+        ("Count", spec["count"]),
         ("Fstop", ""), ("Dither", spec["dither"]), ("Filter", spec["filter"]),
-        ("Offset", "0"), ("Binning", "1x1"), ("Exposure", spec["exposure"]),
+        ("Offset", spec.get("offset", "0")), ("Binning",
+                                              spec.get("binning", "1x1")),
+        ("Exposure", spec["exposure"]),
         ("Autofocus", spec["autofocus"]), ("FrameType", spec["frame_type"]),
         ("ScriptArgs", ""), ("ScriptName", ""), ("ScriptPath", ""),
         ("StackCount", "1"), ("SwitchName", ""),
@@ -239,34 +527,66 @@ def _ccdciel_step(index, spec):
     )
 
 
+def _camera_attrs(plan):
+    # @args: plan - make_plan dict
+    # @return: the Gain/Offset/Binning strings for a step, from the recipe
+    #          (ADR-083). The sample's defaults (1 / 0 / 1x1) when unset.
+    gain = plan.get("gain")
+    offset = plan.get("offset")
+    return {"gain": str(gain) if gain not in (None, "") else "1",
+            "offset": str(offset) if offset not in (None, "") else "0",
+            "binning": str(plan.get("binning") or "1x1")}
+
+
+def _light_spec(plan, count, exposure, filter_name):
+    # One Light step, carrying the plan's dither and autofocus options
+    # (ADR-083). Without a recipe the sample's conventions are kept: dither
+    # on, autofocus at the start, the counts the sample file uses.
+    d = plan.get("dither") or {}
+    a = plan.get("autofocus") or {}
+    on = d.get("on", True)
+    every = int(d.get("every") or 0)
+    af_on = a.get("on", True)
+    spec = {"count": str(count), "exposure": f"{exposure:g}",
+            "filter": filter_name, "frame_type": "Light",
+            "description": "Light",
+            "dither": "True" if on else "False",
+            "dither_count": str(every) if (on and every) else "25",
+            "autofocus": "True" if af_on else "False",
+            "autofocus_start": "True",
+            "autofocus_count": str(int(a.get("every") or 0) or 50)}
+    spec.update(_camera_attrs(plan))
+    return spec
+
+
 def _light_step(plan):
-    # The light step: the actual NightScribe plan, with dithering and an
-    # autofocus at the start (sample conventions).
-    return {"count": plan["n_frames"], "exposure": f"{plan['exp_s']:g}",
-            "filter": plan["filter"], "frame_type": "Light",
-            "description": "Light", "dither": "True", "autofocus": "True",
-            "autofocus_start": "True", "dither_count": "25",
-            "autofocus_count": "50"}
+    # The light step: the actual NightScribe plan.
+    return _light_spec(plan, plan["n_frames"], plan["exp_s"], plan["filter"])
 
 
 def _calibration_steps(plan):
     # Dark/Bias steps: counted, no dither, no autofocus (sample: Filter
     # "Dark" for both, bias exposure 0).
     steps = []
+    cam = _camera_attrs(plan)
     darks = plan["darks"]
     if darks["count"] > 0:
-        steps.append({"count": darks["count"], "exposure": f"{darks['exp_s']:g}",
-                      "filter": "Dark", "frame_type": "Dark",
-                      "description": "Dark", "dither": "False",
-                      "autofocus": "False", "autofocus_start": "False",
-                      "dither_count": "0", "autofocus_count": "0"})
+        spec = {"count": str(darks["count"]),
+                "exposure": f"{darks['exp_s']:g}", "filter": "Dark",
+                "frame_type": "Dark", "description": "Dark", "dither": "False",
+                "autofocus": "False", "autofocus_start": "False",
+                "dither_count": "0", "autofocus_count": "0"}
+        spec.update(cam)
+        steps.append(spec)
     bias = plan["bias"]
     if bias["count"] > 0:
-        steps.append({"count": bias["count"], "exposure": "0",
-                      "filter": "Dark", "frame_type": "Bias",
-                      "description": "Bias", "dither": "False",
-                      "autofocus": "False", "autofocus_start": "False",
-                      "dither_count": "0", "autofocus_count": "0"})
+        spec = {"count": str(bias["count"]), "exposure": "0",
+                "filter": "Dark", "frame_type": "Bias", "description": "Bias",
+                "dither": "False", "autofocus": "False",
+                "autofocus_start": "False", "dither_count": "0",
+                "autofocus_count": "0"}
+        spec.update(cam)
+        steps.append(spec)
     return steps
 
 
@@ -324,14 +644,11 @@ def _dec_sex(dec_deg):
 def _light_steps(plan):
     # @return: list of light-step specs. B8: multi-filter plans carry
     #         one step per filter in plan["steps"]; single-filter plans
-    #         have a single entry built from the legacy fields.
+    #         have a single entry built from the legacy fields. Every step
+    #         carries the plan's dither/autofocus/camera options (ADR-083).
     steps = plan.get("steps")
     if steps:
-        return [{"count": s["n_frames"], "exposure": f"{s['exp_s']:g}",
-                 "filter": s["filter"], "frame_type": "Light",
-                 "description": "Light", "dither": "True",
-                 "autofocus": "True", "autofocus_start": "True",
-                 "dither_count": "25", "autofocus_count": "50"}
+        return [_light_spec(plan, s["n_frames"], s["exp_s"], s["filter"])
                 for s in steps]
     return [_light_step(plan)]
 
@@ -364,11 +681,15 @@ def export_ccdciel(target, plan, out):
                  ("IgnoreRestart", "False")):
         targets.set(k, v)
     t1 = ET.SubElement(targets, "Target1")
+    _af = plan.get("autofocus") or {}
     for k, v in _ccdciel_target({
             "name": name, "ra": _ra_sex(ra_deg), "dec": _dec_sex(dec_deg),
             "start": start_t, "end": end_t,
             "mandatory": "True" if mandatory else "False",
-            "start_rise": "False" if mandatory else "True"}):
+            "start_rise": "False" if mandatory else "True",
+            "delay": plan.get("delay_s") or 0,
+            # temperature-triggered autofocus when the recipe asks for it
+            "autofocus_temp": "True" if _af.get("delta_c") else "False"}):
         t1.set(k, str(v))
     plan_el = ET.SubElement(t1, "Plan")
     plan_el.set("Name", "")
@@ -401,11 +722,14 @@ def export_ccdciel(target, plan, out):
 
 def export(target, plan, out, fmt="csv"):
     # Dispatcher: picks the exporter for the given format.
-    # @args: target - dict, plan - make_plan dict, out - path, fmt - "csv"|"nina"|"ccdciel"
+    # @args: target - dict, plan - make_plan dict, out - path,
+    #        fmt - "csv"|"nina"|"nina_summary"|"ccdciel"
     # @return: output path
     out = Path(out)
     if fmt == "nina":
         return export_nina(target, plan, out.with_suffix(".json"))
+    if fmt == "nina_summary":
+        return export_nina_summary(target, plan, out.with_suffix(".plan.json"))
     if fmt == "ccdciel":
         return export_ccdciel(target, plan, out.with_suffix(".targets"))
     return export_csv(target, plan, out.with_suffix(".csv"))

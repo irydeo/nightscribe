@@ -814,3 +814,226 @@ KP_INDEX = {"short": {
           "encima de ~5 hay auroras posibles en latitudes medias.",
     "en": "The Kp index measures geomagnetic disturbance from 0 to 9; above "
           "~5 auroras are possible at mid-latitudes."}}
+
+
+# ---------------- Capture options (ADR-083) ----------------
+#
+# Dithering and autofocus are decisions, not knobs: each one trades observing
+# time for image quality, and the trade is different for a moving object, a
+# supernova and a transit. They are explained here, once, so the option card
+# and the guide tell the same story.
+
+DITHER = {
+    "short": {
+        "es": "Mover un poco el campo entre tomas: los píxeles calientes y el "
+              "ruido de patrón fijo caen en píxeles distintos y el apilado "
+              "los elimina. Sin dither, se suman y dejan «walking noise».",
+        "en": "Nudge the field between frames: hot pixels and fixed-pattern "
+              "noise land on different pixels and stacking removes them. "
+              "Without dither they add up and leave walking noise."},
+    "long": {
+        "es": "El sensor tiene defectos fijos: píxeles calientes, columnas y "
+              "el patrón de lectura. Si no se mueve el campo, cada toma los "
+              "coloca en el mismo sitio y el apilado los refuerza. Al mover "
+              "la montura unos píxeles entre tomas, cada defecto cae en un "
+              "píxel distinto y un recorte sigma (o la mediana) lo descarta. "
+              "La amplitud típica es de 5 a 15 píxeles (más, 10 a 20, con "
+              "cámara de color o si la escala de placa es gruesa). El coste "
+              "es el tiempo de asentado del guiado, así que no conviene "
+              "hacerlo en cada toma si son muy cortas. Con un objeto que se "
+              "mueve (un NEO o un cometa) el campo ya cambia solo entre "
+              "tomas: el dither explícito sobra. En fotometría de cadencia "
+              "rápida (un tránsito, una HADS) los huecos del dither rompen "
+              "la curva: se hace antes del run, no durante.",
+        "en": "The sensor has fixed defects: hot pixels, columns and the "
+              "readout pattern. If the field does not move, every frame puts "
+              "them in the same place and stacking reinforces them. Moving "
+              "the mount a few pixels between frames makes each defect land "
+              "on a different pixel, so a sigma clip (or the median) drops "
+              "it. The usual amplitude is 5 to 15 pixels (more, 10 to 20, "
+              "with a colour camera or a coarse plate scale). The cost is "
+              "the guide settle time, so it is not worth it on every very "
+              "short frame. With a moving object (an NEO or a comet) the "
+              "field already shifts between frames: an explicit dither is "
+              "redundant. In fast-cadence photometry (a transit, a HADS) the "
+              "dither gaps break the curve: do it before the run, not during."},
+}
+
+AUTOFOCUS = {
+    "short": {
+        "es": "Reenfocar cada cierto tiempo o al cambiar la temperatura: el "
+              "foco se va con el frío y con el filtro, y una estrella "
+              "desenfocada reparte su luz y pierde relación señal/ruido.",
+        "en": "Refocus every so often or when the temperature changes: focus "
+              "drifts with the cold and with the filter, and a defocused star "
+              "spreads its light and loses signal-to-noise."},
+    "long": {
+        "es": "El tubo se contrae al enfriarse la noche y cada filtro tiene "
+              "su propio punto de foco, así que el foco se va poco a poco. "
+              "Una estrella desenfocada tiene una FWHM mayor: la misma luz "
+              "repartida en más píxeles da menos pico y peor relación "
+              "señal/ruido en una apertura fija, y el centroide se vuelve "
+              "menos fiable. Por eso se reenfoca por cambio de temperatura "
+              "(alrededor de 1 a 2 °C en un refractor), cada 30 a 60 minutos, "
+              "y siempre tras cambiar de filtro o de lado de la montura. "
+              "Cada autofoco cuesta uno a tres minutos, que hay que contar "
+              "en la duración de la sesión. En fotometría de cadencia rápida "
+              "(un tránsito) se reenfoca antes del run, nunca a mitad: el "
+              "hueco rompería la curva.",
+        "en": "The tube contracts as the night cools and every filter has its "
+              "own focus point, so focus drifts little by little. A defocused "
+              "star has a larger FWHM: the same light spread over more pixels "
+              "gives a lower peak and worse signal-to-noise in a fixed "
+              "aperture, and the centroid becomes less reliable. That is why "
+              "one refocuses on a temperature change (about 1 to 2 °C on a "
+              "refractor), every 30 to 60 minutes, and always after changing "
+              "filter or side of the mount. Each autofocus costs one to three "
+              "minutes, which must be counted in the session duration. In "
+              "fast-cadence photometry (a transit) refocus before the run, "
+              "never in the middle: the gap would break the curve."},
+}
+
+SUBEXPOSURE = {
+    "short": {
+        "es": "La sub-exposición es un equilibrio: lo bastante larga para que "
+              "el cielo domine sobre el ruido de lectura, lo bastante corta "
+              "para no saturar la estrella.",
+        "en": "The sub-exposure is a balance: long enough for the sky to beat "
+              "the read noise, short enough not to saturate the star."},
+    "long": {
+        "es": "El ruido de lectura se suma a cada píxel cada vez que se lee "
+              "el sensor; si la exposición es muy corta, ese ruido manda "
+              "sobre la señal del cielo y la relación señal/ruido se hunde. "
+              "El criterio habitual es que el cielo por píxel supere unas "
+              "diez veces el cuadrado del ruido de lectura (en electrones), "
+              "lo que se calcula con la ganancia de la cámara. Por el otro "
+              "lado, el pico de la estrella no puede pasar del techo de "
+              "linealidad o la medida deja de ser fiable. La sub-exposición "
+              "buena es la menor de las dos, y la profundidad total sale de "
+              "sumar muchas: la relación señal/ruido crece con la raíz del "
+              "producto de número de tomas por exposición.",
+        "en": "Read noise is added to every pixel each time the sensor is "
+              "read; if the exposure is too short, that noise dominates the "
+              "sky signal and the signal-to-noise collapses. The usual "
+              "criterion is that the sky per pixel be about ten times the "
+              "square of the read noise (in electrons), computed from the "
+              "camera's gain. On the other side, the star's peak cannot pass "
+              "the linearity ceiling or the measurement stops being "
+              "reliable. The right sub-exposure is the lesser of the two, and "
+              "total depth comes from adding many: signal-to-noise grows with "
+              "the square root of frame count times exposure."},
+}
+
+
+EXPOSURE_CALC = {
+    "short": {
+        "es": "La exposición sugerida sale de la tabla de brillo del objeto, "
+              "corregida por el techo de linealidad de TU cámara y por la "
+              "escala de placa, y comprobada contra el ruido de lectura y tu "
+              "cielo.",
+        "en": "The suggested exposure comes from the object's brightness table, "
+              "corrected by YOUR camera's linearity ceiling and by the plate "
+              "scale, and checked against the read noise and your sky."},
+    "long": {
+        "es": "Primero la tabla de brillo dice cuánto aguanta un objeto así sin "
+              "saturar en un equipo típico. Luego se corrige: si tu cámara "
+              "tiene menos full well, la exposición baja en la misma "
+              "proporción (el pico crece con el tiempo, así que la mitad de "
+              "pozo es la mitad de tiempo); y si la escala de placa es gruesa "
+              "(píxeles grandes o focal corta), la misma luz cae en menos "
+              "píxeles y satura antes, por lo que también baja. Se respetan el "
+              "mínimo y el máximo de tu cámara y, en un objeto que se mueve, el "
+              "tope sin traza. Al final se comprueba que la exposición deje al "
+              "cielo por encima del ruido de lectura (unas diez veces su "
+              "cuadrado): si tu cielo es muy oscuro y tu ruido alto, harían "
+              "falta exposiciones más largas de las que permiten la "
+              "saturación, y lo mejor es agrupar (binning) o sumar más tomas.",
+        "en": "First the brightness table says how much such an object takes "
+              "before saturating on a typical setup. Then it is corrected: if "
+              "your camera has a smaller full well, the exposure drops in the "
+              "same proportion (the peak grows with time, so half the well is "
+              "half the time); and if the plate scale is coarse (big pixels or "
+              "a short focal length), the same light lands on fewer pixels and "
+              "saturates sooner, so it drops too. Your camera's minimum and "
+              "maximum are respected and, on a moving object, the trail-free "
+              "cap. Finally it checks that the exposure leaves the sky above "
+              "the read noise (about ten times its square): if your sky is very "
+              "dark and your read noise high, beating it would need longer "
+              "exposures than saturation allows, and the best move is binning "
+              "or more frames."},
+}
+
+
+FIELD_CROSSING = {
+    "short": {
+        "es": "Un objeto que se mueve cruza el campo de la cámara: pasada esa "
+              "hora, cada toma lo pierde, por muchas que quepan en la noche.",
+        "en": "A moving object crosses the camera's field: after that, every "
+              "frame loses it, however many the night would allow."},
+    "long": {
+        "es": "El goto deja el objeto centrado, así que le queda media altura "
+              "del lado corto del sensor antes de llegar al borde (se usa el "
+              "lado corto porque no sabemos en qué dirección se mueve, y se "
+              "deja un margen para el error de efeméride y de punta). "
+              "Dividiendo ese recorrido entre su velocidad aparente sale el "
+              "tiempo de cruce; dividiéndolo entre la exposición más la "
+              "lectura/descarga y el asentamiento de la montura sale cuántas "
+              "tomas caben de verdad. Si el rato de visibilidad es más largo, "
+              "manda el cruce: proponer más tomas solo llenaría la carpeta de "
+              "fotogramas sin el objeto. Cuando no se conoce el campo (sin "
+              "preset de cámara) o la velocidad, el número no se puede acotar "
+              "y se dice, en vez de aparentar un plan.",
+        "en": "The goto leaves the object centred, so it has half the short "
+              "side of the sensor before it reaches the edge (the short side "
+              "is used because the direction of motion is unknown, with a "
+              "margin for the ephemeris and pointing error). That travel "
+              "divided by the object's apparent rate is the crossing time; "
+              "divided by the exposure plus the readout/download and the mount "
+              "settle it gives how many frames really fit. If the visibility "
+              "span is longer, the crossing wins: suggesting more frames would "
+              "only fill the folder with images the object is not in. When the "
+              "field (no camera preset) or the rate is unknown, the number "
+              "cannot be bounded and it is said, instead of pretending a plan."},
+}
+
+
+FOLLOW = {
+    "short": {
+        "es": "«Iniciar y seguir» repite «apuntar y capturar»: llena cada "
+              "observación hasta el borde del campo, vuelve a apuntar al "
+              "objeto en su posición nueva y empieza otra, siguiéndolo por el "
+              "cielo.",
+        "en": "\"Start and follow\" repeats \"point and capture\": it fills "
+              "each observation up to the edge of the field, points at the "
+              "object's new position and starts another one, following it "
+              "across the sky."},
+    "long": {
+        "es": "Un objeto rápido se sale del campo: si se captura sin más, la "
+              "mitad de la serie acaba sin él. «Iniciar y seguir» aprovecha "
+              "cada observación hasta el cruce del campo (lo que se calcula "
+              "para el recuento de tomas), y entonces vuelve a apuntar: "
+              "resuelve la posición ACTUAL del objeto por su efemérides, la "
+              "centra con el goto astrométrico (slew + resolución de placa + "
+              "corrección) y dispara la siguiente tanda. Así se sigue al objeto "
+              "y se consigue el máximo de cada observación sin re-apuntar a "
+              "mano. Cada re-apuntado cuesta su tiempo (apuntar, resolver, "
+              "corregir), que entra en el presupuesto junto con las tomas; si "
+              "las observaciones pedidas no caben en la ventana de visibilidad, "
+              "se dice antes de empezar. El objeto se centra por su efemérides, "
+              "no a unas coordenadas fijas: por eso no es el «recenter» de un "
+              "objeto fijo, sino un seguimiento sobre un objeto que se mueve.",
+        "en": "A fast object leaves the field: capture it as-is and half the "
+              "run ends up without it. \"Start and follow\" uses each "
+              "observation up to the field crossing (the same number the frame "
+              "count is bounded by) and then points again: it resolves the "
+              "object's CURRENT position from its ephemeris, centers it with "
+              "the astrometric goto (slew + plate solve + correction) and fires "
+              "the next batch. That is how the object is followed and each "
+              "observation is maximized without re-pointing by hand. Each "
+              "re-point costs its own time (point, solve, correct), which goes "
+              "into the budget together with the frames; if the requested "
+              "observations do not fit the visibility window, it is said before "
+              "starting. The object is centered by its ephemeris, not at fixed "
+              "coordinates: that is why this is not the \"recenter\" of a fixed "
+              "object but a follow onto a moving one."},
+}

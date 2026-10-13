@@ -192,3 +192,18 @@ def test_position_at_returns_none_when_all_fail(monkeypatch):
 def test_motion_zero_when_no_time():
     r, pa = ephemeris._motion(0.0, 10.0, 5.0, 0.0, 10.0, 5.0)
     assert r == 0.0 and pa == 0.0
+
+
+def test_interpolate_prefers_the_source_rate():
+    # NEOfixer rows carry their own motion_rate (their Find_Orb answer). Using
+    # it keeps Tonight and the Capture step equal and independent of our table
+    # step (ADR-064 rev); the finite difference is only a fallback.
+    rows = [
+        {"jd": 100.0, "ra_deg": 10.0, "dec_deg": 5.0,
+         "rate_arcsec_min": 42.0, "pa_deg": 90.0},
+        {"jd": 100.1, "ra_deg": 10.0, "dec_deg": 5.0,
+         "rate_arcsec_min": 42.0, "pa_deg": 90.0},
+    ]
+    out = ephemeris._interpolate(rows, 100.05)
+    assert out["rate_arcsec_min"] == 42.0
+    assert out["pa_deg"] == 90.0

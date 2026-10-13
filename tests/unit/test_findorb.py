@@ -251,3 +251,29 @@ def test_check_reports_no_fit_when_findorb_fits_nothing(tmp_path,
     assert report.available is True and report.no_fit is True
     assert not report.blocked
     assert "could not fit" in report.note
+
+
+def test_all_our_observations_are_flagged_and_the_worst_sets_the_verdict():
+    # ADR-086 rev: a combined run submits several observations; the check must
+    # flag ALL of ours and its verdict must be about the WORST one, not the
+    # first (a spurious point used to hide behind a good one).
+    from nightscribe.core import mpc_astrometry
+    pts = [
+        {"mjd": 61322.8, "ra": 33.0, "dec": 35.0, "mag": 19.0, "band": "G"},
+        {"mjd": 61322.9, "ra": 33.4, "dec": 35.4, "mag": 19.0, "band": "G"},
+    ]
+    ours = mpc_astrometry.to_mpc80(pts, "Z41", "2026 TQ8", None)
+    jds = findorb._our_jds(ours)
+    assert len(jds) == 2
+    residuals = [
+        {"stn": "Z41", "time": jds[0], "dra": 0.1, "ddec": 0.1},
+        {"stn": "Z41", "time": jds[1], "dra": 200.0, "ddec": 0.0},
+    ]
+    # the others' cloud has a real spread, so the scatter is not zero
+    residuals += [{"stn": f"X{i:02d}", "time": jds[0] + i * 0.001,
+                   "dra": 0.1 * ((-1) ** i), "ddec": 0.05 * ((-1) ** i)}
+                  for i in range(1, 9)]
+    rep = findorb._decide_from_residuals(residuals, None, "Z41",
+                                         ours_lines=ours)
+    assert len([r for r in residuals if r["ours"]]) == 2
+    assert rep.our_residual[0] == 200.0      # the worst, not ours[0]

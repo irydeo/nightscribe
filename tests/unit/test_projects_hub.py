@@ -770,6 +770,377 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
         window._ccd_filter_names = []
 
 
+def test_plan_exposure_filter_follows_the_real_wheel(window, panel):
+    # ADR-081: the Exposure plan's filter combo shows the wheel's real names
+    # when the observatory has answered (the hardcoded list was a promise the
+    # hardware never made).
+    p = _create_and_select(window, "neo", "plan-filter-target",
+                           {"kind": "neo", "mag": 19.0})
+    _open_tab(window, p, "plan")
+    window._ccd_filter_names = ["Red", "Green", "Blue"]
+    try:
+        window._ccd_fill_plan_filter()
+        cmb = window._project_widgets["cmb_filter"]
+        items = [cmb.itemText(i) for i in range(cmb.count())]
+        assert items == ["Red", "Green", "Blue"]
+    finally:
+        window._ccd_filter_names = []
+        window._ccd_fill_plan_filter()
+
+
+def test_stop_goto_is_armed_only_while_a_goto_runs(window, panel, monkeypatch):
+    # ADR-081: the safety stop is disabled on an idle panel, enabled the
+    # moment a goto starts, and disarmed when the goto settles.
+    from nightscribe.core.sources import ccdciel
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099stop", ctx)
+    _open_tab(window, p, "plan")
+    window._ccd_connected = True
+    window._ccd_client = ccdciel.Client()
+    try:
+        window._ccd_apply_state()
+        w = window._obs_widgets
+        assert w["ccd_stop"].isEnabled() is False
+        monkeypatch.setattr(window, "_ccd_run",
+                            lambda slot, action, **kw: None)
+        window._ccd_goto()
+        assert w["ccd_stop"].isEnabled() is True
+        window._ccd_on_goto(None, "boom")
+        assert w["ccd_stop"].isEnabled() is False
+    finally:
+        window._ccd_connected = False
+        window._ccd_client = None
+        window._ccd_goto_running = False
+        window._ccd_point_target = None
+
+
+def test_stop_goto_runs_on_its_own_worker(window, panel, monkeypatch):
+    # The goto owns the single observatory worker slot while it moves, so the
+    # stop cannot queue behind it: it must use a worker of its own.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core.sources import ccdciel
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099stop2", ctx)
+    _open_tab(window, p, "plan")
+    window._ccd_connected = True
+    window._ccd_client = ccdciel.Client()
+    seen = {}
+
+    class _FakeWorker:
+        def __init__(self, client, action, poll_slew=False):
+            seen["action"] = action
+            self._cb = None
+
+        class _sig:
+            def __init__(self, w):
+                self._w = w
+
+            def connect(self, cb):
+                self._w._cb = cb
+
+        @property
+        def finished(self):
+            return self._sig(self)
+
+        def isRunning(self):
+            return False
+
+        def start(self):
+            pass
+
+    class _StopClient:
+        def __init__(self):
+            self.aborted = False
+
+        def abort_motion(self):
+            self.aborted = True
+            return True
+
+    try:
+        monkeypatch.setattr(mw, "ObservatoryWorker", _FakeWorker)
+        window._ccd_goto_running = True
+        window._ccd_stop_goto()
+        client = _StopClient()
+        seen["action"](client)
+        assert client.aborted is True
+    finally:
+        window._ccd_connected = False
+        window._ccd_client = None
+        window._ccd_goto_running = False
+        window._ccd_stop_worker = None
+
+
+def test_capture_plan_is_prefilled_with_the_suggestion(window, panel):
+    # ADR-083: a project with no saved plan opens with the suggested exposure
+    # and frame count already in place.
+    from nightscribe.config import config
+    from nightscribe.core import capture_recipe
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn", "mag": 15.0}
+    p = _create_and_select(window, "sn", "SN2099sug", ctx)
+    _open_tab(window, p, "plan")
+    rec = capture_recipe.recommend(
+        "sn", window._plan_recipe_context(window._current_project), config)
+    w = window._project_widgets
+    assert w["spn_exps"].value() == float(rec["exposure_s"])
+    assert w["spn_nframes"].value() == int(rec["n_frames"])
+
+
+def test_set_suggested_values_button_overwrites(window, panel):
+    # ADR-083: the button re-applies the recipe to both blocks and marks the
+    # plan as "still suggested".
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn", "mag": 15.0}
+    p = _create_and_select(window, "sn", "SN2099sug2", ctx)
+    _open_tab(window, p, "plan")
+    w = window._project_widgets
+    w["spn_exps"].setValue(5.0)
+    opts = w["capture_options"]
+    opts["dither_on"].setChecked(False)
+    window._apply_suggestions()
+    assert w["spn_exps"].value() > 5.0        # back to the suggestion
+    assert opts["dither_on"].isChecked() is True
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p2 = project.get(dbmod.db, window._current_project["id"])
+    data = next(s["data"] for s in p2["steps"] if s["step"] == "plan")
+    assert data["suggested"] is True
+
+
+def test_follow_button_and_progress(window, panel):
+    # ADR-084: the Capture step carries the driven run's button, the progress
+    # events never crash the GUI, and without a connection the run refuses
+    # with a message instead of doing anything.
+    from nightscribe.core import follow
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "neo",
+           "rate_arcsec_min": 30.0}
+    p = _create_and_select(window, "neo", "A11HPKO", ctx)
+    _open_tab(window, p, "plan")
+    w = window._ccd_widgets()
+    assert "ccd_follow" in w
+    window._ccd_follow_progress({"event": "capturing", "i": 1, "n": 3,
+                                   "frames": 10})
+    window._ccd_follow_progress({"event": "centering", "i": 2, "n": 3})
+    window._ccd_follow_progress({"event": "capture_timeout", "i": 1})
+    # not connected: the handler says so and starts nothing
+    window._ccd_connected = False
+    window._ccd_follow()
+    assert window._ccd_follow_running is False
+    # ADR-084: the run takes the observer's Frames/Exposure, not the suggestion
+    pw = window._project_widgets
+    pw["spn_nframes"].setValue(12)
+    pw["spn_exps"].setValue(7.0)
+    assert window._plan_frames_exposure(p) == (12, 7.0)
+    # the confirm box (stubbed to No by the suite) returns False and the plan
+    # is well formed
+    from nightscribe.config import config
+    plan = follow.plan_run("neo", window._plan_recipe_context(p), config, 3,
+                             frames=12, exposure_s=7.0)
+    assert plan["n_obs"] == 3
+    assert plan["frames"] == 12 and plan["exposure_s"] == 7.0
+    assert window._ccd_follow_confirm(plan) is False
+
+
+def test_capture_button_toggles_start_stop(window, monkeypatch):
+    # ADR-081 rev: one button, Start or Stop depending on whether a capture is
+    # running (the state comes from the dashboard poll).
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099cap", ctx)
+    _open_tab(window, p, "plan")
+    window._ccd_connected = True
+    w = window._obs_widgets
+    sent = {}
+
+    class _C:
+        def __init__(self):
+            self.started = False
+            self.stopped = False
+
+        def start_capture(self):
+            self.started = True
+
+        def stop_capture(self):
+            self.stopped = True
+
+    try:
+        monkeypatch.setattr(
+            window, "_ccd_run",
+            lambda slot, action, **kw: sent.update(action=action))
+        window._ccd_capturing = False
+        window._ccd_update_capture()
+        assert w["ccd_start"].text() == window.tr("Start capture")
+        window._ccd_start_capture()
+        c = _C()
+        sent["action"](c)
+        assert c.started and not c.stopped
+
+        window._ccd_capturing = True
+        window._ccd_update_capture()
+        assert w["ccd_start"].text() == window.tr("Stop capture")
+        window._ccd_start_capture()
+        c = _C()
+        sent["action"](c)
+        assert c.stopped and not c.started
+    finally:
+        window._ccd_connected = False
+        window._ccd_capturing = False
+        window._ccd_update_capture()
+
+
+def test_capture_options_are_recommended_and_saved(window, panel):
+    # ADR-083: a supernova gets dither on every 3 frames, and what the
+    # observer changes is stored with the plan.
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn", "mag": 15.0}
+    p = _create_and_select(window, "sn", "SN2099opts", ctx)
+    _open_tab(window, p, "plan")
+    w = window._project_widgets["capture_options"]
+    assert w["dither_on"].isChecked() is True
+    assert w["dither_every"].value() == 3
+    w["gain"].setValue(120)
+    w["binning"].setCurrentText("2x2")
+    window._project_save_plan()
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p2 = project.get(dbmod.db, window._current_project["id"])
+    opts = next(s["data"] for s in p2["steps"]
+                if s["step"] == "plan")["capture_options"]
+    assert opts["gain"] == 120
+    assert opts["binning"] == "2x2"
+    assert opts["dither"]["on"] is True
+
+
+def test_capture_options_dither_off_for_a_moving_object(window, panel):
+    # ADR-083: an NEO moves against the stars, so an explicit dither is wasted.
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "neo", "mag": 19.0}
+    p = _create_and_select(window, "neo", "2099mover", ctx)
+    _open_tab(window, p, "plan")
+    w = window._project_widgets["capture_options"]
+    assert w["dither_on"].isChecked() is False
+
+
+def test_ccd_connect_uses_the_imported_worker(window, monkeypatch):
+    # Regression guard (2026-10-13): _ccd_connect kept the old class name
+    # (CcdcielWorker) after the rename to ObservatoryWorker, and the NameError
+    # only fired when the observer pressed Connect, which no test did.
+    import nightscribe.gui.main_window as mw
+    seen = {}
+
+    class _FakeWorker:
+        def __init__(self, client, action, poll_slew=False):
+            seen["client"] = client
+            seen["action"] = action
+
+        class _sig:
+            def connect(self, cb):
+                seen["connected"] = cb
+
+        @property
+        def finished(self):
+            return self._sig()
+
+        def isRunning(self):
+            return False
+
+        def isFinished(self):
+            return True
+
+        def start(self):
+            seen["started"] = True
+
+    monkeypatch.setattr(mw, "ObservatoryWorker", _FakeWorker)
+    window._ccd_worker = None
+    try:
+        window._ccd_connect()          # must not raise NameError
+        assert "client" in seen and seen.get("started") is True
+    finally:
+        window._ccd_worker = None
+        window._ccd_client = None
+        window._ccd_connected = False
+
+
+def _one_px_png():
+    # A 2x2 grayscale PNG, enough to prove the bytes -> pixmap path.
+    from PySide6.QtCore import QBuffer
+    from PySide6.QtGui import QImage
+    img = QImage(2, 2, QImage.Format_Grayscale8)
+    buf = QBuffer()
+    buf.open(QBuffer.WriteOnly)
+    img.save(buf, "PNG")
+    return bytes(buf.data())
+
+
+def test_capture_preview_shows_the_last_frame(window, panel):
+    # ADR-082: the frame comes over HTTP (bytes) and the preview shows it with
+    # its numbers; nothing about folders is involved.
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099prev", ctx)
+    _open_tab(window, p, "plan")
+    w = window._obs_widgets
+    assert w["capture_preview"].isHidden()
+    window._capture_on_preview(
+        {"image": _one_px_png(), "name": "LIGHT_0001.fits", "filter": "R",
+         "exptime_s": 45.0, "date_obs": "2026-10-13T22:00:00"}, "")
+    assert not w["capture_preview"].isHidden()
+    cap = w["capture_caption"].text()
+    assert "LIGHT_0001.fits" in cap and "R" in cap and "45 s" in cap
+    window._capture_preview_reset()
+
+
+def test_capture_preview_keeps_the_last_frame_on_a_transient_error(
+        window, panel):
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099prev2", ctx)
+    _open_tab(window, p, "plan")
+    window._capture_on_preview(
+        {"image": _one_px_png(), "name": "LIGHT_0001.fits"}, "")
+    window._capture_on_preview(None, "no answer from the API")
+    assert not window._obs_widgets["capture_preview"].isHidden()
+    assert "LIGHT_0001.fits" in window._obs_widgets["capture_caption"].text()
+    window._capture_preview_reset()
+
+
+def test_capture_open_in_editor_uses_the_ccdciel_path(window, panel,
+                                                      tmp_path, monkeypatch):
+    # CCDciel only serves a JPEG; the FITS is opened from the file on disk
+    # when NightScribe can see that path (ADR-082).
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099open", ctx)
+    _open_tab(window, p, "plan")
+    fits = tmp_path / "frame.fits"
+    fits.write_bytes(b"SIMPLE")
+    window._ccd_backend = "ccdciel"
+    window._capture_preview_meta = {"image": b"x", "path": str(fits)}
+    opened = {}
+
+    class _FakeDlg:
+        def open_plate(self, path):
+            opened["path"] = path
+            return True
+
+        def set_object(self, obj):
+            pass
+
+    monkeypatch.setattr(window, "_ufe_open", lambda *a, **k: _FakeDlg())
+    window._open_capture_frame_in_editor()
+    assert opened["path"] == str(fits)
+    window._capture_preview_reset()
+
+
+def test_capture_on_fits_writes_a_temp_and_opens(window, panel, monkeypatch):
+    # NINA remote: the FITS arrives as bytes (raw_fits) and is written to a
+    # temp file before opening it in the editor.
+    import os
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    p = _create_and_select(window, "sn", "SN2099fits", ctx)
+    _open_tab(window, p, "plan")
+    opened = {}
+    monkeypatch.setattr(window, "_open_frame_path_in_editor",
+                        lambda path: opened.update(path=path))
+    window._capture_on_fits(b"SIMPLE", "")
+    assert opened["path"].endswith(".fits")
+    assert os.path.getsize(opened["path"]) == 6
+    os.unlink(opened["path"])
+    window._capture_preview_reset()
+
+
 def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     # UX-PC (U3, ADR-043): "Send plan" stages the CURRENT project's saved
     # plan; the project is the one selected in the hub.
@@ -794,12 +1165,17 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
             self.filter_idx = None
             self.plan = None
 
-        def set_filter(self, i):
-            self.filter_idx = i
-
-        def push_plan(self, n, e, name):
+        def push_plan(self, n, e, name, **kw):
             self.plan = (n, e, name)
-            return True
+            # the wheel slot now rides INSIDE push_plan (best-effort), so a
+            # refused slot cannot lose the plan (ADR-081 revision, 2026-10-13)
+            self.filter_idx = kw.get("filter_index")
+            return {"warnings": []}
+
+        def staged_plan(self):
+            return {"object": self.plan[2], "count": self.plan[0],
+                    "exposure_s": self.plan[1], "frame_type": "Light",
+                    "persistent": True}
 
     client = _FakeClient()
     window._ccd_send_plan()
@@ -809,6 +1185,47 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     # the wheel index follows the plan's filter ("R")
     assert client.filter_idx == \
         window._obs_widgets["cmb_ccd_filter"].findText("R")
+
+
+def test_send_plan_does_not_invent_a_wheel_slot(window, panel, monkeypatch):
+    # ADR-081 revision (2026-10-13): when the plan's filter is NOT in the
+    # wheel, no made-up index is sent (the old code sent slot 0 and a refused
+    # slot lost the whole plan); the filter is left as it is and a warning
+    # reaches the read-back.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _create_and_select(window, "sn", "SN2099nofilter", {"kind": "sn"})
+    _open_tab(window, p, "plan")
+    project.update_step_data(dbmod.db, p["id"], "plan",
+                             {"n_frames": 5, "exp_s": 10.0,
+                              "filter": "NotInWheel"})
+    window._ccd_filter_names = []
+    window._ccd_fill_filters()
+    sent = {}
+    monkeypatch.setattr(window, "_ccd_run",
+                        lambda slot, action, **kw: sent.update(action=action))
+
+    class _FakeClient:
+        def __init__(self):
+            self.filter_idx = "unset"
+            self.plan = None
+
+        def push_plan(self, n, e, name, **kw):
+            self.plan = (n, e, name)
+            self.filter_idx = kw.get("filter_index")
+            return {"warnings": []}
+
+        def staged_plan(self):
+            return {"object": self.plan[2], "count": self.plan[0],
+                    "exposure_s": self.plan[1], "frame_type": "Light",
+                    "persistent": True}
+
+    client = _FakeClient()
+    window._ccd_send_plan()
+    staged = sent["action"](client)
+    assert client.plan == (5, 10.0, "SN2099nofilter")
+    assert client.filter_idx is None
+    assert any("NotInWheel" in w for w in staged["warnings"])
 
 
 def test_send_plan_without_saved_plan_asks_for_one(window, panel,

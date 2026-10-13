@@ -51,6 +51,23 @@
      </layout>
     </widget>
    </item>
+   <item>
+    <widget class="QGroupBox" name="grp_runs">
+     <property name="title"><string>Runs</string></property>
+     <layout class="QVBoxLayout" name="vbox_runs">
+      <item><widget class="QLabel" name="vp_lbl_runs"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QTableWidget" name="vp_tbl_runs">
+        <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+        <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+        <property name="editTriggers"><enum>QAbstractItemView::NoEditTriggers</enum></property>
+        <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
+        <column><property name="text"><string>When</string></property></column>
+        <column><property name="text"><string>Observations</string></property></column>
+        <column><property name="text"><string>State</string></property></column>
+      </widget></item>
+     </layout>
+    </widget>
+   </item>
    <item><widget class="QTextEdit" name="vp_notes"><property name="placeholderText"><string>Night notes (seeing, clouds…)</string></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_bottom">

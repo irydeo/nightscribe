@@ -240,6 +240,18 @@ def hero_cancel_style():
             f" border-color: {C_WARN}; color: {C_WARN}; }}")
 
 
+def section_bar_style(hue=None):
+    # The title BAR of a settings group (ADR-071 rev): a filled strip that
+    # clearly STARTS the group, so adjacent groups do not read as one list.
+    # @args: hue - the accent (None = the app's)
+    # @return: a stylesheet for the bar widget (the title label is styled by
+    #          the caller, in the accent)
+    accent = hue or C_ACCENT
+    return (f"background: {composite(accent, '22', over=C_PANEL)};"
+            f" border-top-left-radius: 6px;"
+            f" border-top-right-radius: 6px;")
+
+
 def block_header_style(hue=None):
     # The header of a collapsible CARD: transparent (the card paints the
     # surface and its border) with the title in the card's accent, which is
@@ -250,9 +262,10 @@ def block_header_style(hue=None):
     # @return: a stylesheet for that header button
     accent = hue or C_ACCENT
     hover = composite(accent, "e6", over="#ffffff")   # +10% toward white
-    return (f"QPushButton {{ background: transparent; border: none;"
-            f" text-align: left; color: {accent}; padding: 8px 10px; }}"
-            f"QPushButton:hover {{ color: {hover}; }}")
+    return (f"QPushButton, QToolButton {{ background: transparent;"
+            f" border: none; text-align: left; color: {accent};"
+            f" padding: 8px 10px; }}"
+            f"QPushButton:hover, QToolButton:hover {{ color: {hover}; }}")
 
 
 def block_card_style(hue=None):

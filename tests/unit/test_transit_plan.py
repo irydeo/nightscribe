@@ -153,8 +153,8 @@ def test_exposure_preselected_from_heuristic(window):
 def test_cadence_label_and_ingress_warning(window):
     _select(window, "WASP-997 b", _transit_ctx())
     lbl = window._project_widgets["transit_cadence"]
-    # 60 s + 15 s pause -> one point every 75 s, well under the 360 s cap
-    assert "75" in lbl.text()
+    # 60 s + 2 s readout -> one point every 62 s, well under the 360 s cap
+    assert "62" in lbl.text()
     assert "⚠" not in lbl.text()
     # push the exposure past the cadence cap -> the warning shows
     window._project_widgets["spn_exps"].setValue(400.0)

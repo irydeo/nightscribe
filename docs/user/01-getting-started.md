@@ -91,9 +91,9 @@ an early visit:
   targets hiding behind the neighbour's house.
 - **Plate solver**: local ASTAP if you have it installed, with
   nova.astrometry.net as fallback. Needed for astrometry (chapter 07).
-- **Optional integrations**: CCDciel (capture, chapter 05), and the NEOfixer,
-  Astrometry.net, TNS and AAVSO keys. None is mandatory: without them, the
-  corresponding feature simply stays quiet.
+- **Optional integrations**: CCDciel or NINA/PINS (capture, chapter 05), and the
+  NEOfixer, Astrometry.net, TNS and AAVSO keys. None is mandatory: without them,
+  the corresponding feature simply stays quiet.
 
 > **Why does it ask for an AAVSO token?** The bright-star vigils (T CrB,
 > R CrB) compare the current state with the photometry the community uploads

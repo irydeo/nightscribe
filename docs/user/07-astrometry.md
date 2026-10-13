@@ -140,17 +140,63 @@ for Find_Orb to fit an orbit. None of those blocks the report.
 **Re-check** repeats the check on the points already measured, **without
 stacking the frames again**.
 
+### A residual looks wrong: fix the centroid by hand
+
+When a point stands out against the others, the usual cause is the centroid: a
+bright neighbour dragged it, or the object sat on a bad pixel. **Right-click an
+observation** (in the points table, or on the image) and choose **Adjust the
+centroid…**: its stack comes on the editor's own stage, so you **zoom, stretch
+and read the histogram** with the controls you already know; click the object and
+the mark snaps to its local centroid. The point is re-measured **on the saved
+stack**, with no re-stacking, the check runs again on its own and you see the new
+error at once. The point is signed ("centroid re-selected by hand"), and the app
+says what it fixes: the **centroid**, not a bad **registration** (for that,
+re-stack the run). It is the per-observation tool: it re-measures ONE observation
+on its saved stack. **Manual mark** (the checkbox) is the other one: it marks the
+object on the **whole-sequence** stack and **re-runs** the pipeline (a new run),
+for an object below the detection gate. Arming one disarms the other.
+
+The same menu offers **Auto centroid**, which lets the app pick it again
+(seeded at the point's current position) and drops the manual mark, opens the
+**Published observations…** listing (the run's residuals, the same window as the
+check block's button), shows or hides the **±** (the photometric error), both in
+the band over the image ("Mag: X ± Y") and in the points table's column, and
+includes/excludes an observation from the report and the check without touching
+the measurement. Moving from one observation to the next **keeps your histogram
+level** (the stretch), so you do not have to set it again for every stack.
+
+### One report from several series
+
+When a project has several runs (for instance a moving object followed across
+the night), the **Combined report** section in **Analysis** puts every
+measurement in one place: tick the ones you want, press **Check together** to run
+**one** check with all of them against the other observers, and **Combined
+report…** to build **one** MPC report. The verdict names **each of your
+observations with its own residual**, so you see which one to drop, and
+**Open in the editor** loads them all as **one combined set** in the editor to
+work on them there. Untick an observation to leave it out; the selection and the
+verdict are kept. Re-measures of the same observation (the same frames stacked
+again) are **merged into one**, keeping the newest run's.
+
+Clicking a visit in **Analysis** filters **Astrometry runs** to that visit, and
+the visit window lists **its own runs**: click one to open it in the editor. An
+undone run has no positions left, so it says so instead of opening a different
+one.
+
 ### Your object was confirmed under a new name
 
 An object observed while it was still on the confirmation page (a NEOCP
 designation) and confirmed since gets a new designation, and its observations
 move with it. NightScribe finds it on its own and shows it **very visibly**: the
 new name and the circular (MPEC) that published it, in the check, on the
-project's card and in the visit. When your station already appears among the
-published observations, it says so: **your data is in that circular**. If the
-automatic lookup comes up empty (the MPC's list of just-confirmed NEOCP objects
-is short), type the current designation in **Check against** and press
-**Re-check**.
+project's card and in the visit. It does this for **any** project whose object
+still carries a temporary NEOCP/PCCP designation, whether or not you observed
+it: a project created by hand is covered too. When your station already appears
+among the published observations it says so: **your data is in that circular**;
+when that is not known it links to the object at the MPC instead and claims
+nothing. If the automatic lookup comes up empty (the MPC's list of
+just-confirmed NEOCP objects is short), type the current designation in
+**Check against** and press **Re-check**.
 
 ## The MPC report
 
@@ -190,8 +236,10 @@ ratio); the app builds the telescope line from them.
 
 **Send to MPC…** opens the submission dialog. It asks for four things and then
 sends the batch to the MPC; the server's own answer (the CurlID or the errors)
-appears in the dialog's log. Without a contact email the send is blocked: the
-MPC needs it.
+appears in the dialog's log. The dialog opens saying what it is about to send
+(how many observations, the format, the target and the mode), so the batch
+never goes out unseen. Without a contact email the send is blocked: the MPC
+needs it.
 
 - **Ack. email**: where the MPC sends its acknowledgement and any designations.
   It is the contact email you set in Settings, and you can change it here.

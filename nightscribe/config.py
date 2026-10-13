@@ -32,6 +32,10 @@ DEFAULTS = {
     # above ours (ADR-015 consequence, object-card plan subplan 6)
     "transit_scope_filter": True,
     "limit_mag": 20.0,
+    # The site's sky brightness, used to pick the sub-exposure (ADR-083): the
+    # modelled zenith value in mag/arcsec2. Auto-filled from the atlas when a
+    # light-pollution key is set, typed by hand otherwise.
+    "sky_brightness_mag": 20.5,
     "min_alt": 30.0,        # degrees above horizon
     "language": "system",   # system | es | en
     "app_version": "",      # last app version the update wizard ran for
@@ -39,6 +43,7 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    "lightpollution_key": "",   # optional, the sky brightness atlas (ADR-083)
     "solver": "auto",       # auto | astap | astrometry (ADR-051)
     "astap_path": "",       # local ASTAP binary; empty = look on PATH
     # ADR-051 rev: a solved plate is saved solved (the WCS cards go into
@@ -56,12 +61,20 @@ DEFAULTS = {
     "horizon_margin_deg": 0.0,  # safety margin added on top of the horizon
     "pixel_um": 3.76,           # camera pixel size in microns
     "focal_mm": 2000.0,         # telescope focal length in mm
-    "overhead_s": 15.0,         # per-frame readout/slew overhead in seconds
+    "follow_s": 60.0,           # slew + solve + correct + settle per re-point
     # CCDciel JSON-RPC (ADR-030). Manual connect by default: the observatory
     # software is a human decision, not an automatic one.
     "ccdciel_host": "127.0.0.1",
     "ccdciel_port": 3277,
     "ccdciel_auto_connect": False,
+    # Which observatory software the Capture step drives (ADR-081): "ccdciel"
+    # or "nina" (NINA on Windows, PINS on Linux; both speak the same Advanced
+    # API v2 plugin). One at a time: the panel talks to a single observatory.
+    "observatory_backend": "ccdciel",
+    # NINA/PINS Advanced API v2 (ADR-081). Default port 1888 is the plugin's.
+    "nina_host": "127.0.0.1",
+    "nina_port": 1888,
+    "nina_auto_connect": False,
     "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
     "moon_max_illum": 0.5,        # above this, faint targets get penalized
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
@@ -183,6 +196,7 @@ DEFAULTS = {
     "cam_linearity_adu": None,  # ADU where linearity is lost (per gain)
     "cam_dark_current_e_s": None,   # e-/pixel/s at cam_dark_temp_c
     "cam_dark_temp_c": None,
+    "cam_readout_s": None,          # readout + download per frame, seconds
     "cam_max_exposure_s": None,     # working max exposure (per gain)
     "cam_regime": "normal",
     # UFE (ADR-044): the unified editor is the only door to the FITS work

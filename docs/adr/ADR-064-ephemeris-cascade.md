@@ -217,3 +217,19 @@ cascade answers both:
 `core/track_stack.py` gains `sequence_ephemeris` (the dict with position, magnitude
 and source); `sequence_motion_solution` stays as a wrapper for the callers that only
 want the position.
+
+**Review (2026-10-13, the source's own rate)**: the apparent rate now prefers
+the **value the source already computed** (NEOfixer's Find_Orb `motion_rate`)
+instead of always recomputing a finite difference over our table step; the
+finite difference stays only as a fallback (Horizons 2-min rows, local Kepler).
+This keeps the Tonight list and the Capture step equal and makes the number
+independent of our step, so a change is attributable (a real orbit update) and
+not an artefact of the interpolation.
+
+**Revisión (2026-10-13, la velocidad de la propia fuente)**: la velocidad
+aparente prefiere ahora **el valor que ya calculó la fuente** (`motion_rate` de
+Find_Orb, vía NEOfixer) en vez de recalcular siempre una diferencia finita sobre
+nuestro paso; la diferencia finita queda solo como respaldo (filas de Horizons a
+2 min, Kepler local). Así Tonight y Captura coinciden y el número deja de
+depender de nuestro paso: un cambio es atribuible (una órbita actualizada) y no
+un artefacto de la interpolación.

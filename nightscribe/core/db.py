@@ -73,6 +73,10 @@ SOURCE_TTL = {
     "astrometry": 30 * DAY,
     "ccdciel": 60,  # local JSON-RPC: covers quick reads (temp, filters,
                     # slewing) without hammering the observatory software
+    "nina": 60,     # local REST (Advanced API v2): same reasoning as CCDciel,
+                    # the dashboard must not hammer NINA between polls
+    "lightpollution": 30 * DAY,  # the sky-brightness atlas is static: one
+                                 # lookup per site lasts a month (ADR-083)
     "geo": 1 * HOUR,         # IP geolocation for the wizard (per provider)
     "elevation": 30 * DAY,   # open-meteo terrain height: static per place
 }
@@ -590,6 +594,32 @@ def _migrate(conn):
         );
         """)
         conn.execute("PRAGMA user_version = 19")
+    if v < 20:
+        # ADR-085: a point can carry its photometric error (the magnitude's
+        # bar, from the run's own photometry) and the provenance of its
+        # centroid (auto | manual): the observer can re-select a centroid on
+        # the saved stack when a residual looks wrong, and the point says so.
+        # ADR-086: the project-level combined check/report across runs lives
+        # in its own table (one row per project) so the project's JSON context
+        # stays light.
+        cols = {row[1] for row in conn.execute(
+            "PRAGMA table_info(astrometry_points)")}
+        if "mag_err" not in cols:
+            conn.execute(
+                "ALTER TABLE astrometry_points ADD COLUMN mag_err REAL")
+        if "centroid_source" not in cols:
+            conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
+                         " centroid_source TEXT DEFAULT 'auto'")
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS astrometry_combined (
+            project_id    INTEGER PRIMARY KEY
+                          REFERENCES projects(id) ON DELETE CASCADE,
+            included_json TEXT,             -- the point ids the observer ticks
+            check_json    TEXT,             -- the combined CheckReport
+            updated       TEXT
+        );
+        """)
+        conn.execute("PRAGMA user_version = 20")
     conn.commit()
 
 
@@ -668,6 +698,10 @@ MIGRATION_NOTES = {
         "The gain of your camera, measured on your own frames, is remembered "
         "per camera and setting, so a single image can reuse it instead of "
         "trusting the FITS header."),
+    20: QT_TRANSLATE_NOOP("NSMigrations",
+        "An astrometric point now carries its photometric error and whether "
+        "its centroid was re-selected by hand, and a project can hold a "
+        "combined check and report across all its runs."),
 }
 
 

@@ -10,10 +10,10 @@ that covers the full life cycle of an observing project:
 2. **Understand each object**: it translates orbital and physical parameters
    into clear explanations, so you know what you are looking at and why it
    matters.
-3. **Capture and reduce**: it talks to CCDciel to launch your captures and, in
-   its FITS editor, it calibrates, stacks and measures your images: photometry
-   (variables, exoplanets, supernovae) and MPC-ready astrometry of minor
-   bodies.
+3. **Capture and reduce**: it talks to CCDciel or NINA/PINS to launch your
+   captures and, in its FITS editor, it calibrates, stacks and measures your
+   images: photometry (variables, exoplanets, supernovae) and MPC-ready
+   astrometry of minor bodies.
 4. **Report it**: it drafts bilingual (ES/EN) posts and tweets, with charts
    ready for social media.
 
@@ -33,7 +33,7 @@ them start to finish or jump to the one you need:
 | [02. Planning the night](02-tonight.md) | The Tonight view, the score, the sky calendar |
 | [03. Projects](03-projects.md) | Creating and tracking projects: from the card to publication |
 | [04. Campaigns and vigils](04-campaigns.md) | Follow-up campaigns and variable star vigils |
-| [05. Capture](05-capture.md) | CCDciel, sequences and image calibration |
+| [05. Capture](05-capture.md) | CCDciel or NINA/PINS, sequences and image calibration |
 | [06. Photometry](06-photometry.md) | Measuring brightness, series, light curves and periods |
 | [07. Astrometry](07-astrometry.md) | Positions of asteroids and comets, and the MPC report |
 | [08. Reporting it](08-posts.md) | Posts, tweets and charts |

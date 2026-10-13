@@ -117,6 +117,8 @@ def test_observatory_page(qapp):
     for w in ("grp_site", "edt_mpc_code", "btn_resolve", "btn_map_pick",
               "edt_obs_name", "spn_lat", "spn_lon", "spn_height",
               "edt_aavso_code",
+              # ADR-083: the site's sky brightness and its two helpers
+              "spn_sky_brightness", "btn_sky_lookup", "btn_sky_map",
               # the observer's own details are NOT visual: they build the MPC
               # report's header and the band, so they live here (2026-10-11)
               "edt_observer", "edt_measurer", "edt_observer_email",
@@ -148,7 +150,7 @@ def test_observing_page(qapp):
               "spn_horizon_margin", "spn_min_alt", "lbl_horizon_stats",
               "grp_kinds", "grp_transits", "chk_transit_scope_filter",
               "grp_moon", "chk_moon_enabled", "spn_moon_sep",
-              "spn_moon_illum", "grp_session", "spn_overhead",
+              "spn_moon_illum", "grp_session",
               "spn_sn_cadence", "spn_event_mag", "spn_extremum_days",
               "chk_aavso", "edt_vigils", "grp_storage", "edt_projects_root",
               "btn_projects_browse", "btn_projects_reset"):
@@ -186,9 +188,13 @@ def test_measurement_page(qapp):
 def test_integrations_page(qapp):
     dlg = _dlg()
     names = _page_widgets(dlg, 4)
-    for w in ("grp_ccdciel", "edt_ccdciel_host", "spn_ccdciel_port",
-              "chk_ccdciel_auto", "grp_apikeys", "edt_neofixer_key",
-              "edt_astrometry_key", "edt_tns_bot", "edt_tns_bot_key",
+    for w in ("grp_obs_backend", "cmb_obs_backend",
+              "grp_ccdciel", "edt_ccdciel_host", "spn_ccdciel_port",
+              "chk_ccdciel_auto",
+              "grp_nina", "edt_nina_host", "spn_nina_port", "chk_nina_auto",
+              "grp_apikeys", "edt_neofixer_key",
+              "edt_astrometry_key", "edt_lightpollution_key",
+              "edt_tns_bot", "edt_tns_bot_key",
               "edt_aavso_token", "grp_ai", "chk_ai_enabled",
               "cmb_ai_preset", "edt_ai_base_url", "edt_ai_api_key",
               "cmb_ai_model", "btn_ai_models", "spn_ai_temp", "btn_ai_test",
@@ -281,13 +287,46 @@ def test_the_field_table_round_trips(qapp):
     dlg2.deleteLater()
 
 
+def test_integrations_show_only_the_selected_backend(qapp):
+    # ADR-081: the Integrations page shows only the fields of the program
+    # picked in the combo, and the search cannot bring the other one back.
+    from nightscribe.gui import settings_spec, settings_view
+    dlg = _dlg()
+    settings_view.build_rail(dlg, settings_spec.CATEGORIES, lambda s: s)
+    # the combo carries the id as data and is filled in code (QUiLoader does
+    # not read userData from a .ui)
+    dlg.cmb_obs_backend.addItem("CCDciel", "ccdciel")
+    dlg.cmb_obs_backend.addItem("NINA / PINS", "nina")
+    apply_search = settings_view.wire_search(
+        dlg, "none",
+        eligible=settings_view.backend_gate(dlg, settings_spec.BACKEND_GROUPS))
+    dlg.cmb_obs_backend.setCurrentIndex(
+        dlg.cmb_obs_backend.findData("ccdciel"))
+    apply_search()
+    assert not dlg.grp_ccdciel.isHidden()
+    assert dlg.grp_nina.isHidden()
+    dlg.cmb_obs_backend.setCurrentIndex(dlg.cmb_obs_backend.findData("nina"))
+    apply_search()
+    assert not dlg.grp_nina.isHidden()
+    assert dlg.grp_ccdciel.isHidden()
+    # a query that matches the hidden backend does not reveal it
+    dlg.edt_search.setText("host")
+    qapp.processEvents()
+    assert dlg.grp_ccdciel.isHidden()
+    assert not dlg.grp_nina.isHidden()
+    # clearing the box leaves the picked backend visible
+    dlg.edt_search.setText("")
+    qapp.processEvents()
+    assert not dlg.grp_nina.isHidden()
+    dlg.deleteLater()
+
+
 def test_the_search_filters_by_label_and_help(qapp):
     from nightscribe.gui import settings_spec, settings_view
     from PySide6.QtWidgets import QLabel
     dlg = _dlg()
     settings_view.build_rail(dlg, settings_spec.CATEGORIES, lambda s: s)
-    for name in settings_spec.ADVANCED_GROUPS:
-        settings_view.make_collapsible(getattr(dlg, name))
+    settings_view.title_groups(dlg)
     settings_view.wire_search(dlg, "none")
     note = dlg.findChild(QLabel, "lbl_no_results")
     # a hit: the row stays and the quiet note is away
@@ -307,16 +346,25 @@ def test_the_search_filters_by_label_and_help(qapp):
     dlg.deleteLater()
 
 
-def test_advanced_groups_open_collapsed(qapp):
-    from PySide6.QtWidgets import QToolButton
-    from nightscribe.gui import settings_spec, settings_view
+def test_every_group_wears_a_title_and_nothing_folds(qapp):
+    # ADR-071 rev: a group shows its title in a bar and its content is ALWAYS
+    # visible; there is no disclosure control.
+    from PySide6.QtWidgets import QGroupBox, QLabel, QToolButton, QWidget
+    from nightscribe.gui import settings_view
     dlg = _dlg()
-    for name in settings_spec.ADVANCED_GROUPS:
-        group = getattr(dlg, name)
-        settings_view.make_collapsible(group, collapsed=True)
-        header = group.findChild(QToolButton, name + "_header")
-        assert header is not None and not header.isChecked(), \
-            f"{name} should start collapsed"
+    settings_view.title_groups(dlg)
+    groups = [g for g in dlg.findChildren(QGroupBox)
+              if g.layout() is not None and g.layout().count()]
+    assert groups, "the dialog has groups"
+    for group in groups:
+        title = group.findChild(QLabel, group.objectName() + "_title")
+        assert title is not None and title.text(), group.objectName()
+        # nothing folds: no disclosure button and the content is shown
+        assert group.findChild(QToolButton,
+                               group.objectName() + "_header") is None
+        content = group.findChild(QWidget, group.objectName() + "_content")
+        assert content is not None and not content.isHidden(), \
+            group.objectName()
     dlg.deleteLater()
 
 
@@ -612,11 +660,16 @@ def test_selecting_a_preset_loads_its_template(qapp, monkeypatch):
     assert dlg.spn_pixel_um.value() == 3.76
     assert dlg.spn_cam_full_well.value() == 50000.0
     assert dlg.spn_cam_ron.value() == 1.0
+    assert dlg.spn_cam_readout.value() == 1.5
     pick("imx294")
     # the WHOLE template moves, not only the pixel size
     assert dlg.spn_pixel_um.value() == 4.63
     assert dlg.spn_cam_full_well.value() == 63700.0
     assert dlg.spn_cam_ron.value() == 1.2
+    # the readout+download (the ONE per-frame overhead) moves too
+    assert dlg.spn_cam_readout.value() == 1.5
+    pick("kaf16803")
+    assert dlg.spn_cam_readout.value() == 8.0
     # a family header reads as a header (bold, uppercased), not as a camera
     c = dlg.cmb_cam_preset
     hidx = next(i for i in range(c.count())

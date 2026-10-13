@@ -167,3 +167,24 @@ gains two things Interfaz 1.9 made visible:
   the 0.5 and 2.0 arcsec/pixel edges, which is Welcome's "Your equipment" step
   explaining why the number matters. The edges are a rule of thumb for the
   seeing of a typical site, and that is how the code comments them.
+
+**Review (2026-10-13, native NINA sequence)**: the NINA export is now the
+**native** sequence (`SequenceRootContainer`, JSON.NET with `$type`/`$id`/`$ref`)
+that NINA can load through `/sequence/load`: Start/Target/End areas, a
+`DeepSkyObjectContainer` with the target, `SwitchFilter` + `TakeManyExposures`/
+`TakeExposure` per band, and dither/autofocus as **triggers**
+(`DitherAfterExposures`, `AutofocusAfterExposures`/`AfterTime`/
+`AfterTemperatureChange`/`AfterFilterChange`). The old bespoke JSON is kept as a
+separate **"plan summary"** (`*.plan.json`), so nobody mistakes it for a
+loadable sequence. The native form is pinned against NINA's test corpus and is
+**pending confirmation against a real NINA/PINS**; the `$type` strings live in
+one place for that tweak.
+
+**Revisión (2026-10-13, secuencia nativa de NINA)**: el export de NINA pasa a ser
+la secuencia **nativa** (`SequenceRootContainer`, JSON.NET con `$type`/`$id`/
+`$ref`) que NINA carga por `/sequence/load`: áreas Start/Target/End, un
+`DeepSkyObjectContainer` con el objetivo, `SwitchFilter` + `TakeManyExposures`/
+`TakeExposure` por banda, y dither/autofocus como **triggers**. El JSON antiguo
+se conserva como **«plan summary»** aparte (`*.plan.json`), para que nadie lo
+confunda con una secuencia cargable. La forma nativa está pinada contra el corpus
+de test de NINA y queda **pendiente de confirmar contra una NINA/PINS real**.

@@ -18,6 +18,7 @@ import time
 import requests
 
 from ..db import db
+from .observatory import ObservatoryError
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +47,10 @@ def truthy(result):
     return bool(result)
 
 
-class CCDcielError(Exception):
+class CCDcielError(ObservatoryError):
     # A CCDciel command came back with status "Failed!" (or an error) and we
-    # have nothing to show but the failure itself.
+    # have nothing to show but the failure itself. It subclasses the common
+    # ObservatoryError so the GUI catches one type whatever the backend is.
     pass
 
 
@@ -176,6 +178,69 @@ class Client:
         # @return: True when the mount is tracking (live, uncached)
         return bool(truthy(self.call("Telescope_tracking")))
 
+    def capturing(self):
+        # @return: True while a capture is running (live, uncached). The
+        # Capture step uses it to stop watching the folder once the run ends.
+        return bool(truthy(self.call("Capture_running")))
+
+    def current_gain(self):
+        # The camera's gain SETTING (its own index), not the system gain in
+        # e-/ADU (that is a photometry quantity, in the profile).
+        # @return: the gain (int) or None
+        try:
+            return int(self.call("Camera_GetGain"))
+        except (CCDcielError, TypeError, ValueError):
+            return None
+
+    def current_offset(self):
+        # @return: the camera's offset setting (int) or None
+        try:
+            return int(self.call("Camera_GetOffset"))
+        except (CCDcielError, TypeError, ValueError):
+            return None
+
+    def last_frame_name(self):
+        # @return: the full path of the last saved file (live), or None
+        try:
+            value = self.call("Capture_getLastfilename")
+        except CCDcielError:
+            return None
+        return str(value) if value else None
+
+    def last_frame_preview(self):
+        # The last image CCDciel has on screen, as a JPEG, over its HTTP
+        # server (the SAME host:port as the JSON-RPC; see pu_main.TCPgetimage,
+        # which serves fullimage.jpg / scrimage.jpg / lastfocus.jpg). It is
+        # NOT the FITS: CCDciel's web server only serves pictures, so the
+        # thumbnail is its own render and the FITS is opened separately from
+        # the file on disk when that path is reachable. Works local and remote.
+        # @return: dict with image (JPEG bytes), name, path; or None when
+        #          there is nothing to show
+        url = f"http://{self.host}:{self.port}/fullimage.jpg"
+        try:
+            r = requests.get(url, timeout=self.timeout)
+            r.raise_for_status()
+            data = r.content
+        except requests.RequestException as err:
+            raise CCDcielError(f"fullimage.jpg: {err}") from err
+        if not data:
+            return None
+        path = self.last_frame_name()
+        name = path.replace("\\", "/").rsplit("/", 1)[-1] if path else None
+        return {"image": data, "name": name, "path": path,
+                "filter": None, "exptime_s": None, "date_obs": None}
+
+    def abort_motion(self):
+        # Safety stop: halt any telescope movement right now. CCDciel's
+        # `Telescope_abortmotion` is the documented "stop any telescope
+        # movement"; it is what the Stop-goto button calls when a slew or an
+        # astrometric goto is heading somewhere wrong. It stops the MOUNT,
+        # not the astrometry job, so the goto may still report a failure
+        # afterwards (which is the honest outcome of an interrupted slew).
+        # @return: True when the server accepted the stop
+        self.call("Telescope_abortmotion")
+        return True
+
     # -- coordinates and motion -------------------------------------------------
 
     def apparent(self, ra_deg, dec_deg):
@@ -265,17 +330,95 @@ class Client:
 
     # -- capture settings ----------------------------------------------------------
 
-    def push_plan(self, n_frames, exp_s, object_name):
+    def push_plan(self, n_frames, exp_s, object_name, dither=None, gain=None,
+                  offset=None, binning=None, filter_index=None):
         # Stage a capture plan inside CCDciel: object name, exposure, count
-        # and Light frame type. Returns as soon as the settings stick.
+        # and Light frame type, plus the capture options that CCDciel can take
+        # live (ADR-083): the wheel filter, binning, gain, offset and the
+        # dither count. The autofocus cadence is not a live setting in CCDciel
+        # (only "focus now"), so it stays in the sequence file.
+        #
+        # The CORE plan (object/exposure/count/type) must always land; the
+        # OPTIONAL setters are best-effort: a rejected one (a binning CCDciel
+        # does not know, a gain out of range, a wheel that refuses the slot)
+        # is collected as a warning and the plan goes on, so "Send plan" never
+        # stops half-way. And CCDciel's `Capture_setbinning` wants an INTEGER
+        # ("1x1" is rejected), unlike NINA's string form, so the binning is
+        # converted here.
         # @args: n_frames - exposure count, exp_s - exposure (s),
-        #        object_name - FITS OBJNAME
-        # @return: True when all Capture_set* commands were accepted
+        #        object_name - FITS OBJNAME, dither - recipe dict (or None),
+        #        gain/offset/binning - recipe values (None = leave as is),
+        #        filter_index - wheel slot to move to (None = leave as is)
+        # @return: {"warnings": [str, ...]} (empty when everything landed)
+        warnings = []
         self.call("Capture_setobjectname", object_name or "NightScribe")
         self.call("Capture_setexposure", float(exp_s))
         self.call("Capture_setcount", int(n_frames))
         self.call("Capture_setframetype", "Light")
+
+        def _try(label, fn):
+            # @args: label - what failed (for the message), fn - the setter
+            # @return: None. A failure is recorded, never raised: the plan is
+            #          more important than the optional knob.
+            try:
+                fn()
+            except CCDcielError as err:
+                warnings.append(f"{label}: {err}")
+
+        # the wheel FIRST, best-effort: it used to run in the GUI BEFORE this
+        # call, so a refused slot (a wheel that rejects the index, or one not
+        # connected) raised and the whole plan was lost (reported 2026-10-13:
+        # "Send plan receives nothing"; the log said Wheel_setfilter: Failed!)
+        if filter_index is not None:
+            _try("filter", lambda: self.set_filter(int(filter_index)))
+        if binning:
+            # CCDciel's Capture_setbinning sets the Binning combo's TEXT
+            # (cmd_Capture_SetBinning -> Capture.Binning.Text := bin), so it
+            # wants "1x1", not an integer (NINA wants the same string form)
+            _try("binning", lambda: self.call("Capture_setbinning",
+                                              str(binning)))
+        if gain not in (None, ""):
+            current = self.current_gain()
+            if current is None or int(gain) != current:
+                _try("gain", lambda: self.call("Camera_SetGain", int(gain)))
+        if offset not in (None, ""):
+            current = self.current_offset()
+            if current is None or int(offset) != current:
+                _try("offset", lambda: self.call("Camera_SetOffset", int(offset)))
+        if dither is not None:
+            count = int(dither.get("every") or 0) if dither.get("on") else 0
+            _try("dither", lambda: self.call("Capture_setdither", count))
+        return {"warnings": warnings}
+
+    def stop_capture(self):
+        # Stop a running capture (ADR-081): CCDciel's documented
+        # "Stop a capture". It halts the capture module, not the mount (that is
+        # abort_motion / the Stop-goto button).
+        # @return: True when the server accepted the stop
+        self.call("Capture_stop")
         return True
+
+    def staged_plan(self):
+        # Reads BACK the capture plan CCDciel is actually holding, so "Send
+        # plan" can prove it did something instead of trusting that the
+        # Capture_set* commands landed. A read-back is the only honest
+        # confirmation: the server accepts a set and could still round it
+        # (a count of 0, a frame type it does not know).
+        # @return: dict with object/exposure_s/count/frame_type/filter, or
+        #          None when the server does not answer the getters
+        try:
+            return {
+                "object": self.call("Capture_getobjectname"),
+                "exposure_s": self.call("Capture_getexposure"),
+                "count": self.call("Capture_getcount"),
+                "frame_type": self.call("Capture_getframetype"),
+                "binning": self.call("Capture_getbinning"),
+                "dither": self.call("Capture_getdither"),
+                "filter": self.current_filter(),
+                "persistent": True,
+            }
+        except CCDcielError:
+            return None
 
     def start_capture(self):
         # Fire the staged capture plan (Capture_start returns immediately).

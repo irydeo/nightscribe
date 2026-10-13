@@ -423,6 +423,19 @@ def test_the_ades_psv_uses_trksub_for_a_temporary_designation():
     assert text.splitlines()[1].startswith("A11HPKO|")
 
 
+def test_is_temporary_designation_recognises_neocp_tags():
+    # ADR-077 rev: the rename notice fires for these names even without the
+    # planner's `neocp` flag, so a project created by hand is covered.
+    for name in ("A11HPKO", "P11ABCD", "P10x99x", "P21vXYZ"):
+        assert mpc.is_temporary_designation(name) is True, name
+    # a confirmed designation (provisional, numbered, comet) is NOT a tag:
+    # there is nothing to announce about it
+    for name in ("2026 TQ8", "2021 EQ3", "433", "C/2023 A3", "", None,
+                 "A11HPK", "AA11HPKO",
+                 "K21E03Q"):        # packed provisional shares the shape
+        assert mpc.is_temporary_designation(name) is False, name
+
+
 def test_the_ades_xml_report_is_well_formed():
     import xml.etree.ElementTree as ET
     text = mpc.to_ades_xml([_point()], "Z41", "2021 EQ3", context=_ctx())

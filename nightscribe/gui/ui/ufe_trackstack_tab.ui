@@ -292,6 +292,7 @@
         <item>
          <widget class="QCheckBox" name="chk_starstack">
           <property name="text"><string>Keep the star stack</string></property>
+          <property name="checked"><bool>true</bool></property>
           <property name="toolTip">
            <string>Saves a second stack of the same frames, aligned on the STARS, next to each observation's stack. It costs one more stacking pass and it is what the Photometry tab needs to measure the brightness by hand (there the object's stack has its stars as trails). The run measures with it too, so nothing is built twice</string>
           </property>
@@ -475,6 +476,7 @@
       <column><property name="text"><string>Δ″</string></property></column>
       <column><property name="text"><string>SNR</string></property></column>
       <column><property name="text"><string>Mag</string></property></column>
+      <column><property name="text"><string>±</string></property></column>
       <column><property name="text"><string>!</string></property></column>
      </widget>
     </item>

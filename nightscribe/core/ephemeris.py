@@ -1051,14 +1051,16 @@ def _interpolate(rows, jd):
             dec = float(dec)
         except (TypeError, ValueError):
             continue
-        pts.append((j, ra, dec))
+        pts.append((j, ra, dec, r.get("rate_arcsec_min"), r.get("pa_deg")))
     if not pts:
         return None
     pts.sort()
     n = len(pts)
     if n == 1:
-        return {"ra_deg": pts[0][1] % 360, "dec_deg": pts[0][2],
-                "rate_arcsec_min": 0.0, "pa_deg": 0.0}
+        _j, ra, dec, rate, pa = pts[0]
+        return {"ra_deg": ra % 360, "dec_deg": dec,
+                "rate_arcsec_min": float(rate) if rate is not None else 0.0,
+                "pa_deg": float(pa) if pa is not None else 0.0}
     if jd <= pts[0][0]:
         i, frac = 0, 0.0
     elif jd >= pts[-1][0]:
@@ -1068,8 +1070,8 @@ def _interpolate(rows, jd):
                  if pts[k][0] <= jd <= pts[k + 1][0])
         span = pts[i + 1][0] - pts[i][0]
         frac = (jd - pts[i][0]) / span if span else 0.0
-    j0, ra0, dec0 = pts[i]
-    j1, ra1, dec1 = pts[i + 1]
+    j0, ra0, dec0, rate0, pa0 = pts[i]
+    j1, ra1, dec1, rate1, pa1 = pts[i + 1]
     dra = ra1 - ra0
     if dra > 180:
         dra -= 360
@@ -1077,9 +1079,39 @@ def _interpolate(rows, jd):
         dra += 360
     ra = (ra0 + frac * dra) % 360
     dec = dec0 + frac * (dec1 - dec0)
-    rate, pa = _motion(j0, ra0, dec0, j1, ra0 + dra, dec1)
+    # Prefer the rate the SOURCE already computed (NEOfixer's Find_Orb
+    # motion_rate): it is the object's own answer, and using it keeps this
+    # number equal to the one the planner shows and independent of our table
+    # step. Only when no row carries one do we fall back to our finite
+    # difference over the bracketing pair (ADR-064 rev).
+    rate, pa = _row_rate(rate0, pa0, rate1, pa1, frac)
+    if rate is None:
+        rate, pa = _motion(j0, ra0, dec0, j1, ra0 + dra, dec1)
     return {"ra_deg": ra, "dec_deg": dec,
             "rate_arcsec_min": rate, "pa_deg": pa}
+
+
+def _row_rate(rate0, pa0, rate1, pa1, frac):
+    # The rate/PA the ephemeris rows carry, interpolated to the instant.
+    # @args: rate0/pa0 - the first bracketing row's rate/PA (or None),
+    #        rate1/pa1 - the second's, frac - the position between them (0..1)
+    # @return: (rate_arcsec_min, pa_deg), or (None, None) when neither row has
+    #          one (the caller then computes it from the positions)
+    if rate0 is None and rate1 is None:
+        return None, None
+    if rate0 is None:
+        return float(rate1), float(pa1 or 0.0)
+    if rate1 is None:
+        return float(rate0), float(pa0 or 0.0)
+    rate = float(rate0) + frac * (float(rate1) - float(rate0))
+    # the PA is an angle: interpolate the short way round
+    dpa = float(pa1 or 0.0) - float(pa0 or 0.0)
+    if dpa > 180:
+        dpa -= 360
+    elif dpa < -180:
+        dpa += 360
+    pa = (float(pa0 or 0.0) + frac * dpa) % 360.0
+    return rate, pa
 
 
 def _kepler_at(elements, jd, lat=None, lon=None):

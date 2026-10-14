@@ -269,17 +269,16 @@ def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
     # hand: the weighted combination needs it and the robust MAD does not
     # care about the stars or the object sitting on top of the sky
     frame.sky_sigma = _frame_noise(data)
-    # The source image and the stars are the WHOLE cost of an estimate
-    # (measured on 2048^2: 88 ms and 69 ms against a vote and a pairing that
-    # round to nothing), and both are memory-bound, so they are what the
-    # optional GPU path takes first (ADR-089). A None answer falls straight
-    # back to the CPU inside estimate_transform: the estimate is never left
-    # undone, only done slower.
+    # The stars are half the cost of an estimate and the device does that half
+    # well (ADR-089). The SOURCE IMAGE stays on the CPU on purpose: its block
+    # median is slow on the device for a frame that does not divide by the
+    # block (the real 2008^2 case), and the CPU builds it in ~120 ms. A None
+    # answer from the device falls straight back to the CPU inside
+    # estimate_transform: the estimate is never left undone, only done slower.
     src_src = src_stars = None
     if gpu.enabled(cfg):
-        got = gpu.frame_stars(data)
-        if got is not None:
-            src_src, src_stars = got
+        src_src = register.source_image(data)
+        src_stars = gpu.stars(src_src)
     tr = register.estimate_transform(
         ref_data, data, guess=guess, ref_stars=ref_stars,
         ref_src=ref_src, allow_rotation=allow_rotation,
@@ -353,16 +352,12 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     # ONE source image of the reference for the whole sequence: it is the
     # same frame every time, and rebuilding it per frame was ~140 ms of
     # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
-    # read from it too, so nothing is computed twice. It is built by the SAME
-    # path the frames use (the GPU kernels when they are on, the CPU
-    # otherwise), so the reference's star list and the frames' are comparable.
-    ref_src = ref_stars = None
-    if gpu.enabled(cfg):
-        got = gpu.frame_stars(ref_data)
-        if got is not None:
-            ref_src, ref_stars = got
-    if ref_src is None:
-        ref_src = register.source_image(ref_data)
+    # read from it too, so nothing is computed twice. The stars come from the
+    # SAME path the frames use (the device when it is on), so the reference's
+    # list and the frames' are comparable.
+    ref_src = register.source_image(ref_data)
+    ref_stars = gpu.stars(ref_src) if gpu.enabled(cfg) else None
+    if ref_stars is None:
         ref_stars = register.detect_stars(ref_src)
     ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:
@@ -1144,15 +1139,6 @@ def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
     n = len(frame_list)
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
-    # The GPU path, when the observer asked for it AND there is a device: the
-    # batch is warped on the device and comes back as one stack (core/gpu.py).
-    # A None answer means the backend cannot serve this call, and the numpy
-    # path below is the fallback, never a second-class citizen.
-    if gpu.enabled(cfg):
-        result = gpu.warp_batch(frame_list, offsets, box, shape, loader=loader,
-                                order=order, preloaded=preloaded)
-        if result is not None:
-            return result
     # one warp holds its output plus a mask and one temporary of the same
     # size, and that is what bounds the thread count on a big box
     per_task = max(1, out_h * out_w * 4 * 3)
@@ -1249,14 +1235,6 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None,
     # only pay when there is work to share.
     if stack.size == 0:
         return stack.reshape(stack.shape[1:]) if stack.ndim == 3 else stack
-    # The GPU path, when it is asked for and there is a device: the combine
-    # is a memory-bound reduction and that is where a GPU pays (core/gpu.py).
-    # None means it could not serve the call and the numpy path below runs.
-    if gpu.enabled(cfg):
-        result = gpu.combine(stack, method, mask=mask, sigma=sigma,
-                             iterations=iterations, weights=weights)
-        if result is not None:
-            return result
     data = stack
     if mask is not None:
         data = np.where(mask, stack, np.nan)
@@ -1418,11 +1396,21 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         py0 = max(0, y0 - pad)
         py1 = min(out_h, y1 + pad)
         sub_box = (box[0], box[1] + py0, box[2], box[1] + py1)
-        strip, masks = _warp_batch([frames[i] for i in indices], offsets,
-                                   sub_box, shape, loader=loader, cfg=cfg,
-                                   order=order)
-        combined = combine(strip, method, mask=masks, sigma=sigma,
-                           iterations=iterations, weights=weights, cfg=cfg)
+        # The fused GPU path per strip, when it is asked for: the strip's
+        # frames go up once and one strip comes down, the same saving the RAM
+        # path gets (ADR-089). A None answer falls back to numpy.
+        combined = None
+        if gpu.enabled(cfg):
+            combined = gpu.stack_ram([frames[i] for i in indices], offsets,
+                                     sub_box, shape, loader=loader, order=order,
+                                     method=method, sigma=sigma,
+                                     iterations=iterations, weights=weights)
+        if combined is None:
+            strip, masks = _warp_batch([frames[i] for i in indices], offsets,
+                                       sub_box, shape, loader=loader, cfg=cfg,
+                                       order=order)
+            combined = combine(strip, method, mask=masks, sigma=sigma,
+                               iterations=iterations, weights=weights, cfg=cfg)
         out[y0:y1] = combined[y0 - py0:y1 - py0]
     return out, report
 

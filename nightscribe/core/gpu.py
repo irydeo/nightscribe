@@ -296,64 +296,9 @@ def _sigma_clip_keep(cp, data, sigma, iterations):
 
 
 # ======================================================================
-# The registration's own kernels (ADR-089): the source image and the stars
-# are the WHOLE cost of a per-frame estimate (measured, 2048^2: source image
-# 88 ms and stars 69 ms against a vote and a pairing that round to nothing),
-# and both are memory-bound, which is where the device pays.
+# The registration's star detection (ADR-089): the stars are half the cost of
+# a per-frame estimate and the half the device does WELL.
 # ======================================================================
-
-_BG_BLOCK = 32
-
-
-def _block_grid_gpu(cp, arr, block):
-    # @args: arr - the frame on the device, block - the cell size
-    # @return: (grid, ys, xs), the block medians and the cell edges
-    # The mirror of register._block_grid. The vectorised reshape is the
-    # common case (a frame that divides by the block) and the loop is the
-    # rare one, exactly as on the CPU.
-    h, w = arr.shape
-    bh = max(1, h // block)
-    bw = max(1, w // block)
-    ys = cp.linspace(0, h, bh + 1).astype(cp.int64)
-    xs = cp.linspace(0, w, bw + 1).astype(cp.int64)
-    if h % block == 0 and w % block == 0:
-        return cp.median(arr.reshape(bh, block, bw, block),
-                         axis=(1, 3)), ys, xs
-    grid = cp.empty((bh, bw), dtype=cp.float64)
-    for j in range(bh):
-        y0, y1 = int(ys[j]), max(int(ys[j + 1]), int(ys[j]) + 1)
-        for i in range(bw):
-            x0, x1 = int(xs[i]), max(int(xs[i + 1]), int(xs[i]) + 1)
-            grid[j, i] = cp.median(arr[y0:y1, x0:x1])
-    return grid, ys, xs
-
-
-def _background_gpu(cp, data, block=_BG_BLOCK):
-    # @args: data - the frame on the device, block - the grid block size
-    # @return: the smooth background, same shape, on the device
-    # The mirror of register._background: block medians, then a bilinear
-    # re-expansion. The median shrugs off the stars a mean would drag up.
-    arr = cp.asarray(data, dtype=cp.float64)
-    h, w = arr.shape
-    grid, ys, xs = _block_grid_gpu(cp, arr, block)
-    bh = grid.shape[0]
-    cy = (ys[:-1] + ys[1:] - 1) / 2.0
-    cx = (xs[:-1] + xs[1:] - 1) / 2.0
-    px = cp.arange(w, dtype=cp.float64)
-    tmp = cp.empty((bh, w), dtype=cp.float64)
-    for j in range(bh):
-        tmp[j] = cp.interp(px, cx, grid[j])
-    py = cp.arange(h, dtype=cp.float64)
-    jy = cp.clip(cp.searchsorted(cy, py) - 1, 0, bh - 2)
-    dy = cy[jy + 1] - cy[jy]
-    wy = cp.where(dy > 0, (py - cy[jy]) / cp.where(dy > 0, dy, 1.0), 0.0)
-    return tmp[jy] * (1.0 - wy)[:, None] + tmp[jy + 1] * wy[:, None]
-
-
-def _source_image_gpu(cp, arr, block=_BG_BLOCK):
-    # @return: the source image on the device (sky removed, negatives clipped)
-    return cp.clip(cp.asarray(arr, dtype=cp.float64)
-                   - _background_gpu(cp, arr, block), 0.0, None)
 
 
 def _refine_gpu(cp, src, xs, ys):
@@ -433,23 +378,30 @@ def _detect_stars_gpu(cp, src, nmax=60, k=8.0, margin=8, sat=None, factor=2):
     return cp.column_stack([fx, fy, peaks])
 
 
-def frame_stars(data, sat=None):
-    # @args: data - a frame's pixels (ADU, any shape), sat - saturation
-    #        ceiling (None keeps every peak, as the CPU path does)
-    # @return: (source image (numpy float64), stars (N, 3) numpy) or None when
-    #          the backend cannot serve the call
-    # ONE upload per frame for BOTH kernels: the frame goes up once, the
-    # source image and the stars are built on the device and only the results
-    # come back. The frame is the biggest thing moved and it is moved once.
+def stars(src, sat=None):
+    # @args: src - a source image (what register.source_image returns), sat -
+    #        saturation ceiling (None keeps every peak, as the CPU path does)
+    # @return: the stars (N, 3) numpy, or None when the backend cannot serve
+    #          the call
+    # The stars are half the cost of a per-frame estimate and the half the
+    # device does well: measured on a real 2008^2 frame, 204 ms on the CPU
+    # against 3.3 ms on the device, and the detection is the same algorithm on
+    # both sides (local maxima, the same robust noise, the same subpixel
+    # refine), so the list is the same to a fraction of a pixel.
+    #
+    # The SOURCE IMAGE is deliberately LEFT on the CPU. Its block median is
+    # slow on the device for a frame that does not divide by the block, which
+    # is the real case here (2008 % 32 = 24, so the device walks 3844 blocks
+    # one kernel at a time: measured 693 ms against the CPU's 122 ms), and the
+    # CPU already builds it in 122 ms. Porting it needs a block median that
+    # reproduces the CPU's uneven edges in one kernel, a change of its own.
     if not available():
         return None
     cp = _state["cp"]
     try:
-        arr = cp.asarray(np.asarray(data, dtype=np.float64))
-        src = _source_image_gpu(cp, arr)
-        stars = _detect_stars_gpu(cp, src, sat=sat)
-        return cp.asnumpy(src), cp.asnumpy(stars)
+        arr = cp.asarray(np.asarray(src, dtype=np.float64))
+        return cp.asnumpy(_detect_stars_gpu(cp, arr, sat=sat))
     except Exception as err:
-        logger.warning("GPU registration kernels failed, falling back to CPU: "
-                       "%s", err)
+        logger.warning("GPU star detection failed, falling back to CPU: %s",
+                       err)
         return None

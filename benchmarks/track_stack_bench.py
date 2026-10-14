@@ -160,17 +160,14 @@ def main():
     from nightscribe.core import gpu
     if gpu.available():
         print(f"\nGPU backend ({gpu.device_name()}):")
-        _time("registration kernels (GPU: source image + stars)",
-              lambda: gpu.frame_stars(ref_data), repeat=3)
+        _time("star detection (GPU)",
+              lambda: gpu.stars(register.source_image(ref_data)), repeat=3)
         _time("warp batch (GPU, whole frame)",
-              lambda: track_stack._warp_batch(
-                  frames, [(0.0, 0.0)] * len(frames), final_box,
-                  (args.size, args.size), cfg={"astrometry_gpu": 1}),
+              lambda: gpu.warp_batch(frames, [(0.0, 0.0)] * len(frames),
+                                     final_box, (args.size, args.size)),
               repeat=1)
         _time(f"combine alone (GPU, {args.method})",
-              lambda: track_stack.combine(strip, args.method,
-                                          cfg={"astrometry_gpu": 1}),
-              repeat=1)
+              lambda: gpu.combine(strip, args.method), repeat=1)
         _time(f"stack_group ({args.method}, GPU, final box)",
               lambda: track_stack.stack_group(
                   frames, (0, len(frames)), frames[0].object_xy, args.method,

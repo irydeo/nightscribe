@@ -1,6 +1,23 @@
 # ADR-069: El flat sintético se enmascara, y el pedestal se quita
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-10-07
+**Estado / Status**: Superseded by [ADR-089](ADR-089-vignetting-model.md) ·
+**Fecha / Date**: 2026-10-07
+
+> **Superado (2026-10-14, ADR-089)**: este ADR construyó un flat sintético de
+> resolución completa (máscara, relleno, píxeles calientes). Medido después
+> contra el master real, toda esa maquinaria compraba el **polvo** (0,026 mag)
+> y nada más: el viñeteo, que es lo que importa (0,087 mag), lo da igual de
+> bien un modelo suave (3,93 % contra 4,26 %) en 3 s en vez de 20. El motor
+> que aquí se describe **ya no existe**; se conserva como historia de lo que
+> se midió entonces y por qué.
+>
+> **Superseded (2026-10-14, ADR-089)**: this ADR built a full-resolution
+> synthetic flat (mask, fill, hot pixels). Measured later against the real
+> master, all that machinery bought the **dust** (0.026 mag) and nothing else:
+> the vignetting, which is what matters (0.087 mag), is given just as well by a
+> smooth model (3.93 % against 4.26 %) in 3 s instead of 20. The engine
+> described here **no longer exists**; it is kept as the history of what was
+> measured then and why.
 
 ## Español
 

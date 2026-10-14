@@ -88,7 +88,7 @@ between pages.
   switch lives in the Photometry tab, beside the measurement (chapter 06).
 - **Calibration masters**: the library of bias, dark and flat frames the
   editor's Calibration tab resolves its recipe against, plus the
-  calibration's policy (build a pseudo-flat when no real one is there, and
+  calibration's policy (model the vignetting when no real flat is there, and
   the dark's temperature tolerance). The files are linked, never copied or
   moved, and they go in **by files or by folder**: each frame is classified
   by its own header (`IMAGETYP`), so you never say which is a dark and which

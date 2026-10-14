@@ -92,7 +92,7 @@ calibración y astrometría juntas, para que quien mide no salte de página.
   placa vive en la pestaña Fotometría, junto a la medida (capítulo 06).
 - **Masters de calibración**: la biblioteca de bias, dark y flat contra la
   que la pestaña Calibración del editor resuelve su receta, y la política de
-  la calibración (construir un pseudo-flat cuando falta uno real, y la
+  la calibración (modelar el viñeteo cuando falta un flat real, y la
   tolerancia de temperatura del dark). Los ficheros se enlazan, nunca se
   copian ni se mueven, y se añaden **por ficheros o por carpeta**: cada toma
   se clasifica por su propia cabecera (`IMAGETYP`), así que tú no dices cuál

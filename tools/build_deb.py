@@ -11,7 +11,7 @@
 #
 ############################################################
 
-"""Build the NightScribe .deb (ADR-079 packaging).
+"""Build the NightScribe .deb (ADR-087 packaging).
 
 The package uses the SYSTEM Python: it depends on the distro's python3 and
 the Qt/scientific packages (PySide6, astropy, scipy, numpy, matplotlib,
@@ -20,6 +20,18 @@ photutils, lxml, requests, PyYAML, platformdirs, Pillow). That keeps the
 The price is the target: Debian 13+ and Ubuntu 25.10+, the distros that
 package PySide6. Older ones (Ubuntu 24.04 LTS has no python3-pyside6) are
 documented as a manual install, not supported by this package.
+
+Three things are NOT optional for a package the observer installs from a
+software centre, and all three were missing until 2026-10-14:
+
+* a *.dist-info with the version, because the app reads its own version with
+  importlib.metadata.version("nightscribe"); copying the tree by hand left it
+  at the "0.0.0" fallback and the update detection never worked;
+* the AppStream metainfo, which is where GNOME Software and the Ubuntu App
+  Center read the licence, the developer and the icon from (a .desktop entry
+  alone gives none of them);
+* usr/share/doc/nightscribe/copyright, the licence file Debian policy asks
+  for (it also names the bundled Find_Orb's separate licence).
 
 imageio-ffmpeg is a RECOMMENDATION, not a dependency: it only powers the
 MP4 animation export, and Fedora does not package it. Without it the GIF and
@@ -37,12 +49,14 @@ Usage:
 """
 
 import argparse
+import gzip
 import os
 import shutil
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -72,6 +86,10 @@ RECOMMENDS = ["python3-imageio-ffmpeg"]
 # The app icons the .desktop entry points at, by size.
 ICON_SIZES = (16, 32, 48, 64, 128, 256)
 
+# The reverse-DNS id shared by the desktop entry and the AppStream metainfo.
+# AppStream requires the two to match, which is why the file names carry it.
+DESKTOP_ID = "io.github.irydeo.nightscribe"
+
 
 def _write(path, text, mode=None):
     # @args: path - Path, text - contents, mode - chmod (or None)
@@ -80,6 +98,55 @@ def _write(path, text, mode=None):
     path.write_text(text, encoding="utf-8")
     if mode is not None:
         path.chmod(mode)
+
+
+def _dist_info(version):
+    # The metadata importlib.metadata.version("nightscribe") reads. Without
+    # it the installed app cannot tell its own version and falls back to
+    # "0.0.0", which also breaks the update detection (ADR-087 rev).
+    # @args: version - the package version
+    # @return: the METADATA text of nightscribe-<version>.dist-info
+    return "\n".join([
+        "Metadata-Version: 2.1",
+        "Name: nightscribe",
+        f"Version: {version}",
+        "Summary: Plan, reduce and report an astronomy night",
+        "License: GPL-3.0-only",
+        "Home-page: https://irydeo.github.io/nightscribe",
+        "",
+    ])
+
+
+def _copyright():
+    # The Debian copyright file (DEP-5): the licence the software centre and
+    # `dpkg` show. GPL-3 is on every Debian/Ubuntu system, so the text is
+    # referenced instead of inlined; the bundled Find_Orb is a SEPARATE
+    # program with its own licence and is named as such (ADR-087).
+    # @return: the copyright text
+    return """Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: NightScribe
+Source: https://github.com/irydeo/nightscribe
+
+Files: *
+Copyright: 2026 Francisco Jose Calvo Fernandez (Irydeo Observatory, MPC Z41)
+License: GPL-3.0-only
+ This program is free software: you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation, version 3.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 3 can be found in "/usr/share/common-licenses/GPL-3".
+
+Files: usr/lib/nightscribe/findorb/*
+Copyright: Bill Gray / Project Pluto
+License: GPL-2.0-or-later with the Project Pluto commercial-use restriction
+ Find_Orb is distributed under the GNU General Public License version 2 or
+ later, with an additional restriction from Project Pluto: it may not be
+ used in or with commercial software without written permission. It travels
+ inside this package as a SEPARATE program (mere aggregation, GPLv2 section
+ 2) by this non-commercial GPLv3 application, which is allowed.
+ Source: https://www.projectpluto.com/find_orb.htm
+"""
 
 
 def _control(version, arch, installed_size_kb):
@@ -111,7 +178,7 @@ def _wrapper():
     return "\n".join([
         "#!/bin/sh",
         "# NightScribe launcher: runs the installed package with the system",
-        "# Python (the .deb depends on it, ADR-079).",
+        "# Python (the .deb depends on it, ADR-087).",
         "exec python3 -m nightscribe \"$@\"",
         "",
     ])
@@ -131,12 +198,25 @@ def build(version, findorb_dir, out_dir, arch="amd64"):
         dest_pkg = stage / "usr" / "lib" / "python3" / "dist-packages"
         shutil.copytree(ROOT / "nightscribe", dest_pkg / "nightscribe",
                         ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        # The version, in the two shapes the app understands: the standard
+        # dist-info (importlib.metadata) and a plain file the version module
+        # reads as a last resort. Both carry the SAME --version, so a package
+        # can never report a version other than the one it was built with.
+        _write(dest_pkg / f"nightscribe-{version}.dist-info" / "METADATA",
+               _dist_info(version))
+        _write(stage / "usr" / "share" / "nightscribe" / "version",
+               version + "\n")
         # The launcher, the desktop entry and the icons.
         _write(stage / "usr" / "bin" / "nightscribe", _wrapper(),
                mode=0o755)
-        shutil.copy2(ROOT / "installer" / "nightscribe.desktop",
+        shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.desktop",
                      _mk(stage / "usr" / "share" / "applications"
-                         / "nightscribe.desktop"))
+                         / f"{DESKTOP_ID}.desktop"))
+        # The AppStream metainfo: licence, developer and icon for the
+        # software centre (its id must match the .desktop file's name).
+        shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.metainfo.xml",
+                     _mk(stage / "usr" / "share" / "metainfo"
+                         / f"{DESKTOP_ID}.metainfo.xml"))
         for size in ICON_SIZES:
             src = ROOT / "nightscribe" / "assets" / f"appicon-{size}.png"
             if src.is_file():
@@ -144,6 +224,17 @@ def build(version, findorb_dir, out_dir, arch="amd64"):
                        / f"{size}x{size}" / "apps" / "nightscribe.png")
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src, dst)
+        # The Debian documentation: the copyright (the licence Debian policy
+        # asks for) and a one-line changelog.
+        doc = stage / "usr" / "share" / "doc" / "nightscribe"
+        _write(doc / "copyright", _copyright())
+        with gzip.open(_mk(doc / "changelog.gz"), "wt", encoding="utf-8") as fh:
+            fh.write(
+                f"nightscribe ({version}) unstable; urgency=medium\n\n"
+                f"  * Package build {version}.\n\n"
+                f" -- Francisco Jose Calvo Fernandez "
+                f"<irydeo@users.noreply.github.com>  "
+                f"{time.strftime('%a, %d %b %Y %H:%M:%S %z')}\n")
         # Find_Orb, when the caller prepared one (bin/fo + share/findorb/data).
         if findorb_dir and Path(findorb_dir).is_dir():
             shutil.copytree(findorb_dir,

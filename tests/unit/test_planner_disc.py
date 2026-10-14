@@ -64,3 +64,43 @@ def test_pccp_targets_carry_disc_date(monkeypatch):
     out = planner._pccp_targets(40.0, -3.0, None, None, 0.0)
     assert len(out) == 1
     assert out[0]["disc_date"] == "2026-09-01"
+
+
+class _Cfg:
+    def __init__(self, code):
+        self._v = {"lat": 40.0, "lon": -3.0, "limit_mag": 20.0,
+                   "mpc_code": code}
+
+    def get(self, key, default=None):
+        return self._v.get(key, default)
+
+
+def test_site_code_falls_back_to_the_geocentric_500():
+    # NEOfixer REJECTS an empty site, so an observer with only coordinates got
+    # no NEOs at all, in silence. The planning site falls back to 500
+    # (geocentric), which is honest for planning and never written to the
+    # config (2026-10-14).
+    assert planner.site_code(_Cfg("Z41")) == "Z41"
+    assert planner.site_code(_Cfg("")) == "500"
+    assert planner.site_code(_Cfg(None)) == "500"
+
+
+def test_build_tonight_asks_neofixer_for_the_geocentric_site(monkeypatch):
+    # The fix end to end: with no MPC code the NEO stage is asked for site
+    # 500 instead of an empty site (which returns nothing).
+    seen = {}
+
+    def _fake_neo(site, *a, **k):
+        seen["site"] = site
+        return []
+    monkeypatch.setattr(planner, "_neo_targets", _fake_neo)
+    for name in ("_sn_targets", "_comet_targets", "_pccp_targets",
+                 "_transit_targets", "_hads_targets", "_campaign_targets",
+                 "_vigil_targets", "_aavso_targets", "_approach_alerts"):
+        monkeypatch.setattr(planner, name, lambda *a, **k: [])
+    monkeypatch.setattr(planner.vigils, "check_vigils", lambda _cfg: {})
+    monkeypatch.setattr(planner, "_aavso_fetch", lambda _cfg: [])
+    monkeypatch.setattr(planner, "_transit_aperture", lambda _cfg: None)
+    monkeypatch.setattr(planner, "_transit_plate_scale", lambda _cfg: None)
+    planner.build_tonight(_Cfg(""), date=None)
+    assert seen["site"] == "500"

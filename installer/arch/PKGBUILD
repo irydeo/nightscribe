@@ -48,8 +48,13 @@ package() {
 #!/bin/sh
 exec python3 -m nightscribe "$@"
 EOF
-    install -Dm644 installer/nightscribe.desktop \
-        "$pkgdir/usr/share/applications/nightscribe.desktop"
+    install -Dm644 installer/io.github.irydeo.nightscribe.desktop \
+        "$pkgdir/usr/share/applications/io.github.irydeo.nightscribe.desktop"
+    # The AppStream metainfo: licence, developer and icon for the software
+    # centre (its id must match the .desktop file's name).
+    install -Dm644 installer/io.github.irydeo.nightscribe.metainfo.xml \
+        "$pkgdir/usr/share/metainfo/io.github.irydeo.nightscribe.metainfo.xml"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     for s in 16 32 48 64 128 256; do
         install -Dm644 "nightscribe/assets/appicon-$s.png" \
             "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/nightscribe.png"

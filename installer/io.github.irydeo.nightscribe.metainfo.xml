@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AppStream metainfo for the Linux packages (ADR-087).
+
+  Why this file exists: a .deb that ships only a .desktop entry has no
+  licence, no developer and no icon in the software centres (GNOME Software,
+  Ubuntu App Center). AppStream is where those three facts live, and the
+  component id must match the .desktop file's name (reverse-DNS), which is why
+  the desktop entry is io.github.irydeo.nightscribe.desktop.
+
+  It is installed to /usr/share/metainfo/ by tools/build_deb.py, the RPM spec
+  and the Arch PKGBUILD, and validated with `appstreamcli validate`.
+-->
+<component type="desktop-application">
+  <id>io.github.irydeo.nightscribe</id>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+
+  <name>NightScribe</name>
+  <summary>Plan, capture, reduce and report an astronomy night</summary>
+  <summary xml:lang="es">Planifica, captura, reduce y publica una noche de observación</summary>
+
+  <description>
+    <p>
+      NightScribe is a desktop application for amateur observatories. It
+      suggests the best targets of the night (near-Earth objects, comets,
+      supernovae, exoplanet transits and variable stars), explains each object
+      in plain language, drives the camera through CCDciel or NINA, calibrates,
+      stacks and measures (astrometry and photometry) in a unified FITS editor,
+      and drafts a bilingual post with ready-to-share charts.
+    </p>
+    <p xml:lang="es">
+      NightScribe es una aplicación de escritorio para observatorios amateur.
+      Sugiere los mejores objetivos de la noche (objetos cercanos a la Tierra,
+      cometas, supernovas, tránsitos de exoplanetas y estrellas variables),
+      explica cada objeto en lenguaje divulgativo, maneja la cámara a través de
+      CCDciel o NINA, calibra, apila y mide (astrometría y fotometría) en un
+      editor FITS unificado, y redacta un post bilingüe con gráficos listos
+      para compartir.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">io.github.irydeo.nightscribe.desktop</launchable>
+
+  <!-- The developer shown by the software centre: this is the "editor" the
+       observer was missing on Ubuntu. -->
+  <developer id="io.github.irydeo">
+    <name>Francisco José Calvo Fernández</name>
+  </developer>
+
+  <url type="homepage">https://irydeo.github.io/nightscribe</url>
+  <url type="bugtracker">https://github.com/irydeo/nightscribe/issues</url>
+  <url type="vcs-browser">https://github.com/irydeo/nightscribe</url>
+
+  <provides>
+    <binary>nightscribe</binary>
+  </provides>
+
+  <categories>
+    <category>Science</category>
+    <category>Astronomy</category>
+  </categories>
+
+  <keywords>
+    <keyword>astronomy</keyword>
+    <keyword>astrophotography</keyword>
+    <keyword>astrometry</keyword>
+    <keyword>photometry</keyword>
+    <keyword>supernova</keyword>
+    <keyword>asteroid</keyword>
+    <keyword>comet</keyword>
+    <keyword>exoplanet</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-10-14"/>
+  </releases>
+</component>

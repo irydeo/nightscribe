@@ -32,16 +32,29 @@ def make_window(monkeypatch):
     from PySide6.QtWidgets import QApplication
     from nightscribe.gui import theme
     from nightscribe.config import config
+    from nightscribe.core import project as proj_mod
     from nightscribe.gui.main_window import MainWindow
     app = QApplication.instance() or QApplication([])
     theme.apply_theme(app)
-    # a first run with no site: Welcome is due
-    monkeypatch.setattr(config, "is_configured", lambda: False)
-    # an "old" version forces the update path too
-    config.set("app_version", "")
+    # Never touch the developer's real config file: the window writes
+    # settings as it is exercised.
+    monkeypatch.setattr(config, "save", lambda: None)
+    # No projects on record: Welcome is shown for the setup / update reason,
+    # not because the runner's own database happens to hold projects.
+    monkeypatch.setattr(proj_mod, "list_projects", lambda *a, **k: [])
     windows = []
 
-    def _make(snapshot=None):
+    def _make(snapshot=None, configured=False, app_version=""):
+        # A configured site is a real coordinate pair in the config, so the
+        # REAL is_configured() runs and the setup gate can lift when the
+        # observer sets the site during the test. app_version="" is a first
+        # run (no update); an older value is a pending update.
+        monkeypatch.setitem(config._data, "lat", 40.0 if configured else 0.0)
+        monkeypatch.setitem(config._data, "lon", -3.0 if configured else 0.0)
+        monkeypatch.setitem(config._data, "mpc_code",
+                            "Z41" if configured else "")
+        monkeypatch.setitem(config._data, "app_version", app_version)
+        monkeypatch.setitem(config._data, "welcome_seen", False)
         w = MainWindow(snapshot=snapshot)
         w._now_timer.stop()
         windows.append(w)
@@ -90,7 +103,9 @@ def test_update_is_a_gate_until_acknowledged(make_window):
     from nightscribe.gui.main_window import VIEW_WELCOME, VIEW_HOME
     snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),
             "size": 1024, "schema_version": 0}
-    w = make_window(snapshot=snap)
+    # an update is a KNOWN older version on record, on an install that is
+    # otherwise set up
+    w = make_window(snapshot=snap, configured=True, app_version="0.0.1")
     assert w._shell_stack().currentIndex() == VIEW_WELCOME
     assert w._welcome_gate is True
     # every other view is blocked while the report is unacknowledged
@@ -199,6 +214,19 @@ def test_equipment_continue_stores_and_never_blocks(make_window, monkeypatch):
     assert config.get("pixel_um") == 4.63
     assert config.get("focal_mm") == 1200.0
     assert config.get("camera_type") == "CMOS"
+
+
+def test_the_preset_fills_the_camera_type(make_window):
+    # Choosing a camera already says what it is (2026-10-14): the type combo
+    # follows the preset, so the observer is not asked again what they just
+    # told us. It stays editable for a camera the catalogue does not cover.
+    w = make_window(snapshot=None)
+    u = w._welcome.ui
+    combo = u.cmb_cam_preset
+    combo.setCurrentIndex(combo.findData("imx455"))       # a CMOS sensor
+    assert u.cmb_camera_type.currentText() == "CMOS"
+    combo.setCurrentIndex(combo.findData("kaf16803"))     # a CCD sensor
+    assert u.cmb_camera_type.currentText() == "CCD"
 
 
 def test_the_equipment_step_starts_the_limit_from_the_aperture(make_window,
@@ -407,6 +435,8 @@ def test_animations_follow_the_preference(make_window, monkeypatch):
 
 
 def test_skip_goes_home(make_window):
+    # On a first run "explore first" is allowed (the app is not a jail): it
+    # lands on Home, while Tonight stays held back until the site is set.
     from nightscribe.gui.main_window import VIEW_HOME, VIEW_WELCOME
     w = make_window(snapshot=None)
     assert w._shell_stack().currentIndex() == VIEW_WELCOME
@@ -419,7 +449,7 @@ def test_cta_swaps_when_there_are_projects(make_window):
     # is a lie. The big button becomes the way back to them and starting
     # another one drops to the quiet link.
     from nightscribe.gui.main_window import VIEW_HOME
-    w = make_window(snapshot=None)
+    w = make_window(snapshot=None, configured=True)
     ws = w._welcome
     u = ws.ui
     ws.set_context(has_projects=False)
@@ -480,6 +510,58 @@ def test_first_run_is_not_an_update(make_window):
     assert u.btn_data_ack.property("primary") is False
     assert not u.btn_create.isHidden()
     assert not u.btn_step_obs.text().startswith("✓")
+
+
+def test_is_update_only_for_a_known_older_version():
+    # The rule behind the fix (2026-10-14): an update is a KNOWN, strictly
+    # older version on record. An empty or unparseable app_version is a first
+    # run (or a corrupt file), never an update.
+    from nightscribe.gui import wizard as wz
+    from nightscribe.core import kinds
+    from nightscribe.version import base_version
+    cur = kinds.version_key(base_version())
+    assert wz.is_update("") is False
+    assert wz.is_update("garbage") is False
+    assert wz.is_update(base_version()) is False      # same version, no gate
+    # a version strictly below the running one is an update
+    assert wz.is_update("0.0.1") is (cur > (0, 0, 1))
+
+
+def test_a_first_run_with_a_leftover_database_is_not_an_update(make_window):
+    # The bug the observer hit on Ubuntu: the app creates its database while
+    # Welcome is being built, so the NEXT launch found a database and treated
+    # the fresh install as an update: it landed on the data report with the
+    # first three steps marked as done. An empty app_version is a first run,
+    # never an update (2026-10-14).
+    snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),
+            "size": 1024, "schema_version": 0}
+    w = make_window(snapshot=snap, configured=False, app_version="")
+    assert w._update_due is False
+    assert w._welcome_gate is False
+    # it opens on the observatory, not on the report, and marks nothing done
+    assert w._welcome.ui.setup_stack.currentIndex() == 0
+    assert not w._welcome.ui.btn_step_obs.text().startswith("✓")
+    # and Tonight is held back until the site is set
+    assert w._tonight_blocked() is True
+
+
+def test_the_setup_gate_lifts_once_the_site_is_set(make_window):
+    # A first run must set the observatory before Tonight can compute
+    # anything (ADR-055 rev). Only Tonight is held back, and the gate lifts
+    # by itself the moment the site is set.
+    from nightscribe.gui.main_window import VIEW_TONIGHT, VIEW_WELCOME
+    w = make_window(snapshot=None, configured=False)
+    assert w._tonight_blocked() is True
+    w._goto_tab(VIEW_TONIGHT)
+    assert w._shell_stack().currentIndex() == VIEW_WELCOME       # held back
+    # the observer sets a site and continues
+    u = w._welcome.ui
+    u.spn_site_lat.setValue(40.41678)
+    u.spn_site_lon.setValue(-3.70379)
+    w._welcome._obs_next()
+    assert w._tonight_blocked() is False
+    w._goto_tab(VIEW_TONIGHT)
+    assert w._shell_stack().currentIndex() == VIEW_TONIGHT
 
 
 def test_the_data_report_rows_are_not_stretched(make_window):
@@ -597,7 +679,7 @@ def test_skip_is_blocked_while_an_update_gates(make_window):
     from nightscribe.gui.main_window import VIEW_WELCOME
     snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),
             "size": 1024, "schema_version": 0}
-    w = make_window(snapshot=snap)
+    w = make_window(snapshot=snap, configured=True, app_version="0.0.1")
     assert w._welcome_gate is True
     w._welcome.skip.emit()
     assert w._shell_stack().currentIndex() == VIEW_WELCOME

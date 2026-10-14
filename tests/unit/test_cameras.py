@@ -75,6 +75,25 @@ def test_short_regime_only_for_the_scmos():
     assert shorts == ["gsense400"]
 
 
+def test_every_preset_says_its_type():
+    # Choosing a camera already says what it is (2026-10-14): each preset
+    # carries its technology and the family agrees with it, so the type field
+    # of the setup steps can be filled from the preset instead of asked again.
+    for p in cameras.PRESETS:
+        typ = cameras.sensor_type(p)
+        assert typ in ("CMOS", "CCD"), p["key"]
+        assert p["type"] == typ
+        assert ("CCD" if "ccd" in p["family"].lower() else "CMOS") == typ
+
+
+def test_sensor_type_falls_back_to_the_family():
+    # A camera the user added without a `type`: the family still names it.
+    assert cameras.sensor_type({"family": "My CCD"}) == "CCD"
+    assert cameras.sensor_type({"family": "Back-illuminated CMOS"}) == "CMOS"
+    assert cameras.sensor_type({"family": "Gpixel sCMOS"}) == "CMOS"
+    assert cameras.sensor_type(None) is None
+
+
 def test_full_well_in_adu():
     p = cameras.preset("imx571")     # 50000 e-
     assert cameras.full_well_adu(p, 2.0) == 25000.0

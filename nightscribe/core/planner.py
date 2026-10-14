@@ -22,6 +22,22 @@ from .sources import (aavso, cobs, esa_neo, exoclock, horizons, neofixer,
 
 logger = logging.getLogger(__name__)
 
+# The site code the planning and goto sources need. NEOfixer REJECTS an empty
+# site ("Parameter 'site' should be of type string with a length between 3 and
+# 32 characters"), so an observer who only set coordinates and never an MPC
+# code would get no NEOs at all, in silence (reported 2026-10-14). 500 is the
+# geocentric site: the positions are geocentric, which is honest for planning,
+# and the local visibility is still computed against the observer's own
+# lat/lon. It is NEVER written to the config, so is_configured() stays honest
+# (a bare "500" must not count as a real observatory).
+DEFAULT_SITE = "500"
+
+
+def site_code(cfg):
+    # @args: cfg - a Config (or a config-like object with .get)
+    # @return: the MPC code, or "500" (geocentric) when none is set
+    return (cfg.get("mpc_code") or "").strip() or DEFAULT_SITE
+
 # Load-phase order (single source of truth for the build_tonight stages and
 # the GUI progress bar total). Scoring is the final phase, emitted by the
 # worker after build_tonight returns. The GUI keeps the human labels (they
@@ -44,7 +60,9 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
     #        each source block; used by the GUI to show per-phase progress
     # @return: list of target dicts
     lat, lon = cfg.get("lat"), cfg.get("lon")
-    site = cfg.get("mpc_code")
+    # Planning/goto site: the MPC code, or 500 (geocentric) when none is set,
+    # so the NEO list still loads for a coordinates-only observer (2026-10-14).
+    site = site_code(cfg)
     limit_mag = float(cfg.get("limit_mag", 20.0))
     hor = horizon.from_config(cfg)
     margin = float(cfg.get("horizon_margin_deg", 0.0))

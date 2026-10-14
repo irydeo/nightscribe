@@ -103,6 +103,20 @@ anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
 datos se conservan: viven en `%APPDATA%`/`%LOCALAPPDATA%`, no en la carpeta de
 instalación.
 
+En Linux la misma página de Releases trae un **`.deb`** (Debian 13+ / Ubuntu
+25.10+) y un **`.rpm`** (Fedora 42+ / openSUSE Tumbleweed). Usan el Python del
+sistema y los paquetes Qt/científicos de la distro, así que pesan unos pocos MB
+y Find_Orb viaja dentro:
+
+```bash
+sudo apt install ./nightscribe_*_amd64.deb      # Debian / Ubuntu
+sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
+nightscribe gui
+```
+
+Ubuntu 24.04 LTS es demasiado antiguo (no tiene `python3-pyside6`): instala
+desde el código (Opción A).
+
 Para generar el tuyo:
 
 ```bash

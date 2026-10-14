@@ -61,6 +61,15 @@ install -d %{buildroot}%{python3_sitelib}
 cp -a nightscribe %{buildroot}%{python3_sitelib}/nightscribe
 find %{buildroot}%{python3_sitelib} -name '__pycache__' -type d \
     -exec rm -rf {} +
+# The version, in the two shapes the app understands: the standard dist-info
+# (importlib.metadata.version) and a plain file the version module reads as a
+# last resort. Without the dist-info the installed app reports "0.0.0" and the
+# update detection never fires (ADR-087 rev).
+install -d %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info
+printf 'Metadata-Version: 2.1\nName: nightscribe\nVersion: %{version}\n' \
+    > %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info/METADATA
+install -d %{buildroot}%{_datadir}/nightscribe
+printf '%s\n' '%{version}' > %{buildroot}%{_datadir}/nightscribe/version
 install -d %{buildroot}%{_bindir}
 cat > %{buildroot}%{_bindir}/nightscribe <<'EOF'
 #!/bin/sh
@@ -68,8 +77,16 @@ exec python3 -m nightscribe "$@"
 EOF
 chmod 0755 %{buildroot}%{_bindir}/nightscribe
 install -d %{buildroot}%{_datadir}/applications
-install -m 0644 installer/nightscribe.desktop \
-    %{buildroot}%{_datadir}/applications/nightscribe.desktop
+install -m 0644 installer/io.github.irydeo.nightscribe.desktop \
+    %{buildroot}%{_datadir}/applications/io.github.irydeo.nightscribe.desktop
+# The AppStream metainfo: licence, developer and icon for the software centre
+# (its id must match the .desktop file's name).
+install -d %{buildroot}%{_datadir}/metainfo
+install -m 0644 installer/io.github.irydeo.nightscribe.metainfo.xml \
+    %{buildroot}%{_datadir}/metainfo/io.github.irydeo.nightscribe.metainfo.xml
+# The licence, where RPM's %license macro expects it.
+install -d %{buildroot}%{_datadir}/licenses/%{name}
+install -m 0644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
 for s in 16 32 48 64 128 256; do
     install -d %{buildroot}%{_datadir}/icons/hicolor/${s}x${s}/apps
     install -m 0644 nightscribe/assets/appicon-${s}.png \
@@ -83,8 +100,12 @@ fi
 
 %files
 %{python3_sitelib}/nightscribe
+%{python3_sitelib}/nightscribe-%{version}.dist-info
 %{_bindir}/nightscribe
-%{_datadir}/applications/nightscribe.desktop
+%{_datadir}/applications/io.github.irydeo.nightscribe.desktop
+%{_datadir}/metainfo/io.github.irydeo.nightscribe.metainfo.xml
+%license %{_datadir}/licenses/%{name}/LICENSE
+%{_datadir}/nightscribe/version
 %{_datadir}/icons/hicolor/*/apps/nightscribe.png
 %{_prefix}/lib/nightscribe/findorb
 

@@ -883,7 +883,9 @@ class ObjectPanel(QWidget):
                                            sigmas=sb.get("sigmas"),
                                            n_resids=sb.get("n_resids"),
                                            arc_days=sb.get("arc_days"),
-                                           disc_date=sb.get("disc_date"))
+                                           disc_date=sb.get("disc_date"),
+                                           family_source=d.get("family_source")
+                                           or "")
         if d.get("unconfirmed"):
             return orbits.explain_neofixer(d["unconfirmed"])
         if e.get("type") == "transient":

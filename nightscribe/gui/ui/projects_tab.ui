@@ -284,9 +284,9 @@
              <property name="visible"><bool>false</bool></property>
              <property name="wordWrap"><bool>true</bool></property>
              <property name="textFormat"><enum>Qt::RichText</enum></property>
-             <property name="openExternalLinks"><bool>true</bool></property>
+             <property name="openExternalLinks"><bool>false</bool></property>
              <property name="textInteractionFlags"><set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set></property>
-             <property name="toolTip"><string>An object observed while it was still on the confirmation page and confirmed since: its new name and the circular that published it, so you can find your data in it</string></property>
+             <property name="toolTip"><string>An object observed while it was still on the confirmation page and confirmed since: its new name and the circular that published it, so you can find your data in it. "Use the confirmed name" renames the project, and the report, the check and the orbit follow.</string></property>
              <property name="styleSheet"><string notr="true">background-color: #1e2a3a; color: #8fd0ff; border: 1px solid #2f4a66; border-radius: 4px; padding: 6px;</string></property>
             </widget>
            </item>

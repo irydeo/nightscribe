@@ -139,17 +139,34 @@ exposure, the re-point cost and the total, and whether the whole thing fits
 your object's visibility window. It runs **your** numbers from the Plan step
 (the **Frames** and **Exposure** boxes), not a fresh suggestion; if your frame
 count is more than fit before the object reaches the edge of the field, it says
-so and honours it anyway. While it runs the button becomes **Stop following**,
-and the panel says which observation it is on. The commercial software uses the
-word *recenter* for each step (CCDciel) and *Center After Drift* (NINA); the
-difference is that here each step points at the object's **updated ephemeris**,
-not fixed coordinates, because the object really moves.
+so and honours it anyway.
+
+While it runs you always know where it is: a **progress bar** and a line in the
+Capture step say which **observation** (i of N), which **frame** (c of f) and
+how much exposure is left, with the percentage of the whole run. **Stop
+following** (the same button) stops the camera and the mount right away, not at
+the end of the step.
+
+**The guider is put back before each observation.** A slew stops the guider, so
+without this each observation would be captured unguided. The run connects the
+guider when it can (CCDciel), starts it **using the calibration you already
+have** (a fresh calibration is only run if you ask for it in Settings), and
+waits until it says it is guiding before capturing. If it cannot start it, the
+run says so and captures anyway (short exposures are often usable) and you
+decide. Turn it off in Settings if you guide by hand.
+
+**The frames are grouped per observation.** Each observation's frames are
+copied into their own subfolder (in the capture folder when NightScribe can see
+it, in the project otherwise) and the run writes down how many each took. The
+FITS editor then **groups them by themselves**: no more guessing how many
+observations there were. When the subfolders are not reachable, the run's own
+record groups them; if that does not fit either, the gap the re-point leaves
+separates them; the manual count is the last resort.
 
 Two things to know: it needs a **plate solver** (the centering is an astrometric
 goto), and with **NINA/PINS** each observation is **one frame** (its snapshot
 capture takes one) unless you load the native sequence; with CCDciel the frame
-count is honoured. Each re-point opens a new batch, so the FITS editor can
-treat them as separate observations.
+count is honoured.
 
 ### What NINA / PINS does not do (yet)
 

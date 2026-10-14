@@ -343,6 +343,43 @@ def test_reference_80_says_so_when_there_is_nothing(monkeypatch):
     assert "no published observations" in ref.note
 
 
+def test_reference_80_forces_a_fresh_alias_read_on_a_miss(monkeypatch):
+    # A confirmation that landed INSIDE the rolling-list cache window: the
+    # cached read misses and the check must not give up on it. It re-reads
+    # the list fresh (force=True) and finds the new name (measured
+    # 2026-10-13: Sar2949 -> 2026 TG69, the check said "no published
+    # observations" all evening because the cached list came from 17:00).
+    calls = []
+
+    def alias(d, force=False):
+        calls.append(force)
+        if d == "Sar2949" and force:
+            return {"designation": "2026 TG69", "mpec": "MPEC 2026-T237"}
+        return None
+
+    monkeypatch.setattr(
+        mpc_obs, "observations_80",
+        lambda d, force=False: "LINE\n" if d == "2026 TG69" else "")
+    monkeypatch.setattr(mpc_obs, "neocp_observations_80",
+                        lambda d, force=False: "")
+    monkeypatch.setattr(mpc_obs, "resolve_neocp_alias", alias)
+    ref = mpc_obs.reference_80("Sar2949")
+    assert calls == [False, True]
+    assert ref.designation == "2026 TG69" and ref.lines == "LINE\n"
+
+
+def test_reference_80_does_not_re_read_when_already_forced(monkeypatch):
+    # force=True is a single, deliberate fresh read: it must not fire twice.
+    calls = []
+    monkeypatch.setattr(mpc_obs, "observations_80", lambda d, force=False: "")
+    monkeypatch.setattr(mpc_obs, "neocp_observations_80",
+                        lambda d, force=False: "")
+    monkeypatch.setattr(mpc_obs, "resolve_neocp_alias",
+                        lambda d, force=False: calls.append(force) or None)
+    mpc_obs.reference_80("X", force=True)
+    assert calls == [True]
+
+
 def test_reference_80_flags_when_our_station_is_already_published(monkeypatch):
     # "Tus datos están en ese MPEC": our station already among the published
     # lines is the fact the rename notice leans on.

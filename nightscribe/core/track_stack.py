@@ -1450,14 +1450,15 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
     return out
 
 
-def preview_groups(frames, n_obs, base_snr=None):
+def preview_groups(frames, n_obs, base_snr=None, groups=None):
     # @args: frames - list[Frame], n_obs - how many observations, base_snr
-    #        - the SNR of the whole sequence (when known)
+    #        - the SNR of the whole sequence (when known), groups - explicit
+    #        (start, end) groups (the follow run's), which win over n_obs
     # @return: list of dicts {n_frames, t_mid, snr_est}
     # The SNR grows with the square root of the frame count, so asking for
     # more observations splits the signal; the UI shows this before the
     # user accepts (D22).
-    groups = split_groups(frames, n_obs)
+    groups = groups or split_groups(frames, n_obs)
     out = []
     for group in groups:
         n = group[1] - group[0]

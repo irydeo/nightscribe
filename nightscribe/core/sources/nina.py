@@ -303,6 +303,66 @@ class Client:
         self.call("/equipment/mount/slew/stop")
         return True
 
+    # -- autoguider (ADR-084 rev) ----------------------------------------------
+
+    def guider_state(self):
+        # The guider's connection and guiding state, live. NINA's `State` is a
+        # word ("Guiding", "Calibrating", "Stopped", "LostLock"...); only
+        # "Guiding" means it is really guiding.
+        # @return: {"connected": bool|None, "guiding": bool|None, "state": str}
+        try:
+            info = self.call("/equipment/guider/info") or {}
+        except NinaError:
+            return {"connected": None, "guiding": None, "state": ""}
+        state = str(info.get("State") or "")
+        return {"connected": bool(truthy(info.get("Connected"))),
+                "guiding": state.strip().lower() == "guiding",
+                "state": state}
+
+    def guider_connect(self):
+        # NINA/PINS manages the guider's connection itself: the Advanced API
+        # has no connect endpoint (start answers 409 "Guider not connected").
+        # The observer connects it in NINA; here it is a no-op that says so.
+        # @return: None (the caller reads guider_state to learn the truth)
+        return None
+
+    def guider_start(self, calibrate=False):
+        # Start guiding. `calibrate=false` uses the calibration NINA already
+        # has; a fresh calibration is asked for only when the observer wants it
+        # (ADR-084 rev: calibrate only if needed).
+        # @args: calibrate - True to calibrate before guiding
+        # @return: True when the plugin accepted the start
+        self.call("/equipment/guider/start",
+                  {"calibrate": "true" if calibrate else "false"})
+        return True
+
+    def guider_stop(self):
+        # @return: True when the plugin accepted the stop
+        self.call("/equipment/guider/stop")
+        return True
+
+    # -- capture folder and progress (ADR-084 rev) -----------------------------
+
+    def capture_dir(self):
+        # NINA saves the frames in a folder of its own that the API does not
+        # expose; the FITS are pulled over HTTP instead (`image_fits_bytes`).
+        # @return: None (there is no folder to watch here)
+        return None
+
+    def capture_progress(self):
+        # Live capture progress. NINA's snapshot takes ONE frame, so there is
+        # no frame counter like CCDciel's: the honest answer is whether the
+        # camera is exposing and, when it says, when the exposure ends.
+        # @return: {"running": bool, "current": 0|1, "total": 1,
+        #          "exposure_end": str|None}
+        try:
+            cam = self.call("/equipment/camera/info") or {}
+        except NinaError:
+            return {}
+        running = bool(truthy(cam.get("IsExposing")))
+        return {"running": running, "current": 1 if running else 0, "total": 1,
+                "exposure_end": cam.get("ExposureEndTime")}
+
     # -- coordinates and motion -------------------------------------------------
 
     def slew_target(self, ra_deg, dec_deg):

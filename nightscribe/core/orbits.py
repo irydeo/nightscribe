@@ -61,6 +61,12 @@ FAMILIES = {
             "en": "Long-period comet: from the Oort cloud; it will not return for millennia."},
 }
 
+# The NEO families the MPC names the way we do (ADR-087): only these are
+# taken from the MPC's own orbit type, because the rest of the MPC's labels
+# (Mars Crosser, Hungaria, Jupiter Trojan, ...) do not match our FAMILIES
+# keys and our classification stays for them.
+NEO_FAMILIES = ("Atira", "Aten", "Apollo", "Amor")
+
 
 def classify(elements, orbit_code=None):
     # Orbital family from elements (and the SBDB class code when given).
@@ -329,7 +335,8 @@ def _crossing_text(q, Q):
 
 def explain_elements(elements, phys=None, family=None, moid=None,
                      sigmas=None, n_resids=None, arc_days=None,
-                     disc_date=None, n_stations=None, last_obs=None):
+                     disc_date=None, n_stations=None, last_obs=None,
+                     family_source=""):
     # Translates each orbital/physical parameter into *intuitive* language.
     # Every row has a "level": "basic" rows are the handful everyone should
     # see; "deep" rows appear under the "in depth" toggle (see ADR-017).
@@ -339,7 +346,8 @@ def explain_elements(elements, phys=None, family=None, moid=None,
     #        n_resids - number of astrometric residuals, arc_days - observed arc
     #        disc_date - discovery date (ISO) from SBDB, when known,
     #        n_stations - how many DIFFERENT observatories have seen it,
-    #        last_obs - date of the last observation (ISO), from the MPC
+    #        last_obs - date of the last observation (ISO), from the MPC,
+    #        family_source - "" (our own rule) or "MPC" (the MPC's own type)
     # @return: list of dicts: {"param", "value", "level", "es", "en", "group"}
     phys = phys or {}
     out = []
@@ -364,10 +372,16 @@ def explain_elements(elements, phys=None, family=None, moid=None,
                   "observations. It can change — tonight's measurement is exactly "
                   "what improves it."})
     if family and family_text(family):
-        out.append({"param": {"es": "Familia", "en": "Family"},
-                    "value": family, "level": "basic",
-                    "es": family_text(family)["es"],
-                    "en": family_text(family)["en"]})
+        fam_row = {"param": {"es": "Familia", "en": "Family"},
+                   "value": family, "level": "basic",
+                   "es": family_text(family)["es"],
+                   "en": family_text(family)["en"]}
+        if family_source == "MPC":
+            # Honesty (ADR-087): this is the MPC's own type, not our q rule,
+            # and the two can disagree (they did on 2026 TG69).
+            fam_row["es"] += " Es la clasificación del propio MPC."
+            fam_row["en"] += " It is the MPC's own classification."
+        out.append(fam_row)
     if q is not None and Q is not None:
         out.append({
             "param": {"es": "Distancias al Sol (q / Q)", "en": "Sun distances (q / Q)"},

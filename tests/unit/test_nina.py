@@ -188,9 +188,37 @@ def test_capturing_reads_the_camera(client, fake_get):
                               "/equipment/camera/info"]
 
 
-def test_capture_dir_is_gone(client):
-    # The capture-folder idea is gone (ADR-082 rev): the frame comes over HTTP.
-    assert not hasattr(client, "capture_dir")
+def test_capture_dir_is_none_because_the_fits_come_over_http(client):
+    # NINA exposes no capture folder (ADR-082 rev: the frame comes over HTTP),
+    # so the follow run's per-observation subfolders cannot be made from a
+    # folder here. The method exists so the worker has ONE interface, and it
+    # answers None: the grouping then rides on the manifest (ADR-084 rev).
+    assert client.capture_dir() is None
+
+
+def test_capture_progress_reports_exposing(client, fake_get):
+    fake_get.bodies = [_ok({"IsExposing": True, "ExposureEndTime": "x"})]
+    prog = client.capture_progress()
+    assert prog["running"] is True and prog["total"] == 1
+
+
+def test_guider_state_reads_the_state_word(client, fake_get):
+    fake_get.bodies = [_ok({"Connected": True, "State": "Guiding"})]
+    st = client.guider_state()
+    assert st == {"connected": True, "guiding": True, "state": "Guiding"}
+
+
+def test_guider_start_passes_calibrate(client, fake_get):
+    fake_get.bodies = [_ok("Guiding started")]
+    assert client.guider_start(calibrate=False) is True
+    assert fake_get.calls[0]["params"] == {"calibrate": "false"}
+    client.guider_start(calibrate=True)
+    assert fake_get.calls[1]["params"] == {"calibrate": "true"}
+
+
+def test_guider_connect_is_a_noop(client):
+    # NINA manages the guider's connection itself: no endpoint, no lie.
+    assert client.guider_connect() is None
 
 
 def test_last_frame_preview_streams_the_image(client, fake_get):

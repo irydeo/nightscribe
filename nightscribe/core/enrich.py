@@ -16,7 +16,8 @@ import logging
 import re
 
 from . import coords, ephem_minor, hads, orbits
-from .sources import cad, exoplanet_archive, horizons, neofixer, sbdb, simbad
+from .sources import (cad, exoplanet_archive, horizons, mpc_orbits, neofixer,
+                      sbdb, simbad)
 
 logger = logging.getLogger(__name__)
 
@@ -328,7 +329,20 @@ def _enrich_small_body(name, date, site):
         out["dist_now_km"] = row["delta"] * orbits.AU_KM
     out["next_approach"] = cad.next_approach(body["des"] or name)
     elements = body.get("elements") or {}
-    out["family"] = orbits.classify(elements, body.get("orbit_code"))
+    # Our own q-based family, then the MPC's OFFICIAL type on top when it is
+    # one of the NEO families we name the same way (ADR-087): the observer
+    # compares against the MPC's page, and JPL's orbit_code and our rule can
+    # disagree with it. The source is carried so the card can say whose it is.
+    family = orbits.classify(elements, body.get("orbit_code"))
+    family_source = ""
+    mpc = mpc_orbits.get_orb(name)
+    if mpc:
+        out["mpc_orbit_type"] = mpc.get("orbit_type") or ""
+        if mpc.get("orbit_type") in orbits.NEO_FAMILIES:
+            family = mpc["orbit_type"]
+            family_source = "MPC"
+    out["family"] = family
+    out["family_source"] = family_source
     # comet expected brightness (outburst detection feeds the narrative)
     m1, k1 = body["phys"].get("M1"), body["phys"].get("K1")
     if m1 and k1 and eph:

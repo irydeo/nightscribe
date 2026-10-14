@@ -1655,6 +1655,57 @@ class CalibrationWorker(QThread):
                             "flat_file": flat_file})
 
 
+# The window the velocity sweep scores in, in pixels. The sweep freezes the
+# OBJECT at q, and its score (SNR x roundness) only ever reads q's own
+# neighbourhood: an r=4 aperture, an r=8-12 sky annulus and an r=4 roundness
+# window. It used to be given the whole TRAIL cutout, which for a fast object
+# is a thousand pixels across, and it re-stacked all of it for every one of the
+# 25 candidates: measured on a 539-frame visit of a 17"/min object that is
+# MINUTES of wall clock for a number that reads a hundred pixels. A window
+# around q gives the SAME rate, PA and score (measured) for a fraction of the
+# work, and it also shrinks the ROI the sweep preloads.
+_SWEEP_WINDOW = 128
+
+
+class _WholeFrameCache:
+    # A loader that reads each frame ONCE and slices every later box from
+    # memory. The comps' windows all need the SAME frames, so without this a
+    # set of twelve comps opens and reads every file twelve times, and the
+    # reads are the whole cost of that stage (measured: 120 box reads 118 ms
+    # against 120 whole-frame reads 283 ms). The cache is BOUNDED: past the
+    # budget it stops storing and serves the box the slow way, so a huge visit
+    # pays the old price instead of the machine's memory.
+    def __init__(self, base, budget_bytes=1024 ** 3):
+        self._base = base
+        self._budget = int(budget_bytes)
+        self._used = 0
+        self._cache = {}
+
+    def __call__(self, path, box=None):
+        # @args: path - the frame, box - (x0, y0, x1, y1) or None for the whole
+        # @return: the pixels (and header) the base loader gives for that box
+        import numpy as np
+        key = str(path)
+        got = self._cache.get(key)
+        if got is None:
+            got = self._base(path)                 # the WHOLE frame, once
+            data = got[0] if isinstance(got, tuple) else got
+            size = int(np.asarray(data).nbytes)
+            if self._used + size > self._budget:
+                # over the budget: serve this box without keeping the frame
+                if box is None:
+                    return got
+                x0, y0, x1, y1 = box
+                return np.asarray(data)[y0:y1, x0:x1]
+            self._cache[key] = got
+            self._used += size
+        data = got[0] if isinstance(got, tuple) else got
+        if box is None:
+            return got
+        x0, y0, x1, y1 = box
+        return data[y0:y1, x0:x1]
+
+
 class TrackStackWorker(QThread):
     # The whole track & stack pipeline off the GUI thread (astrometry plan,
     # phases 2-6 wired by phase 7): solve the reference, register, stack the
@@ -2169,8 +2220,18 @@ class TrackStackWorker(QThread):
         # measured on 2025 UR: SNR 2), but only in the pixels it occupies.
         # A window around each comp is ~1 % of the frame, and the whole
         # star stack measured 74 s for the very same zero point.
+        #
+        # The windows are stacked in a SERIAL loop with ONE cached read per
+        # frame: every comp re-reads the SAME frames and the reads are the
+        # whole cost of this stage (measured: 120 box reads 118 ms against 120
+        # whole-frame reads 283 ms, and a twelve-comp set pays the reads
+        # twelve times). Parallelising the loop was tried and REJECTED: each
+        # per-comp stack already uses the machine's cores, so the outer walk
+        # only oversubscribed them (measured x1.08).
         from ..core import track_stack
+        from ..core import calibration
         half = self._window_half()
+        cached = _WholeFrameCache(self._loader or calibration.read_image)
         out = []
         for e in entries:
             star = e.get("star") or {}
@@ -2185,7 +2246,7 @@ class TrackStackWorker(QThread):
                 continue
             small, _rep = track_stack.stack_group(
                 frames, group, (cx, cy), self._method, box, shape,
-                cfg=self._cfg, track=False, loader=self._loader,
+                cfg=self._cfg, track=False, loader=cached,
                 order=self._warp_order())
             if small is None:
                 continue
@@ -2348,6 +2409,12 @@ class TrackStackWorker(QThread):
         out = {"status": "ok", "name": self._name, "method": self._method,
                "n_obs": self._n_obs}
         try:
+            # Say WHAT computed the stack when the GPU backend is on: an
+            # accelerated run must not be silent about it, the same rule that
+            # makes every other choice visible (ADR-089).
+            from ..core import gpu as gpu_mod
+            if gpu_mod.enabled(self._cfg):
+                out["gpu"] = gpu_mod.device_name()
             # --- calibration, when the observer asked for it (ADR-061) ----
             # The frames are calibrated AS THEY ARE READ, so the engine's
             # many passes (the registration, the sweep's candidates, the
@@ -2396,7 +2463,8 @@ class TrackStackWorker(QThread):
             track_stack.register_sequence(
                 frames,
                 progress=lambda d, t, _l: self.progress.emit("register", d, t),
-                cancel=lambda: self._cancel, loader=self._loader)
+                cancel=lambda: self._cancel, loader=self._loader,
+                cfg=self._cfg)
             out["dither"] = track_stack.dither_check(frames)
             out["n_failed"] = sum(1 for f in frames if f.failed_register)
             # WHICH frames were left out, by path: the editor's preview list
@@ -2539,9 +2607,16 @@ class TrackStackWorker(QThread):
                     base_stack, q_all_box, w0, box_all, frames, base_rate,
                     base_pa)
                 out["trail_seed"] = len(trail_cands)
+                # The sweep scores in a SMALL window around the object, never
+                # in the trail cutout: the score reads q's own neighbourhood
+                # (see _SWEEP_WINDOW), so the trail cutout was paying to
+                # re-stack a thousand pixels for a number that comes from a
+                # hundred. The object is frozen at q by the sweep itself, so
+                # the window is all the score can see.
+                sweep_box = track_stack.box_around(q_all, _SWEEP_WINDOW, shape)
                 self.progress.emit("sweep", 0, steps * steps)
                 sweep = track_stack.sweep(
-                    frames, q_all, base_rate, base_pa, box_all, shape,
+                    frames, q_all, base_rate, base_pa, sweep_box, shape,
                     pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
                     steps=steps, method="median", cfg=self._cfg,
                     loader=self._loader, extra_cands=trail_cands,

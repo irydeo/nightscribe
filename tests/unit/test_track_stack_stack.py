@@ -578,6 +578,29 @@ def test_the_sweep_centre_reproduces_the_direct_stack(tmp_path):
     assert result.best["score"] == max(item["score"] for item in result.grid)
 
 
+def test_the_sweep_scores_the_same_in_a_small_window(tmp_path):
+    # The sweep freezes the OBJECT at q, and its score (SNR x roundness) reads
+    # only q's own neighbourhood: an r=4 aperture, an r=8-12 sky annulus and an
+    # r=4 roundness window. So a small window around q must give the SAME rate,
+    # PA and score as the whole TRAIL cutout. That is what makes a fast
+    # object's sweep affordable: its trail cutout is hundreds of pixels across
+    # and it was re-stacked for every one of the 25 candidates (ADR-089).
+    frames = _sequence(tmp_path, n=16, size=384, rate_px=14.0)
+    q = (24.0 + 14.0 * 7.5, 34.0)         # the object at the sequence's middle
+    big = ts.cutout_box(frames, (0, len(frames)), q, margin_px=64,
+                        shape=(384, 384))
+    small = ts.box_around(q, 128, (384, 384))
+    # the trail really is longer than the window, or the test proves nothing
+    assert (big[2] - big[0]) > (small[2] - small[0])
+    a = ts.sweep(frames, q, 14.0, 90.0, big, (384, 384), pct=5.0, steps=5,
+                 method="median")
+    b = ts.sweep(frames, q, 14.0, 90.0, small, (384, 384), pct=5.0, steps=5,
+                 method="median")
+    assert a.best["rate"] == pytest.approx(b.best["rate"])
+    assert a.best["pa"] == pytest.approx(b.best["pa"])
+    assert a.best["score"] == pytest.approx(b.best["score"])
+
+
 def test_a_stack_with_nan_pixels_is_still_scorable(tmp_path):
     # The stack carries NaN where a frame did not cover the box, which is
     # the footprint's border and exists whenever the sequence was DITHERED.

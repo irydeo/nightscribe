@@ -2126,6 +2126,12 @@ class TrackStackWorker(QThread):
         out = {"status": "ok", "name": self._name, "method": self._method,
                "n_obs": self._n_obs}
         try:
+            # Say WHAT computed the stack when the GPU backend is on: an
+            # accelerated run must not be silent about it, the same rule that
+            # makes every other choice visible (ADR-089).
+            from ..core import gpu as gpu_mod
+            if gpu_mod.enabled(self._cfg):
+                out["gpu"] = gpu_mod.device_name()
             # --- calibration, when the observer asked for it (ADR-061) ----
             # The frames are calibrated AS THEY ARE READ, so the engine's
             # many passes (the registration, the sweep's candidates, the

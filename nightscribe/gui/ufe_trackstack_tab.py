@@ -2111,6 +2111,13 @@ class UfeTrackStackTab(QWidget):
                 "prediction.").replace(
                     "%1", self.tr("local elements") if ephem_source
                     == "kepler:sbdb" else self.tr("a preliminary orbit")))
+        if self._result.get("gpu"):
+            # Say what computed the stack: an accelerated run is not silent
+            # about it (ADR-089), and the number is the same either way.
+            notes.append(self.tr(
+                "The warp and the combination ran on the GPU (%1): the same "
+                "result to a fraction of an ADU.").replace(
+                    "%1", str(self._result.get("gpu"))))
         dither = self._result.get("dither")
         if dither is not None and not dither.dithered:
             # informative, never blocking (D27): pattern noise stacks and

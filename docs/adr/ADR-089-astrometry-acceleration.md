@@ -143,6 +143,21 @@ punto 4 pedía paralelizar las dos, y **ninguna de las dos gana**:
   una vez y sirve todas las cajas desde memoria baja las ventanas de **2954 a
   699 ms (x4,2)**, con paridad exacta (probada, con `BZERO`/`BSCALE`).
 
+**Nota (2026-10-14): el barrido de velocidad, medido sobre 539 tomas reales.**
+El barrido usaba el recorte del TRAZO (para un objeto a 17″/min, 1084²) y lo
+re-apilaba entero para cada uno de los 25 candidatos: medido, **207 s**. Pero el
+score del barrido solo lee el entorno de `q` (apertura r=4, anillo r=8–12,
+redondez r=4), así que basta una ventana alrededor de `q`: **128²**. Con ella el
+barrido baja a **6,1 s (x34)**, con el MISMO rate, PA y score.
+
+Para que el score fuera exacto hubo que arreglar una dependencia escondida: la
+**redondez** tomaba su cielo de TODO el recorte (`_local_sky(stack, ~win)`), así
+que el mismo objeto puntuaba distinto según el tamaño de la caja (medido: 46,1
+en el trazo contra 47,2 en 128², que habría movido la puerta de significancia).
+Ahora el cielo sale de un **anillo fijo** alrededor de la fuente
+(`_ROUNDNESS_SKY_PX`), y el score es idéntico en cualquier tamaño (medido: 46,93
+en 64², 128², 256² y 495²).
+
 ## English
 
 **Context**: ADR-062's speed campaign (`docs/PLANS/astrometry-perf/`) cut the
@@ -284,3 +299,18 @@ Point 4 asked to parallelise both, and **neither one wins**:
   reads twelve times). A bounded cache that reads each frame once and serves
   every box from memory takes the windows from **2954 to 699 ms (x4.2)**, with
   exact parity (tested, with `BZERO`/`BSCALE`).
+
+**Note (2026-10-14): the velocity sweep, measured on 539 real frames.** The
+sweep used the TRAIL cutout (1084² for a 17"/min object) and re-stacked all of
+it for every one of the 25 candidates: measured, **207 s**. But the sweep's
+score only reads q's neighbourhood (an r=4 aperture, an r=8-12 sky annulus and
+an r=4 roundness window), so a window around q is enough: **128²**. With it the
+sweep drops to **6.1 s (x34)**, with the SAME rate, PA and score.
+
+Making the score exact needed fixing a hidden dependence: the **roundness** took
+its sky from the WHOLE box (`_local_sky(stack, ~win)`), so the same source
+scored differently depending on how big the box was (measured: 46.1 on the trail
+cutout against 47.2 in a 128² window, which would have moved the significance
+gate). The sky now comes from a **fixed ring** around the source
+(`_ROUNDNESS_SKY_PX`), and the score is identical at every size (measured: 46.93
+in 64², 128², 256² and 495²).

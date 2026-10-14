@@ -1437,6 +1437,18 @@ class CalibrationWorker(QThread):
                             "flat_file": flat_file})
 
 
+# The window the velocity sweep scores in, in pixels. The sweep freezes the
+# OBJECT at q, and its score (SNR x roundness) only ever reads q's own
+# neighbourhood: an r=4 aperture, an r=8-12 sky annulus and an r=4 roundness
+# window. It used to be given the whole TRAIL cutout, which for a fast object
+# is a thousand pixels across, and it re-stacked all of it for every one of the
+# 25 candidates: measured on a 539-frame visit of a 17"/min object that is
+# MINUTES of wall clock for a number that reads a hundred pixels. A window
+# around q gives the SAME rate, PA and score (measured) for a fraction of the
+# work, and it also shrinks the ROI the sweep preloads.
+_SWEEP_WINDOW = 128
+
+
 class _WholeFrameCache:
     # A loader that reads each frame ONCE and slices every later box from
     # memory. The comps' windows all need the SAME frames, so without this a
@@ -2373,9 +2385,16 @@ class TrackStackWorker(QThread):
                     base_stack, q_all_box, w0, box_all, frames, base_rate,
                     base_pa)
                 out["trail_seed"] = len(trail_cands)
+                # The sweep scores in a SMALL window around the object, never
+                # in the trail cutout: the score reads q's own neighbourhood
+                # (see _SWEEP_WINDOW), so the trail cutout was paying to
+                # re-stack a thousand pixels for a number that comes from a
+                # hundred. The object is frozen at q by the sweep itself, so
+                # the window is all the score can see.
+                sweep_box = track_stack.box_around(q_all, _SWEEP_WINDOW, shape)
                 self.progress.emit("sweep", 0, steps * steps)
                 sweep = track_stack.sweep(
-                    frames, q_all, base_rate, base_pa, box_all, shape,
+                    frames, q_all, base_rate, base_pa, sweep_box, shape,
                     pct=float(self._cfg_get("astrometry_sweep_pct", 5.0)),
                     steps=steps, method="median", cfg=self._cfg,
                     loader=self._loader, extra_cands=trail_cands,

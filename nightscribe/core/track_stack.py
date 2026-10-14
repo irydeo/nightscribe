@@ -1541,13 +1541,25 @@ def _local_sigma(stack, mask, sky):
     return sigma if np.isfinite(sigma) and sigma > 0 else None
 
 
+# The ring the roundness takes its sky from, in pixels (outer radius). It is
+# FIXED, and not "the whole box", on purpose (ADR-089): see _roundness.
+_ROUNDNESS_SKY_PX = 28
+
+
 def _roundness(stack, x, y, radius=4.0):
     # @args: stack, x, y - the source, radius - the moments window
     # @return: b/a of the second moments (1 = circular)
     yy, xx = np.mgrid[0:stack.shape[0], 0:stack.shape[1]]
     d = np.hypot(xx - x, yy - y)
     win = d <= radius
-    sky = _local_sky(stack, ~win)
+    # The sky comes from a FIXED ring around the source, never from the whole
+    # box. The box changes size (the sweep scores in a small window, the
+    # detection in the trail cutout) and a box-sized sky made the SAME source
+    # score differently for no physical reason: measured, 46.1 on a 495 px
+    # trail cutout against 47.2 in a 128 px window, which would have moved the
+    # sweep's significance gate. The ring is the source's own background,
+    # which is exactly what the roundness wants.
+    sky = _local_sky(stack, (d > radius) & (d <= radius + _ROUNDNESS_SKY_PX))
     if sky is None:
         return 0.0
     finite = np.isfinite(stack)

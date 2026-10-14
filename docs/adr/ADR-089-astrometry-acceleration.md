@@ -101,6 +101,25 @@ bloques; y el banco `benchmarks/track_stack_bench.py` gana la ruta GPU. ADR-062
 **no se revoca**: el tracking directo y el alcance siguen igual, y esta es una
 ruta de velocidad, no un requisito del algoritmo.
 
+**Nota (2026-10-14): el clip de CPU, medido y no tocado.** Con el GPU encendido
+el recorte sigma corre en el dispositivo, así que esta palanca es para quien no
+tenga tarjeta. El recorte es **median-bound** (un solo `nanmedian` de
+(60, 2048²) cuesta ~2,2 s y hay cuatro por recorte), y se probaron dos vías:
+
+- **Ordenar una copia transpuesta** (eje de muestras contiguo): el `sort` en sí
+  es x5 más rápido, pero la copia añade un cubo entero de tráfico y el recorte
+  corre sobre **columnas en paralelo**, donde ese tráfico contiende entre los
+  hilos. Medido en (60, 2048²): el recorte serial 14120 → 12249 ms (x1,15) pero
+  el `combine` paralelo 5213 → 5987 ms (**x0,87**). **Rechazado**, y queda
+  escrito en el comentario de `outliers.nanmedian_axis0`.
+- **Menos iteraciones**: bajar de 3 a 2 (el defecto actual) es **x1,40** en el
+  `combine` (5245 → 3750 ms) y cambia la imagen menos de 1 ADU en el caso
+  sintético, pero el defecto de 3 no tiene una medida publicada y la profundidad
+  es territorio de **ADR-068**; cambiarlo pide el banco de inyección, no un
+  atajo. Queda como decisión **medida y no adoptada**.
+- La escala por **media y desviación** en vez de MAD es x1,95 pero deja de ser
+  robusta, que es justo para lo que existe el recorte. Descartado.
+
 ## English
 
 **Context**: ADR-062's speed campaign (`docs/PLANS/astrometry-perf/`) cut the
@@ -198,3 +217,22 @@ setting (`astrometry_gpu`, off by default); the registration rewritten in chunks
 and `benchmarks/track_stack_bench.py` gains the GPU path. ADR-062 is **not
 revoked**: the direct tracking and the scope stay the same, and this is a speed
 road, not a requirement of the algorithm.
+
+**Note (2026-10-14): the CPU clip, measured and left alone.** With the GPU on,
+the sigma clip runs on the device, so this lever is for whoever has no card. The
+clip is **median-bound** (a single `nanmedian` of (60, 2048²) costs ~2.2 s and
+there are four per clip), and two roads were tried:
+
+- **Sorting a transposed copy** (sample axis contiguous): the sort itself is x5
+  faster, but the copy adds a whole cube of traffic and the clip runs on
+  **column slices in parallel**, where that traffic contends across the threads.
+  Measured on (60, 2048²): the serial clip 14120 -> 12249 ms (x1.15) but the
+  parallel combine 5213 -> 5987 ms (**x0.87**). **Rejected**, and written down in
+  the comment of `outliers.nanmedian_axis0`.
+- **Fewer iterations**: dropping from 3 to 2 (the current default) is **x1.40**
+  on the combine (5245 -> 3750 ms) and changes the image by under 1 ADU in the
+  synthetic case, but the default of 3 has no published measurement and depth is
+  **ADR-068** territory; changing it asks for the injection bench, not a
+  shortcut. It stays a decision **measured and not taken**.
+- A **mean-and-standard-deviation** scale instead of MAD is x1.95 but stops being
+  robust, which is exactly what the clip exists for. Rejected.

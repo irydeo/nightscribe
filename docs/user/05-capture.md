@@ -161,7 +161,9 @@ it, in the project otherwise) and the run writes down how many each took. The
 FITS editor then **groups them by themselves**: no more guessing how many
 observations there were. When the subfolders are not reachable, the run's own
 record groups them; if that does not fit either, the gap the re-point leaves
-separates them; the manual count is the last resort.
+separates them; the manual count is the last resort. The number is a
+**suggestion**: it comes prefilled and you can type another one, and then your
+number is the one that counts.
 
 Two things to know: it needs a **plate solver** (the centering is an astrometric
 goto), and with **NINA/PINS** each observation is **one frame** (its snapshot

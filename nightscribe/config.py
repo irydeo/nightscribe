@@ -188,6 +188,11 @@ DEFAULTS = {
     # leave the app exactly as it was, and the result does not change (the two
     # paths are pinned to agree to a fraction of an ADU). 0 = off, 1 = on.
     "astrometry_gpu": 0,
+    # WHICH backend serves the GPU path (ADR-089/090). "auto" prefers CUDA
+    # (NVIDIA, the fastest) and falls back to OpenCL, which runs on NVIDIA,
+    # AMD and Intel and is the one the app can ship; "cuda" / "opencl" force
+    # one, for a machine that has both or to compare them.
+    "astrometry_gpu_backend": "auto",
     "astrometry_disagree_arcsec": 0.5,
     "astrometry_disagree_sigma": 3.0,
     "astrometry_astcat": "Gaia2",

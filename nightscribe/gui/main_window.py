@@ -2408,6 +2408,12 @@ class MainWindow(QMainWindow):
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
         dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
+        # which backend serves the GPU path (ADR-090), same id-as-data rule
+        dlg.cmb_astro_gpu_backend.addItem(
+            self.tr("Auto (CUDA, then OpenCL)"), "auto")
+        dlg.cmb_astro_gpu_backend.addItem(self.tr("CUDA (NVIDIA)"), "cuda")
+        dlg.cmb_astro_gpu_backend.addItem(
+            self.tr("OpenCL (NVIDIA, AMD, Intel)"), "opencl")
         dlg.cmb_cam_preset.addItem(self.tr("None"), "")
         for text, key, is_header in cameras.combo_entries():
             dlg.cmb_cam_preset.addItem(text, key)

@@ -148,6 +148,10 @@ FIELDS = [
     Field("spn_astro_check_window", "astrometry_check_window_days", "int"),
     Field("spn_astro_threads", "astrometry_threads", "int"),
     Field("chk_astro_gpu", "astrometry_gpu", "bool"),
+    # Which backend serves the GPU path (ADR-090): auto | cuda | opencl. The
+    # items carry the id as data and are filled in code (QUiLoader does not
+    # read userData from a .ui; ADR-005).
+    Field("cmb_astro_gpu_backend", "astrometry_gpu_backend", "combo"),
     Field("spn_astro_fallback_margin", "astrometry_fallback_margin_px",
           "int"),
     Field("spn_astro_disagree_arcsec", "astrometry_disagree_arcsec", "float"),

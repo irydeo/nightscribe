@@ -879,6 +879,8 @@
              <item>
               <layout class="QHBoxLayout" name="row_astro_gpu">
                <item><widget class="QCheckBox" name="chk_astro_gpu"><property name="text"><string>Warp and combine on the GPU</string></property><property name="toolTip"><string>Do the two memory-bound stages (the warp and the combination) on a graphics card when one is there: several times faster than the CPU. It is off by default, it needs a supported card, and it does not change what is measured: without one the app runs on the CPU exactly as before, and the result is the same to a fraction of an ADU</string></property></widget></item>
+               <item><widget class="QLabel" name="lbl_astro_gpu_backend"><property name="text"><string>Backend:</string></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_astro_gpu_backend"><property name="toolTip"><string>Which backend does the work. Auto prefers CUDA (NVIDIA, the fastest, and the one the app measured first) and falls back to OpenCL, which runs on NVIDIA, AMD and Intel and needs nothing installed by hand. Force one to compare them, or when a machine has both and you want to pick</string></property></widget></item>
                <item>
                 <spacer name="hsp_astro_gpu">
                  <property name="orientation"><enum>Qt::Horizontal</enum></property>

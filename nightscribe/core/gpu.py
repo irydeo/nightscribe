@@ -110,6 +110,54 @@ def _affine_matrix(track_stack, tr, delta):
     return P @ A_xy @ P, P @ b_xy
 
 
+def _warp_stack_gpu(cp, cnd, track_stack, frame_list, offsets, box, shape,
+                    loader, order, preloaded):
+    # @args: the pieces of a warp batch, already unpacked
+    # @return: (stack, masks) both ON THE DEVICE, or None when the box is
+    #          empty
+    # The warp itself, kept on the device so a fused caller never downloads
+    # the stack only to upload it again (that round trip was the whole reason
+    # the warp measured x1.7 while the kernel is many times faster).
+    cp_order = track_stack.WARP_ORDER if order is None else int(order)
+    n = len(frame_list)
+    out_h = box[3] - box[1]
+    out_w = box[2] - box[0]
+    if out_h <= 0 or out_w <= 0 or n == 0:
+        return None
+    stack = cp.empty((n, out_h, out_w), dtype=cp.float32)
+    masks = cp.empty((n, out_h, out_w), dtype=cp.bool_)
+    out_o = np.array([float(box[1]), float(box[0])])
+    for k in range(n):
+        frame = frame_list[k]
+        A, b = _affine_matrix(track_stack, frame.transform, offsets[k])
+        src_box = track_stack._source_box(A, b, box, shape)
+        if src_box is None:
+            # this frame does not cover the box: no data here, and saying so
+            # is the honest answer (the same None the CPU path returns)
+            stack[k] = 0.0
+            masks[k] = False
+            continue
+        data = None
+        if preloaded is not None:
+            data = track_stack._slice_region(preloaded[k], src_box)
+        if data is None:
+            data = track_stack.read_pixels(loader, frame.path, src_box)
+        src_o = np.array([float(src_box[1]), float(src_box[0])])
+        offset = A @ out_o + b - src_o
+        g = cp.asarray(np.asarray(data, dtype=np.float32))
+        warped = cnd.affine_transform(
+            g, cp.asarray(A), offset=cp.asarray(offset),
+            output_shape=(out_h, out_w), order=cp_order,
+            mode="constant", cval=0.0)
+        ones = cnd.affine_transform(
+            cp.ones_like(g), cp.asarray(A), offset=cp.asarray(offset),
+            output_shape=(out_h, out_w), order=1,
+            mode="constant", cval=0.0)
+        stack[k] = warped
+        masks[k] = ones > 0.5
+    return stack, masks
+
+
 def warp_batch(frame_list, offsets, box, shape, loader=None, order=None,
                preloaded=None):
     # @args: frame_list - list[Frame], offsets - one (dx, dy) per frame, box -
@@ -118,59 +166,55 @@ def warp_batch(frame_list, offsets, box, shape, loader=None, order=None,
     #        order, preloaded - optional list of (array, box) already in RAM
     # @return: (stack (n, h, w) float32, masks (n, h, w) bool), or None when
     #          the backend cannot serve this call (the caller then uses numpy)
-    # The mirror of track_stack._warp_batch. The frames are read on the CPU
-    # (the page cache makes that cheap and the disk is the same either way),
-    # uploaded, warped on the device and downloaded as ONE stack: the whole
-    # point is that the reduction happens on the device, so the per-frame
-    # round trip is never paid.
+    # The mirror of track_stack._warp_batch. Kept for the callers that want
+    # the stack itself; the fused stack_ram below is what avoids the round
+    # trip when the combine follows.
     if not available():
         return None
     from . import track_stack
     cp, cnd = _state["cp"], _state["cnd"]
     try:
-        cp_order = track_stack.WARP_ORDER if order is None else int(order)
-        n = len(frame_list)
-        out_h = box[3] - box[1]
-        out_w = box[2] - box[0]
-        if out_h <= 0 or out_w <= 0 or n == 0:
+        got = _warp_stack_gpu(cp, cnd, track_stack, frame_list, offsets, box,
+                              shape, loader, order, preloaded)
+        if got is None:
             return None
-        stack = np.empty((n, out_h, out_w), dtype=np.float32)
-        masks = np.empty((n, out_h, out_w), dtype=bool)
-        out_o = np.array([float(box[1]), float(box[0])])
-        for k in range(n):
-            frame = frame_list[k]
-            A, b = _affine_matrix(track_stack, frame.transform, offsets[k])
-            src_box = track_stack._source_box(A, b, box, shape)
-            if src_box is None:
-                # this frame does not cover the box: no data here, and saying
-                # so is the honest answer (the same None the CPU path returns)
-                stack[k] = 0.0
-                masks[k] = False
-                continue
-            data = None
-            if preloaded is not None:
-                data = track_stack._slice_region(preloaded[k], src_box)
-            if data is None:
-                data = track_stack.read_pixels(loader, frame.path, src_box)
-            src_o = np.array([float(src_box[1]), float(src_box[0])])
-            offset = A @ out_o + b - src_o
-            g = cp.asarray(np.asarray(data, dtype=np.float32))
-            warped = cnd.affine_transform(
-                g, cp.asarray(A), offset=cp.asarray(offset),
-                output_shape=(out_h, out_w), order=cp_order,
-                mode="constant", cval=0.0)
-            ones = cnd.affine_transform(
-                cp.ones_like(g), cp.asarray(A), offset=cp.asarray(offset),
-                output_shape=(out_h, out_w), order=1,
-                mode="constant", cval=0.0)
-            stack[k] = cp.asnumpy(warped)
-            masks[k] = cp.asnumpy(ones) > 0.5
-        return stack, masks
+        stack, masks = got
+        return cp.asnumpy(stack), cp.asnumpy(masks)
     except Exception as err:
         # A kernel that fails (an out-of-memory on a huge stack, a driver
         # hiccup) must NOT take the run down: the caller falls back to numpy
         # and the run finishes, only slower.
         logger.warning("GPU warp failed, falling back to CPU: %s", err)
+        return None
+
+
+def stack_ram(frame_list, offsets, box, shape, loader=None, order=None,
+              preloaded=None, method="sigma", sigma=3.0, iterations=3,
+              weights=None):
+    # @args: the warp batch arguments, plus the combine's (method, sigma,
+    #        iterations, weights)
+    # @return: the combined (h, w) float32, or None when the backend cannot
+    #          serve the call
+    # THE FUSED PATH: warp and combine in one trip. The warped stack is built
+    # ON the device and reduced there, so the only things that cross the bus
+    # are the frames going up and the single combined image coming down. The
+    # separate warp_batch + combine would move the whole stack down and up
+    # again (measured on 60 x 2048^2: a 1 GB download and a 1 GB upload of
+    # pure overhead per stack).
+    if not available():
+        return None
+    from . import track_stack
+    cp, cnd = _state["cp"], _state["cnd"]
+    try:
+        got = _warp_stack_gpu(cp, cnd, track_stack, frame_list, offsets, box,
+                              shape, loader, order, preloaded)
+        if got is None:
+            return None
+        stack, masks = got
+        out = _combine_gpu(cp, stack, method, masks, sigma, iterations, weights)
+        return cp.asnumpy(out).astype(np.float32)
+    except Exception as err:
+        logger.warning("GPU stack failed, falling back to CPU: %s", err)
         return None
 
 
@@ -187,17 +231,25 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None):
         return None
     cp = _state["cp"]
     try:
-        g = cp.asarray(np.asarray(stack, dtype=np.float32))
-        if mask is not None:
-            g = cp.where(cp.asarray(mask), g, cp.nan)
-        if method == "weighted":
-            out = _combine_weighted(cp, g, weights, sigma, iterations)
-        else:
-            out = _combine_masked(cp, g, method, sigma, iterations)
+        out = _combine_gpu(cp, cp.asarray(np.asarray(stack, dtype=np.float32)),
+                           method, mask, sigma, iterations, weights)
         return cp.asnumpy(out).astype(np.float32)
     except Exception as err:
         logger.warning("GPU combine failed, falling back to CPU: %s", err)
         return None
+
+
+def _combine_gpu(cp, data, method, mask, sigma, iterations, weights):
+    # @args: data - the cube ON the device, method, mask - (n, h, w) on the
+    #        host or the device, sigma/iterations, weights
+    # @return: the combined (h, w) ON the device
+    # The one place the arithmetic lives, so the public combine and the fused
+    # stack_ram cannot drift apart.
+    if mask is not None:
+        data = cp.where(cp.asarray(mask), data, cp.nan)
+    if method == "weighted":
+        return _combine_weighted(cp, data, weights, sigma, iterations)
+    return _combine_masked(cp, data, method, sigma, iterations)
 
 
 def _combine_masked(cp, data, method, sigma, iterations):

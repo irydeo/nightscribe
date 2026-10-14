@@ -51,6 +51,15 @@ queda.
    `source_image` y `detect_stars` son el COSTE ENTERO de una estimación por
    toma, y se calculan en la GPU con la paridad fijada por un test (la imagen
    fuente coincide bit a bit y el transform, dx/dy y ángulo, a 0,0000).
+6. **El warp y el combine se FUSIONAN en una sola pasada** (`gpu.stack_ram`): la
+   pila deformada se construye y se reduce en el dispositivo, así que solo suben
+   los fotogramas y baja una imagen. Es lo que quita el viaje de ida y vuelta de
+   la pila entera (medido: `stack_group` sigma de x2,8 a **x4,0**).
+   **El barrido de velocidad se queda en la CPU**: su recorte es pequeño y sus
+   regiones ya están en RAM, y el coste por candidato de un viaje al dispositivo
+   no compensa (medido: x0,9 a 2048², x0,6 a 1024²). El GPU paga donde el
+   trabajo es grande y continuo, no en muchas re-apiladas pequeñas de los mismos
+   píxeles.
 
 **Lo medido** (60 tomas de 2048²; CPU = 16 hilos):
 
@@ -60,17 +69,19 @@ queda.
 | Registro, secuencia de 60 tomas (bucle en serie) | 10,5 s | | |
 | Registro, secuencia de 60 tomas (bloques CPU) | 4,4 s | | x2,4 |
 | Registro, secuencia de 60 tomas (kernels GPU) | 4,4 s | 1,6 s | x2,7 |
-| `_warp_batch` (frame completo) | 1,28 s | 0,75 s | x1,7 |
-| `combine` sigma (recorte 3 iter) | 5,56 s | 1,05 s | x5,3 |
-| `stack_group` sigma, extremo a extremo | 7,06 s | 2,55 s | x2,8 |
+| `stack_group` sigma, frame completo (fusión) | 7,9 s | 2,0 s | x4,0 |
+| `stack_group` sigma, franjas (streaming) | 6,8 s | 2,2 s | x3,1 |
+| Barrido de velocidad, 25 candidatos | 2,4 s | 2,6 s | x0,9 (se queda en CPU) |
 | Correlación de fase (una toma) | 320 ms | 9,3 ms | x34 |
 
-El warp del GPU está limitado por la lectura de las tomas y el viaje por PCIe, no
-por el kernel; el combine es donde gana. El registro va ahora por los mismos
-kernels (`source_image` y `detect_stars` en el dispositivo), con paridad
-**exacta** en la imagen fuente y en el transform; en serie el registro costaba
-10,5 s, en bloques baja a 4,4 s y con los kernels a 1,6 s, y el margen que queda
-está en el viaje por PCIe de cada toma, que un lote por bloque recortaría.
+El registro va por los kernels del dispositivo (`source_image` y `detect_stars`),
+con paridad **exacta** en la imagen fuente y en el transform; en serie costaba
+10,5 s, en bloques baja a 4,4 s y con los kernels a 1,6 s. El warp y el combine
+se **fusionan** en una sola pasada, así que solo suben los fotogramas y baja una
+imagen: `stack_group` pasa de x2,8 a **x4,0** en RAM y x3,1 por franjas. **El
+barrido se queda en la CPU** porque su recorte es pequeño y sus regiones ya
+están en RAM: el coste por candidato de un viaje al dispositivo no compensa (x0,9
+medido).
 
 **Alternativas**:
 
@@ -138,6 +149,14 @@ the lever that is left.
    `source_image` and `detect_stars` are the WHOLE cost of a per-frame estimate,
    and they are computed on the GPU with the parity pinned by a test (the source
    image matches to the bit and the transform, dx/dy and angle, to 0.0000).
+6. **The warp and the combine are FUSED into one pass** (`gpu.stack_ram`): the
+   warped stack is built and reduced on the device, so only the frames go up and
+   one image comes down. That is what removes the round trip of the whole stack
+   (measured: `stack_group` sigma from x2.8 to **x4.0**). **The velocity sweep
+   stays on the CPU**: its cutout is small and its regions are already in RAM,
+   and the per-candidate cost of a trip to the device does not pay (measured:
+   x0.9 at 2048², x0.6 at 1024²). The GPU pays where the work is big and
+   continuous, not on many small re-stacks of the same pixels.
 
 **What was measured** (60 frames of 2048²; CPU = 16 threads):
 
@@ -147,17 +166,19 @@ the lever that is left.
 | Registration, 60-frame sequence (serial loop) | 10.5 s | | |
 | Registration, 60-frame sequence (CPU chunks) | 4.4 s | | x2.4 |
 | Registration, 60-frame sequence (GPU kernels) | 4.4 s | 1.6 s | x2.7 |
-| `_warp_batch` (whole frame) | 1.28 s | 0.75 s | x1.7 |
-| `combine` sigma (clip, 3 iter) | 5.56 s | 1.05 s | x5.3 |
-| `stack_group` sigma, end to end | 7.06 s | 2.55 s | x2.8 |
+| `stack_group` sigma, whole frame (fused) | 7.9 s | 2.0 s | x4.0 |
+| `stack_group` sigma, strips (streaming) | 6.8 s | 2.2 s | x3.1 |
+| Velocity sweep, 25 candidates | 2.4 s | 2.6 s | x0.9 (stays on the CPU) |
 | Phase correlation (one frame) | 320 ms | 9.3 ms | x34 |
 
-The GPU warp is bound by reading the frames and the PCIe trip, not by the kernel;
-the combine is where it wins. The registration now runs through the same kernels
-(`source_image` and `detect_stars` on the device), with **exact** parity in the
-source image and in the transform; serially the registration cost 10.5 s, in
-chunks it drops to 4.4 s and with the kernels to 1.6 s, and the margin that is
-left is the PCIe trip of each frame, which one batch per chunk would cut.
+The registration runs through the device's kernels (`source_image` and
+`detect_stars`), with **exact** parity in the source image and in the transform;
+serially it cost 10.5 s, in chunks 4.4 s and with the kernels 1.6 s. The warp and
+the combine are **fused** into one pass, so only the frames go up and one image
+comes down: `stack_group` goes from x2.8 to **x4.0** in RAM and x3.1 in strips.
+**The sweep stays on the CPU** because its cutout is small and its regions are
+already in RAM: the per-candidate cost of a trip to the device does not pay
+(x0.9 measured).
 
 **Alternatives**:
 

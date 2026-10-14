@@ -1387,6 +1387,17 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     n = len(indices)
     need = n * out_h * out_w * 4
     if need <= budget_bytes:
+        # The FUSED GPU path, when it is asked for: the warped stack is built
+        # and reduced on the device, so only the frames go up and one image
+        # comes down. It returns None when it cannot serve the call and the
+        # numpy path below runs exactly as before (ADR-089).
+        if gpu.enabled(cfg):
+            fused = gpu.stack_ram([frames[i] for i in indices], offsets, box,
+                                  shape, loader=loader, order=order,
+                                  method=method, sigma=sigma,
+                                  iterations=iterations, weights=weights)
+            if fused is not None:
+                return fused, report
         stack, masks = _warp_batch([frames[i] for i in indices], offsets, box,
                                    shape, loader=loader, cfg=cfg,
                                    order=order)
@@ -1825,6 +1836,15 @@ def _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
     # @return: None (appends to grid)
     frame_list = [b[0] for b in base]
     offsets = [deltas[k][index] for k in range(len(base))]
+    # THE SWEEP STAYS ON THE CPU even with the GPU backend on, and that is a
+    # MEASURED decision (ADR-089): its cutout is small (a couple of hundred
+    # pixels) and its regions are already in RAM, so the per-candidate cost of
+    # a GPU trip (the upload plus the launches of a whole candidate) outweighs
+    # the win. Measured on 60 x 2048^2 with a 245 px box: the CPU scores the
+    # 25-candidate grid in 2.39 s and the GPU in 2.60 s (x0.9), and on
+    # 40 x 1024^2 the GPU is even worse (x0.6). The GPU pays where the work is
+    # big and continuous (the final stacks), not on many small re-stacks of
+    # the same pixels.
     stack, masks = _warp_batch(frame_list, offsets, box, shape, loader=loader,
                                cfg=cfg, preloaded=preloaded,
                                order=WARP_ORDER_SWEEP)

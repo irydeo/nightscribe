@@ -11,7 +11,8 @@
 # photutils, lxml, requests, PyYAML, platformdirs, Pillow). imageio-ffmpeg is
 # a WEAK dependency (Recommends): it only powers the MP4 export, and Fedora
 # does not package it, so the GIF and the montage must keep working without
-# it (ADR-079).
+# it (ADR-079). pyopencl is a hard dependency (ADR-091): the portable GPU
+# backend travels with the app.
 #
 # Find_Orb is shipped inside the package. It is GPLv2 with an extra
 # commercial-use clause from Project Pluto: fine for this non-commercial
@@ -43,6 +44,12 @@ BuildRequires:  python3-devel
 # imageio-ffmpeg is OPTIONAL: it only powers the MP4 animation export, and
 # Fedora does not package it. Without it the GIF and the montage keep working.
 Recommends:     python3dist(imageio-ffmpeg)
+# pyopencl IS required (ADR-091): it is the portable GPU backend and the app
+# ships it. It is named BY HAND because the import is lazy (inside the probe),
+# so RPM's automatic Python dependency generator never sees it. It pulls the
+# ICD loader (ocl-icd) with it. The acceleration stays off by default and the
+# CPU path runs unchanged with no OpenCL device.
+Requires:       python3dist(pyopencl)
 
 %description
 NightScribe plans the night's best targets, captures and reduces the images

@@ -41,6 +41,10 @@ def test_the_deb_control_is_amd64_and_names_the_deps():
     for mod in ("qtcore", "qtgui", "qtwidgets", "qtsvg", "qtuitools"):
         assert f"python3-pyside6.{mod}" in control
     assert "python3-astropy" in control and "python3-photutils" in control
+    # pyopencl travels with the app (ADR-091): the portable GPU backend is a
+    # hard dependency, not an extra the observer installs
+    assert "python3-pyopencl" in control
+    assert "python3-pyopencl" in control.split("Recommends:")[0]
     # imageio-ffmpeg is OPTIONAL (only the MP4 export)
     assert "Recommends: python3-imageio-ffmpeg" in control
     assert "Depends:" in control and "python3-imageio-ffmpeg" not in \

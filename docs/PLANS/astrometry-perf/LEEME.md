@@ -78,3 +78,9 @@ ganancia marginal de una GPU es x1,5-2 a cambio de una dependencia (OpenCL
 o CuPy), kernels por dispositivo y empaquetado del runtime. El suelo que no
 acelera (lectura de FITS, ASTAP, Find_Orb) ya es el 30-40 % del run. Decisión
 en ADR-062.
+
+> **Nota (2026-10-14): esta sección quedó desfasada.** El **ADR-089** reabrió la
+> ruta GPU (registro en bloques + warp/combine opcionales) y el **ADR-091** la
+> completa con el backend **OpenCL «de serie»**, que resultó no ser más lento
+> que CuPy. Lo que sigue vigente de aquí es el suelo que no acelera (FITS,
+> ASTAP, Find_Orb).

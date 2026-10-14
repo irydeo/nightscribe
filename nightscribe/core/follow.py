@@ -41,6 +41,7 @@ every frame to measure the real offset is a heavier, later refinement.
 """
 
 import logging
+import os
 import time
 
 from . import capture_recipe, exposure
@@ -62,6 +63,13 @@ DEFAULT_POLL_S = 1.0
 # The wait is the planned duration times this margin: the frames take what they
 # take, but a rig that never reports "done" must not hang the run forever.
 CAPTURE_MARGIN = 1.4
+
+# The grouping fallback (ADR-084 rev): when neither the subfolders nor the
+# manifest can place the frames, a gap this many times the typical one (and at
+# least this many seconds) is taken for the re-point between observations.
+GAP_FACTOR = 2.5
+GAP_MIN_S = 30.0
+
 
 
 def plan_run(kind, ctx, cfg, n_obs, frames=None, exposure_s=None):
@@ -133,10 +141,11 @@ def plan_run(kind, ctx, cfg, n_obs, frames=None, exposure_s=None):
 
 class FollowRun:
     # The loop: for each observation, resolve the object's CURRENT position,
-    # center on it, push the plan for that many frames and capture, wait for
-    # the capture to end, then do it again (the object is near the edge by
-    # then). Every effect is a callable so the loop can be tested without a
-    # mount, a network or a clock.
+    # center on it, ensure the guider is running, push the plan for that many
+    # frames and capture, wait for the capture to end (reporting the frames as
+    # they come), then do it again (the object is near the edge by then).
+    # Every effect is a callable so the loop can be tested without a mount, a
+    # network or a clock.
     #
     # @args: plan - the dict from plan_run,
     #        resolve_position - callable() -> {ra_deg, dec_deg} or None,
@@ -148,13 +157,26 @@ class FollowRun:
     #        cancel - callable() -> bool,
     #        progress - callable(event, **info) (core has no tr(): the GUI owns
     #           the wording),
+    #        guide - callable() -> bool or None: blocks until the guider is
+    #           guiding (True) or gives up (False); called before each capture
+    #           so a slew does not leave the observation unguided,
+    #        capture_progress - callable() -> dict or None: the live capture
+    #           numbers (frames done, remaining exposure...) the loop forwards
+    #           in the "progress" events,
+    #        group_observation - callable(i, t0, t1) -> int|None or None: files
+    #           the observation's frames (the subfolder copy) and answers how
+    #           many it filed; None keeps the manifest on the planned count,
+    #        calibrate - True asks the guider to calibrate before guiding,
     #        sleep - injectable sleep, clock - injectable monotonic clock,
+    #        wall - injectable wall clock (for the manifest's timestamps),
     #        poll_s - seconds between capture polls
 
     def __init__(self, plan, *, resolve_position, center, push_plan,
                  start_capture, capturing, stop_capture=None, cancel=None,
                  progress=None, sleep=time.sleep, clock=time.monotonic,
-                 poll_s=DEFAULT_POLL_S):
+                 wall=time.time, poll_s=DEFAULT_POLL_S, guide=None,
+                 capture_progress=None, group_observation=None,
+                 calibrate=False):
         self._plan = plan or {}
         self._resolve = resolve_position
         self._center = center
@@ -166,8 +188,18 @@ class FollowRun:
         self._progress = progress
         self._sleep = sleep
         self._clock = clock
+        self._wall = wall
         self._poll_s = max(0.01, float(poll_s))
+        self._guide = guide
+        self._capture_progress = capture_progress
+        self._group = group_observation
+        self._calibrate = bool(calibrate)
         self.status = "idle"
+        # What the reduction needs to group the frames: one entry per
+        # observation, with the frame count and its wall-clock window. It is
+        # the backbone of the grouping (ADR-084 rev): the subfolders may not
+        # be reachable in remote operation, but the manifest is always written.
+        self.manifest = {"observations": [], "t0": None, "t1": None}
 
     def _cancelled(self):
         # @return: True when the observer asked to stop
@@ -187,10 +219,12 @@ class FollowRun:
         expected_s = max(1.0, float(plan.get("obs_span_s") or 0.0)
                          * CAPTURE_MARGIN)
         self.status = "running"
+        self.manifest["t0"] = self._wall()
         self._say("start", n=n, frames=frames)
         for i in range(1, n + 1):
             if self._cancelled():
                 return self._end("cancelled")
+            t0 = self._wall()
             self._say("centering", i=i, n=n)
             pos = self._resolve()
             if not pos:
@@ -198,23 +232,45 @@ class FollowRun:
             self._center(pos["ra_deg"], pos["dec_deg"])
             if self._cancelled():
                 return self._end("cancelled")
+            # the slew stopped the guider: put it back before capturing
+            if self._guide is not None:
+                self._say("guiding", i=i, n=n)
+                if not self._guide():
+                    # a guide failure does NOT kill the run: the frames are
+                    # still taken, and the observer decides (short NEO
+                    # exposures are often usable unguided)
+                    self._say("guide_failed", i=i, n=n)
+                if self._cancelled():
+                    return self._end("cancelled")
             self._say("capturing", i=i, n=n, frames=frames)
             self._push(frames, exp_s)
             self._start()
-            outcome = self._wait_capture(expected_s)
+            outcome = self._wait_capture(expected_s, i=i, n=n)
             if outcome == "cancelled":
                 return self._end("cancelled")
             if outcome == "timeout":
                 # the software never said it was capturing: it may simply not
                 # report it, so we say it and go on rather than hang
                 self._say("capture_timeout", i=i, n=n)
+            t1 = self._wall()
+            filed = None
+            if self._group is not None:
+                try:
+                    filed = self._group(i, t0, t1)
+                except Exception as err:      # a copy that fails is not a stop
+                    logger.warning("filing the observation failed: %s", err)
+            self.manifest["observations"].append({
+                "i": i, "frames": int(filed) if filed else frames,
+                "t0": t0, "t1": t1})
             # the object has been drifting for the whole observation: the next
             # iteration re-points at its fresh position
         return self._end("done")
 
-    def _wait_capture(self, expected_s):
+    def _wait_capture(self, expected_s, i=None, n=None):
         # Wait until the software stops reporting a capture, with the planned
-        # duration as the honest fallback when it never reports one.
+        # duration as the honest fallback when it never reports one. Every poll
+        # also forwards the live capture numbers (frames done, remaining
+        # exposure) so the window shows real progress, not a spinner.
         # @args: expected_s - the planned wall clock (with margin)
         # @return: "done" | "cancelled" | "timeout"
         started = False
@@ -233,10 +289,131 @@ class FollowRun:
                 started = True
             elif started:
                 return "done"
+            if self._capture_progress is not None:
+                try:
+                    prog = self._capture_progress() or {}
+                except Exception as err:
+                    logger.warning("capture progress failed: %s", err)
+                    prog = {}
+                self._say("progress", i=i, n=n, **prog)
             self._sleep(self._poll_s)
         return "done" if started else "timeout"
 
     def _end(self, status, reason=None):
         self.status = status
+        self.manifest["t1"] = self._wall()
         self._say("finished", status=status, reason=reason)
         return status
+
+
+# ---------------- grouping the frames per observation (ADR-084 rev) -----------
+
+def _frame_path(frame):
+    # @return: the frame's path ("" when the object has none)
+    return getattr(frame, "path", None) or ""
+
+
+def _frame_time(frame):
+    # @return: the frame's mid-exposure instant (t_mid_jd preferred, mjd as a
+    #          fallback), or None
+    t = getattr(frame, "t_mid_jd", None)
+    if t is None:
+        t = getattr(frame, "mjd", None)
+    return t
+
+
+def group_by_folder(frames):
+    # The follow run copies each observation into its own subfolder, so the
+    # folder IS the observation. Only groups when EVERY frame has a folder and
+    # there is more than one distinct folder; a single folder (or none) means
+    # "no subfolders", and the caller falls back to the manifest or the gaps.
+    # @args: frames - time-ordered frames (each with a .path)
+    # @return: list of (start, end) index pairs, or [] when there is nothing
+    #          to group by
+    folders = [os.path.dirname(_frame_path(f)) for f in frames]
+    if not folders or any(not d for d in folders):
+        return []
+    if len(set(folders)) < 2:
+        return []
+    groups, start = [], 0
+    for i in range(1, len(folders)):
+        if folders[i] != folders[i - 1]:
+            groups.append((start, i))
+            start = i
+    groups.append((start, len(folders)))
+    return groups
+
+
+def group_by_manifest(frames, manifest):
+    # The run wrote down how many frames each observation took. When the
+    # attached frames are exactly those (the total matches), the counts place
+    # them by ORDER, with no clock to reconcile between two machines.
+    # @args: frames - time-ordered frames, manifest - the run's manifest dict
+    # @return: list of (start, end) index pairs, or [] when it does not fit
+    counts = [int(o.get("frames") or 0)
+              for o in (manifest or {}).get("observations") or []]
+    counts = [c for c in counts if c > 0]
+    if not counts or sum(counts) != len(frames):
+        return []
+    groups, start = [], 0
+    for c in counts:
+        groups.append((start, start + c))
+        start += c
+    return groups
+
+
+def group_by_gaps(frames, factor=GAP_FACTOR, min_s=GAP_MIN_S):
+    # Last automatic resort: the re-point leaves a gap much larger than the
+    # frames' own cadence, so a gap over `factor` times the typical one (and at
+    # least `min_s`) starts a new observation. It is honest about its limit: an
+    # exposure longer than the re-point itself can fool it, which is why the
+    # manifest and the subfolders come first.
+    # @args: frames - time-ordered frames, factor/min_s - the split rule
+    # @return: list of (start, end) index pairs (always at least one)
+    n = len(frames)
+    if n == 0:
+        return []
+    stamps = [_frame_time(f) for f in frames]
+    if any(s is None for s in stamps):
+        return [(0, n)]
+    deltas = [(float(stamps[i]) - float(stamps[i - 1])) * 86400.0
+              for i in range(1, n)]
+    positive = sorted(d for d in deltas if d > 0)
+    median = positive[len(positive) // 2] if positive else 0.0
+    threshold = max(min_s, factor * median)
+    groups, start = [], 0
+    for i, gap in enumerate(deltas, start=1):
+        if gap > threshold:
+            groups.append((start, i))
+            start = i
+    groups.append((start, n))
+    return groups
+
+
+def resolve_groups(frames, manifest=None, n_obs=None, follow_s=None):
+    # The priority the editor uses: the subfolders the run created, then the
+    # run's manifest, then the re-point gaps, and the manual count last. It
+    # returns WHICH rule won, so the tab can say it instead of pretending.
+    # @args: frames - time-ordered frames, manifest - the run's manifest or
+    #        None, n_obs - the observer's manual count (or None),
+    #        follow_s - the re-point cost, to scale the gap rule
+    # @return: (groups, source): groups is a list of (start, end), source is
+    #          "folders" | "manifest" | "gaps" | "manual" | "single"
+    n = len(frames)
+    if n == 0:
+        return [], "single"
+    groups = group_by_folder(frames)
+    if len(groups) > 1:
+        return groups, "folders"
+    groups = group_by_manifest(frames, manifest)
+    if len(groups) > 1:
+        return groups, "manifest"
+    if n > 1:
+        groups = group_by_gaps(frames)
+        if len(groups) > 1:
+            return groups, "gaps"
+    if n_obs is not None and n_obs >= 1:
+        from .track_stack import split_groups
+        return split_groups(frames, int(n_obs)), "manual"
+    return [(0, n)], "single"
+

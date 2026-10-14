@@ -211,6 +211,8 @@ class UfeTrackStackTab(QWidget):
         self._send_dialog = MpcSendDialog(self)
         self.cmb_format = self._report_dialog.cmb_format
         self.txt_report = self._report_dialog.txt_report
+        self.btn_regen_report = self._report_dialog.btn_regen
+        self.lbl_report_state = self._report_dialog.lbl_report_state
         self.btn_send_mpc = self._report_dialog.btn_send
         self.btn_copy_report = self._report_dialog.btn_copy
         self.btn_save_report = self._report_dialog.btn_save
@@ -223,6 +225,13 @@ class UfeTrackStackTab(QWidget):
         self.btn_save_report.clicked.connect(self._save_report)
         self.btn_send_mpc.clicked.connect(self._open_send_dialog)
         self.btn_close_report.clicked.connect(self._report_dialog.hide)
+        # The report is EDITABLE (the observer's ask, 2026-10-14): a wrong
+        # designation or a line can be fixed before sending. Regenerate
+        # rebuilds it from the measurements and clears the edit.
+        self._report_dirty = False
+        self.txt_report.textChanged.connect(self._on_report_edited)
+        self.btn_regen_report.clicked.connect(
+            lambda: self._on_report(quiet=True))
         self._send_dialog.btn_close.clicked.connect(self._send_dialog.hide)
         self._send_dialog.btn_send.clicked.connect(self._on_mpc_submit)
         # set before the combo signals below: set_targets() fills the combo and
@@ -1040,7 +1049,7 @@ class UfeTrackStackTab(QWidget):
             self._result = None
             self.cmb_group.clear()
             self.cmb_group.setEnabled(False)
-            self.txt_report.clear()
+            self._fill_report_text("")
             self.txt_notes.setVisible(False)
             self._hide_manual()
             self._hide_residuals()
@@ -1093,11 +1102,15 @@ class UfeTrackStackTab(QWidget):
         # stays "–": an estimate without a measurement would be invented.
         # @return: None
         from ..core import track_stack
-        # the spinbox's floor is 1, but a tab whose visit was never armed
-        # can still be repainted: a zero would divide inside split_groups
+        # ADR-084 rev: when a follow run produced these frames, its own
+        # grouping (subfolders or manifest) decides how many observations there
+        # are; the manual count is the fallback.
+        groups, source = self._resolved_groups()
         rows = track_stack.preview_groups(self._frames or [],
                                           max(1, self.spn_nobs.value()),
-                                          base_snr=self._base_snr)
+                                          base_snr=self._base_snr,
+                                          groups=groups)
+        self._apply_group_source(source, len(rows))
         floor = float(config.get("astrometry_submit_snr", 20.0))
         tbl = self.tbl_snr
         tbl.setRowCount(len(rows))
@@ -1123,6 +1136,64 @@ class UfeTrackStackTab(QWidget):
             self.tr("Expected SNR: %1").replace("%1", " · ".join(parts))
             if parts else "")
         self._sync_plan_line()
+
+    def _follow_manifest(self):
+        # @return: the project's most recent follow run manifest, or None. It
+        #          is what lets the reduction group the frames per observation
+        #          even when the subfolders are not reachable (ADR-084 rev).
+        ctx = self._context() or {}
+        runs = ctx.get("follow_runs") or []
+        return runs[-1] if runs else None
+
+    def _resolved_groups(self):
+        # @return: (groups, source): the per-observation groups the reduction
+        #          should use. The follow run's subfolders win, then its
+        #          manifest, then the re-point gaps; when none applies, None is
+        #          returned and the manual count decides (source "manual").
+        from ..core import follow
+        frames = self._frames or []
+        if not frames:
+            return None, "manual"
+        groups, source = follow.resolve_groups(
+            frames, manifest=self._follow_manifest(),
+            n_obs=self.spn_nobs.value(),
+            follow_s=config.get("follow_s"))
+        if source in ("folders", "manifest", "gaps"):
+            return groups, source
+        return None, source
+
+    def _apply_group_source(self, source, n_groups):
+        # @args: source - "folders"|"manifest"|"gaps"|"manual"|"single",
+        #        n_groups - how many observations came out
+        # @return: None. The observation count is the follow run's when it can
+        #          group the frames; then the spinbox is locked and says where
+        #          the number comes from. Otherwise it is the observer's.
+        spn = self.spn_nobs
+        auto = source in ("folders", "manifest", "gaps")
+        if auto:
+            spn.blockSignals(True)
+            spn.setRange(1, max(1, len(self._frames or [])))
+            spn.setValue(max(1, int(n_groups)))
+            spn.blockSignals(False)
+        spn.setEnabled(not auto)
+        if auto:
+            spn.setToolTip(self.tr(
+                "Set by the follow run: its %1 observations, grouped by %2."
+            ).replace("%1", str(n_groups)).replace(
+                "%2", self._group_source_word(source)))
+        else:
+            spn.setToolTip(self.tr(
+                "How many observations the frames are split into (an equal "
+                "split). A follow run sets this on its own."))
+
+    def _group_source_word(self, source):
+        # @args: source - the grouping rule that won
+        # @return: the plain-words name of the rule, for the tooltip
+        if source == "folders":
+            return self.tr("the subfolder of each observation")
+        if source == "manifest":
+            return self.tr("the follow run's own record")
+        return self.tr("the gaps between observations")
 
     def _snr_text(self, est, floor):
         # @args: est - the expected SNR or None, floor - the recommended
@@ -1214,7 +1285,8 @@ class UfeTrackStackTab(QWidget):
             save_star_stack=self.chk_starstack.isChecked(),
             calibrate=self.chk_calibrate.isChecked(),
             manual_ref=manual_ref,
-            packed=ctx.get("packed") or ctx.get("id")))
+            packed=ctx.get("packed") or ctx.get("id"),
+            groups=self._resolved_groups()[0]))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -1322,7 +1394,7 @@ class UfeTrackStackTab(QWidget):
         self.cmb_group.clear()
         self.cmb_group.setEnabled(False)
         self.tbl_points.setRowCount(0)
-        self.txt_report.clear()
+        self._fill_report_text("")
         self._thumbs.clear()
         self.btn_blink.setEnabled(False)
         self._hide_manual()
@@ -4299,12 +4371,62 @@ class UfeTrackStackTab(QWidget):
         return ((self._context() or {}).get("object_name") or "").strip()
 
     def _check_desig(self):
-        # @return: the designation the check field should carry: the name
-        #          the object is known by NOW (the confirmed one when the
-        #          run resolved a rename), else the visit's own name
+        # @return: the designation the check field should carry: the name the
+        #          object is known by NOW. The confirmed one wins (the
+        #          project's context when the rename was applied, else the run
+        #          that resolved it); a still-unconfirmed object keeps its own
+        #          temporary name.
         check = (self._result or {}).get("check")
         resolved = getattr(check, "resolved_desig", "") if check else ""
-        return resolved or self._current_object_name()
+        if resolved:
+            return resolved
+        ctx = self._context() or {}
+        conf = ctx.get("confirmed") or {}
+        return (conf.get("designation") or self._current_object_name())
+
+    def _report_designation(self, ctx=None):
+        # @args: ctx - the visit context (asked from the host when omitted)
+        # @return: (designation, kind) for the MPC report. The CONFIRMED name
+        #          wins (the project's context when the rename was applied,
+        #          else the run that resolved it), so the packer emits
+        #          K26T69G and not the temporary tag; `kind` is the hint the
+        #          packer uses (None = pack it as a confirmed designation,
+        #          "neocp" = emit the temporary tag as-is).
+        ctx = ctx if ctx is not None else (self._context() or {})
+        conf = ctx.get("confirmed") or {}
+        check = (self._result or {}).get("check")
+        resolved = getattr(check, "resolved_desig", "") if check else ""
+        confirmed = (conf.get("designation") or resolved or "").strip()
+        if confirmed:
+            return confirmed, None
+        return (ctx.get("object_name") or ""), (
+            "neocp" if ctx.get("neocp") else None)
+
+    def _fill_report_text(self, text):
+        # @args: text - the generated report
+        # @return: None. Putting the text in the box fires textChanged; the
+        #          dirty flag is cleared AFTER it, because a freshly generated
+        #          report is not an edit.
+        self.txt_report.setPlainText(text)
+        self._report_dirty = False
+        self._paint_report_state()
+
+    def _on_report_edited(self):
+        # @return: None. The observer touched the report: what is in the box is
+        #          what gets sent, and the send dialog says so.
+        if self.txt_report.toPlainText():
+            self._report_dirty = True
+        self._paint_report_state()
+
+    def _paint_report_state(self):
+        # @return: None. Says, under the box, whether the report is the
+        #          generated one or the observer's edited version.
+        if self._report_dirty:
+            self.lbl_report_state.setText(self.tr(
+                "Edited: this exact text will be sent (Regenerate to rebuild "
+                "it from the measurements)."))
+        else:
+            self.lbl_report_state.setText("")
 
     def _build_residuals_table(self):
         # @return: None. The published observations' table: the columns are
@@ -4622,12 +4744,16 @@ class UfeTrackStackTab(QWidget):
             return
         fmt = self.cmb_format.currentData() or "ades"
         context = mpc_astrometry.report_context(config)
-        kind = "neocp" if ctx.get("neocp") else None
+        # The report names the object as the MPC knows it NOW: the confirmed
+        # designation when the object was renamed since the visit, else the
+        # temporary tag (ADR-077 rev). Before this the report kept the old
+        # NEOCP name even after the confirmation.
+        designation, kind = self._report_designation(ctx)
         rep = mpc_astrometry.generate(
             points, fmt, context.obs_code or str(config.get("mpc_code", "")),
-            ctx.get("object_name") or "", config,
+            designation, config,
             context=context, submission=self._submission, kind=kind)
-        self.txt_report.setPlainText(rep["text"])
+        self._fill_report_text(rep["text"])
         floor = float(config.get("astrometry_submit_snr", 20.0))
         kept = list(rep.get("kept") or [])
         excluded = list(rep.get("excluded") or [])
@@ -4762,6 +4888,9 @@ class UfeTrackStackTab(QWidget):
         idx = self._send_dialog.cmb_target.findData(default_target)
         if idx >= 0:
             self._send_dialog.cmb_target.setCurrentIndex(idx)
+        # an edited report is sent as it reads, so the ACK/target fields do
+        # not apply and the dialog says so (the observer's ask, 2026-10-14)
+        self._send_dialog.set_edited(self._report_dirty)
         self._refresh_send_gate()
         self._refresh_send_intro()
         self._send_dialog.show()
@@ -4806,7 +4935,9 @@ class UfeTrackStackTab(QWidget):
     def _on_mpc_submit(self):
         # @return: None. Builds the report with the chosen acknowledgement
         #          and target, then submits it off the GUI thread. The
-        #          server's own answer lands in the dialog's log.
+        #          server's own answer lands in the dialog's log. When the
+        #          observer EDITED the report, that text is sent verbatim and
+        #          is NOT rebuilt (regenerating it would throw the edit away).
         from .workers import MpcSubmitWorker
         dlg = self._send_dialog
         email = dlg.edt_ack_email.text().strip()
@@ -4814,8 +4945,11 @@ class UfeTrackStackTab(QWidget):
         target = dlg.cmb_target.currentData() or ""
         test = bool(dlg.cmb_mode.currentData())
         self._submission = {"ack": ack, "obj_type": target}
-        # rebuild with the chosen ACK/target so the header carries them
-        self._on_report(quiet=True)
+        if self._report_dirty:
+            dlg.log(self.tr("Sending your edited report as it reads."))
+        else:
+            # rebuild with the chosen ACK/target so the header carries them
+            self._on_report(quiet=True)
         text = self.txt_report.toPlainText()
         if not text.strip():
             dlg.log(self.tr("Nothing to send: the report is empty."))

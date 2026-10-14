@@ -40,6 +40,7 @@ class MpcSendDialog(QDialog):
         self.setModal(False)
         self._ui = adopt_ui(self, "ufe_mpc_send_dialog")
         self.lbl_intro = self._ui.lbl_intro
+        self.lbl_edited = self._ui.lbl_edited
         self.txt_log = self._ui.txt_log
         self.edt_ack_email = self._ui.edt_ack_email
         self.edt_ack = self._ui.edt_ack
@@ -59,6 +60,21 @@ class MpcSendDialog(QDialog):
         self.cmb_target.clear()
         for name in targets:
             self.cmb_target.addItem(name, name)
+
+    def set_edited(self, edited):
+        # @args: edited - True when the observer changed the report text
+        # @return: None. An edited report is sent EXACTLY as it reads, so the
+        #          acknowledgement text and the target keyword (which only
+        #          reach the report when it is regenerated) no longer apply:
+        #          the fields are disabled and the dialog says so, instead of
+        #          silently ignoring what the observer typed in them.
+        self.lbl_edited.setVisible(bool(edited))
+        self.lbl_edited.setText(self.tr(
+            "You edited the report: exactly that text will be sent. The "
+            "acknowledgement text and the target below are NOT applied "
+            "(regenerate the report to use them).") if edited else "")
+        self.edt_ack.setEnabled(not edited)
+        self.cmb_target.setEnabled(not edited)
 
     def log(self, text):
         # @args: text - one line for the submission log

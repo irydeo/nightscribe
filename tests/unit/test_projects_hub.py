@@ -3124,3 +3124,34 @@ def test_due_project_row_carries_the_urgency(window, panel):
     row = window._project_row_widget(proj_mod.get(mw.db, p["id"]),
                                      {"urgency": "due"}, {})
     assert theme.C_WARN in row.lbl_next.styleSheet()
+
+
+def test_follow_result_keeps_the_manifest(window, panel):
+    # ADR-084 rev: the run's manifest is kept in the project so the editor can
+    # group the frames per observation (and it survives a stopped run).
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project as project_mod
+    p = _create_and_select(window, "neo", "A11HPKOm", {"kind": "neo"})
+    window._ccd_follow_pid = p["id"]
+    window._ccd_follow_result({"manifest": {
+        "t0": 1791925460.0, "observations": [{"i": 1, "frames": 12}]},
+        "status": "done"})
+    ctx = project_mod.get(dbmod.db, p["id"])["context"]
+    run = ctx["follow_runs"][-1]
+    assert run["observations"][0]["frames"] == 12
+    assert run["date"] and run["object"] == "A11HPKOm"
+
+
+def test_follow_progress_fills_the_bar_and_the_line(window, panel):
+    # ADR-084 rev: the run is not a black box; the Capture step shows which
+    # observation, how many frames and how much is left.
+    p = _create_and_select(window, "neo", "A11HPKO2", {"kind": "neo"})
+    _open_tab(window, p, "plan")
+    window._ccd_follow_total = 4
+    window._ccd_follow_frames = 10
+    window._ccd_follow_progress({"event": "progress", "i": 2, "n": 4,
+                                 "current": 5, "total": 10,
+                                 "exposure_remaining": 3.0})
+    w = window._ccd_widgets()
+    assert w["follow_bar"].value() == 37        # (1 + 0.5) / 4
+    assert "5/10" in w["follow_label"].text()

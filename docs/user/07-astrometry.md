@@ -189,14 +189,20 @@ An object observed while it was still on the confirmation page (a NEOCP
 designation) and confirmed since gets a new designation, and its observations
 move with it. NightScribe finds it on its own and shows it **very visibly**: the
 new name and the circular (MPEC) that published it, in the check, on the
-project's card and in the visit. It does this for **any** project whose object
-still carries a temporary NEOCP/PCCP designation, whether or not you observed
-it: a project created by hand is covered too. When your station already appears
-among the published observations it says so: **your data is in that circular**;
-when that is not known it links to the object at the MPC instead and claims
-nothing. If the automatic lookup comes up empty (the MPC's list of
-just-confirmed NEOCP objects is short), type the current designation in
-**Check against** and press **Re-check**.
+project's card and in the visit. The card's notice carries a **Use the confirmed
+name** link: it renames the project and moves its identity, so the MPC report,
+the check, the orbit and the ephemeris all use the confirmed designation from
+then on. The **report already uses the confirmed name** even before you click
+that link, so a batch can go out under `K26T69G` and not the temporary tag. It
+does this for **any** project whose object is unconfirmed (the NEOCP flag, or a
+PCCP kind), whether or not you observed it: a project created by hand is covered
+too. The lookup is read **fresh** when it matters: the check and the report
+always ask the MPC for the current name, so a confirmation that lands while you
+are working is seen at once. When your station already appears among the
+published observations it says so: **your data is in that circular**; when that
+is not known it links to the object at the MPC instead and claims nothing. If
+the lookup still comes up empty (the MPC has not published the mapping yet),
+type the current designation in **Check against** and press **Re-check**.
 
 ### Find_Orb comes with the app
 
@@ -233,6 +239,11 @@ ratio); the app builds the telescope line from them.
 - **Format**: **ADES XML** is the format the MPC prefers, then **ADES PSV**,
   then the classic **80-column** one. All three carry the header. If in doubt:
   ADES XML.
+- The report is **editable**: fix a designation, a line or the header before
+  sending. What you see is what gets sent; **Regenerate** rebuilds it from the
+  measurements (discarding your edits). When you have edited it, the send
+  dialog's acknowledgement-text and target fields are disabled, because they
+  only reach the report when it is regenerated.
 - **Copy to clipboard** and **Save to file…** take the report out as it reads.
 - If you configured **Find_Orb** in Settings, the app cross-checks your
   measurements against the orbit it computes itself and shows you the

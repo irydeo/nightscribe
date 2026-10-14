@@ -138,6 +138,32 @@ def test_merge_confirmed_ignores_none_values(tmp_db):
     assert conf["mpec"] == "MPEC 2026-T201"
 
 
+def test_rename_object_adopts_the_confirmed_designation(tmp_db):
+    # ADR-077 rev: the one-click apply renames the project AND moves its
+    # identity context, so the report, the check and the orbit stop using the
+    # temporary NEOCP name. The temporary name is kept for the fallback, and
+    # `confirmed` is merged, not replaced.
+    p = project.create(tmp_db, "neo", "Sar2949",
+                       {"id": "Sar2949", "neocp": True})
+    project.merge_confirmed(tmp_db, p["id"], {
+        "designation": "2026 TG69", "mpec": "MPEC 2026-T237"})
+    assert project.rename_object(tmp_db, p["id"], "2026 TG69", {
+        "id": "2026 TG69", "name": "2026 TG69", "neocp": False,
+        "temp_id": "Sar2949",
+        "confirmed": {"designation": "2026 TG69", "mpec": "MPEC 2026-T237"}})
+    p = project.get(tmp_db, p["id"])
+    assert p["object_name"] == "2026 TG69"
+    assert p["context"]["id"] == "2026 TG69"
+    assert p["context"]["neocp"] is False
+    assert p["context"]["temp_id"] == "Sar2949"
+    assert p["context"]["confirmed"]["designation"] == "2026 TG69"
+    assert p["context"]["confirmed"]["mpec"] == "MPEC 2026-T237"
+
+
+def test_rename_object_returns_false_for_unknown_project(tmp_db):
+    assert project.rename_object(tmp_db, 999999, "2026 TG69") is False
+
+
 def test_set_status(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
     assert project.set_status(tmp_db, p["id"], "archived")

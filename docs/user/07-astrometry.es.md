@@ -195,14 +195,20 @@ Un objeto observado mientras seguía en la página de confirmación (una designa
 del NEOCP) y confirmado después recibe una designación nueva, y sus observaciones
 se van con ella. NightScribe lo encuentra solo y lo muestra **muy visible**: el
 nombre nuevo y la circular (MPEC) que lo publicó, en el chequeo, en la ficha del
-proyecto y en la visita. Lo hace para **cualquier** proyecto cuyo objeto aún
-lleve una designación temporal del NEOCP/PCCP, lo hayas observado o no: un
-proyecto creado a mano también queda cubierto. Cuando tu estación ya aparece
-entre las observaciones publicadas, lo dice: **tus datos están en esa circular**;
-cuando eso no consta, enlaza con el objeto en el MPC y no afirma nada. Si la
-búsqueda automática no lo encuentra (la lista del MPC de objetos recién
-confirmados es corta), escribe la designación actual en **Comprobar con** y pulsa
-**Recomprobar**.
+proyecto y en la visita. El aviso de la ficha lleva un enlace **«Usar el nombre
+confirmado»**: renombra el proyecto y mueve su identidad, así que el reporte MPC,
+el chequeo, la órbita y la efemérides usan desde entonces la designación
+confirmada. El **reporte ya usa el nombre confirmado** incluso antes de que pulses
+ese enlace, así que un lote puede salir con `K26T69G` y no con la etiqueta
+temporal. Lo hace para **cualquier** proyecto cuyo objeto no esté confirmado (el
+flag del NEOCP, o un kind PCCP), lo hayas observado o no: un proyecto creado a
+mano también queda cubierto. La búsqueda se lee **fresca** cuando importa: el
+chequeo y el reporte preguntan siempre al MPC por el nombre actual, así que una
+confirmación que caiga mientras trabajas se ve al momento. Cuando tu estación ya
+aparece entre las observaciones publicadas, lo dice: **tus datos están en esa
+circular**; cuando eso no consta, enlaza con el objeto en el MPC y no afirma
+nada. Si la búsqueda sigue sin encontrarlo (el MPC aún no ha publicado el mapeo),
+escribe la designación actual en **Comprobar con** y pulsa **Recomprobar**.
 
 ### Find_Orb viene con la app
 
@@ -239,6 +245,11 @@ y relación focal); la app construye con ellos la línea del telescopio.
 - **Formato**: **ADES XML** es el formato que prefiere el MPC, luego **ADES
   PSV** y luego el clásico de **80 columnas**. Los tres llevan el encabezado.
   Si dudas: ADES XML.
+- El reporte es **editable**: corrige una designación, una línea o el encabezado
+  antes de enviarlo. Lo que ves es lo que se envía; **Regenerar** lo reconstruye
+  desde las medidas (y descarta tus ediciones). Cuando lo has editado, los campos
+  de texto de acuse y objetivo del diálogo de envío se desactivan, porque solo
+  llegan al reporte al regenerarlo.
 - **Copiar al portapapeles** y **Guardar en fichero…** sacan el reporte tal
   como se lee.
 - Si configuraste **Find_Orb** en Configuración…, la app cruza tus medidas contra

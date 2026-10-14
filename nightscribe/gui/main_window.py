@@ -15,6 +15,7 @@ import datetime
 import datetime as _dt
 import logging
 import re
+import time
 import uuid
 from pathlib import Path
 
@@ -393,6 +394,11 @@ class MainWindow(QMainWindow):
     # holds the Sky calendar, the observing journal, and the contextual
     # Explore/Post/Blink dialogs.
 
+    # The per-project guard on the NEOCP alias lookup (ADR-077 rev): short,
+    # because a confirmation can land mid-session, but not zero, because the
+    # hub repaints on every selection.
+    _ALIAS_GUARD_S = 300.0
+
     # @args: snapshot - the pre-migration backup dict from core/backup.py
     #        (the Welcome view's data report), or None when there is no
     #        database yet
@@ -433,6 +439,12 @@ class MainWindow(QMainWindow):
         self._active_tab = None  # key of the visible tab page (or None)
         self._advisor_dismissed = None  # A2: id of the project whose advisor
         #                                the user dismissed this session
+        # The NEOCP alias lookup (ADR-077 rev): one in flight at a time and a
+        # per-project guard, so repainting the hub does not spawn a worker on
+        # every keystroke. The guard is short because an object can be
+        # confirmed at any moment during a night.
+        self._alias_pending = None
+        self._alias_looked = {}
 
         # Observatory integration (ADR-030, ADR-081). The connection survives
         # project switches: the observatory does not re-connect per target.
@@ -452,6 +464,10 @@ class MainWindow(QMainWindow):
         # whether it is in flight). One run at a time.
         self._ccd_follow_worker = None
         self._ccd_follow_running = False
+        # ADR-084 rev: the run's progress and where its manifest goes
+        self._ccd_follow_pid = None
+        self._ccd_follow_total = 0
+        self._ccd_follow_frames = 0
         self._ccd_gain = None          # the camera's gain setting (from the software)
         self._ccd_offset = None        # the camera's offset setting (from the software)
         # The last-frame preview (ADR-082): its own timer and worker; the
@@ -1597,6 +1613,11 @@ class MainWindow(QMainWindow):
         # here instead of the browser)
         self.projects.lbl_mast_camp.linkActivated.connect(
             self._campaign_link_clicked)
+        # The rename banner carries two links (ADR-077 rev): the object at
+        # the MPC (browser) and the one-click "use the confirmed name".
+        # openExternalLinks is off in the .ui so linkActivated fires here.
+        self.projects.lbl_confirm.linkActivated.connect(
+            self._confirm_link_clicked)
         # A4 (rewritten): the project files window (ADR-019, UX v3). The
         # masthead "Files (n)" button is the single entry; the dialog
         # owns its row menus and the main window owns the two open
@@ -4958,39 +4979,45 @@ class MainWindow(QMainWindow):
             advisor.setVisible(False)
         # The rename notice (the observer's idea): an object visited while
         # still on the confirmation page and CONFIRMED SINCE is shown as
-        # such, very visibly, with the circular that published it. The
-        # lookup is cached and runs once, off the GUI thread.
+        # such, very visibly, with the circular that published it. The lookup
+        # runs off the GUI thread; for an object that is still unconfirmed
+        # (the planner's NEOCP flag, or a PCCP) it is read FRESH, because the
+        # confirmation can land at any moment during a night.
         conf = ctx.get("confirmed") or {}
-        self._paint_confirmation(conf)
+        self._paint_confirmation(conf, p)
         if not conf.get("designation") and self._could_be_renamed(p, ctx):
-            self._start_alias_lookup(p)
+            force = bool(ctx.get("neocp")) or p.get("kind") == "pccp"
+            self._start_alias_lookup(p, force=force)
 
     def _could_be_renamed(self, p, ctx):
         # @args: p - the project row, ctx - its context
         # @return: True when the object may have been confirmed under a new
-        #          name since the visit, so the alias lookup is worth a call:
-        #          either the planner flagged it as a NEOCP object, or its
-        #          name still IS a temporary NEOCP/PCCP designation (a project
-        #          created by hand, or one whose context lost the flag). A
-        #          name that is already a confirmed designation has nothing to
-        #          announce (ADR-077 rev).
+        #          name since the visit, so the alias lookup is worth a call.
+        #          NEOCP/PCCP tags have NO reliable shape (every survey or
+        #          group names them as it likes), so nothing is guessed from
+        #          the name: the project's own flags say "unconfirmed"
+        #          (ctx["neocp"], set by the planner from NEOfixer, or a PCCP
+        #          kind) and the rolling list is the only judge. A hand-made
+        #          project whose flags are gone is still checked when it is a
+        #          NEO or a comet: the lookup answers nothing for a name that
+        #          is already a confirmed designation, so it can only be right
+        #          (ADR-077 rev).
         if ctx.get("neocp"):
             return True
-        if p.get("kind") not in ("neo", "comet", "pccp"):
-            return False
-        from ..core.mpc_astrometry import is_temporary_designation
-        return is_temporary_designation(p.get("object_name"))
+        return p.get("kind") in ("neo", "comet", "pccp")
 
-    def _paint_confirmation(self, conf):
-        # @args: conf - {"designation","mpec","mpec_url","ours_published"} or {}
+    def _paint_confirmation(self, conf, p=None):
+        # @args: conf - {"designation","mpec","mpec_url","ours_published"} or
+        #        {}, p - the project row (for the one-click apply)
         # @return: None. The banner reads as data (the new name and the
         #          circular), never as a code: the observer sees what it
         #          means without looking anything up. Whether OUR observations
         #          are in that circular is said ONLY when it is known (the
         #          check block writes it into the context); otherwise the
         #          banner links to the object at the MPC and claims nothing,
-        #          so it never asserts a participation that did not happen
-        #          (ADR-077 rev).
+        #          so it never asserts a participation that did not happen.
+        #          When the project still carries the OLD name, the banner
+        #          also offers the one-click apply (ADR-077 rev).
         lbl = self.projects.lbl_confirm
         desig = (conf or {}).get("designation")
         if not desig:
@@ -5019,19 +5046,35 @@ class MainWindow(QMainWindow):
             text += ". " + self.tr(
                 '<a href="%1">see the object at the MPC</a>').replace(
                     "%1", obj_url)
+        current = (p or {}).get("object_name") or ""
+        if current and current != desig:
+            text += " · " + self.tr(
+                "<a href='ns://use-confirmed'>Use the confirmed name</a>")
         lbl.setText(text)
         lbl.setVisible(True)
 
-    def _start_alias_lookup(self, p):
-        # @args: p - the project row (its id and object_name)
+    def _start_alias_lookup(self, p, force=False):
+        # @args: p - the project row (its id and object_name),
+        #        force - True bypasses the source cache (a fresh read)
         # @return: None. Asks the MPC, off the GUI thread, whether this
         #          object was confirmed under a new name; the answer is
         #          written into the project's context so the banner is
         #          instant the next time and the visit window can read it.
+        #          One in flight, and a short per-project guard so repainting
+        #          the hub is not a network call on every keystroke.
         from .workers import MpcAliasWorker, hold
-        name = p["object_name"]
-        worker = hold(MpcAliasWorker(name))
         pid = p["id"]
+        if self._alias_pending == pid:
+            return
+        # The guard applies to EVERY lookup, forced or not: `force` only says
+        # whether the source cache is bypassed, not whether we may call at
+        # all. Without it a NEOCP project would hit the MPC on every repaint.
+        now = time.monotonic()
+        if now - self._alias_looked.get(pid, 0.0) < self._ALIAS_GUARD_S:
+            return
+        self._alias_looked[pid] = now
+        self._alias_pending = pid
+        worker = hold(MpcAliasWorker(p["object_name"], force=force))
         worker.finished.connect(
             lambda hit, pid=pid: self._on_confirmation(pid, hit))
         worker.start()
@@ -5039,12 +5082,62 @@ class MainWindow(QMainWindow):
     def _on_confirmation(self, pid, hit):
         # @args: pid - the project id, hit - {"designation","mpec",...} or {}
         # @return: None
+        self._alias_pending = None
         if not hit or not hit.get("designation"):
             return
         project.merge_confirmed(db, pid, hit)
         cur = self._current_project
         if cur and cur.get("id") == pid:
-            self._paint_confirmation(hit)
+            self._paint_confirmation(hit, cur)
+
+    def _confirm_link_clicked(self, url):
+        # @args: url - the clicked href in the rename banner
+        # @return: None. The banner carries the object at the MPC and the
+        #          one-click "use the confirmed name": the first opens in the
+        #          browser, the second adopts the new designation.
+        if url.startswith("ns://use-confirmed"):
+            self._apply_confirmation(self._current_project)
+            return
+        self._open_url(url)
+
+    def _apply_confirmation(self, p):
+        # @args: p - the project row
+        # @return: None. Adopts the confirmed designation (ADR-077 rev): the
+        #          project is renamed and its identity context follows, so the
+        #          MPC report, the check, the orbit and the ephemeris stop
+        #          using the temporary NEOCP name. The temporary name is kept
+        #          as temp_id for the NEOfixer fallback, and the orbit is
+        #          re-read from the confirmed sources on the next render
+        #          (Horizons/SBDB now know the object).
+        if not p:
+            return
+        ctx = p.get("context") or {}
+        conf = ctx.get("confirmed") or {}
+        desig = (conf.get("designation") or "").strip()
+        old = (p.get("object_name") or "").strip()
+        if not desig or desig == old:
+            return
+        # `id` was the key the sources knew the object by (NEOfixer's packed
+        # tag for a NEOCP); the confirmed name is what Horizons and SBDB now
+        # resolve, so `id`/`name` move to it and the OLD key is kept as
+        # `temp_id` (and `packed`, which is the NEOfixer fallback key) so the
+        # preliminary route still works if the confirmed sources miss.
+        old_id = ctx.get("id") or old
+        patch = {
+            "id": desig,
+            "name": desig,
+            "neocp": False,
+            "temp_id": ctx.get("temp_id") or old_id,
+            "packed": ctx.get("packed") or old_id,
+            "confirmed": dict(conf),
+        }
+        project.rename_object(db, p["id"], desig, patch)
+        self.on_refresh_projects()
+        self._select_project_row(p["id"])
+        self.statusBar().showMessage(
+            self.tr("Renamed to %1: the report, the check and the orbit now "
+                    "use the confirmed designation.").replace("%1", desig),
+            8000)
 
     def _advisor_dismiss(self):
         # A2: dismiss the close-advisor banner for the current project.
@@ -6238,6 +6331,21 @@ class MainWindow(QMainWindow):
         bl.addLayout(prev_col)
         bl.addStretch(1)
         gv.addWidget(box)
+        # ADR-084 rev: the follow run's progress, in the window and not only in
+        # the status bar. Hidden until a run starts (an empty bar is noise).
+        follow_box = QWidget()
+        follow_box.setVisible(False)
+        fl = QVBoxLayout(follow_box)
+        fl.setContentsMargins(0, 0, 0, 0)
+        fl.setSpacing(4)
+        lbl_follow = QLabel("")
+        lbl_follow.setWordWrap(True)
+        prg_follow = QProgressBar()
+        prg_follow.setRange(0, 100)
+        prg_follow.setTextVisible(True)
+        fl.addWidget(lbl_follow)
+        fl.addWidget(prg_follow)
+        gv.addWidget(follow_box)
         layout.addWidget(grp)
 
         self._obs_widgets = {
@@ -6263,6 +6371,9 @@ class MainWindow(QMainWindow):
             "capture_preview_img": lbl_prev,
             "capture_caption": lbl_prev_cap,
             "capture_open": btn_prev_open,
+            "follow_box": follow_box,
+            "follow_label": lbl_follow,
+            "follow_bar": prg_follow,
         }
         btn_c.clicked.connect(self._ccd_connect)
         btn_d.clicked.connect(self._ccd_disconnect)
@@ -7146,6 +7257,10 @@ class MainWindow(QMainWindow):
                 "the observation ends.").replace(
                     "%1", str(plan["frames"])).replace(
                     "%2", str(plan.get("crossing_frames") or 0))
+        if bool(config.get("follow_guide", True)):
+            text += "\n\n" + self.tr(
+                "The guider is put back before each observation (a slew stops "
+                "it), using the calibration you already have.")
         # the "why" of the loop, from the one house of explanations (ADR-058)
         from ..core import explain
         short = explain.short(explain.FOLLOW)
@@ -7158,12 +7273,24 @@ class MainWindow(QMainWindow):
     def _ccd_follow_start(self, p, ctx, plan):
         # @args: p - the project, ctx - its context, plan - follow.plan_run
         from .workers import FollowWorker, hold
+        from ..core import project as project_mod
         options = self._capture_options_from_widgets()
         site = config.get("mpc_code", "")
+        guide = bool(config.get("follow_guide", True))
+        calibrate = bool(config.get("follow_calibrate", False))
+        try:
+            project_dir = str(project_mod.storage_dir(p))
+        except Exception:                 # never block the run on a path
+            project_dir = None
         worker = FollowWorker(self._ccd_client, plan, p["object_name"],
-                                ctx, options=options, site=site)
+                              ctx, options=options, site=site, guide=guide,
+                              calibrate=calibrate, project_dir=project_dir)
         self._ccd_follow_worker = hold(worker)
+        self._ccd_follow_pid = p["id"]
+        self._ccd_follow_total = int(plan.get("n_obs") or 1)
+        self._ccd_follow_frames = int(plan.get("frames") or 1)
         worker.progress.connect(self._ccd_follow_progress)
+        worker.result.connect(self._ccd_follow_result)
         worker.finished.connect(self._ccd_follow_finished)
         self._ccd_follow_running = True
         # the loop owns the client: stop the dashboard poll so two workers do
@@ -7172,36 +7299,118 @@ class MainWindow(QMainWindow):
         w = self._ccd_widgets()
         if w.get("ccd_follow"):
             w["ccd_follow"].setText(self.tr("Stop following"))
+        self._ccd_follow_show(0, self.tr("Follow run started."))
         self._ccd_apply_state()
         worker.start()
         self.statusBar().showMessage(
             self.tr("Follow run started."), 5000)
 
+    def _ccd_follow_show(self, percent, text):
+        # @args: percent - 0..100 overall progress, text - the one-line state
+        # @return: None. The follow run's own progress area (ADR-084 rev): a
+        #          bar and a line that say which observation, how many frames
+        #          and how much is left, so the run is not a black box that
+        #          only talks through the status bar.
+        w = self._ccd_widgets()
+        box = w.get("follow_box")
+        if box is not None:
+            box.setVisible(True)
+        bar = w.get("follow_bar")
+        if bar is not None:
+            bar.setValue(max(0, min(100, int(percent))))
+        lbl = w.get("follow_label")
+        if lbl is not None:
+            lbl.setText(text or "")
+
+    def _ccd_follow_hide(self):
+        # @return: None. The progress area belongs to the run that filled it.
+        box = self._ccd_widgets().get("follow_box")
+        if box is not None:
+            box.setVisible(False)
+
     def _ccd_follow_cancel(self):
         if self._ccd_follow_worker is not None:
             self._ccd_follow_worker.cancel()
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Stopping the follow run…"))
             self.statusBar().showMessage(
                 self.tr("Stopping the follow run…"), 5000)
 
+    def _ccd_follow_percent(self, i=None, frac=0.0):
+        # @return: the overall progress in percent from the observation index
+        #          (1-based) and the fraction of it already captured
+        n = max(1, int(self._ccd_follow_total or 1))
+        done = (max(0, int(i or 1) - 1) + max(0.0, min(1.0, frac)))
+        return int(100.0 * done / n)
+
     def _ccd_follow_progress(self, info):
-        # @args: info - {event, i, n, frames, ...} from the run
+        # @args: info - {event, i, n, frames, current, total, ...} from the run
         info = info or {}
         event = info.get("event")
         i, n = info.get("i"), info.get("n")
         if event == "centering":
             msg = self.tr("Observation %1 of %2: centering…").replace(
                 "%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "guiding":
+            msg = self.tr("Observation %1 of %2: starting the guider…").replace(
+                "%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "guide_failed":
+            msg = self.tr(
+                "Observation %1 of %2: the guider did not start; capturing "
+                "unguided.").replace("%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
         elif event == "capturing":
             msg = self.tr("Observation %1 of %2: capturing %3 frames…").replace(
                 "%1", str(i)).replace("%2", str(n)).replace(
                     "%3", str(info.get("frames")))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "progress":
+            cur, total = info.get("current"), info.get("total")
+            frac = 0.0
+            if cur is not None and total:
+                try:
+                    frac = float(cur) / float(total)
+                except (TypeError, ValueError):
+                    frac = 0.0
+            remain = info.get("exposure_remaining")
+            msg = self.tr("Observation %1 of %2 · frame %3/%4").replace(
+                "%1", str(i)).replace("%2", str(n)).replace(
+                    "%3", str(cur if cur is not None else "–")).replace(
+                    "%4", str(total if total else "–"))
+            if remain is not None:
+                msg += " · " + self.tr("%1 s left").replace(
+                    "%1", f"{float(remain):.0f}")
+            self._ccd_follow_show(self._ccd_follow_percent(i, frac), msg)
         elif event == "capture_timeout":
             msg = self.tr(
                 "Observation %1: the software did not report the end; going "
                 "on.").replace("%1", str(i))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
         else:
             return
         self.statusBar().showMessage(msg, 0)
+
+    def _ccd_follow_result(self, payload):
+        # @args: payload - {"manifest": {...}, "status": str}
+        # @return: None. The run's manifest is what lets the editor group the
+        #          frames per observation, so it is kept in the project even
+        #          when the run was stopped part way (ADR-084 rev).
+        manifest = (payload or {}).get("manifest") or {}
+        pid = self._ccd_follow_pid
+        if pid is None or not manifest.get("observations"):
+            return
+        p = project.get(db, pid) or {}
+        t0 = manifest.get("t0")
+        manifest["date"] = manifest.get("date") or time.strftime(
+            "%Y-%m-%d", time.localtime(t0) if t0 else time.localtime())
+        manifest["object"] = p.get("object_name") or ""
+        ctx = dict(p.get("context") or {})
+        runs = list(ctx.get("follow_runs") or [])
+        runs.append(manifest)
+        ctx["follow_runs"] = runs[-20:]
+        project.update_context(db, pid, ctx)
 
     def _ccd_follow_finished(self, status, error):
         # @args: status - done|cancelled|failed, error - message or ""
@@ -7213,17 +7422,26 @@ class MainWindow(QMainWindow):
             w["ccd_follow"].setText(self.tr("Start and follow…"))
         self._ccd_apply_state()
         if error:
+            self._ccd_follow_show(0, self.tr("Follow run failed: %1").replace(
+                "%1", str(error)))
             self.statusBar().showMessage(error, 10000)
         elif status == "cancelled":
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Follow run stopped."))
             self.statusBar().showMessage(
                 self.tr("Follow run stopped."), 8000)
         elif status == "done":
+            self._ccd_follow_show(100, self.tr("Follow run finished."))
             self.statusBar().showMessage(
                 self.tr("Follow run finished."), 8000)
         else:
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Follow run ended: %1").replace(
+                                      "%1", str(status)))
             self.statusBar().showMessage(
                 self.tr("Follow run ended: %1").replace(
                     "%1", str(status)), 8000)
+        self._ccd_follow_pid = None
 
     # -- last-frame preview (ADR-082) -------------------------------------
 
@@ -13126,7 +13344,8 @@ class MainWindow(QMainWindow):
         # object, never a folder dialog. No visit (or no FITS in it): the
         # tabs stay disarmed and say why.
         # @args: pid - project id, session_id - the visit or None
-        # @return: {"pid", "session_id", "paths", "object_name"} or None
+        # @return: {"pid", "session_id", "paths", "object_name", "confirmed",
+        #           "neocp"} or None
         if session_id is None:
             return None
         files = project.files_for_session(db, session_id)
@@ -13143,8 +13362,15 @@ class MainWindow(QMainWindow):
         seq = ctx.get("sequence") or {}
         comps = [e for e in (seq.get("entries") or [])
                  if (e.get("kind") or "comp") == "comp"]
+        # The CONFIRMED identity rides along (ADR-077 rev): the report and the
+        # check must name the object as the MPC knows it NOW, not by the
+        # temporary NEOCP tag. The context used to drop both keys, so the
+        # report fell back to the old name and the packer could not place it.
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "object_name": p.get("object_name") or "",
+                "confirmed": dict(ctx.get("confirmed") or {}),
+                "neocp": bool(ctx.get("neocp")),
+                "follow_runs": list(ctx.get("follow_runs") or []),
                 "packed": ctx.get("packed") or ctx.get("id"),
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}

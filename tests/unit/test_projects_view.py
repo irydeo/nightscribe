@@ -396,27 +396,84 @@ def test_the_confirmation_banner_says_participation_when_known(window):
     assert "your observations are among them" in text
 
 
-def test_a_temporary_designation_triggers_the_alias_lookup(window):
-    # ADR-077 rev: a NEO created by hand (no `neocp` flag) whose name is still
-    # a NEOCP/PCCP temporary designation is looked up too, so a confirmation
-    # under a new name is announced anyway.
+def test_an_unconfirmed_neo_triggers_the_alias_lookup(window):
+    # ADR-077 rev: the trigger is the project's own flags, NOT the name's
+    # shape (NEOCP/PCCP tags have none). A NEO created by hand, with no
+    # `neocp` flag, is still looked up: the rolling list is the only judge,
+    # and it answers nothing for a name that is already confirmed.
     from nightscribe.core import db as coredb
     from nightscribe.core import project
     from nightscribe.gui.main_window import VIEW_DETAIL
     p = project.create(coredb.db, "neo", "A11HPKO", {"mag": 19.0})
     seen = []
-    window._start_alias_lookup = lambda proj: seen.append(proj["object_name"])
+    window._start_alias_lookup = lambda proj, force=False: seen.append(
+        (proj["object_name"], force))
     window.navigate(VIEW_DETAIL, pid=p["id"])
-    assert seen == ["A11HPKO"]
+    assert seen == [("A11HPKO", False)]
 
 
-def test_a_confirmed_name_does_not_trigger_the_alias_lookup(window):
+def test_a_pccp_triggers_a_fresh_alias_lookup(window):
+    # A PCCP is, by definition, a candidate still awaiting confirmation: its
+    # lookup bypasses the cache so a confirmation that just landed is seen.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    p = project.create(coredb.db, "pccp", "P10abcd", {"mag": 19.0})
+    seen = []
+    window._start_alias_lookup = lambda proj, force=False: seen.append(
+        (proj["object_name"], force))
+    window.navigate(VIEW_DETAIL, pid=p["id"])
+    assert seen == [("P10abcd", True)]
+
+
+def test_a_confirmed_object_does_not_trigger_the_alias_lookup(window):
+    # Once the rename is known (context["confirmed"]), there is nothing left
+    # to look up: the banner is painted and no call is made.
     from nightscribe.core import db as coredb
     from nightscribe.core import project
     from nightscribe.gui.main_window import VIEW_DETAIL
     p = [x for x in project.list_projects(coredb.db)
          if x["kind"] == "neo"][0]
+    project.merge_confirmed(coredb.db, p["id"], {"designation": "2026 TG69"})
     seen = []
-    window._start_alias_lookup = lambda proj: seen.append(proj["object_name"])
+    window._start_alias_lookup = lambda proj, force=False: seen.append(proj)
     window.navigate(VIEW_DETAIL, pid=p["id"])
     assert seen == []
+
+
+def test_apply_confirmation_renames_and_moves_the_identity(window):
+    # ADR-077 rev: the one-click apply renames the project and moves its
+    # identity context, so the report, the check and the orbit stop using the
+    # temporary NEOCP name; the temporary one is kept for the fallback.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    old = p["object_name"]
+    project.merge_confirmed(coredb.db, p["id"],
+                            {"designation": "2026 TG69",
+                             "mpec": "MPEC 2026-T237"})
+    window._apply_confirmation(project.get(coredb.db, p["id"]))
+    p2 = project.get(coredb.db, p["id"])
+    assert p2["object_name"] == "2026 TG69"
+    assert p2["context"]["id"] == "2026 TG69"
+    assert p2["context"]["neocp"] is False
+    assert p2["context"]["temp_id"] == old
+    assert p2["context"]["confirmed"]["designation"] == "2026 TG69"
+
+
+def test_the_confirm_link_uses_the_confirmed_name(window):
+    # The banner's "Use the confirmed name" link routes to the apply; the
+    # object-at-the-MPC link still opens in the browser.
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    p = [x for x in project.list_projects(coredb.db)
+         if x["kind"] == "neo"][0]
+    project.merge_confirmed(coredb.db, p["id"], {"designation": "2026 TG69"})
+    window._current_project = project.get(coredb.db, p["id"])
+    opened = []
+    window._open_url = lambda url: opened.append(url)
+    window._confirm_link_clicked("ns://use-confirmed")
+    assert project.get(coredb.db, p["id"])["object_name"] == "2026 TG69"
+    window._confirm_link_clicked("https://www.minorplanetcenter.net/x")
+    assert opened == ["https://www.minorplanetcenter.net/x"]

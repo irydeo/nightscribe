@@ -60,9 +60,15 @@ URL_NEOCP_PREV = "https://minorplanetcenter.net/mpcops/neocp/neocp_prev_des/"
 # setdefault keeps it idempotent if the module is imported twice.
 SOURCE_TTL.setdefault(
     "mpc_obs", int(config.get("mpc_obs_ttl_h") or 6) * 3600)
-# The rolling NEOCP list moves during a night; 6 h keeps the alias lookup
-# fresh without hammering the MPC.
-SOURCE_TTL.setdefault("mpc_neocp_prev", 6 * 3600)
+# The rolling NEOCP list is where a temporary designation turns into a
+# confirmed one, and that happens DURING a night. A 6 h cache hid it: on
+# 2026-10-13 the object was confirmed at 19:38 and a list cached at 17:00
+# stayed blind to it all evening (the check said "no published observations"
+# and the observer had to type the new name by hand). 30 min keeps the
+# PASSIVE banner fresh without hammering the MPC; the ACTIVE paths (the
+# check via reference_80, and the report) force a fresh read regardless, so
+# the window that matters is never gated by this TTL.
+SOURCE_TTL.setdefault("mpc_neocp_prev", 30 * 60)
 
 
 @dataclass
@@ -405,6 +411,16 @@ def reference_80(desig, obs_code="", force=False):
         return Reference(lines=lines, source="NEOCP", designation=name,
                          ours_present=_station_in(lines, obs_code))
     alias = resolve_neocp_alias(name, force=force)
+    if not alias and not force:
+        # The object left the NEOCP and the cached rolling list did not name
+        # it: either it is not confirmed yet, or it was confirmed in the last
+        # few minutes and the cached list predates the confirmation. That
+        # second case is the ONE window this whole path exists for, so read
+        # the list fresh instead of trusting a cache that may be minutes old
+        # (measured 2026-10-13: a check at 21:04 kept saying "no published
+        # observations" because the cached list came from 17:00, while a
+        # fresh read resolved Sar2949 -> 2026 TG69 at once).
+        alias = resolve_neocp_alias(name, force=True)
     if alias and alias.get("designation") and alias["designation"] != name:
         lines = observations_80(alias["designation"], force=force)
         if _lines_block(lines):

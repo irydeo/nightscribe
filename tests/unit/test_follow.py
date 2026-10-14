@@ -198,3 +198,141 @@ def test_run_says_a_capture_timeout_and_goes_on():
         sleep=clock.sleep, clock=clock, poll_s=1.0)
     assert run.run() == "done"
     assert events.count("capture_timeout") == 2
+
+
+# ------------------------------------------- guiado, progreso y manifiesto
+
+def test_run_records_a_manifest_per_observation():
+    # ADR-084 rev: the run writes down how many frames each observation took
+    # (what the reduction groups by), with the wall-clock window of each one.
+    clock = _Clock()
+    wall = [1000.0]
+    filed = []
+
+    def group(i, t0, t1):
+        filed.append((i, t0, t1))
+        wall[0] += 10.0
+        return 3                       # the run filed 3 frames
+
+    run = follow.FollowRun(
+        _plan(n=2, frames=4),
+        resolve_position=lambda: {"ra_deg": 1.0, "dec_deg": 2.0},
+        center=lambda ra, dec: None,
+        push_plan=lambda n, e: None,
+        start_capture=lambda: None,
+        capturing=lambda: False,
+        group_observation=group,
+        progress=lambda ev, **k: None,
+        sleep=clock.sleep, clock=clock, wall=lambda: wall[0], poll_s=1.0)
+    assert run.run() == "done"
+    obs = run.manifest["observations"]
+    assert [o["i"] for o in obs] == [1, 2]
+    assert [o["frames"] for o in obs] == [3, 3]     # the filed count wins
+    assert len(filed) == 2
+    assert run.manifest["t0"] is not None and run.manifest["t1"] is not None
+
+
+def test_run_guides_before_each_capture():
+    clock = _Clock()
+    order = []
+    run = follow.FollowRun(
+        _plan(n=2),
+        resolve_position=lambda: {"ra_deg": 1.0, "dec_deg": 2.0},
+        center=lambda ra, dec: order.append("center"),
+        push_plan=lambda n, e: order.append("push"),
+        start_capture=lambda: order.append("start"),
+        capturing=lambda: False,
+        guide=lambda: order.append("guide") or True,
+        progress=lambda ev, **k: None,
+        sleep=clock.sleep, clock=clock, poll_s=1.0)
+    assert run.run() == "done"
+    assert order[:4] == ["center", "guide", "push", "start"]
+
+
+def test_a_guide_failure_is_said_and_the_run_goes_on():
+    clock = _Clock()
+    events = []
+    run = follow.FollowRun(
+        _plan(n=1),
+        resolve_position=lambda: {"ra_deg": 1.0, "dec_deg": 2.0},
+        center=lambda ra, dec: None,
+        push_plan=lambda n, e: None,
+        start_capture=lambda: None,
+        capturing=lambda: False,
+        guide=lambda: False,
+        progress=lambda ev, **k: events.append(ev),
+        sleep=clock.sleep, clock=clock, poll_s=1.0)
+    assert run.run() == "done"
+    assert "guide_failed" in events
+
+
+def test_the_capture_numbers_ride_the_progress_events():
+    clock = _Clock()
+    seen = []
+    run = follow.FollowRun(
+        _plan(n=1),
+        resolve_position=lambda: {"ra_deg": 1.0, "dec_deg": 2.0},
+        center=lambda ra, dec: None,
+        push_plan=lambda n, e: None,
+        start_capture=lambda: None,
+        capturing=lambda: True,          # stays capturing, so progress fires
+        capture_progress=lambda: {"current": 2, "total": 5,
+                                  "exposure_remaining": 3.0},
+        progress=lambda ev, **k: seen.append((ev, k)),
+        sleep=clock.sleep, clock=clock, poll_s=1.0)
+    run.run()
+    prog = [k for ev, k in seen if ev == "progress"]
+    assert prog and prog[0]["current"] == 2 and prog[0]["total"] == 5
+
+
+# ------------------------------------------------- agrupación de las tomas
+
+class _Frame:
+    def __init__(self, path, t):
+        self.path = path
+        self.t_mid_jd = t
+
+
+def test_group_by_folder_separates_the_observations():
+    frames = [_Frame("/cap/obj_20261014/obs01/a.fits", 1.0),
+              _Frame("/cap/obj_20261014/obs01/b.fits", 1.001),
+              _Frame("/cap/obj_20261014/obs02/c.fits", 2.0),
+              _Frame("/cap/obj_20261014/obs02/d.fits", 2.001)]
+    assert follow.group_by_folder(frames) == [(0, 2), (2, 4)]
+
+
+def test_group_by_folder_needs_more_than_one_folder():
+    frames = [_Frame("/cap/a.fits", 1.0), _Frame("/cap/b.fits", 1.001)]
+    assert follow.group_by_folder(frames) == []
+
+
+def test_group_by_manifest_places_the_frames_by_count():
+    frames = [_Frame(f"/cap/{i}.fits", float(i)) for i in range(5)]
+    manifest = {"observations": [{"frames": 2}, {"frames": 3}]}
+    assert follow.group_by_manifest(frames, manifest) == [(0, 2), (2, 5)]
+    # a total that does not match is refused (the observer added a frame)
+    assert follow.group_by_manifest(frames + [_Frame("/cap/x.fits", 9.0)],
+                                    manifest) == []
+
+
+def test_group_by_gaps_splits_at_the_repoint():
+    # intra-observation gap ~2 s, re-point ~60 s: one clean split
+    times = [1.0, 1.0 + 2 / 86400, 1.0 + 4 / 86400,
+             1.0 + 64 / 86400, 1.0 + 66 / 86400]
+    frames = [_Frame(f"/c/{i}.fits", t) for i, t in enumerate(times)]
+    assert follow.group_by_gaps(frames) == [(0, 3), (3, 5)]
+
+
+def test_resolve_groups_prefers_the_folders_then_the_manifest():
+    frames = [_Frame("/cap/obs01/a.fits", 1.0),
+              _Frame("/cap/obs02/b.fits", 1.1)]
+    groups, source = follow.resolve_groups(frames)
+    assert source == "folders" and groups == [(0, 1), (1, 2)]
+    # one folder, 0.86 s apart: no subfolders and no gap, so the manifest
+    flat = [_Frame(f"/cap/{i}.fits", 1.0 + i * 1e-5) for i in range(4)]
+    groups, source = follow.resolve_groups(
+        flat, manifest={"observations": [{"frames": 2}, {"frames": 2}]})
+    assert source == "manifest" and groups == [(0, 2), (2, 4)]
+    # nothing to go on: the manual count decides
+    groups, source = follow.resolve_groups(flat, n_obs=2)
+    assert source == "manual" and len(groups) == 2

@@ -62,6 +62,12 @@ DEFAULTS = {
     "pixel_um": 3.76,           # camera pixel size in microns
     "focal_mm": 2000.0,         # telescope focal length in mm
     "follow_s": 60.0,           # slew + solve + correct + settle per re-point
+    # ADR-084 rev: the follow run puts the guider back before each observation
+    # (a slew stops it). On by default; calibrating is off because CCDciel's
+    # StartGuiding and NINA's start already use the stored calibration, and a
+    # fresh one is only worth it when the observer knows it is needed.
+    "follow_guide": True,
+    "follow_calibrate": False,
     # CCDciel JSON-RPC (ADR-030). Manual connect by default: the observatory
     # software is a human decision, not an automatic one.
     "ccdciel_host": "127.0.0.1",

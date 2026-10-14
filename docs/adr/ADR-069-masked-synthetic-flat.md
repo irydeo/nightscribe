@@ -1,9 +1,9 @@
 # ADR-069: El flat sintético se enmascara, y el pedestal se quita
 
-**Estado / Status**: Superseded by [ADR-089](ADR-089-vignetting-model.md) ·
+**Estado / Status**: Superseded by [ADR-090](ADR-090-vignetting-model.md) ·
 **Fecha / Date**: 2026-10-07
 
-> **Superado (2026-10-14, ADR-089)**: este ADR construyó un flat sintético de
+> **Superado (2026-10-14, ADR-090)**: este ADR construyó un flat sintético de
 > resolución completa (máscara, relleno, píxeles calientes). Medido después
 > contra el master real, toda esa maquinaria compraba el **polvo** (0,026 mag)
 > y nada más: el viñeteo, que es lo que importa (0,087 mag), lo da igual de
@@ -11,7 +11,7 @@
 > que aquí se describe **ya no existe**; se conserva como historia de lo que
 > se midió entonces y por qué.
 >
-> **Superseded (2026-10-14, ADR-089)**: this ADR built a full-resolution
+> **Superseded (2026-10-14, ADR-090)**: this ADR built a full-resolution
 > synthetic flat (mask, fill, hot pixels). Measured later against the real
 > master, all that machinery bought the **dust** (0.026 mag) and nothing else:
 > the vignetting, which is what matters (0.087 mag), is given just as well by a

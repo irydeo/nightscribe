@@ -1,4 +1,4 @@
-# ADR-089: El modelo de viñeteo se muestrea del cielo
+# ADR-090: El modelo de viñeteo se muestrea del cielo
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-10-14
 

@@ -27,7 +27,8 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 
 - **Código siempre en inglés**: identificadores, comentarios, cabeceras. La documentación
   vive en `docs/` en español e inglés.
-- **Mensajes de commit siempre en inglés**: asunto, ámbito y cuerpo.
+- **Mensajes de commit y texto de las PR siempre en inglés**: asunto, ámbito,
+  cuerpo y descripción de la PR.
 - **Cabecera en TODOS los ficheros `.py`** (copiar tal cual, adaptando el nombre del módulo):
 
 ```
@@ -363,7 +364,8 @@ drafts + tweet + ready-to-attach PNG charts). And between planning and reporting
 
 - **Code is always English**: identifiers, comments, headers. Documentation lives in
   `docs/` in Spanish and English.
-- **Commit messages are always in English**: subject, scope and body.
+- **Commit messages and PR text are always in English**: subject, scope, body
+  and the pull request's description.
 - **The header block above goes in EVERY `.py` file** (adjust module name).
 - **Human voice**: short `# @args:` / `# @return:` comments above each method, in the
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.

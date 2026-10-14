@@ -158,6 +158,17 @@ Ahora el cielo sale de un **anillo fijo** alrededor de la fuente
 (`_ROUNDNESS_SKY_PX`), y el score es idéntico en cualquier tamaño (medido: 46,93
 en 64², 128², 256² y 495²).
 
+**Nota (2026-10-14): el tope de RAM del apilado, medido.** El presupuesto que
+decide RAM o franjas es una constante FIJA (`MEMORY_BUDGET_BYTES`, 2 GiB). Se
+probó a derivarlo de la memoria libre (media de la RAM disponible, con suelo y
+techo, como hace el número de hilos) para no mandar a franjas una pila de 4,2 GiB
+en una máquina de 125 GB, y **se rechazó al medirlo**: las franjas son MÁS
+RÁPIDAS. Medido en una visita de 539 tomas, una pila a frame completo de 270
+tomas (4,2 GiB): CPU 37,8 s en franjas contra 42,5 s en RAM; GPU 11,2 s en
+franjas contra una caída por falta de memoria en RAM (los intermedios del
+recorte son ~5× la pila, así que 4,5 GiB de pila piden ~20 GiB de dispositivo).
+El tope fijo fuerza la ruta buena.
+
 ## English
 
 **Context**: ADR-062's speed campaign (`docs/PLANS/astrometry-perf/`) cut the
@@ -314,3 +325,14 @@ cutout against 47.2 in a 128² window, which would have moved the significance
 gate). The sky now comes from a **fixed ring** around the source
 (`_ROUNDNESS_SKY_PX`), and the score is identical at every size (measured: 46.93
 in 64², 128², 256² and 495²).
+
+**Note (2026-10-14): the stacking's RAM cap, measured.** The budget that decides
+RAM or strips is a FIXED constant (`MEMORY_BUDGET_BYTES`, 2 GiB). Deriving it
+from the free memory (half the available RAM, with a floor and a ceiling, as the
+worker count does) was tried, to stop a 4.2 GiB stack from going to strips on a
+125 GB machine, and it was REJECTED by the measurement: the strips are FASTER.
+Measured on a 539-frame visit, one 270-frame full-frame stack (4.2 GiB): CPU
+37.8 s in strips against 42.5 s in RAM; GPU 11.2 s in strips against an
+out-of-memory fallback in RAM (the combine's intermediates are ~5x the stack, so
+4.5 GiB of stack asks for ~20 GiB of device). The fixed cap forces the good
+path.

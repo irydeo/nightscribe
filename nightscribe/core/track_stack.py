@@ -806,9 +806,15 @@ def sequence_motion_solution(frames, name, site="", lat=None, lon=None,
 # Stacking (phase 3)
 # ======================================================================
 
-# How much memory the stacking may use before it switches to strips. The
-# whole point of the region read is that the cutout path never gets near
-# this; the full-frame final stack is where the budget matters.
+# How much memory the stacking may use before it switches to strips. It is a
+# FIXED threshold on purpose: for a stack that does not fit, the STRIPS are
+# FASTER than holding it all in RAM, on the CPU and on the GPU, because the
+# working set stays small. Measured on a 539-frame visit, one 270-frame
+# full-frame stack (4.2 GiB): CPU 37.8 s in strips against 42.5 s in RAM, and
+# the GPU 11.2 s in strips against an OUT-OF-MEMORY fallback in RAM (the
+# combine's intermediates are about five times the stack, so 4.5 GiB of stack
+# needs ~20 GiB of device). Deriving the budget from the free memory was tried
+# and REJECTED for exactly that reason.
 MEMORY_BUDGET_BYTES = 2 * 1024 ** 3
 
 # The interpolation order the warp resamples with, as ONE constant so the
@@ -1333,9 +1339,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, method - one of METHODS, box - the output box,
     #        shape - the native frame size, cfg - Config, loader - array
-    #        reader, budget_bytes - the RAM budget, track - True freezes the
-    #        OBJECT (the stars trail), False freezes the STARS (the object
-    #        trails), order - the warp's interpolation order (None = the
+    #        reader, budget_bytes - the RAM budget (see MEMORY_BUDGET_BYTES:
+    #        a fixed threshold, because the strips win past it), track - True
+    #        freezes the OBJECT (the stars trail), False freezes the STARS (the
+    #        object trails), order - the warp's interpolation order (None = the
     #        module's default, see WARP_ORDER: a knob for the eye and not for
     #        the limit, which is what the measurement says)
     # @return: (stack, report)

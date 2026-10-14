@@ -41,7 +41,7 @@ def test_v15_walks_to_v16(tmp_path):
     db_file = tmp_path / "old.db"
     _v15_database(db_file)
     db = Database(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 21
     assert {"kind", "path", "camera", "gain", "temp_c", "exptime_s",
             "filter", "created", "meta"} <= _columns(db)
     # The index the matching leans on.
@@ -55,7 +55,27 @@ def test_v16_is_idempotent(tmp_path):
     Database(db_file).close()
     Database(db_file).close()          # reopening must be a no-op
     db = Database(db_file)
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 20
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 21
+
+
+def test_v21_merges_the_dark_of_the_flats_into_the_darks(tmp_path):
+    # ADR-061 rev: a "dark of the flats" is a dark at the flat's exposure,
+    # so the rows move over instead of asking the observer to keep two
+    # entries for one frame.
+    db_file = tmp_path / "with_darkflat.db"
+    db = Database(db_file)          # current version, base schema laid down
+    db.execute("INSERT INTO calib_masters (kind, path) VALUES (?, ?)",
+               ("dark_flat", "/m/df.fits"))
+    db.execute("INSERT INTO calib_masters (kind, path) VALUES (?, ?)",
+               ("dark", "/m/d.fits"))
+    # walk BACK to v20 (a restored backup), so reopening runs the step
+    db.execute("PRAGMA user_version = 20")
+    db.commit()
+    db.close()
+    db = Database(db_file)
+    kinds = [r[0] for r in db.execute(
+        "SELECT kind FROM calib_masters ORDER BY id")]
+    assert kinds == ["dark", "dark"]
 
 
 def test_calibration_module_uses_the_new_table(tmp_db, tmp_path):

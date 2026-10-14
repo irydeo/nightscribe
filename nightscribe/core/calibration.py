@@ -30,11 +30,20 @@ Two physical facts decide the arithmetic, and both are easy to get wrong:
 - A **flat must be normalised before dividing**. Dividing by the flat
   without normalising it would rescale the whole frame's flux level; the
   flat's job is to remove the shape, not to change the brightness. And the
-  flat needs its own offset removed first (a dark-flat, or the bias if the
-  flat is short), or the division amplifies the pedestal in the dark
-  corners of the flat.
+  flat needs its own offset removed first (a dark at the flat's exposure,
+  or the bias if the flat is short), or the division amplifies the pedestal
+  in the dark corners of the flat.
 
 The order matters: offset first, flat second.
+
+The library holds THREE kinds (bias, dark, flat). What each one is matched
+on is decided by physics, not by convenience: a dark carries the level, so
+it needs the exposure and the temperature; a flat carries a SHAPE that is
+the optical train's, so it needs neither (its level is normalised away);
+and a bias is a read-out pedestal, which barely moves with the
+temperature. When a piece is missing, the recipe says WHY with the numbers
+(Recipe.notes), so an observer who can see the master in the library learns
+which criterion left it out instead of reading "no flat" and giving up.
 
 Reading a FITS is not obvious either (ADR-060, D32): astropy refuses to
 memory-map an image whose header carries BSCALE/BZERO/BLANK (the usual
@@ -46,6 +55,7 @@ in float32.
 import datetime
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -63,6 +73,9 @@ _GAIN_KEYS = ("GAIN", "EGAIN", "CCD-GAIN")
 _TEMP_KEYS = ("CCD-TEMP", "DET-TEMP", "SET-TEMP", "TEMP")
 _EXPTIME_KEYS = ("EXPTIME", "EXPOSURE", "ELAPSED")
 _FILTER_KEYS = ("FILTER", "FILTERS", "FILT")
+# DATE-OBS is the observation's own instant; DATE is often just the file's
+# creation time, so it is the last resort.
+_DATE_KEYS = ("DATE-OBS", "DATEOBS", "DATE")
 
 # Matching tolerances. Exposure is exact on purpose: in CMOS the thermal
 # pattern does not scale linearly with time, so a dark at another exposure
@@ -72,8 +85,18 @@ _EXPTIME_TOL_S = 1e-3
 _GAIN_TOL = 1e-6
 _DEFAULT_TEMP_TOL_C = 3.0
 
-# The four kinds of master the library knows.
-KINDS = ("bias", "dark", "dark_flat", "flat")
+# Above this many days between the flat and the light, the flat is used but
+# the recipe warns: the train's dust moves, and a flat from weeks ago may
+# carry a mote that is no longer there (or miss one that is). Measured on
+# the author's own case: a flat 53 days older than the lights was the one
+# the library held.
+FLAT_AGE_WARN_DAYS = 30
+
+# The THREE kinds of master the library knows. A "dark of the flats" is not
+# a kind of its own: it is a DARK at the flat's exposure, and the exposure
+# is what the matching already keys on. Keeping it as a fourth kind asked
+# the observer to classify the same frame twice (ADR-061 rev).
+KINDS = ("bias", "dark", "flat")
 
 
 # ------------------------------------------------------------------ reading
@@ -155,9 +178,11 @@ def _num(value, default=None):
 
 def meta_from_header(header):
     # @args: header - dict
-    # @return: dict {camera, gain, temp_c, exptime_s, filter} (missing: None)
+    # @return: dict {camera, gain, temp_c, exptime_s, filter, date_obs}
+    #          (missing: None)
     # The same tolerant lookup is used to index a master and to ask for the
-    # recipe of a light, so the two speak the same language.
+    # recipe of a light, so the two speak the same language. date_obs is not
+    # part of the matching key: it is what tells the recipe how old a flat is.
     out = {}
     for key in _CAMERA_KEYS:
         if header.get(key):
@@ -189,7 +214,38 @@ def meta_from_header(header):
             break
     else:
         out["filter"] = None
+    for key in _DATE_KEYS:
+        if header.get(key):
+            out["date_obs"] = str(header[key]).strip()
+            break
+    else:
+        out["date_obs"] = None
     return out
+
+
+def parse_date_obs(text):
+    # @args: text - a FITS date ("2026-10-13T19:40:58.875", or a bare date)
+    # @return: a naive datetime, or None when it cannot be read
+    # Timezone-aware strings are accepted and their offset dropped: the age
+    # is read in days, so a few hours of offset change nothing.
+    if not text:
+        return None
+    text = str(text).strip().replace("Z", "+00:00")
+    try:
+        parsed = datetime.datetime.fromisoformat(text)
+    except ValueError:
+        parsed = None
+    if parsed is None:
+        for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S",
+                    "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+            try:
+                parsed = datetime.datetime.strptime(text, fmt)
+                break
+            except ValueError:
+                continue
+    if parsed is None:
+        return None
+    return parsed.replace(tzinfo=None)
 
 
 # ------------------------------------------------------------- the library
@@ -266,7 +322,11 @@ def list_masters(db, camera=None, kind=None):
         out = [m for m in out if _same_text(m.camera, camera)]
     if kind is not None:
         out = [m for m in out if m.kind == kind]
-    out.sort(key=lambda m: m.created or "", reverse=True)
+    # Newest first, and the id breaks a tie: masters indexed in the same
+    # second (a whole folder at once, the usual way) would otherwise come
+    # back in insertion order and the "newest wins" rule would pick the
+    # oldest of the batch.
+    out.sort(key=lambda m: (m.created or "", m.id), reverse=True)
     return out
 
 
@@ -290,6 +350,90 @@ def delete_master(db, master_id, delete_file=False):
     return path
 
 
+# ------------------------------------------------ what a frame IS (ADR-061 rev)
+#
+# The observer should not have to classify a frame by hand: a calibration
+# frame says what it is in its own header, and asking "is this a dark or a
+# dark of the flats?" made the observer answer a question the frame already
+# answers (a dark of the flats IS a dark, at the flat's exposure).
+_IMAGETYP_KEYS = ("IMAGETYP", "IMAGETYPE", "OBSTYPE", "FRAME")
+_IMAGETYP_KINDS = {
+    "bias": "bias", "biasframe": "bias", "zero": "bias",
+    "dark": "dark", "darkframe": "dark",
+    "darkflat": "dark", "flatdark": "dark", "darkforflat": "dark",
+    "flat": "flat", "flatfield": "flat", "skyflat": "flat",
+    "domeflat": "flat", "twilightflat": "flat", "lampflat": "flat",
+}
+_IMAGETYP_LIGHTS = ("light", "object", "science", "target")
+# The exposure is the only fallback when IMAGETYP is missing, and it is a
+# NARROW one on purpose: a 0.005 s flat and a bias are both "short", so only
+# an exposure at zero is called a bias, and only a clearly long one (the
+# usual minutes-long dark) is called a dark. Anything in between is not
+# guessed: the observer is asked, because guessing wrong puts the frame in
+# the wrong arithmetic.
+_BIAS_MAX_EXPTIME_S = 1e-3
+_DARK_MIN_EXPTIME_S = 5.0
+
+
+def classify_master(path):
+    # @args: path - a FITS frame the observer wants to index
+    # @return: (kind, None) with kind one of KINDS, or (None, why) when it
+    #          cannot be told (why is plain language, for the observer)
+    # IMAGETYP first, because that is what the frame itself says; the
+    # exposure only as a last resort, and only where it is unambiguous.
+    try:
+        header = read_header(path)
+    except Exception as err:
+        return None, f"the header could not be read ({err})"
+    raw = None
+    for key in _IMAGETYP_KEYS:
+        value = header.get(key)
+        if value:
+            raw = str(value).strip()
+            break
+    if raw:
+        norm = re.sub(r"[^a-z]", "", raw.lower())
+        if norm in _IMAGETYP_KINDS:
+            return _IMAGETYP_KINDS[norm], None
+        if norm in _IMAGETYP_LIGHTS:
+            return None, ("this is a LIGHT frame, not a calibration "
+                          "master")
+        return None, f"IMAGETYP says {raw!r}, which is not a master kind"
+    exptime = meta_from_header(header).get("exptime_s")
+    if exptime is not None and exptime <= _BIAS_MAX_EXPTIME_S:
+        return "bias", None
+    if exptime is not None and exptime >= _DARK_MIN_EXPTIME_S:
+        return "dark", None
+    return None, ("IMAGETYP is missing and the exposure alone cannot tell "
+                  "a flat from a dark: add IMAGETYP to the frame")
+
+
+_DATE_CACHE = {}
+
+
+def master_date_obs(ref):
+    # @args: ref - a MasterRef
+    # @return: the frame's own DATE-OBS as a string, or None when it is not
+    #          known and cannot be read
+    # The index stores the date since ADR-061 rev; a row indexed before that
+    # carries none, so it is read from the master's own header ONCE and
+    # remembered. Without this the age of an existing flat (the author's:
+    # 53 days) would stay invisible.
+    key = str(ref.path)
+    if key in _DATE_CACHE:
+        return _DATE_CACHE[key]
+    date = (ref.meta or {}).get("date_obs")
+    if not date:
+        try:
+            date = meta_from_header(read_header(ref.path)).get("date_obs")
+        except Exception as err:                 # a header is never fatal
+            logger.warning("master %s: its date could not be read (%s)",
+                           ref.path, err)
+            date = None
+    _DATE_CACHE[key] = date
+    return date
+
+
 def _same_text(a, b):
     # @args: a, b - two optional strings
     # @return: True when both are known and equal (case-insensitive)
@@ -306,6 +450,36 @@ def _close(a, b, tol):
     return abs(float(a) - float(b)) <= tol
 
 
+def _rejections(ref, camera=None, gain=None, temp_c=None, exptime_s=None,
+                filter=None, tol_c=None):
+    # @args: ref - a MasterRef, the rest - what the light asks for
+    # @return: the criteria this master FAILS, as (name, master value,
+    #          wanted value); an empty list means it matches
+    # One function decides the match and the same one explains a miss, so
+    # the "no flat" line and the matching can never disagree about why a
+    # master was left out. A criterion left as None is IGNORED (the caller
+    # may not know it): that is what lets the flat be matched without a
+    # temperature, or the bias without a gain.
+    bad = []
+    if camera is not None and ref.camera is not None \
+            and not _same_text(ref.camera, camera):
+        bad.append(("camera", ref.camera, camera))
+    if gain is not None and ref.gain is not None \
+            and not _close(ref.gain, gain, _GAIN_TOL):
+        bad.append(("gain", ref.gain, gain))
+    if exptime_s is not None and ref.exptime_s is not None \
+            and not _close(ref.exptime_s, exptime_s, _EXPTIME_TOL_S):
+        bad.append(("exposure", ref.exptime_s, exptime_s))
+    if filter is not None and ref.filter is not None \
+            and not _same_text(ref.filter, filter):
+        bad.append(("filter", ref.filter, filter))
+    if temp_c is not None and ref.temp_c is not None:
+        tol = _DEFAULT_TEMP_TOL_C if tol_c is None else float(tol_c)
+        if abs(ref.temp_c - float(temp_c)) > tol:
+            bad.append(("temperature", ref.temp_c, temp_c))
+    return bad
+
+
 def find_master(db, kind, camera=None, gain=None, temp_c=None,
                 exptime_s=None, filter=None, tol_c=None):
     # The best master for a light. A criterion left as None is IGNORED
@@ -319,38 +493,54 @@ def find_master(db, kind, camera=None, gain=None, temp_c=None,
     #        exptime_s/filter - what the light asks for, tol_c - temperature
     #        tolerance (config default when None)
     # @return: MasterRef or None
-    tol = _DEFAULT_TEMP_TOL_C if tol_c is None else float(tol_c)
     best = None
     best_delta = None
     for ref in list_masters(db, kind=kind):
-        if not _same_text(ref.camera, camera) and ref.camera and camera:
-            continue
-        if not _close(ref.gain, gain, _GAIN_TOL) and ref.gain is not None \
-                and gain is not None:
-            continue
-        if not _close(ref.exptime_s, exptime_s, _EXPTIME_TOL_S) \
-                and ref.exptime_s is not None and exptime_s is not None:
-            continue
-        if not _same_text(ref.filter, filter) and ref.filter and filter:
+        if _rejections(ref, camera, gain, temp_c, exptime_s, filter, tol_c):
             continue
         delta = None
         if ref.temp_c is not None and temp_c is not None:
             delta = abs(ref.temp_c - float(temp_c))
-            if delta > tol:
-                continue
         if best is None or _prefer(delta, ref, best_delta, best):
             best, best_delta = ref, delta
     return best
+
+
+def closest_rejected(db, kind, camera=None, gain=None, temp_c=None,
+                     exptime_s=None, filter=None, tol_c=None):
+    # @args: db - Database, kind - one of KINDS, the rest - what the light
+    #        asks for
+    # @return: (ref, bad) the master of this kind that came CLOSEST to
+    #          matching, with the criteria it failed, or (None, []) when
+    #          the library holds none of this kind at all
+    # The observer who reads "no flat" while KNOWING there is one needs the
+    # reason, not a shrug: a master of the right camera with one criterion
+    # off beats a stranger that fails everything.
+    best, best_bad, best_rank = None, [], None
+    for ref in list_masters(db, kind=kind):
+        bad = _rejections(ref, camera, gain, temp_c, exptime_s, filter, tol_c)
+        if not bad:
+            continue
+        same_cam = camera is not None and _same_text(ref.camera, camera)
+        rank = (0 if same_cam else 1, len(bad))
+        if best_rank is None or rank < best_rank:
+            best, best_bad, best_rank = ref, bad, rank
+    return best, best_bad
 
 
 def _prefer(delta, ref, best_delta, best):
     # @args: delta - temperature distance of the candidate (or None),
     #        ref - candidate, best_delta/best - current winner
     # @return: True when the candidate wins
-    # Nearest temperature first; ties (or no temperature at all) go to the
-    # most recent, which is what list_masters returns first.
+    # Nearest temperature first; ties go to the most recent, which is what
+    # list_masters returns first. When there is no temperature to compare
+    # (delta is None, either because the light does not know its own or the
+    # master does not carry one) nothing improves on the first candidate, so
+    # it stands: the newest wins. Returning True here would walk all the way
+    # to the OLDEST, which is how a flat with no temperature criterion came
+    # out years old (measured on the author's library, 2026-10-14).
     if delta is None:
-        return best_delta is None
+        return False
     if best_delta is None:
         return True
     return delta < best_delta
@@ -367,6 +557,15 @@ class Recipe:
     flat: MasterRef | None = None
     flat_offset: MasterRef | None = None  # offset removed from the flat
     warnings: list[str] = field(default_factory=list)
+    # WHY a piece could not be found, WITH the numbers, one dict per miss:
+    # {"what": "dark"|"bias"|"flat", "reason": "camera"|"gain"|"exposure"|
+    #  "filter"|"temperature"|"age", "master": the file name, "value": what
+    #  the master has, "wanted": what the light asks for, "tol": the
+    #  tolerance it broke, "days": the flat's age}. The warnings stay short
+    #  and stable (the log and the run's own note read them); these carry
+    #  the detail that lets the observer FIX the library instead of
+    #  guessing why the master he can see was not used (ADR-061 rev).
+    notes: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -381,10 +580,70 @@ class CalibrationReport:
     ok: bool = True
 
 
+def _note(recipe, what, reason, master=None, value=None, wanted=None,
+          tol=None, days=None):
+    # @args: recipe - the Recipe being built, what - "dark"|"bias"|"flat",
+    #        reason - the criterion that failed, master - the file left out,
+    #        value/wanted - what it has against what the light asks for,
+    #        tol - the tolerance it broke, days - the flat's age
+    # @return: None
+    recipe.notes.append({
+        "what": what, "reason": reason,
+        "master": Path(master).name if master else None,
+        "value": value, "wanted": wanted, "tol": tol, "days": days})
+
+
+def _note_missing(recipe, db, kind, what, camera=None, gain=None, temp_c=None,
+                  exptime_s=None, filter=None, tol_c=None):
+    # @args: recipe - the Recipe being built, db - Database, kind - the kind
+    #        looked for, what - "dark"|"bias"|"flat", the rest - what the
+    #        light asks for
+    # @return: None. Adds ONE note naming the closest master that was left
+    #          out and the criterion it failed, or nothing when the library
+    #          holds none of this kind (the warning already says that).
+    ref, bad = closest_rejected(db, kind, camera, gain, temp_c, exptime_s,
+                                filter, tol_c)
+    if ref is None or not bad:
+        return
+    # The FIRST failed criterion is the one to name: camera, gain, exposure,
+    # filter, temperature, in the order _rejections reports them.
+    name, have, want = bad[0]
+    _note(recipe, what, name, master=ref.path, value=have, wanted=want,
+          tol=tol_c)
+
+
+def _flat_age_note(recipe, flat, meta):
+    # @args: recipe - the Recipe, flat - the chosen flat, meta - the light's
+    # @return: None. A flat from weeks ago is USED (it is better than none)
+    #          but it is SAID: the train's dust moves between nights, and a
+    #          mote that was there in August may not be there in October.
+    light = parse_date_obs(meta.get("date_obs"))
+    taken = parse_date_obs(master_date_obs(flat))
+    if light is None or taken is None:
+        return
+    days = (light - taken).total_seconds() / 86400.0
+    if days >= FLAT_AGE_WARN_DAYS:
+        _note(recipe, "flat", "age", master=flat.path, days=int(round(days)))
+
+
 def resolve_recipe(db, meta, tol_c=None):
     # @args: db - Database, meta - a light's metadata (from a header),
     #        tol_c - temperature tolerance
     # @return: Recipe (with warnings in plain language, never an exception)
+    #
+    # WHAT EACH PIECE IS MATCHED ON, and why it is not more:
+    #   dark   camera + gain + temperature (+/-3 C) + exposure (exact)
+    #   bias   camera + gain                    (no exposure of its own, and
+    #          its pattern barely moves with the sensor's temperature)
+    #   flat   camera + filter                  (its SHAPE is the train's,
+    #          which does not depend on the sensor's temperature; its level
+    #          is normalised away, so neither the gain nor the exposure
+    #          matter)
+    # The temperature LEFT the flat's match in ADR-061 rev: requiring it
+    # rejected the author's own flat (taken at -14.6 C while the lights sat
+    # at -20.0 C, 5.3 C apart) and the recipe then answered "no flat for
+    # this filter", blaming the one criterion that DID match. The gain had
+    # left it earlier for the same reason (a normalised level).
     camera = meta.get("camera")
     gain = meta.get("gain")
     temp = meta.get("temp_c")
@@ -403,41 +662,51 @@ def resolve_recipe(db, meta, tol_c=None):
     else:
         # A bias has no exposure of its own: matching it against the
         # light's exposure would find nothing. It is the fallback offset.
-        bias = find_master(db, "bias", camera, gain, temp, exptime_s=None,
+        bias = find_master(db, "bias", camera, gain, None, exptime_s=None,
                            filter=None, tol_c=tol_c)
         if bias is not None:
             recipe.offset, recipe.offset_kind = bias, "bias"
             recipe.warnings.append(
                 "no dark at this exposure: the bias was subtracted, so the "
                 "thermal current stays in the frame")
+            _note_missing(recipe, db, "dark", "dark", camera, gain, temp,
+                          exptime, None, tol_c)
         else:
             recipe.warnings.append(
                 "no dark or bias in the library: the pedestal and the "
                 "thermal current stay in the frame")
+            _note_missing(recipe, db, "dark", "dark", camera, gain, temp,
+                          exptime, None, tol_c)
+            _note_missing(recipe, db, "bias", "bias", camera, gain, None,
+                          None, None, tol_c)
 
     # Flat: same filter (that is its whole point). Its exposure is not the
-    # light's, so exposure is not part of the match, and NEITHER IS THE GAIN:
-    # a flat is NORMALISED before it is applied, so the gain only scales its
-    # whole level, never its shape. Requiring it was rejecting real flats
-    # (measured on the author's own 2025 FG18 night: the flats were taken at
-    # gain 3 and the lights at gain 5, so the library said "no flat" and the
-    # run fell back to a pseudo-flat). The dark DOES need the gain: there the
-    # level is the signal.
-    flat = find_master(db, "flat", camera, None, temp, exptime_s=None,
+    # light's, so exposure is not part of the match, and NEITHER IS THE GAIN
+    # (a flat is NORMALISED before it is applied, so the gain only scales
+    # its whole level, never its shape: requiring it was rejecting real
+    # flats) NOR THE TEMPERATURE (its shape is the train's). The dark DOES
+    # need the gain and the temperature: there the level IS the signal.
+    flat = find_master(db, "flat", camera, None, None, exptime_s=None,
                        filter=filt, tol_c=tol_c)
     if flat is not None:
         recipe.flat = flat
-        # The flat needs its own offset: a dark-flat at the flat's own
-        # exposure, or the bias when the flat is short. Without it the
-        # division amplifies the pedestal where the flat is dark.
+        # The flat needs its own offset: a dark at the FLAT's own exposure
+        # (the same pool of darks: a "dark of the flats" is a dark, and the
+        # exposure tells them apart), or the bias when the flat is short.
+        # Without it the division amplifies the pedestal where the flat is
+        # dark. The temperature IS kept here: what this removes is the
+        # flat's own dark current, and that one does depend on it.
         recipe.flat_offset = find_master(
-            db, "dark_flat", camera, gain, temp, flat.exptime_s,
+            db, "dark", camera, gain, temp, flat.exptime_s,
             filter=None, tol_c=tol_c) or find_master(
-            db, "bias", camera, gain, temp, None, filter=None, tol_c=tol_c)
+            db, "bias", camera, gain, None, None, filter=None, tol_c=tol_c)
+        _flat_age_note(recipe, flat, meta)
     else:
         recipe.warnings.append(
             "no flat for this filter: the flat residual is not corrected "
             "(it matters for the magnitude, little for the centroid)")
+        _note_missing(recipe, db, "flat", "flat", camera, None, None, None,
+                      filt, tol_c)
     return recipe
 
 

@@ -620,6 +620,15 @@ def _migrate(conn):
         );
         """)
         conn.execute("PRAGMA user_version = 20")
+    if v < 21:
+        # ADR-061 rev: a "dark of the flats" is not a kind of its own. It is
+        # a DARK at the flat's exposure, and the exposure is what the
+        # matching already keys on, so keeping it as a fourth kind only
+        # asked the observer to classify the same frame twice. The rows move
+        # to "dark" and the recipe finds them by exposure.
+        conn.execute(
+            "UPDATE calib_masters SET kind='dark' WHERE kind='dark_flat'")
+        conn.execute("PRAGMA user_version = 21")
     conn.commit()
 
 
@@ -702,6 +711,11 @@ MIGRATION_NOTES = {
         "An astrometric point now carries its photometric error and whether "
         "its centroid was re-selected by hand, and a project can hold a "
         "combined check and report across all its runs."),
+    21: QT_TRANSLATE_NOOP("NSMigrations",
+        "The calibration library is simpler: a dark of the flats is a dark, "
+        "so the two entries became one and your frames are found by their "
+        "exposure. Your flats are used whatever the sensor temperature they "
+        "were taken at, because a flat's shape does not depend on it."),
 }
 
 

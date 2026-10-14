@@ -99,13 +99,17 @@ def test_first_run_stays_on_welcome_after_the_startup_refresh(make_window):
     assert w._welcome is not None
 
 
-def test_update_is_a_gate_until_acknowledged(make_window):
+def test_update_is_a_gate_until_acknowledged(make_window, monkeypatch):
+    from nightscribe.gui import wizard as wz
     from nightscribe.gui.main_window import VIEW_WELCOME, VIEW_HOME
+    # The gate itself is what this test checks, not is_update (which has its
+    # own test). Forcing the update keeps it independent of the running
+    # version: a build without git metadata reports the 0.0.0 fallback, so no
+    # stored version would be "older" (the Windows CI, 2026-10-14).
+    monkeypatch.setattr(wz, "is_update", lambda _last: True)
     snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),
             "size": 1024, "schema_version": 0}
-    # an update is a KNOWN older version on record, on an install that is
-    # otherwise set up
-    w = make_window(snapshot=snap, configured=True, app_version="0.0.1")
+    w = make_window(snapshot=snap, configured=True)
     assert w._shell_stack().currentIndex() == VIEW_WELCOME
     assert w._welcome_gate is True
     # every other view is blocked while the report is unacknowledged
@@ -673,13 +677,15 @@ def test_the_map_shows_no_marker_without_a_site(make_window):
     assert not ws._map.has_site()
 
 
-def test_skip_is_blocked_while_an_update_gates(make_window):
+def test_skip_is_blocked_while_an_update_gates(make_window, monkeypatch):
     # The Data report is read once per version: "explore first" cannot walk
     # around the gate.
+    from nightscribe.gui import wizard as wz
     from nightscribe.gui.main_window import VIEW_WELCOME
+    monkeypatch.setattr(wz, "is_update", lambda _last: True)
     snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),
             "size": 1024, "schema_version": 0}
-    w = make_window(snapshot=snap, configured=True, app_version="0.0.1")
+    w = make_window(snapshot=snap, configured=True)
     assert w._welcome_gate is True
     w._welcome.skip.emit()
     assert w._shell_stack().currentIndex() == VIEW_WELCOME

@@ -167,3 +167,102 @@ def install(manager_path, target_dir, on_log=None, cancel=None):
     ok = proc.returncode == 0
     return {"ok": ok, "path": find_fo(target_dir) if ok else None,
             "log": log[-40:]}
+
+
+# The JPL DE430t ephemeris Find_Orb reads for perturbations. It is PUBLIC
+# DOMAIN (the conda-forge package is `LicenseRef-Public-Domain`), 95 MB, and
+# OPTIONAL: without it Find_Orb still runs, just with poorer planetary
+# positions. So NightScribe never ships it in the default install and offers
+# it as a one-click download from Settings.
+EPHEMERIS_NAME = "linux_p1550p2650.430t"
+# The conda-forge `noarch` package that carries it. It is a plain .tar.bz2:
+# we take the one file out of it, so no package manager is involved.
+EPHEMERIS_URL = ("https://conda.anaconda.org/conda-forge/noarch/"
+                 "findorb-data-de430t-1.0-hfe9d6e3_0.tar.bz2")
+
+
+def bundled_fo():
+    # @return: the `fo` NightScribe SHIPS (paths.findorb_bundle_dir), or None
+    #          when running from a source tree without one.
+    from .. import paths
+    bundle = paths.findorb_bundle_dir()
+    return find_fo(bundle) if bundle else None
+
+
+def ephemeris_path():
+    # @return: where Find_Orb reads the DE430t from (the private .find_orb)
+    from .. import paths
+    return paths.findorb_home_dir() / ".find_orb" / EPHEMERIS_NAME
+
+
+def has_ephemeris():
+    # @return: True when the DE430t is already in place
+    return ephemeris_path().is_file()
+
+
+def download_ephemeris(url=None, progress=None, cancel=None, timeout=900):
+    # @args: url - override the source (cfg "findorb_ephemeris_url"),
+    #        progress - callable(done_bytes, total_bytes), cancel - callable()
+    #        -> True, timeout - seconds for the whole download
+    # @return: {"ok", "path", "error"}: the file is written STRAIGHT to the
+    #          place Find_Orb reads it (the private .find_orb), never a temp
+    #          that could be lost, so the next check uses it.
+    # This is a data file, public domain, fetched from the same channel the
+    # guide already points at. Like the micromamba path, it is an installer
+    # download, not an API query: it is exempt from the core/db.py cache rule
+    # (ADR-062, D31).
+    import tarfile
+    import tempfile
+    import urllib.request
+    from .. import paths
+    url = url or EPHEMERIS_URL
+    dest = paths.findorb_home_dir() / ".find_orb" / EPHEMERIS_NAME
+    if dest.is_file():
+        return {"ok": True, "path": str(dest), "error": ""}
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = None
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "NightScribe Find_Orb ephemeris"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            total = int(resp.headers.get("Content-Length") or 0)
+            fd, tmp = tempfile.mkstemp(prefix="ns-de430t-", suffix=".tar.bz2")
+            done = 0
+            with os.fdopen(fd, "wb") as out:
+                while True:
+                    if cancel is not None and cancel():
+                        raise RuntimeError("cancelled")
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    done += len(chunk)
+                    if progress is not None:
+                        progress(done, total)
+        # Pull the single file out of the archive and place it where Find_Orb
+        # reads it. `mktemp` kept the download off the destination until now,
+        # so a failed download never leaves a half file the next run trusts.
+        with tarfile.open(tmp, "r:bz2") as tar:
+            member = next((m for m in tar.getmembers()
+                           if m.name.endswith(EPHEMERIS_NAME)), None)
+            if member is None:
+                return {"ok": False, "path": "", "error":
+                        "the ephemeris was not in the downloaded archive"}
+            src = tar.extractfile(member)
+            if src is None:
+                return {"ok": False, "path": "", "error":
+                        "the ephemeris could not be read from the archive"}
+            part = dest.with_name(dest.name + ".part")
+            with open(part, "wb") as out:
+                shutil.copyfileobj(src, out)
+            os.replace(part, dest)
+        return {"ok": True, "path": str(dest), "error": ""}
+    except Exception as err:            # network, archive, cancel, disk
+        logger.warning("DE430t download failed: %s", err)
+        return {"ok": False, "path": "", "error": str(err)}
+    finally:
+        if tmp and os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass

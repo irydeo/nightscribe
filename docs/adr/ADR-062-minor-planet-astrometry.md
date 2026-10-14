@@ -61,7 +61,10 @@ documenta para el apilado de objetos débiles (synthetic tracking).
    Linux/macOS, micromamba privado + `findorb` de conda-forge; en Windows, los
    binarios de Project Pluto. **No se empaqueta en el instalador** (GPLv2 con una
    cláusula extra de uso comercial, y el peso de las efemérides DE430t). Sin
-   Find_Orb, el chequeo **no está disponible** y se dice. El botón **Instalar…**
+   Find_Orb, el chequeo **no está disponible** y se dice. **Revisión (ADR-080)**:
+   Find_Orb **sí se empaqueta** ahora (programa separado, app no comercial:
+   agregación legal); la efeméride DE430t sigue fuera y se descarga desde
+   Ajustes. El botón **Instalar…**
    de Ajustes (`core/findorb_install.py`) recorre el camino en el orden que
    ahorra más trabajo: si `fo` ya está en el PATH apunta la ruta y lo dice (el
    caso habitual), si hay **micromamba/mamba/conda** ofrece el comando exacto
@@ -270,7 +273,9 @@ calibrate, stack following the motion, measure and report. The field's reference
    Linux/macOS, a private micromamba + `findorb` from conda-forge; on Windows, the
    Project Pluto binaries. **Not bundled in the installer** (GPLv2 with an extra
    commercial-use clause, and the DE430t ephemeris weight). Without Find_Orb, the
-   check is **not available** and says so.
+   check is **not available** and says so. **Revision (ADR-080)**: Find_Orb **is
+   bundled** now (a separate program, a non-commercial app: legal aggregation);
+   the DE430t ephemeris stays out and is downloaded from Settings.
 10. **Report**: ADES PSV and MPC 80-column, with `T_mid`, calibrated magnitude
     **only if comparisons exist** (otherwise omitted) and propagated
     `rmsRA`/`rmsDec`. Validated with the ADR-022 validator (round trip).

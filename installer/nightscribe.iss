@@ -31,6 +31,11 @@ PrivilegesRequired=lowest
 OutputDir=..\dist
 OutputBaseFilename=NightScribeSetup-{#AppVersion}{#AppSuffix}
 LicenseFile=..\LICENSE
+; Find_Orb travels inside the app folder (dist\nightscribe\findorb). This
+; note tells the observer what it is, its licence and where its source is:
+; GPLv2 with a no-commercial clause, shipped as a separate program by this
+; non-commercial GPLv3 app (ADR-079).
+InfoBeforeFile=..\installer\findorb-notice.txt
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

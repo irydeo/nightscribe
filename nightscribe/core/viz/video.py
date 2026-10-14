@@ -66,7 +66,16 @@ def write_mp4(frames, out, duration_ms=700, fps=VIDEO_FPS,
     # @return: the path written
     if not frames:
         raise ValueError("no frames to write")
-    import imageio_ffmpeg
+    try:
+        import imageio_ffmpeg
+    except ImportError as err:
+        # imageio-ffmpeg is OPTIONAL and only provides the static ffmpeg this
+        # one export needs (some distros do not package it, e.g. Fedora). The
+        # GIF and the montage are written by Pillow and keep working, so this
+        # is a plain, actionable message rather than a crash.
+        raise RuntimeError(
+            "the MP4 export needs imageio-ffmpeg; the GIF and the montage "
+            "still work") from err
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     cycle_ms = duration_ms * len(frames)

@@ -91,8 +91,15 @@ calibración y astrometría juntas, para que quien mide no salte de página.
   adaptado). Una placa ya medida conserva su receta; el interruptor de la
   placa vive en la pestaña Fotometría, junto a la medida (capítulo 06).
 - **Masters de calibración**: la biblioteca de bias, dark y flat contra la
-  que la pestaña Calibración del editor resuelve su receta. Los ficheros se
-  enlazan, nunca se copian ni se mueven.
+  que la pestaña Calibración del editor resuelve su receta, y la política de
+  la calibración (construir un pseudo-flat cuando falta uno real, y la
+  tolerancia de temperatura del dark). Los ficheros se enlazan, nunca se
+  copian ni se mueven, y se añaden **por ficheros o por carpeta**: cada toma
+  se clasifica por su propia cabecera (`IMAGETYP`), así que tú no dices cuál
+  es dark y cuál flat. Son **tres tipos, no cuatro**: un «dark de los flats»
+  es un dark, y lo que lo hace válido es su exposición. La biblioteca está
+  solo aquí; la pestaña Calibración del editor la **lee** y te enlaza de
+  vuelta a esta página.
 - **Astrometría**: la compuerta de detección, el listón de envío al MPC, el
   barrido de velocidades, el chequeo contra otras estaciones (con
   **Find_Orb**) y los hilos de trabajo.

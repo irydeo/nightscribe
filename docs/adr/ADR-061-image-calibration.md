@@ -304,3 +304,83 @@ smoothed flat **at the pixels that were masked**, which separates cleanly
 (33.83 % against 2.05 %). The residual is kept as a figure. And the flat is
 written to FITS as a product of the visit, so it can be looked at in the
 editor: a flat nobody can look at is a flat nobody can check.
+
+**Revisión (2026-10-14): el flat no se empareja por temperatura, hay tres
+tipos, y la biblioteca tiene una sola casa.** Cuatro correcciones, la
+primera medida sobre la visita real del autor (Sar2949, 2026-10-13, 539
+tomas de 2048², QHY42PRO, ganancia 3, −20 °C, filtro Clear):
+
+1. **La temperatura sale del emparejamiento del flat y del bias.** Un flat
+   mide la **forma** del tren óptico (viñeteo, polvo) y la respuesta píxel
+   a píxel: nada de eso depende de la temperatura del sensor, y su nivel se
+   normaliza. Exigirla rechazó el flat del propio autor (tomado a −14.6 °C,
+   con las luces a −20.0 °C: 5.3 °C de diferencia frente a una tolerancia
+   de ±3 °C). La receta respondía «no flat for this filter», culpando al
+   único criterio que SÍ coincidía, y como el default automático de
+   «aplicar la calibración al apilado» se enciende solo si la receta tiene
+   un offset o un flat real, la casilla se quedaba **apagada** y el run no
+   calibraba nada (`calibration: null` en el run guardado). Una sola causa,
+   dos síntomas. El **dark** conserva la temperatura (ahí el nivel ES la
+   señal) y el dark del flat también; el bias tampoco se empareja por ella,
+   porque es un pedestal de lectura.
+2. **Tres tipos, no cuatro.** Un «dark de los flats» es un **dark** a la
+   exposición del flat, y la exposición es lo que el emparejamiento ya
+   miraba: tenerlo como cuarto tipo obligaba a clasificar la misma toma dos
+   veces. Migración v21 (`dark_flat` → `dark`), y el offset del flat se
+   busca en el mismo pozo de darks, por la exposición del flat.
+3. **La biblioteca dice POR QUÉ.** Cuando un master que el observador VE en
+   la biblioteca no se usa, la receta lo dice con el criterio que falló y
+   los números (`Recipe.notes`): «hay un dark (dark_cold.fits), pero su
+   temperatura de sensor está fuera de tolerancia: −16 °C frente a −10 °C
+   (tolerancia 3 °C)». Y avisa de la **edad del flat** (medido: 53 días,
+   del 21 de agosto a las tomas del 13 de octubre) sin dejar de usarlo: el
+   polvo del tren se mueve, pero un flat viejo sigue corrigiendo el
+   viñeteo (medido en esa visita: 5.5 % esquina/centro, ~0.06 mag).
+4. **Una sola casa.** La biblioteca y la política (el pseudo-flat, la
+   tolerancia de temperatura) viven en **Ajustes**; la pestaña Calibración
+   del editor solo resuelve y **muestra** la receta, y su botón es el
+   enlace. Antes la biblioteca estaba en los dos sitios y el pseudo-flat
+   también, que es como el interruptor que el observador tocaba resultó ser
+   el que nadie leía. Los masters se indexan por **IMAGETYP** (con respaldo
+   por exposición cuando la cabecera calla), así que el observador no
+   clasifica nada a mano y una toma de luz se rechaza sola.
+
+**Revision (2026-10-14): the flat is not matched by temperature, there are
+three kinds, and the library has a single home.** Four corrections, the
+first measured on the author's own visit (Sar2949, 2026-10-13, 539 frames
+of 2048², QHY42PRO, gain 3, −20 °C, Clear filter):
+
+1. **The temperature leaves the flat's and the bias's match.** A flat
+   measures the optical train's **shape** (vignetting, dust) and the
+   pixel-to-pixel response: none of that depends on the sensor's
+   temperature, and its level is normalised away. Requiring it rejected the
+   author's own flat (taken at −14.6 °C, with the lights at −20.0 °C: 5.3 °C
+   apart against a ±3 °C tolerance). The recipe answered "no flat for this
+   filter", blaming the one criterion that DID match, and because the
+   automatic default of "apply the calibration to the stack" comes on only
+   when the recipe has an offset or a real flat, the checkbox stayed
+   **off** and the run calibrated nothing (`calibration: null` in the saved
+   run). One cause, two symptoms. The **dark** keeps the temperature (there
+   the level IS the signal) and so does the dark of the flat; the bias is
+   not matched by it either, because it is a read-out pedestal.
+2. **Three kinds, not four.** A "dark of the flats" is a **dark** at the
+   flat's exposure, and the exposure is what the matching already keyed on:
+   keeping it as a fourth kind asked the observer to classify the same
+   frame twice. Migration v21 (`dark_flat` → `dark`), and the flat's offset
+   is found in the same pool of darks, by the flat's exposure.
+3. **The library says WHY.** When a master the observer can SEE in the
+   library is not used, the recipe says so with the criterion it failed and
+   the numbers (`Recipe.notes`): "there is a dark (dark_cold.fits), but its
+   sensor temperature is out of tolerance: −16 °C against −10 °C (tolerance
+   3 °C)". And it warns about the flat's **age** (measured: 53 days, from
+   21 August to the 13 October lights) without refusing to use it: the
+   train's dust moves, but an old flat still corrects the vignetting
+   (measured on that visit: 5.5 % corner/centre, ~0.06 mag).
+4. **A single home.** The library and the policy (the pseudo-flat, the
+   temperature tolerance) live in **Settings**; the editor's Calibration
+   tab only resolves and **shows** the recipe, and its button is the deep
+   link. Before, the library was in both places and so was the pseudo-flat,
+   which is how the switch the observer touched came to be the one nobody
+   read. Masters are indexed by **IMAGETYP** (with an exposure fallback
+   when the header is silent), so the observer classifies nothing by hand
+   and a light frame refuses itself.

@@ -1463,6 +1463,36 @@ class FindOrbInstallWorker(QThread):
         self.finished.emit(out)
 
 
+class FindOrbEphemerisWorker(QThread):
+    # Downloads the optional DE430t ephemeris (public domain, ~95 MB) off the
+    # GUI thread. The file is written straight where Find_Orb reads it, so the
+    # next check uses it (the observer asked for it to "save correctly").
+
+    progress = Signal(int, int)     # (done bytes, total bytes; total may be 0)
+    finished = Signal(object)       # {"ok", "path", "error"}
+
+    def __init__(self, url=""):
+        super().__init__()
+        self._url = url
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import findorb_install
+        try:
+            out = findorb_install.download_ephemeris(
+                url=self._url or None,
+                progress=lambda d, t: self.progress.emit(int(d), int(t)),
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("DE430t download failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(out)
+
+
 class ProbeExoticWorker(QThread):
     # Detects and probes the EXOTIC interpreter off the GUI thread:
     # detect_python spawns subprocesses and the cold import of exotic

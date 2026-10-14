@@ -24,9 +24,12 @@ fantasma. El MPC lo advierte y explica que un tracklet falso en el NEOCP puede
 hacer que el objeto se pierda. Ver el objeto (la secuencia centrada) y
 comprobarlo contra los demás (Find_Orb) son las dos redes de seguridad.
 
-NightScribe **no distribuye Find_Orb**: solo detecta tu copia y la ejecuta,
-igual que hace con ASTAP para resolver la placa. La licencia de Find_Orb es
-GPL-2.0-or-later.
+NightScribe **incluye una copia de Find_Orb** (ADR-087): el chequeo funciona
+recién instalado, sin ruta que configurar, y la app lo ejecuta como programa
+separado, igual que hace con ASTAP para resolver la placa. Si ya tienes tu
+propia copia, apunta el campo de ruta a ella y la app usa esa. La licencia de
+Find_Orb es GPL-2.0-or-later, con una cláusula extra de Project Pluto (prohibido
+el uso comercial sin permiso): aceptable para esta app GPLv3 no comercial.
 
 ## 2. Instalación
 

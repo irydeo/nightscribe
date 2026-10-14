@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=NightScribe
+GenericName=Astronomy night planner
+Comment=Plan the night, capture and reduce it, and report it
+Comment[es]=Planifica la noche, captura y reduce, y publica
+Exec=nightscribe gui
+TryExec=nightscribe
+Icon=nightscribe
+Terminal=false
+Categories=Science;Astronomy;
+Keywords=astronomy;astrophotography;astrometry;photometry;supernova;asteroid;comet;
+StartupNotify=true

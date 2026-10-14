@@ -48,6 +48,27 @@ figures live in the ADR and in the code's comments, which is where they can be c
 on a case; if a string is legitimately about the vigils (whose list IS T CrB and
 R CrB), the test says so in its own words.
 
+## Packaging
+
+```bash
+# Windows: Inno Setup over the PyInstaller onedir (the workflow does both)
+pyinstaller installer/nightscribe.spec --clean --noconfirm
+
+# Linux (.deb): system Python, Find_Orb included (ADR-087)
+sh tools/fetch_findorb.sh findorb-payload
+.venv/bin/python tools/build_deb.py --version 0.1.0 --findorb findorb-payload
+
+# Linux (.rpm): installer/rpm/nightscribe.spec   (rpmbuild -bb)
+# Arch:          installer/arch/PKGBUILD
+```
+
+The three Linux packages use the DISTRO's Python and Qt (ADR-087): `.deb` for
+Debian 13+ / Ubuntu 25.10+, `.rpm` for Fedora 42+ / openSUSE Tumbleweed and a
+PKGBUILD for Arch. Find_Orb travels inside them (a separate program, legal
+aggregation for this non-commercial GPLv3 app); the DE430t ephemeris does not,
+it is downloaded from Settings. Distros without a packaged PySide6 (Ubuntu
+24.04 LTS) are a documented manual install.
+
 ## Tests
 
 ```bash

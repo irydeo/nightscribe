@@ -313,15 +313,23 @@ tools/bench/         #   catálogo, inyección/recuperación, combinación, flat
 tools/i18n.py        # recompila los catálogos de traducción: lupdate + lrelease
                      #   ATÓMICO (ADR-079); nunca el lrelease crudo con la app
                      #   abierta
+tools/fetch_findorb.sh # prepara el Find_Orb que se empaqueta (micromamba,
+                     #   sin la efeméride DE430t); lo usan el CI y build_deb
+tools/build_deb.py   # construye el .deb (Python del sistema, ADR-087)
 website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
                      #   README y el manual es docs/user, los mismos ficheros
                      #   que pinta la app; tools/build_site.py los convierte y
                      #   inyecta la paleta y los chips del tema; el HTML se
                      #   commitea y un test lo regenera y lo compara
-installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
-.github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
-                     #   PyInstaller, zip portable + instalador Inno, pre-release
-                     #   rodante preview-<rama>; push a main o manual)
+installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
+                     #   Setup, con Find_Orb dentro y su aviso de licencia);
+                     #   nightscribe.desktop, rpm/nightscribe.spec y
+                     #   arch/PKGBUILD para los paquetes de Linux (ADR-087)
+.github/workflows/   # preview.yml: el build de preview de las DOS plataformas
+                     #   (tests unitarios en ubuntu y en Windows, PyInstaller +
+                     #   zip portable + instalador Inno, .deb y .rpm) y un solo
+                     #   pre-release rodante preview-<rama> con los cuatro
+                     #   artefactos; push a main o manual (ADR-087)
                      # windows-tests.yml: la suite unitaria en Windows, en cada PR
                      # pages.yml: construye la web y la publica en GitHub Pages
                      #   (push a main o release/v0.1, y manual)

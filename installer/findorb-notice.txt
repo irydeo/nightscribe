@@ -1,0 +1,17 @@
+NightScribe includes a copy of Find_Orb
+=======================================
+
+NightScribe bundles a copy of Find_Orb (Project Pluto), the orbit fitter it
+uses to check your measurements against the published observations.
+
+  * Find_Orb is Copyright (C) Bill Gray / Project Pluto.
+  * It is distributed under the GNU General Public License, version 2 (or
+    later), with an extra clause: use in or with commercial software is
+    forbidden without written permission from Project Pluto.
+  * NightScribe is a non-commercial, GPLv3 project, so it ships Find_Orb as
+    a separate program (mere aggregation).
+  * Source code:  https://github.com/Bill-Gray/find_orb
+  * Project page: https://www.projectpluto.com/find_orb.htm
+
+The optional JPL DE430t ephemerides (public domain) are NOT included: you
+can download them from Settings (Measurement -> Find_Orb).

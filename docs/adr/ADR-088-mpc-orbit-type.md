@@ -1,4 +1,4 @@
-# ADR-087: El tipo orbital oficial del MPC (API de órbitas)
+# ADR-088: El tipo orbital oficial del MPC (API de órbitas)
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-10-14
 

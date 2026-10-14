@@ -61,7 +61,7 @@ FAMILIES = {
             "en": "Long-period comet: from the Oort cloud; it will not return for millennia."},
 }
 
-# The NEO families the MPC names the way we do (ADR-087): only these are
+# The NEO families the MPC names the way we do (ADR-088): only these are
 # taken from the MPC's own orbit type, because the rest of the MPC's labels
 # (Mars Crosser, Hungaria, Jupiter Trojan, ...) do not match our FAMILIES
 # keys and our classification stays for them.
@@ -377,7 +377,7 @@ def explain_elements(elements, phys=None, family=None, moid=None,
                    "es": family_text(family)["es"],
                    "en": family_text(family)["en"]}
         if family_source == "MPC":
-            # Honesty (ADR-087): this is the MPC's own type, not our q rule,
+            # Honesty (ADR-088): this is the MPC's own type, not our q rule,
             # and the two can disagree (they did on 2026 TG69).
             fam_row["es"] += " Es la clasificación del propio MPC."
             fam_row["en"] += " It is the MPC's own classification."

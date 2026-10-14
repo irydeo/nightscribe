@@ -178,10 +178,14 @@ DEFAULTS = {
     "astrometry_disagree_sigma": 3.0,
     "astrometry_astcat": "Gaia2",
     # The check against other observers (ADR-062): Find_Orb is an external
-    # tool the user installs (never bundled); the residual is normalised by
-    # our own rms and the robust scatter of the others inside a window.
+    # tool; NightScribe SHIPS a copy (ADR-079) and the path below overrides
+    # it when the observer wants their own. The residual is normalised by our
+    # own rms and the robust scatter of the others inside a window.
     "findorb_path": "",
     "findorb_run": False,
+    # Where the optional DE430t ephemeris (public domain, ~95 MB) is fetched
+    # from; empty means the conda-forge package the app knows about.
+    "findorb_ephemeris_url": "",
     "astrometry_check_enabled": True,
     "astrometry_check_sigma": 3.0,
     "astrometry_check_floor_arcsec": 1.0,

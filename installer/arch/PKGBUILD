@@ -1,0 +1,63 @@
+# Maintainer: Francisco José Calvo Fernández <irydeo@users.noreply.github.com>
+# NightScribe - Arch Linux PKGBUILD (ADR-080 packaging)
+#
+# Uses the system Python and the distro's packages. Two of them are NOT in
+# the official Arch repos and come from the AUR:
+#   * python-photutils (required: it is the subpixel centroid of the
+#     astrometry, core/astrometry.py);
+#   * python-imageio-ffmpeg (OPTIONAL: only the MP4 animation export).
+# The AUR helper resolves them.
+#
+# Find_Orb is shipped inside the package, in /usr/lib/nightscribe/findorb,
+# which is where the app looks for it (paths.findorb_bundle_dir). It is GPLv2
+# with an extra commercial-use clause from Project Pluto: fine for this
+# non-commercial GPLv3 app (see ADR-080).
+
+pkgname=nightscribe
+pkgver=0.0.0
+pkgrel=1
+pkgdesc="Plan, reduce and report an astronomy night"
+arch=('x86_64')
+url="https://github.com/irydeo/nightscribe"
+license=('GPL3')
+depends=('python' 'pyside6' 'python-astropy' 'python-scipy' 'python-numpy'
+         'python-matplotlib' 'python-photutils' 'python-lxml'
+         'python-requests' 'python-yaml' 'python-platformdirs' 'python-pillow')
+optdepends=('python-imageio-ffmpeg: export the animation as MP4')
+makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
+# source=("$pkgname-$pkgver.tar.gz")
+source=("git+$url.git#tag=v$pkgver")
+sha256sums=('SKIP')
+# The packaging step drops a prepared Find_Orb tree here
+# (bin/fo + share/findorb/data), built by tools/fetch_findorb.sh.
+_findorb="${srcdir}/findorb-payload"
+
+build() {
+    cd "$srcdir/$pkgname"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/$pkgname"
+
+    # The Python package, into the system site-packages.
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    # The launcher, the desktop entry and the icons.
+    install -Dm755 /dev/stdin "$pkgdir/usr/bin/nightscribe" <<'EOF'
+#!/bin/sh
+exec python3 -m nightscribe "$@"
+EOF
+    install -Dm644 installer/nightscribe.desktop \
+        "$pkgdir/usr/share/applications/nightscribe.desktop"
+    for s in 16 32 48 64 128 256; do
+        install -Dm644 "nightscribe/assets/appicon-$s.png" \
+            "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/nightscribe.png"
+    done
+
+    # Find_Orb, when the packaging step prepared one.
+    if [ -d "$_findorb" ]; then
+        install -d "$pkgdir/usr/lib/nightscribe"
+        cp -a "$_findorb" "$pkgdir/usr/lib/nightscribe/findorb"
+    fi
+}

@@ -145,6 +145,7 @@ FIELDS = [
     Field("edt_astap_path", "astap_path", "str"),
     Field("chk_solve_save", "solve_save", "bool"),
     Field("edt_findorb_path", "findorb_path", "str"),
+    Field("edt_findorb_eph_url", "findorb_ephemeris_url", "str"),
     Field("edt_exotic_python", "exotic_python_path", "str"),
     Field("edt_exotic_install", "exotic_install_dir", "str"),
     # --- Integrations --------------------------------------------------

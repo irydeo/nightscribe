@@ -24,9 +24,12 @@ MPC warns about this and explains that a false tracklet on the NEOCP can make
 the object be lost. Seeing the object (the centred sequence) and checking it
 against the others (Find_Orb) are the two safety nets.
 
-NightScribe **does not distribute Find_Orb**: it only detects your copy and
-runs it, just as it does with ASTAP for plate solving. Find_Orb is licensed
-under GPL-2.0-or-later.
+NightScribe **ships a copy of Find_Orb** (ADR-087): the check works out of the
+box, with no path to set, and the app runs it as a separate program, just as it
+does with ASTAP for plate solving. If you already keep your own copy, point the
+path field at it and the app uses that instead. Find_Orb is licensed under
+GPL-2.0-or-later, with an extra Project Pluto clause (no commercial use without
+permission): fine for this non-commercial GPLv3 app.
 
 ## 2. Installation
 
@@ -180,5 +183,8 @@ of ours. That is exactly what Tycho-Tracker does.
   DE430t ephemerides are local.
 - **Nothing of yours is uploaded**: you do the MPC submission yourself, as
   always.
-- **Licence**: Find_Orb is GPL-2.0-or-later. NightScribe does not distribute or
-  bundle it; it only detects and runs your copy, just as with ASTAP.
+- **Licence**: Find_Orb is GPL-2.0-or-later, with an extra Project Pluto clause
+  (no commercial use without permission). NightScribe ships a copy as a
+  separate program (legal aggregation for this non-commercial GPLv3 app) and
+  points at its source; you can also point it at your own copy, just as with
+  ASTAP.

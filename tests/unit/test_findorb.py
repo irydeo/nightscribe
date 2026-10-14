@@ -277,3 +277,61 @@ def test_all_our_observations_are_flagged_and_the_worst_sets_the_verdict():
                                          ours_lines=ours)
     assert len([r for r in residuals if r["ours"]]) == 2
     assert rep.our_residual[0] == 200.0      # the worst, not ours[0]
+
+
+# ------------------------------------------- the copy NightScribe ships
+
+def test_probe_uses_the_bundled_copy(tmp_path, monkeypatch):
+    # Installing the app brings Find_Orb with it: probe must find the shipped
+    # `fo` before looking at PATH, so the check works out of the box.
+    from nightscribe import paths
+    bundle = tmp_path / "findorb"
+    (bundle / "bin").mkdir(parents=True)
+    fo = bundle / "bin" / "fo"
+    fo.write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: bundle)
+    monkeypatch.setattr(findorb.shutil, "which", lambda name: None)
+    path, message = findorb.probe()
+    assert path == str(fo) and "bundled" in message
+
+
+def test_probe_falls_back_to_path_without_a_bundle(monkeypatch):
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    monkeypatch.setattr(findorb.shutil, "which",
+                        lambda name: "/usr/bin/fo" if name == "fo" else None)
+    path, _message = findorb.probe()
+    assert path == "/usr/bin/fo"
+
+
+def test_seed_findorb_home_copies_the_shipped_data(tmp_path, monkeypatch):
+    # The shipped `fo` was built with a prefix that no longer exists and
+    # copies its data to $HOME/.find_orb on the first run. Seeding the folder
+    # first is what makes a relocated copy start at all.
+    from nightscribe import paths
+    bundle = tmp_path / "bundle"
+    data = bundle / "share" / "findorb" / "data"
+    data.mkdir(parents=True)
+    (data / "ObsCodes.htm").write_text("codes")
+    (data / "calendar.txt").write_text("cal")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: bundle)
+    home = tmp_path / "home"
+    home.mkdir()
+    findorb._seed_findorb_home(home)
+    cfg = home / ".find_orb"
+    assert (cfg / "ObsCodes.htm").read_text() == "codes"
+    assert (cfg / "calendar.txt").read_text() == "cal"
+    # a second seed is a no-op: it must never overwrite the observer's config
+    (cfg / "calendar.txt").write_text("mine")
+    findorb._seed_findorb_home(home)
+    assert (cfg / "calendar.txt").read_text() == "mine"
+
+
+def test_private_env_points_home_at_the_findorb_folder(tmp_path,
+                                                       monkeypatch):
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "findorb_home_dir", lambda: tmp_path)
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    env = findorb._private_env()
+    assert env["HOME"] == str(tmp_path)
+    assert env["USERPROFILE"] == str(tmp_path)

@@ -51,6 +51,20 @@ for f in glob.glob(os.path.join(ROOT, "docs/**/*.md"), recursive=True):
     sub = os.path.dirname(os.path.relpath(f, ROOT))
     datas.append((f, sub))
 
+# Find_Orb, when the CI dropped a prepared tree next to the repo
+# (findorb-payload/: bin/fo + share/findorb/data). It travels as a folder in
+# the bundle, so paths.findorb_bundle_dir() finds it under
+# sys._MEIPASS/findorb and the orbit check works with NO path to set
+# (ADR-079). Absent in a source build, which is why the probe still falls
+# back to PATH.
+_findorb = os.path.join(ROOT, "findorb-payload")
+if os.path.isdir(_findorb):
+    for f in glob.glob(os.path.join(_findorb, "**", "*"), recursive=True):
+        if os.path.isfile(f):
+            sub = os.path.join("findorb",
+                               os.path.dirname(os.path.relpath(f, _findorb)))
+            datas.append((f, sub))
+
 a = Analysis(
     [os.path.join(ROOT, "launcher.py")],
     pathex=[ROOT],

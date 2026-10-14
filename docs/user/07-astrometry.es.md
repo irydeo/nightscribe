@@ -204,6 +204,15 @@ búsqueda automática no lo encuentra (la lista del MPC de objetos recién
 confirmados es corta), escribe la designación actual en **Comprobar con** y pulsa
 **Recomprobar**.
 
+### Find_Orb viene con la app
+
+No instalas Find_Orb a mano: viaja dentro de NightScribe, así que el chequeo
+funciona recién instalado. Las **efemérides DE430t** (dominio público, unos
+95 MB) son opcionales y le dan al ajuste de órbita perturbaciones planetarias
+más finas; descárgalas en **Ajustes → Medida → Find_Orb** si las quieres (no se
+incluyen). Si ya tienes tu propio Find_Orb, apunta el campo de ruta a él y la
+app usa esa copia.
+
 ## El reporte al MPC
 
 **Gestionar reporte MPC** abre el reporte en su propia ventana: la sumisión

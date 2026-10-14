@@ -176,7 +176,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git ca-certificates curl bzip2 tar dpkg-dev python3
+            git ca-certificates curl bzip2 tar dpkg-dev python3 appstream
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -190,6 +190,12 @@ jobs:
             --version "${{ needs.test.outputs.version }}" \
             --findorb findorb-payload --arch amd64 --out dist
           ls -la dist
+
+      - name: Validate the AppStream metainfo
+        # A package whose software centre shows no licence, no developer and
+        # no icon is what the observer reported on Ubuntu; this gate keeps it
+        # from shipping again (ADR-087 rev).
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
 
       - name: Upload the .deb
         uses: actions/upload-artifact@v4
@@ -207,13 +213,16 @@ jobs:
       - name: Install build tools
         run: |
           dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build \
-            python3-devel
+            python3-devel appstream
 
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Prepare the Find_Orb payload (linux-64)
         run: sh tools/fetch_findorb.sh findorb-payload
+
+      - name: Validate the AppStream metainfo
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
 
       - name: Build the .rpm
         run: |

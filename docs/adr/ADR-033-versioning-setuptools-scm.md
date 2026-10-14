@@ -115,3 +115,13 @@ prone, hard to maintain).
 git (PyInstaller frozen) use the `0.0.0` fallback; `__version__` in
 `__init__.py` is no longer updated by hand; `__main__.py` gains the missing
 `--version` flag.
+
+**Revision (2026-10-14): the packaged install carries its version.** A `.deb`
+or `.rpm` that copies the tree into `dist-packages` by hand has no `*.dist-info`,
+so `importlib.metadata.version("nightscribe")` failed and the app reported the
+`0.0.0` fallback, which also broke the update detection (see ADR-087).
+`version.base_version()` now tries, in order: the installed metadata, a packaged
+version file (`/usr/share/nightscribe/version`, written by the packagers), and
+finally `__version__`; when the answer is `0.0.0` it logs a warning instead of
+staying silent. The packagers write the `*.dist-info/METADATA` so the metadata
+lookup succeeds in the normal case.

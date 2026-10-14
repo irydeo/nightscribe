@@ -14,6 +14,12 @@
 # Fields per [[camera]]:
 #   key            unique id (also the config value of cam_preset)
 #   family         one of family_order (groups the combo)
+#   type           the sensor technology: "CMOS" or "CCD" (a "DSLR" body is
+#                  not a sensor type; a DSLR user picks no preset and sets
+#                  the type by hand). It fills the camera-type field of the
+#                  Welcome/Settings steps, which feeds the MPC report's
+#                  instrument type and the EXOTIC handoff, so picking a
+#                  camera already says what it is (2026-10-14).
 #   sensor         the sensor's name, with its technology and bit depth
 #   cameras        the commercial cameras that use it (comma-separated; each
 #                  one is also an alias the lookup accepts)
@@ -68,6 +74,7 @@ family_order = [
 [[camera]]
 key = "imx455"
 family = "Sony CMOS (16-bit)"
+type = "CMOS"
 sensor = "Sony IMX455 (BSI, 16-bit)"
 cameras = "QHY600, ASI6200, FLI Kepler 455, SBIG AC455"
 pixel_um = 3.76
@@ -92,6 +99,7 @@ source = "ZWO ASI6200 manual; QHY600 product page"
 [[camera]]
 key = "imx461"
 family = "Sony CMOS (16-bit)"
+type = "CMOS"
 sensor = "Sony IMX461 (BSI, 16-bit)"
 cameras = "QHY461, Moravian C3-61000"
 pixel_um = 3.76
@@ -116,6 +124,7 @@ source = "QHY461 product page; QHY411/461 comparison"
 [[camera]]
 key = "imx411"
 family = "Sony CMOS (16-bit)"
+type = "CMOS"
 sensor = "Sony IMX411 (BSI, 16-bit)"
 cameras = "QHY411, FLI Kepler 411, Moravian C5"
 pixel_um = 3.76
@@ -140,6 +149,7 @@ source = "QHY411 product page"
 [[camera]]
 key = "imx571"
 family = "Sony CMOS (16-bit)"
+type = "CMOS"
 sensor = "Sony IMX571 (BSI, 16-bit)"
 cameras = "QHY268, ASI2600, Touptek ATR2600, Player One Ares-M"
 pixel_um = 3.76
@@ -164,6 +174,7 @@ source = "ZWO ASI2600 manual; QHY268 product page"
 [[camera]]
 key = "imx533"
 family = "Sony CMOS (16-bit)"
+type = "CMOS"
 sensor = "Sony IMX533 (BSI, 14-bit)"
 cameras = "QHY533, ASI533, Player One Poseidon-M, Touptek ATR533"
 pixel_um = 3.76
@@ -191,6 +202,7 @@ source = "ZWO ASI533 manual; QHY533 product page"
 [[camera]]
 key = "imx492"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX492 (BSI, 14-bit mono)"
 cameras = "QHY294M, ASI294MM"
 pixel_um = 4.63                 # the 2x2-binned 11 MP mode
@@ -215,6 +227,7 @@ source = "ZWO ASI294 manual (mono); QHY294M product page"
 [[camera]]
 key = "imx294"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX294 (FSI, 14-bit)"
 cameras = "ASI294, QHY294, Atik ACIS 294"
 pixel_um = 4.63
@@ -239,6 +252,7 @@ source = "ZWO ASI294 manual; QHY294 product page"
 [[camera]]
 key = "imx183"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX183 (BSI, 12-bit)"
 cameras = "ASI183, QHY183, Atik ACIS 183"
 pixel_um = 2.4
@@ -262,6 +276,7 @@ source = "ZWO ASI183 manual"
 [[camera]]
 key = "imx178"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX178 (BSI, 14-bit)"
 cameras = "ASI178, QHY178, Player One Sedna-M"
 pixel_um = 2.4
@@ -285,6 +300,7 @@ source = "QHY174/178/224/290 manual; ZWO ASI178"
 [[camera]]
 key = "imx174"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX174 (global shutter, 12-bit)"
 cameras = "ASI174, QHY174"
 pixel_um = 5.86
@@ -308,6 +324,7 @@ source = "ZWO ASI174; QHY174GPS manual"
 [[camera]]
 key = "imx290"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Sony IMX290 (BSI, 12-bit)"
 cameras = "ASI290, QHY290"
 pixel_um = 2.9
@@ -331,6 +348,7 @@ source = "QHY174/178/224/290 manual; ZWO ASI290"
 [[camera]]
 key = "mn34230"
 family = "Sony CMOS (12/14-bit)"
+type = "CMOS"
 sensor = "Panasonic MN34230 (FSI, 12-bit)"
 cameras = "ASI1600, QHY163, Atik Horizon"
 pixel_um = 3.8
@@ -358,6 +376,7 @@ source = "ZWO ASI1600 manual; QHY163 product page"
 [[camera]]
 key = "gsense400"
 family = "Gpixel sCMOS"
+type = "CMOS"
 sensor = "Gpixel GSENSE400 (BSI sCMOS, 12-bit)"
 cameras = "QHY42Pro"
 pixel_um = 11.0
@@ -382,6 +401,7 @@ source = "Gpixel GSENSE400 datasheet + QHY42Pro page + irydeo.com QHY42Pro artic
 [[camera]]
 key = "gsense4040"
 family = "Gpixel sCMOS"
+type = "CMOS"
 sensor = "Gpixel GSENSE4040 (FSI sCMOS, 12-bit)"
 cameras = "QHY4040 Pro, Tucsen Dhyana 4040"
 pixel_um = 9.0
@@ -406,6 +426,7 @@ source = "Gpixel GSENSE4040 datasheet; QHY4040 Pro page"
 [[camera]]
 key = "gsense6060"
 family = "Gpixel sCMOS"
+type = "CMOS"
 sensor = "Gpixel GSENSE6060 (BSI sCMOS, 14-bit)"
 cameras = "QHY6060, Tucsen Dhyana 6060"
 pixel_um = 10.0
@@ -432,6 +453,7 @@ source = "Gpixel GSENSE6060 datasheet; Tucsen Dhyana 6060"
 [[camera]]
 key = "icx694"
 family = "CCD Sony"
+type = "CCD"
 sensor = "Sony ICX694 (CCD, 16-bit)"
 cameras = "Atik 460EX, QHY22, QSI 690"
 pixel_um = 4.54
@@ -456,6 +478,7 @@ source = "Atik specifications; QHY22 product page"
 [[camera]]
 key = "icx814"
 family = "CCD Sony"
+type = "CCD"
 sensor = "Sony ICX814 (CCD, 16-bit)"
 cameras = "Atik 490EX, QHY23"
 pixel_um = 3.69
@@ -483,6 +506,7 @@ source = "Atik specifications; QHY23 product page"
 [[camera]]
 key = "kaf8300"
 family = "CCD Kodak/ON"
+type = "CCD"
 sensor = "Kodak/Truesense KAF-8300 (CCD, 16-bit)"
 cameras = "SBIG STF-8300, Atik 383L+, QHY9"
 pixel_um = 5.4
@@ -507,6 +531,7 @@ source = "Kodak KAF-8300 product summary; Atik specifications"
 [[camera]]
 key = "kaf16803"
 family = "CCD Kodak/ON"
+type = "CCD"
 sensor = "Kodak/Truesense KAF-16803 (CCD, 16-bit)"
 cameras = "SBIG STX-16803, FLI PL16803"
 pixel_um = 9.0
@@ -531,6 +556,7 @@ source = "onsemi KAF-16803 datasheet; QHY461 comparison"
 [[camera]]
 key = "kaf09000"
 family = "CCD Kodak/ON"
+type = "CCD"
 sensor = "Kodak/Truesense KAF-09000 (CCD, 16-bit)"
 cameras = "FLI PL09000, SBIG STX-09000"
 pixel_um = 12.0
@@ -554,6 +580,7 @@ source = "onsemi KAF-09000 datasheet"
 [[camera]]
 key = "kai11002"
 family = "CCD Kodak/ON"
+type = "CCD"
 sensor = "Kodak/Truesense KAI-11002 (CCD, 16-bit)"
 cameras = "SBIG STL-11000, QHY11, Atik 11000"
 pixel_um = 9.0

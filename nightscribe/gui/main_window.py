@@ -406,7 +406,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self._snapshot = snapshot
         self._welcome = None
-        self._welcome_gate = False   # True while an update is unacknowledged
+        self._welcome_gate = False   # True while an UPDATE is unacknowledged
         # Interfaz 1.0: Tonight is computed on demand, when the new-project
         # view is first opened (never at start).
         self._tonight_loaded = False
@@ -605,11 +605,19 @@ class MainWindow(QMainWindow):
 
     def _goto_tab(self, index):
         # Switches the shell's view. The name is kept (Interfaz 1.0): every
-        # deep link in the file calls _goto_tab(TAB_*). While an update's
-        # Data step is unacknowledged, Welcome is a gate: nothing else can
-        # be opened until "Got it".
-        if getattr(self, "_welcome_gate", False) and index != VIEW_WELCOME:
+        # deep link in the file calls _goto_tab(TAB_*). While an update's Data
+        # step is unacknowledged, Welcome is a gate: nothing else opens.
+        if self._welcome_gate and index != VIEW_WELCOME:
             return
+        # A first run must set the observatory before Tonight: the targets
+        # cannot be computed without a site (ADR-055 rev, 2026-10-14). Instead
+        # of a dead view, the observer lands on the setup step that unblocks
+        # it. Other views stay reachable (the app is not a jail).
+        if index == VIEW_TONIGHT and not config.is_configured():
+            self._ensure_welcome()
+            self._sync_welcome()
+            self._welcome.show_step("obs")
+            index = VIEW_WELCOME
         # The workbench stays alive when another view is opened (ADR-047:
         # its plate and stretch survive); its workers are only shut down
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
@@ -741,9 +749,9 @@ class MainWindow(QMainWindow):
         self._goto_tab(view)
 
     def back(self):
-        # Goes to the previous location. Blocked while Welcome gates the
-        # app (an unacknowledged update). An open drawer closes first.
-        if getattr(self, "_welcome_gate", False):
+        # Goes to the previous location. Blocked while an update gates the
+        # app. An open drawer closes first.
+        if self._welcome_gate:
             return
         if getattr(self, "_drawer", None) is not None and self._drawer.isVisible():
             self._drawer_open(False)
@@ -762,7 +770,7 @@ class MainWindow(QMainWindow):
 
     def forward(self):
         # Re-applies the location we just left with back().
-        if getattr(self, "_welcome_gate", False) or not self._nav_fwd:
+        if self._welcome_gate or not self._nav_fwd:
             return
         cur = self._current_location()
         loc = self._nav_fwd.pop()
@@ -784,7 +792,7 @@ class MainWindow(QMainWindow):
         back = getattr(self._menus, "btn_nav_back", None)
         if back is None:
             return
-        gate = getattr(self, "_welcome_gate", False)
+        gate = self._welcome_gate
         back.setEnabled(bool(self._nav_back) and not gate)
         fwd = getattr(self._menus, "btn_nav_fwd", None)
         if fwd is not None:
@@ -1042,14 +1050,19 @@ class MainWindow(QMainWindow):
         self.projects.btn_filters.blockSignals(False)
         self._build_drawer()
         self._build_sky_bar()
-        # Interfaz 1.0 (ADR-053): Welcome only when it is needed: a first
-        # run (no observatory), a pending update (a newer version than the
-        # one last run) or no projects at all. Otherwise the app opens on
-        # Home, ready and offline.
+        # Interfaz 1.0 (ADR-053/ADR-055 rev): Welcome only when it is needed:
+        # a first run (no observatory), a pending update (a newer version than
+        # the one last run) or no projects AND the setup not seen yet.
+        # Otherwise the app opens on Home, ready and offline.
         from . import wizard as _wz
         self._fresh = not config.is_configured()
-        self._update_due = _wz._wizard_needed(config.get("app_version") or "")
-        if self._fresh or self._update_due or not project.list_projects(db):
+        # The post-update notice is for a REAL update: a known, older version
+        # on record. A first run (empty app_version) is never an update, no
+        # matter what database happens to exist (2026-10-14).
+        self._update_due = _wz.is_update(config.get("app_version") or "")
+        has_projects = bool(project.list_projects(db))
+        if (self._fresh or self._update_due
+                or (not has_projects and not config.get("welcome_seen"))):
             self._show_welcome()
         else:
             self._goto_tab(VIEW_HOME)
@@ -1098,52 +1111,70 @@ class MainWindow(QMainWindow):
     def _show_welcome(self):
         # Startup decision (first run / update / no projects): builds
         # Welcome and makes it current. An update is a blocking gate (the
-        # data report is read before the app is usable); a first run is not.
+        # data report is read before the app is usable); a first run is a
+        # DIFFERENT gate, the observatory step, because the app computes
+        # nothing without a site.
         self._ensure_welcome()
         self._welcome_gate = bool(self._update_due
                                   and self._snapshot is not None)
         self._sync_welcome()
-        # Only a REAL update lands on the data report (the gate). A first
-        # run has no database to report on, so jumping to step 3 there
-        # would open the app on a paragraph about a file that does not
-        # exist yet: it starts at the observatory, which is the first thing
-        # an observer can actually answer (Interfaz 1.4).
         if self._welcome_gate:
+            # A real update lands on the data report (the gate).
             self._welcome.show_step("data")
+        else:
+            # First run / no projects: always the observatory, never the
+            # data report. Showing the report on a fresh install (with its
+            # first three steps marked as done) was exactly the Ubuntu bug
+            # (2026-10-14).
+            self._welcome.show_step("obs")
         self._shell_stack().setCurrentIndex(VIEW_WELCOME)
         self._update_vtab_visibility()
 
+    def _tonight_blocked(self):
+        # @return: True while the observatory is not set. Tonight cannot
+        #          compute anything without a site, so a first run must
+        #          finish the setup's step 1 before it (ADR-055 rev). This is
+        #          NOT a jail: only Tonight is held back, and it lifts by
+        #          itself the moment the site is configured.
+        return not config.is_configured()
+
+    def _site_code(self):
+        # @return: the MPC code for a PLANNING/goto lookup, or "500"
+        #          (geocentric) when none is set, so a NEO position still
+        #          resolves for a coordinates-only observer (NEOfixer rejects
+        #          an empty site). Never used for a report or an astrometry
+        #          context: those must carry the observer's REAL code.
+        return (config.get("mpc_code") or "").strip() or "500"
+
     def _welcome_finished(self):
-        # "Got it" on the Data step. Only a REAL update seals the version
-        # (and unlocks Home); a manual visit just goes back (Interfaz 1.1).
-        if self._update_due:
-            if self._welcome is not None:
-                self._welcome.ack_data()
-            self._update_due = False
-            self._welcome_gate = False
-            self.on_refresh_projects()
-            self.navigate(VIEW_HOME, replace=True)
-            return
-        if self._nav_back:
-            self.back()
-        else:
-            self.navigate(VIEW_HOME, replace=True)
+        # "Got it" on the Data step. A real update seals the version; a first
+        # run just records the setup as seen. Either way the observer lands
+        # on Home.
+        if self._welcome is not None:
+            self._welcome.ack_data()
+        self._update_due = False
+        self._welcome_gate = False
+        self.on_refresh_projects()
+        self.navigate(VIEW_HOME, replace=True)
 
     def _welcome_skip(self):
-        # "Explore first" on Welcome. A pending update is still a gate (its
-        # report must be read once), so the skip is honoured only when the
-        # app is otherwise free; on a first run it simply lands on Home.
+        # "Explore first" on Welcome. Blocked while an UPDATE gates the app
+        # (its report must be read once). A first run is not a jail: the
+        # observer may walk to Home; Tonight stays held back until the site
+        # is set (_tonight_blocked). Either way the setup is recorded as seen.
         if self._welcome_gate:
             return
+        if self._welcome is not None:
+            self._welcome.ack_data()
         self.navigate(VIEW_HOME, replace=True)
 
     def _welcome_create(self):
         # The CTA: persist the setup, acknowledge a pending update (the
         # report was seen) and open the new-project view, replacing Welcome.
-        if self._update_due and self._welcome is not None:
+        if self._welcome is not None:
             self._welcome.ack_data()
-            self._update_due = False
-            self._welcome_gate = False
+        self._update_due = False
+        self._welcome_gate = False
         self.navigate(VIEW_TONIGHT, replace=True)
 
     def _visit_window(self):
@@ -2042,6 +2073,12 @@ class MainWindow(QMainWindow):
             if spin is not None:
                 # an unknown field comes back None: show 0 ("unknown")
                 getattr(dlg, spin).setValue(value if value is not None else 0)
+        # The type (CCD/CMOS) is a datasheet fact too: picking a camera says
+        # what it is, so the combo follows (2026-10-14). It stays editable for
+        # a camera the catalogue does not cover.
+        typ = cameras.sensor_type(p)
+        if typ:
+            dlg.cmb_camera_type.setCurrentText(typ)
         self._cam_ref_update(dlg)
 
     def _ai_preset_selected(self, dlg):
@@ -3993,7 +4030,7 @@ class MainWindow(QMainWindow):
         if btn is None:
             return
         btn.setVisible(self._shell_stack().currentIndex() != VIEW_HOME)
-        btn.setEnabled(not getattr(self, "_welcome_gate", False))
+        btn.setEnabled(not self._welcome_gate)
 
     def _rebuild_campaign_filter(self):
         # Refills the hub's campaign combo, keeping the current selection.
@@ -6798,7 +6835,7 @@ class MainWindow(QMainWindow):
         kind = ctx.get("kind") or p.get("kind")
         obj_id = (ctx.get("id") or ctx.get("packed")
                   or p.get("object_name") or ctx.get("object_name"))
-        site = config.get("mpc_code", "")
+        site = self._site_code()
         if kind in ("neo", "comet", "pccp"):
             def action(c):
                 pos = ephemeris.position_at(obj_id, site,
@@ -6999,7 +7036,7 @@ class MainWindow(QMainWindow):
         ctx = dict(p.get("context") or {})
         obj_id = (ctx.get("id") or ctx.get("packed")
                   or p.get("object_name") or "")
-        site = config.get("mpc_code", "")
+        site = self._site_code()
         btn = w["ccd_refresh_pos"]
         btn.setEnabled(False)
         btn.setText(self.tr("Refreshing…"))
@@ -9186,7 +9223,7 @@ class MainWindow(QMainWindow):
             return
         ctx = p.get("context") or {}
         obj_id = ctx.get("id") or ctx.get("packed") or p["object_name"]
-        site = config.get("mpc_code", "")
+        site = self._site_code()
         lang = config.get("language", "es")
         spn = self._project_widgets.get("neo_zoom")
         zoom = spn.value() if spn else 2

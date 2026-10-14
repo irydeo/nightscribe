@@ -116,6 +116,24 @@ def _wizard_needed(last):
     return current > stored
 
 
+def is_update(last):
+    # The post-update notice (a blocking gate) is for an update, and an
+    # update means a KNOWN previous version strictly older than this one. An
+    # empty stored version is a FIRST RUN, never an update: the old rule
+    # (an existing database counted as an update) greeted a fresh install
+    # with the data report and the first three steps marked as done, which is
+    # exactly what the observer saw on Ubuntu (2026-10-14).
+    # @args: last - the app_version string from the settings (may be "")
+    # @return: True only when a real, older version was recorded
+    if not last:
+        return False
+    current = kinds.version_key(base_version())
+    stored = kinds.version_key(last)
+    if current is None or stored is None:
+        return False
+    return current > stored
+
+
 def _detect(wizard):
     # Button: resolves this machine's public IP to a city and fills the
     # site fields. Nothing does it on its own (see the privacy note on
@@ -348,15 +366,19 @@ def _setup_equipment(wizard):
 
 
 def _equipment_preset_picked(wizard):
-    # The preset the observer just chose brings its pixel size: the only
-    # profile field the step shows, and the one the scale hook reads. The
-    # rest of the profile rides in _apply_equipment, which fills it only when
-    # the preset really changed.
+    # The preset the observer just chose brings its pixel size AND its type:
+    # the profile field the step shows is the pixel size, but the camera type
+    # (CCD/CMOS) is a datasheet fact too, and asking for it again after a
+    # camera is picked is asking the observer what they just told us. The
+    # combo stays editable for the case the preset does not cover (a DSLR).
     # @args: wizard - the loaded Welcome husk
     from ..core import cameras
     p = cameras.preset(wizard.cmb_cam_preset.currentData())
     if p is not None:
         wizard.spn_pixel_um.setValue(float(p["pixel_um"]))
+        typ = cameras.sensor_type(p)
+        if typ:
+            wizard.cmb_camera_type.setCurrentText(typ)
 
 
 def _setup_data(wizard, snapshot):
@@ -460,6 +482,11 @@ def _apply_site(wizard):
     name = wizard.edt_site_name.text().strip()
     if name:
         config.set("observatory_name", name)
+    # The moment the observatory is usable, the first-run setup is done: the
+    # observer should not be greeted by Welcome again just because there is
+    # no project yet (2026-10-14).
+    if config.is_configured():
+        config.set("welcome_seen", True)
 
 
 def _apply_equipment(wizard):
@@ -500,5 +527,7 @@ def _apply_kinds(boxes):
 
 def _mark_done():
     # Saves the running version so the next start of this same version
-    # does not run the wizard again.
+    # does not run the wizard again, and remembers the setup was seen so a
+    # later start with no project opens on Home instead of Welcome.
     config.set("app_version", base_version())
+    config.set("welcome_seen", True)

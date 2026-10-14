@@ -101,37 +101,33 @@ def test_export_checkbox_defaults_to_the_setting(qapp, tmp_path):
     assert tab.chk_export.isChecked() is False
 
 
-def test_the_pseudo_flat_and_the_export_write_their_settings(qapp, tmp_path,
-                                                             monkeypatch):
-    # The switch WRITES its key now. It used to read calib_pseudo_flat and
-    # never save it, while the stack read a DIFFERENT widget's copy: the one
-    # the observer touched was not the one that worked.
+def test_the_export_checkbox_writes_its_setting(qapp, tmp_path, monkeypatch):
+    # D6: writing calibrated copies is explicit, and the choice survives the
+    # session. The pseudo-flat policy is NOT here any more (ADR-061 rev): it
+    # lives in Settings, its single home, and this tab only READS it.
     from nightscribe.config import config
-    monkeypatch.setitem(config._data, "calib_pseudo_flat", 0)
     monkeypatch.setitem(config._data, "calib_export", 0)
     tab, _host = _tab(qapp, tmp_path, visit=False)
-    tab.chk_pseudo_flat.setChecked(True)
-    assert int(config.get("calib_pseudo_flat")) == 1
-    tab.chk_pseudo_flat.setChecked(False)
-    assert int(config.get("calib_pseudo_flat")) == 0
     tab.chk_export.setChecked(True)
     assert int(config.get("calib_export")) == 1
+    assert not hasattr(tab, "chk_pseudo_flat")
 
 
 def test_short_recipe_says_what_the_calibration_will_do(qapp, tmp_path,
                                                         tmp_db, monkeypatch):
     # The one-liner the astrometry hint shows comes from HERE, the single
     # source of the recipe: an empty library says the vignetting stays; the
-    # policy says a pseudo-flat will stand in; and a real flat always wins
-    # and is named.
+    # policy (read from Settings) says a pseudo-flat will stand in; and a
+    # real flat always wins and is named.
     import nightscribe.core.db as db_mod
+    from nightscribe.config import config
     from nightscribe.core import calibration as cal
     monkeypatch.setattr(db_mod, "db", tmp_db)
+    monkeypatch.setitem(config._data, "calib_pseudo_flat", 0)
     tab, _host = _tab(qapp, tmp_path)
-    tab.chk_pseudo_flat.setChecked(False)
     text = tab.short_recipe()
     assert "no dark/bias" in text and "vignetting stays" in text
-    tab.chk_pseudo_flat.setChecked(True)
+    config._data["calib_pseudo_flat"] = 1
     assert "pseudo-flat" in tab.short_recipe()
     flat = _write_fits(tmp_path / "flatR.fits", np.full((64, 64), 5000.0))
     cal.add_master(tmp_db, flat, {"kind": "flat", "camera": "TestCam",
@@ -244,29 +240,41 @@ def test_no_orphan_widgets(qapp, tmp_path):
         assert isinstance(w, QWidget), name
 
 
-def test_the_library_is_filled_from_the_tab_that_reads_the_recipe(qapp,
-                                                                 tmp_path):
-    # ADR-061 rev: the library used to be fillable only from Settings, so
-    # this tab could report what was missing and nothing else. An observer
-    # with real flats (measured: 150 of them for one night) had no way to
-    # put them in from where the recipe is read. The tab never touches the
-    # database: it asks the host and shows what the host answers.
+def test_the_settings_button_is_the_door_to_the_library(qapp, tmp_path):
+    # ADR-061 rev: the library and the policy live in Settings, their single
+    # home; this tab only reads them and its button is the deep link there.
+    # The tab never touches the database: it asks the host. Without a hook
+    # it says where the library is instead of failing.
     tab, host = _tab(qapp, tmp_path)
     seen = {}
 
-    def _add(kind):
-        seen["kind"] = kind
-        return "Indexed 3 masters (Flat)."
-    host.add_masters = _add
-    # the four kinds are offered, and they are four different arithmetics
-    kinds = [tab.cmb_master_kind.itemData(i)
-             for i in range(tab.cmb_master_kind.count())]
-    assert kinds == ["bias", "dark", "dark_flat", "flat"]
-    tab.cmb_master_kind.setCurrentIndex(kinds.index("flat"))
-    tab.btn_master_add.click()
-    assert seen["kind"] == "flat"
-    assert "Indexed 3 masters" in tab.lbl_master_status.text()
-    # without a host hook it says so instead of failing
-    host.add_masters = None
-    tab.btn_master_add.click()
-    assert "no library" in tab.lbl_master_status.text()
+    def _open(page):
+        seen["page"] = page
+    host.open_settings_page = _open
+    tab.btn_settings.click()
+    assert seen["page"] == "page_measurement"
+    # the library is NOT here any more: one home, no second copy
+    assert not hasattr(tab, "cmb_master_kind")
+    assert not hasattr(tab, "btn_master_add")
+    host.open_settings_page = None
+    tab.btn_settings.click()
+    assert "Settings" in tab.lbl_status.text()
+
+
+def test_a_master_out_of_tolerance_is_explained(qapp, tmp_path, tmp_db,
+                                                monkeypatch):
+    # The observer who can SEE a dark in the library must learn why it was
+    # left out, with the numbers: "no dark" on its own is the message that
+    # sent the author hunting (ADR-061 rev).
+    import nightscribe.core.db as db_mod
+    from nightscribe.core import calibration as cal
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    dark = _write_fits(tmp_path / "dark_cold.fits", np.full((64, 64), 900.0))
+    cal.add_master(tmp_db, dark, {"kind": "dark", "camera": "TestCam",
+                                  "gain": 2.0, "temp_c": -16.0,
+                                  "exptime_s": 30.0})
+    tab, _host = _tab(qapp, tmp_path)     # the lights sit at -10 C
+    warnings = tab.lbl_warnings.text()
+    assert "dark_cold.fits" in warnings
+    assert "out of tolerance" in warnings
+    assert "-16" in warnings and "-10" in warnings

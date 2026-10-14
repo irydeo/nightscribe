@@ -132,6 +132,11 @@ FIELDS = [
     Field("chk_phot_matched", "phot_matched", "bool"),
     Field("spn_ccd_saturate", "ccd_saturate", "float", zero_none=True),
     Field("spn_flat_resid_mag", "flat_resid_mag", "float"),
+    # ADR-061 rev: the calibration's own POLICY lives here, with the library,
+    # because it is global (it is the same switch every pipeline reads). The
+    # editor's Calibration tab only reads it and applies it.
+    Field("chk_calib_pseudo_flat", "calib_pseudo_flat", "bool"),
+    Field("spn_calib_temp_tol", "calib_temp_tol_c", "float"),
     Field("spn_astro_gate", "astrometry_snr_sigma", "float"),
     Field("spn_astro_floor", "astrometry_submit_snr", "float"),
     Field("spn_astro_sweep_pct", "astrometry_sweep_pct", "float"),

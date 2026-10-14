@@ -139,20 +139,29 @@ def test_read_pixels_accepts_both_loader_conventions(tmp_path):
                           path).shape == (4, 4)
 
 
-def test_the_pseudo_flat_switch_lives_with_the_recipe_not_in_settings(
-        qapp=None):
-    # The policy used to be duplicated: a "default" in Settings AND a checkbox
-    # in the Calibration tab that read it but never wrote it, while the stack
-    # read the Settings copy. Two controls, one key, and the one the observer
-    # touched was not the one that worked. It lives now in ONE place, the
-    # Calibration tab, next to the recipe it belongs to.
+def test_the_calibration_policy_lives_in_settings():
+    # ADR-061 rev: the policy (the pseudo-flat switch, the dark temperature
+    # tolerance) belongs WITH the library it governs, in Settings, its single
+    # home. The editor's Calibration tab only READS it. The policy used to be
+    # duplicated, and two controls on one key is how the switch the observer
+    # touched came to be one nobody read.
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     from nightscribe.gui.main_window import _load_ui
     settings = _load_ui("settings_dialog")
-    assert not hasattr(settings, "chk_calib_pseudo_flat")
-    assert not hasattr(settings, "lblH_calib_pseudo_flat")
+    assert hasattr(settings, "chk_calib_pseudo_flat")
+    assert hasattr(settings, "spn_calib_temp_tol")
+    assert hasattr(settings, "btn_master_add_dir")
+    assert not hasattr(settings, "cmb_master_kind")
     settings.deleteLater()
+    ui = Path(__file__).parents[2] / "nightscribe" / "gui" / "ui" \
+        / "ufe_calibration_tab.ui"
+    names = {w.get("name") for w in ET.parse(ui).getroot().iter("widget")}
+    assert "btn_settings" in names
+    assert "chk_pseudo_flat" not in names
+    assert "cmb_master_kind" not in names
 
 
 def test_a_flat_does_not_have_to_share_the_lights_gain(tmp_path, tmp_db):

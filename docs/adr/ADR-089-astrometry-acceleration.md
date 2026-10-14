@@ -47,16 +47,17 @@ queda.
    como máximo).
 4. **La ruta CPU sigue siendo la probada y el defecto.** El GPU es una carretera
    más rápida al mismo resultado, nunca un resultado distinto.
-5. **La DETECCIÓN DE ESTRELLAS del registro va al dispositivo** (`gpu.stars`): es
-   la mitad del coste de una estimación por toma y la que el dispositivo hace
-   bien (medido en un frame real de 2008²: 204 ms en CPU contra 3,3 ms en GPU).
-   **La imagen fuente se queda en la CPU**: su mediana por bloques es lenta en el
-   dispositivo para un frame que no divide por el bloque, que es el caso real
-   (2008 % 32 = 24, así que el dispositivo recorre 3844 bloques uno a uno,
-   medido 693 ms contra 122 ms del CPU). Portarla pide una mediana por bloques
-   que reproduzca los bordes irregulares del CPU en un solo kernel, un cambio
-   aparte. La paridad del registro sigue siendo **exacta** (dx/dy y ángulo a
-   0,0000).
+5. **La imagen fuente y las estrellas del registro van al dispositivo**
+   (`gpu.frame_stars`): son el COSTE ENTERO de una estimación por toma y ahora
+   las dos pagan (medido en un frame real de 2008²: 199 ms en CPU contra 18,4 ms
+   en GPU, **x10,8**). La pieza que lo desbloqueó fue la **mediana por bloques**:
+   el dispositivo recorría 3844 bloques uno a uno (693 ms) para un frame que no
+   divide por el bloque, que es el caso real (2008 % 32 = 24). Ahora los bloques
+   se **dispersan** en un array acolchado (NaN donde un bloque es una fila o
+   columna más corta) y UN `nanmedian` los reduce: **4,2 ms, paridad max 0**,
+   porque los bordes salen del linspace TRUNCADO, igual que en el CPU. La
+   paridad del registro es **exacta** (las mismas 186/207 tomas y el mismo rms
+   mediano).
 6. **El warp y el combine se FUSIONAN en una sola pasada** (`gpu.stack_ram`): la
    pila deformada se construye y se reduce en el dispositivo, así que solo suben
    los fotogramas y baja una imagen. Es lo que quita el viaje de ida y vuelta de
@@ -71,22 +72,22 @@ queda.
 
 | Etapa | CPU | GPU | Ganancia |
 | --- | --- | --- | --- |
-| Registro de la secuencia | 54,3 s | 33,5 s | x1,6 |
-| Pila base (recorte de la traza, 142²) | 0,7 s | 0,5 s | x1,4 |
+| Registro de la secuencia | 54,3 s | 7,7 s | **x7,1** |
+| Pila base (recorte de la traza, 142²) | 0,7 s | 0,6 s | x1,2 |
 | Barrido de velocidad (25 candidatos) | 2,3 s | 2,3 s | x1,0 (CPU) |
-| Pilas por observación (2, frame completo) | 20,8 s | 4,5 s | x4,6 |
+| Pilas por observación (2, frame completo) | 20,8 s | 4,5 s | **x4,6** |
 | Medida (stack + por frame) | 4,5 s | 4,1 s | x1,1 |
-| **Total de las etapas medidas** | **83,3 s** | **45,4 s** | **x1,8** |
+| **Total de las etapas medidas** | **83,3 s** | **19,6 s** | **x4,25** |
 
-Y el detalle por kernel, en el banco sintético de 2048² (que SÍ divide por el
-bloque): las estrellas del registro x60 (204 → 3,3 ms), el `stack_group`
-fusionado x4,0 (7,9 → 2,0 s) y la correlación de fase x34 (320 → 9,3 ms).
+Y el detalle por kernel, sobre el frame real de 2008²: la imagen fuente y las
+estrellas del registro **x10,8** (199 → 18,4 ms); y en el banco sintético de
+2048², el `stack_group` fusionado x4,0 (7,9 → 2,0 s) y la correlación de fase
+x34 (320 → 9,3 ms).
 
-El registro es ahora el mayor coste (33,5 s de 45,4 s) y está limitado por la
-**imagen fuente**, que se queda en la CPU (ver el punto 5). El warp y el combine
-se **fusionan** en una sola pasada, y las pilas por observación, que son a frame
-completo, van a **x4,6**. **El barrido se queda en la CPU** (x1,0): su recorte es
-pequeño y sus regiones ya están en RAM.
+El registro baja de 54,3 s a **7,7 s** con la mediana por bloques en un solo
+kernel, y las pilas por observación, que son a frame completo, van a **x4,6**.
+**El barrido se queda en la CPU** (x1,0): su recorte es pequeño y sus regiones ya
+están en RAM.
 
 **Alternativas**:
 
@@ -186,15 +187,16 @@ the lever that is left.
    by at most 0.29 ADU).
 4. **The CPU path stays the tested one and the default.** The GPU is a faster road
    to the same answer, never a different answer.
-5. **The registration's STAR DETECTION goes to the device** (`gpu.stars`): it is
-   half the cost of a per-frame estimate and the half the device does well
-   (measured on a real 2008² frame: 204 ms on the CPU against 3.3 ms on the
-   device). **The source image stays on the CPU**: its block median is slow on
-   the device for a frame that does not divide by the block, which is the real
-   case (2008 % 32 = 24, so the device walks 3844 blocks one kernel at a time,
-   measured 693 ms against the CPU's 122 ms). Porting it needs a block median
-   that reproduces the CPU's uneven edges in one kernel, a change of its own.
-   The registration's parity is still **exact** (dx/dy and angle to 0.0000).
+5. **The registration's source image and stars both go to the device**
+   (`gpu.frame_stars`): they are the WHOLE cost of a per-frame estimate and both
+   now pay (measured on a real 2008² frame: 199 ms on the CPU against 18.4 ms on
+   the device, **x10.8**). What unlocked it was the **block median**: the device
+   walked 3844 blocks one kernel at a time (693 ms) for a frame that does not
+   divide by the block, which is the real case (2008 % 32 = 24). The blocks are
+   now **scattered** into a padded array (NaN where a block is one row or column
+   shorter) and ONE `nanmedian` reduces them: **4.2 ms, parity max 0**, because
+   the edges come from the TRUNCATED linspace, as on the CPU. The registration's
+   parity is **exact** (the same 186/207 frames and the same median rms).
 6. **The warp and the combine are FUSED into one pass** (`gpu.stack_ram`): the
    warped stack is built and reduced on the device, so only the frames go up and
    one image comes down. That is what removes the round trip of the whole stack
@@ -211,22 +213,22 @@ threads):
 
 | Stage | CPU | GPU | Gain |
 | --- | --- | --- | --- |
-| Sequence registration | 54.3 s | 33.5 s | x1.6 |
-| Base stack (trail cutout, 142²) | 0.7 s | 0.5 s | x1.4 |
+| Sequence registration | 54.3 s | 7.7 s | **x7.1** |
+| Base stack (trail cutout, 142²) | 0.7 s | 0.6 s | x1.2 |
 | Velocity sweep (25 candidates) | 2.3 s | 2.3 s | x1.0 (CPU) |
-| Per-observation stacks (2, whole frame) | 20.8 s | 4.5 s | x4.6 |
+| Per-observation stacks (2, whole frame) | 20.8 s | 4.5 s | **x4.6** |
 | Measurement (stack + per frame) | 4.5 s | 4.1 s | x1.1 |
-| **Total of the measured stages** | **83.3 s** | **45.4 s** | **x1.8** |
+| **Total of the measured stages** | **83.3 s** | **19.6 s** | **x4.25** |
 
-And the per-kernel detail, on the synthetic 2048² bench (which DOES divide by
-the block): the registration's stars x60 (204 -> 3.3 ms), the fused
-`stack_group` x4.0 (7.9 -> 2.0 s) and the phase correlation x34 (320 -> 9.3 ms).
+And the per-kernel detail, on the real 2008² frame: the registration's source
+image and stars **x10.8** (199 -> 18.4 ms); and on the synthetic 2048² bench, the
+fused `stack_group` x4.0 (7.9 -> 2.0 s) and the phase correlation x34 (320 ->
+9.3 ms).
 
-The registration is now the biggest cost (33.5 s of 45.4 s) and it is bound by
-the **source image**, which stays on the CPU (see point 5). The warp and the
-combine are **fused** into one pass, and the per-observation stacks, which are
-whole-frame, reach **x4.6**. **The sweep stays on the CPU** (x1.0): its cutout is
-small and its regions are already in RAM.
+The registration drops from 54.3 s to **7.7 s** with the block median in one
+kernel, and the per-observation stacks, which are whole-frame, reach **x4.6**.
+**The sweep stays on the CPU** (x1.0): its cutout is small and its regions are
+already in RAM.
 
 **Alternatives**:
 

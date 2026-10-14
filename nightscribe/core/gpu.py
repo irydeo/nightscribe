@@ -296,9 +296,76 @@ def _sigma_clip_keep(cp, data, sigma, iterations):
 
 
 # ======================================================================
-# The registration's star detection (ADR-089): the stars are half the cost of
-# a per-frame estimate and the half the device does WELL.
+# The registration's own kernels (ADR-089): the source image and the stars
+# are the WHOLE cost of a per-frame estimate, and the block median that made
+# the source image slow on the device is now a single kernel.
 # ======================================================================
+
+_BG_BLOCK = 32
+
+
+def _block_grid_gpu(cp, arr, block):
+    # @args: arr - the frame on the device, block - the cell size
+    # @return: (grid, ys, xs), the block medians and the cell edges
+    # The mirror of register._block_grid, ragged blocks INCLUDED: the edges
+    # come from linspace TRUNCATED, exactly as on the CPU, so a frame that
+    # does not divide by the block (the real 2008^2 case: 2008 % 32 = 24) gets
+    # the same grid to the bit.
+    #
+    # Why not a loop of cp.median: the device then launches one kernel per
+    # block and 3844 blocks cost 693 ms. Instead the blocks are SCATTERED into
+    # a padded (bh, block+1, bw, block+1) array (NaN where a block is one row
+    # or column shorter) and ONE nanmedian reduces them: measured on 2008^2,
+    # 4.2 ms against the CPU's 92 ms, parity max 0.
+    h, w = arr.shape
+    bh = max(1, h // block)
+    bw = max(1, w // block)
+    ys = cp.linspace(0, h, bh + 1).astype(cp.int64)
+    xs = cp.linspace(0, w, bw + 1).astype(cp.int64)
+    if h % block == 0 and w % block == 0:
+        return cp.median(arr.reshape(bh, block, bw, block),
+                         axis=(1, 3)), ys, xs
+    max_h = int((ys[1:] - ys[:-1]).max())
+    max_w = int((xs[1:] - xs[:-1]).max())
+    row_j = cp.clip(cp.searchsorted(ys, cp.arange(h), side="right") - 1,
+                    0, bh - 1)
+    row_p = cp.arange(h) - ys[row_j]
+    col_j = cp.clip(cp.searchsorted(xs, cp.arange(w), side="right") - 1,
+                    0, bw - 1)
+    col_p = cp.arange(w) - xs[col_j]
+    padded = cp.full((bh, max_h, bw, max_w), cp.nan, dtype=cp.float64)
+    padded[row_j[:, None], row_p[:, None],
+           col_j[None, :], col_p[None, :]] = arr
+    flat = padded.transpose(0, 2, 1, 3).reshape(bh * bw, max_h * max_w)
+    return cp.nanmedian(flat, axis=1).reshape(bh, bw), ys, xs
+
+
+def _background_gpu(cp, data, block=_BG_BLOCK):
+    # @args: data - the frame on the device, block - the grid block size
+    # @return: the smooth background, same shape, on the device
+    # The mirror of register._background: block medians, then a bilinear
+    # re-expansion. The median shrugs off the stars a mean would drag up.
+    arr = cp.asarray(data, dtype=cp.float64)
+    h, w = arr.shape
+    grid, ys, xs = _block_grid_gpu(cp, arr, block)
+    bh = grid.shape[0]
+    cy = (ys[:-1] + ys[1:] - 1) / 2.0
+    cx = (xs[:-1] + xs[1:] - 1) / 2.0
+    px = cp.arange(w, dtype=cp.float64)
+    tmp = cp.empty((bh, w), dtype=cp.float64)
+    for j in range(bh):
+        tmp[j] = cp.interp(px, cx, grid[j])
+    py = cp.arange(h, dtype=cp.float64)
+    jy = cp.clip(cp.searchsorted(cy, py) - 1, 0, bh - 2)
+    dy = cy[jy + 1] - cy[jy]
+    wy = cp.where(dy > 0, (py - cy[jy]) / cp.where(dy > 0, dy, 1.0), 0.0)
+    return tmp[jy] * (1.0 - wy)[:, None] + tmp[jy + 1] * wy[:, None]
+
+
+def _source_image_gpu(cp, arr, block=_BG_BLOCK):
+    # @return: the source image on the device (sky removed, negatives clipped)
+    return cp.clip(cp.asarray(arr, dtype=cp.float64)
+                   - _background_gpu(cp, arr, block), 0.0, None)
 
 
 def _refine_gpu(cp, src, xs, ys):
@@ -378,30 +445,25 @@ def _detect_stars_gpu(cp, src, nmax=60, k=8.0, margin=8, sat=None, factor=2):
     return cp.column_stack([fx, fy, peaks])
 
 
-def stars(src, sat=None):
-    # @args: src - a source image (what register.source_image returns), sat -
-    #        saturation ceiling (None keeps every peak, as the CPU path does)
-    # @return: the stars (N, 3) numpy, or None when the backend cannot serve
-    #          the call
-    # The stars are half the cost of a per-frame estimate and the half the
-    # device does well: measured on a real 2008^2 frame, 204 ms on the CPU
-    # against 3.3 ms on the device, and the detection is the same algorithm on
-    # both sides (local maxima, the same robust noise, the same subpixel
-    # refine), so the list is the same to a fraction of a pixel.
-    #
-    # The SOURCE IMAGE is deliberately LEFT on the CPU. Its block median is
-    # slow on the device for a frame that does not divide by the block, which
-    # is the real case here (2008 % 32 = 24, so the device walks 3844 blocks
-    # one kernel at a time: measured 693 ms against the CPU's 122 ms), and the
-    # CPU already builds it in 122 ms. Porting it needs a block median that
-    # reproduces the CPU's uneven edges in one kernel, a change of its own.
+def frame_stars(data, sat=None):
+    # @args: data - a frame's pixels (ADU, any shape), sat - saturation
+    #        ceiling (None keeps every peak, as the CPU path does)
+    # @return: (source image (numpy float64), stars (N, 3) numpy) or None when
+    #          the backend cannot serve the call
+    # ONE upload per frame for BOTH kernels: the frame goes up once, the
+    # source image and the stars are built on the device and the two results
+    # come back. The source image's block median used to make this a loss (a
+    # kernel per block, 693 ms on a frame that does not divide by the block);
+    # with the scatter it is 4.2 ms, so both halves now pay.
     if not available():
         return None
     cp = _state["cp"]
     try:
-        arr = cp.asarray(np.asarray(src, dtype=np.float64))
-        return cp.asnumpy(_detect_stars_gpu(cp, arr, sat=sat))
+        arr = cp.asarray(np.asarray(data, dtype=np.float64))
+        src = _source_image_gpu(cp, arr)
+        st = _detect_stars_gpu(cp, src, sat=sat)
+        return cp.asnumpy(src), cp.asnumpy(st)
     except Exception as err:
-        logger.warning("GPU star detection failed, falling back to CPU: %s",
-                       err)
+        logger.warning("GPU registration kernels failed, falling back to CPU: "
+                       "%s", err)
         return None

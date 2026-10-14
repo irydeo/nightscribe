@@ -269,16 +269,16 @@ def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
     # hand: the weighted combination needs it and the robust MAD does not
     # care about the stars or the object sitting on top of the sky
     frame.sky_sigma = _frame_noise(data)
-    # The stars are half the cost of an estimate and the device does that half
-    # well (ADR-089). The SOURCE IMAGE stays on the CPU on purpose: its block
-    # median is slow on the device for a frame that does not divide by the
-    # block (the real 2008^2 case), and the CPU builds it in ~120 ms. A None
-    # answer from the device falls straight back to the CPU inside
-    # estimate_transform: the estimate is never left undone, only done slower.
+    # The source image and the stars are the WHOLE cost of an estimate and
+    # both now pay on the device (ADR-089): the block median that used to make
+    # the source image a loss is a single scatter kernel. A None answer falls
+    # straight back to the CPU inside estimate_transform: the estimate is
+    # never left undone, only done slower.
     src_src = src_stars = None
     if gpu.enabled(cfg):
-        src_src = register.source_image(data)
-        src_stars = gpu.stars(src_src)
+        got = gpu.frame_stars(data)
+        if got is not None:
+            src_src, src_stars = got
     tr = register.estimate_transform(
         ref_data, data, guess=guess, ref_stars=ref_stars,
         ref_src=ref_src, allow_rotation=allow_rotation,
@@ -352,12 +352,16 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     # ONE source image of the reference for the whole sequence: it is the
     # same frame every time, and rebuilding it per frame was ~140 ms of
     # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
-    # read from it too, so nothing is computed twice. The stars come from the
-    # SAME path the frames use (the device when it is on), so the reference's
+    # read from it too, so nothing is computed twice. It is built by the SAME
+    # path the frames use (the device when it is on), so the reference's star
     # list and the frames' are comparable.
-    ref_src = register.source_image(ref_data)
-    ref_stars = gpu.stars(ref_src) if gpu.enabled(cfg) else None
-    if ref_stars is None:
+    ref_src = ref_stars = None
+    if gpu.enabled(cfg):
+        got = gpu.frame_stars(ref_data)
+        if got is not None:
+            ref_src, ref_stars = got
+    if ref_src is None:
+        ref_src = register.source_image(ref_data)
         ref_stars = register.detect_stars(ref_src)
     ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:

@@ -123,23 +123,38 @@ def _field(size, seed=1, n=40):
     return img
 
 
-def test_the_star_detection_matches_the_numpy_path():
-    # The stars are the half of an estimate the device does well. The
-    # detection is the same algorithm on both sides, so the list has to match
-    # to a fraction of a pixel: anything larger would move the transform and
-    # the stack. The SOURCE IMAGE stays on the CPU (its block median is slow
-    # on the device for a frame that does not divide by the block).
+def test_the_registration_kernels_match_the_numpy_path():
+    # The source image and the stars are the WHOLE cost of an estimate. Both
+    # are deterministic in float64, so the source image matches to the bit and
+    # the stars to a fraction of a pixel; anything larger would move the
+    # transform and the stack.
     from nightscribe.core import register
     size = 256
     img = _field(size, seed=4)
-    src = register.source_image(img)
-    stars_cpu = register.detect_stars(src)
-    stars_gpu = gpu.stars(src)
-    assert stars_gpu is not None
+    src_cpu = register.source_image(img)
+    stars_cpu = register.detect_stars(src_cpu)
+    got = gpu.frame_stars(img)
+    assert got is not None
+    src_gpu, stars_gpu = got
+    assert np.abs(src_gpu - src_cpu).max() < 1e-6
     assert len(stars_gpu) == len(stars_cpu)
     for x, y, _peak in stars_cpu:
         d = np.hypot(stars_gpu[:, 0] - x, stars_gpu[:, 1] - y).min()
         assert d < 0.1
+
+
+def test_the_source_image_matches_on_a_ragged_frame():
+    # The real camera writes 2008^2, which does NOT divide by the block (32):
+    # 2008 % 32 = 24, so the CPU walks RAGGED blocks of 32 and 33 and the
+    # device has to reproduce them, or the background (and the stars) move.
+    from nightscribe.core import register
+    size = 200              # 200 % 32 = 8, a ragged frame
+    img = _field(size, seed=6)
+    src_cpu = register.source_image(img)
+    got = gpu.frame_stars(img)
+    assert got is not None
+    src_gpu, _stars = got
+    assert np.abs(src_gpu - src_cpu).max() < 1e-6
 
 
 def test_register_sequence_matches_with_the_gpu_on(tmp_path):

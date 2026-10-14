@@ -110,3 +110,73 @@ def test_the_engine_takes_the_gpu_path_when_it_is_on(tmp_path):
     on_gpu, _ = ts.stack_group(frames, (0, len(frames)), q, "sigma", box,
                                (size, size), cfg={"astrometry_gpu": 1})
     assert np.nanmax(np.abs(cpu - on_gpu)) < 0.5
+
+
+def _field(size, seed=1, n=40):
+    rng = np.random.default_rng(seed)
+    img = rng.normal(1000.0, 3.0, (size, size))
+    yy, xx = np.mgrid[0:size, 0:size]
+    for _ in range(n):
+        x, y = rng.uniform(20, size - 20), rng.uniform(20, size - 20)
+        img += rng.uniform(1500.0, 6000.0) * np.exp(
+            -((xx - x) ** 2 + (yy - y) ** 2) / (2 * 1.6 ** 2))
+    return img
+
+
+def test_the_registration_kernels_match_the_numpy_path():
+    # The source image and the stars are the WHOLE cost of an estimate, so
+    # they are what the device takes first. Both are deterministic in float64,
+    # so the source image matches to the bit and the stars to a fraction of a
+    # pixel; anything larger would move the transform and the stack.
+    from nightscribe.core import register
+    size = 256
+    img = _field(size, seed=4)
+    src_cpu = register.source_image(img)
+    stars_cpu = register.detect_stars(src_cpu)
+    got = gpu.frame_stars(img)
+    assert got is not None
+    src_gpu, stars_gpu = got
+    assert np.abs(src_gpu - src_cpu).max() < 1e-6
+    assert len(stars_gpu) == len(stars_cpu)
+    for x, y, _peak in stars_cpu:
+        d = np.hypot(stars_gpu[:, 0] - x, stars_gpu[:, 1] - y).min()
+        assert d < 0.1
+
+
+def test_register_sequence_matches_with_the_gpu_on(tmp_path):
+    # The point of the whole exercise: the same sequence on the same grid must
+    # come out with the SAME transform frame by frame, trusted or not. The
+    # estimate is deterministic once the source image and the stars are equal,
+    # so any drift here would be a wiring mistake, not a tolerance question.
+    from astropy.io import fits
+    from astropy.wcs import WCS
+    size = 200
+    base = _field(size, seed=7)
+    paths = []
+    for i in range(8):
+        img = np.roll(base, (i % 3 - 1, i % 2 - 1), axis=(0, 1))
+        p = tmp_path / f"f{i}.fits"
+        fits.PrimaryHDU(img.astype(np.int16)).writeto(str(p), overwrite=True)
+        paths.append(str(p))
+
+    def _run(cfg):
+        frames = ts.load_sequence(paths)
+        w = WCS(naxis=2)
+        w.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+        w.wcs.crval = [10.0, 20.0]
+        w.wcs.crpix = [size / 2.0 + 0.5, size / 2.0 + 0.5]
+        w.wcs.cd = [[-2.0 / 3600, 0.0], [0.0, 2.0 / 3600]]
+        w.pixel_shape = (size, size)
+        frames[0].wcs = w
+        ts.register_sequence(frames, cfg=cfg)
+        return frames
+
+    cpu = _run({"astrometry_gpu": 0})
+    on_gpu = _run({"astrometry_gpu": 1})
+    assert [f.failed_register for f in cpu] == \
+        [f.failed_register for f in on_gpu]
+    for a, b in zip(cpu, on_gpu):
+        assert a.transform["dx"] == pytest.approx(b.transform["dx"], abs=0.05)
+        assert a.transform["dy"] == pytest.approx(b.transform["dy"], abs=0.05)
+        assert a.transform.get("angle_deg", 0.0) == pytest.approx(
+            b.transform.get("angle_deg", 0.0), abs=0.05)

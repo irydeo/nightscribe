@@ -160,6 +160,8 @@ def main():
     from nightscribe.core import gpu
     if gpu.available():
         print(f"\nGPU backend ({gpu.device_name()}):")
+        _time("registration kernels (GPU: source image + stars)",
+              lambda: gpu.frame_stars(ref_data), repeat=3)
         _time("warp batch (GPU, whole frame)",
               lambda: track_stack._warp_batch(
                   frames, [(0.0, 0.0)] * len(frames), final_box,

@@ -250,13 +250,14 @@ def read_pixels(loader, path, box=None):
 
 
 def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
-                  guess, loader):
+                  guess, loader, cfg=None):
     # @args: frame - the Frame to estimate, ref_data/ref_stars/ref_src - the
     #        reference frame's pixels, its stars and its source image (shared
     #        and read only), fwhm_px - the session's point spread for the
     #        gate, allow_rotation - fit the rotation on the FIRST attempt,
     #        guess - the previous chunk's transform (a hint for the pairing,
-    #        never trusted), loader - array reader
+    #        never trusted), loader - array reader, cfg - Config, so the
+    #        optional GPU kernels can be asked for
     # @return: (tr, note) with tr the estimate and note "rotation" when the
     #          second attempt earned its place, "" otherwise
     # The per-frame half of register_sequence, lifted out so a whole chunk of
@@ -268,9 +269,21 @@ def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
     # hand: the weighted combination needs it and the robust MAD does not
     # care about the stars or the object sitting on top of the sky
     frame.sky_sigma = _frame_noise(data)
+    # The source image and the stars are the WHOLE cost of an estimate
+    # (measured on 2048^2: 88 ms and 69 ms against a vote and a pairing that
+    # round to nothing), and both are memory-bound, so they are what the
+    # optional GPU path takes first (ADR-089). A None answer falls straight
+    # back to the CPU inside estimate_transform: the estimate is never left
+    # undone, only done slower.
+    src_src = src_stars = None
+    if gpu.enabled(cfg):
+        got = gpu.frame_stars(data)
+        if got is not None:
+            src_src, src_stars = got
     tr = register.estimate_transform(
         ref_data, data, guess=guess, ref_stars=ref_stars,
-        ref_src=ref_src, allow_rotation=allow_rotation)
+        ref_src=ref_src, allow_rotation=allow_rotation,
+        src_src=src_src, src_stars=src_stars)
     # "Accepted" is not the same as "good": a translation that could not
     # explain the stars is returned anyway when the rotation is not allowed,
     # so the retry fires both when the gate rejects the answer AND when the
@@ -285,7 +298,8 @@ def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
     if needs_rotation and not allow_rotation:
         retry = register.estimate_transform(
             ref_data, data, guess=guess, ref_stars=ref_stars,
-            ref_src=ref_src, allow_rotation=True)
+            ref_src=ref_src, allow_rotation=True,
+            src_src=src_src, src_stars=src_stars)
         # The retry has to be PROVEN, not hinted: the stars must certify it
         # (register.trusted's correlation fallback is not enough for a
         # rotation, see require_stars), and the angle has to be a field
@@ -306,14 +320,15 @@ def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
 
 def register_sequence(frames, ref_index=None, allow_rotation=False,
                       progress=None, cancel=None, fwhm_px=None, sat=None,
-                      loader=None):
+                      loader=None, cfg=None):
     # @args: frames - list[Frame] with a solved reference, ref_index -
     #        which frame is the grid (default: the solved one), allow_rotation
     #        - fit a rigid rotation on the FIRST attempt (slower, for alt-az
     #        without derotator; the retry below does it anyway when needed),
     #        progress/cancel - as usual, fwhm_px - the session's point
     #        spread for the quality gate (measured here when None),
-    #        sat - saturation ceiling
+    #        sat - saturation ceiling, cfg - Config, so the optional GPU
+    #        kernels can be asked for (ADR-089)
     # @return: the reference Frame
     # The transform is ESTIMATED by core/register.py (star voting, proven);
     # the RESAMPLING is scipy's spline, which keeps the shape of a point
@@ -338,9 +353,17 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     # ONE source image of the reference for the whole sequence: it is the
     # same frame every time, and rebuilding it per frame was ~140 ms of
     # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
-    # read from it too, so nothing is computed twice.
-    ref_src = register.source_image(ref_data)
-    ref_stars = register.detect_stars(ref_src)
+    # read from it too, so nothing is computed twice. It is built by the SAME
+    # path the frames use (the GPU kernels when they are on, the CPU
+    # otherwise), so the reference's star list and the frames' are comparable.
+    ref_src = ref_stars = None
+    if gpu.enabled(cfg):
+        got = gpu.frame_stars(ref_data)
+        if got is not None:
+            ref_src, ref_stars = got
+    if ref_src is None:
+        ref_src = register.source_image(ref_data)
+        ref_stars = register.detect_stars(ref_src)
     ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:
         fwhm_px = session_fwhm(ref_data, ref_stars, sat=sat)
@@ -377,7 +400,7 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
         seed = previous
         results = parallel.map_parallel(
             lambda i: _estimate_one(frames[i], ref_data, ref_stars, ref_src,
-                                    fwhm_px, allow_rotation, seed, loader),
+                                    fwhm_px, allow_rotation, seed, loader, cfg),
             chunk, workers=len(chunk))
         for i, (tr, note) in zip(chunk, results):
             frame = frames[i]

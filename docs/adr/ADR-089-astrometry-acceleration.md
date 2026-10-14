@@ -47,21 +47,30 @@ queda.
    como máximo).
 4. **La ruta CPU sigue siendo la probada y el defecto.** El GPU es una carretera
    más rápida al mismo resultado, nunca un resultado distinto.
+5. **Los kernels del registro también van al dispositivo** (`gpu.frame_stars`):
+   `source_image` y `detect_stars` son el COSTE ENTERO de una estimación por
+   toma, y se calculan en la GPU con la paridad fijada por un test (la imagen
+   fuente coincide bit a bit y el transform, dx/dy y ángulo, a 0,0000).
 
 **Lo medido** (60 tomas de 2048²; CPU = 16 hilos):
 
 | Etapa | CPU | GPU | Ganancia |
 | --- | --- | --- | --- |
-| Registro de la secuencia (bucle) | 10,5 s | 4,4 s (bloques) | x2,4 |
+| Registro, kernels (source image + estrellas, por toma) | 155 ms | 17 ms | x9 |
+| Registro, secuencia de 60 tomas (bucle en serie) | 10,5 s | | |
+| Registro, secuencia de 60 tomas (bloques CPU) | 4,4 s | | x2,4 |
+| Registro, secuencia de 60 tomas (kernels GPU) | 4,4 s | 1,6 s | x2,7 |
 | `_warp_batch` (frame completo) | 1,28 s | 0,75 s | x1,7 |
 | `combine` sigma (recorte 3 iter) | 5,56 s | 1,05 s | x5,3 |
 | `stack_group` sigma, extremo a extremo | 7,06 s | 2,55 s | x2,8 |
 | Correlación de fase (una toma) | 320 ms | 9,3 ms | x34 |
 
 El warp del GPU está limitado por la lectura de las tomas y el viaje por PCIe, no
-por el kernel; el combine es donde gana. El registro no lo toca esta revisión (su
-coste está en `source_image` y `detect_stars`, también limitados por memoria y
-candidatos a un kernel propio más adelante).
+por el kernel; el combine es donde gana. El registro va ahora por los mismos
+kernels (`source_image` y `detect_stars` en el dispositivo), con paridad
+**exacta** en la imagen fuente y en el transform; en serie el registro costaba
+10,5 s, en bloques baja a 4,4 s y con los kernels a 1,6 s, y el margen que queda
+está en el viaje por PCIe de cada toma, que un lote por bloque recortaría.
 
 **Alternativas**:
 
@@ -125,21 +134,30 @@ the lever that is left.
    by at most 0.29 ADU).
 4. **The CPU path stays the tested one and the default.** The GPU is a faster road
    to the same answer, never a different answer.
+5. **The registration's kernels go to the device too** (`gpu.frame_stars`):
+   `source_image` and `detect_stars` are the WHOLE cost of a per-frame estimate,
+   and they are computed on the GPU with the parity pinned by a test (the source
+   image matches to the bit and the transform, dx/dy and angle, to 0.0000).
 
 **What was measured** (60 frames of 2048²; CPU = 16 threads):
 
 | Stage | CPU | GPU | Gain |
 | --- | --- | --- | --- |
-| Sequence registration (loop) | 10.5 s | 4.4 s (chunks) | x2.4 |
+| Registration kernels (source image + stars, per frame) | 155 ms | 17 ms | x9 |
+| Registration, 60-frame sequence (serial loop) | 10.5 s | | |
+| Registration, 60-frame sequence (CPU chunks) | 4.4 s | | x2.4 |
+| Registration, 60-frame sequence (GPU kernels) | 4.4 s | 1.6 s | x2.7 |
 | `_warp_batch` (whole frame) | 1.28 s | 0.75 s | x1.7 |
 | `combine` sigma (clip, 3 iter) | 5.56 s | 1.05 s | x5.3 |
 | `stack_group` sigma, end to end | 7.06 s | 2.55 s | x2.8 |
 | Phase correlation (one frame) | 320 ms | 9.3 ms | x34 |
 
 The GPU warp is bound by reading the frames and the PCIe trip, not by the kernel;
-the combine is where it wins. The registration is untouched by this revision (its
-cost is in `source_image` and `detect_stars`, also memory-bound and candidates for
-a kernel of their own later).
+the combine is where it wins. The registration now runs through the same kernels
+(`source_image` and `detect_stars` on the device), with **exact** parity in the
+source image and in the transform; serially the registration cost 10.5 s, in
+chunks it drops to 4.4 s and with the kernels to 1.6 s, and the margin that is
+left is the PCIe trip of each frame, which one batch per chunk would cut.
 
 **Alternatives**:
 

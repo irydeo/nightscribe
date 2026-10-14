@@ -569,7 +569,7 @@ def _fit_translation(ref_xy, src_xy, dx, dy):
 
 def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
                        tol=3.0, allow_rotation=True, ref_src=None,
-                       allow_scale=False):
+                       src_src=None, src_stars=None, allow_scale=False):
     # Estimate the transform that maps `src` onto `ref` (rotation about
     # the frame centre plus subpixel translation), in the module's
     # convention: {"angle", "dx", "dy"} so that apply_transform(src,
@@ -596,15 +596,21 @@ def estimate_transform(ref, src, guess=None, ref_stars=None, sat=None,
     #        allow_scale - also fit a pixel SCALE (a similarity). Off for
     #        a series (same instrument, same scale); ON for the host
     #        subtraction, where the survey cutout's scale is not the
-    #        frame's (see _fit_similarity).
+    #        frame's (see _fit_similarity), src_src - the frame's source image
+    #        when the caller already built it, src_stars - its stars likewise.
+    #        The optional GPU path (core/gpu.py) computes both on the device
+    #        and hands them here, so the CPU half of the estimate (the vote
+    #        and the pairing) is the only thing that still runs: measured, the
+    #        source image and the stars are the WHOLE cost of an estimate.
     # @return: {"angle", "dx", "dy", "quality", "rms_px", "n",
     #          "scale", "angle_deg", "shift_px", "stars", "rotated"}
     ref_src = source_image(ref) if ref_src is None else ref_src
-    src_src = source_image(src)
+    src_src = source_image(src) if src_src is None else src_src
     shape = tuple(np.shape(ref))
     if ref_stars is None:
         ref_stars = detect_stars(ref_src, sat=sat)
-    src_stars = detect_stars(src_src, sat=sat)
+    if src_stars is None:
+        src_stars = detect_stars(src_src, sat=sat)
     out = {"angle": 0.0, "dx": 0.0, "dy": 0.0, "quality": 0.0,
            "rms_px": None, "n": 0, "scale": 1.0, "angle_deg": 0.0,
            "shift_px": 0.0, "spread": 0.0,

@@ -2180,7 +2180,8 @@ class TrackStackWorker(QThread):
             track_stack.register_sequence(
                 frames,
                 progress=lambda d, t, _l: self.progress.emit("register", d, t),
-                cancel=lambda: self._cancel, loader=self._loader)
+                cancel=lambda: self._cancel, loader=self._loader,
+                cfg=self._cfg)
             out["dither"] = track_stack.dither_check(frames)
             out["n_failed"] = sum(1 for f in frames if f.failed_register)
             # WHICH frames were left out, by path: the editor's preview list

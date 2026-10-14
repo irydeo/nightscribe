@@ -241,3 +241,163 @@ def _sigma_clip_keep(cp, data, sigma, iterations):
                 / cp.maximum(count, 1)
         med = cp.where(count > 0, new_med, med)
     return keep
+
+
+# ======================================================================
+# The registration's own kernels (ADR-089): the source image and the stars
+# are the WHOLE cost of a per-frame estimate (measured, 2048^2: source image
+# 88 ms and stars 69 ms against a vote and a pairing that round to nothing),
+# and both are memory-bound, which is where the device pays.
+# ======================================================================
+
+_BG_BLOCK = 32
+
+
+def _block_grid_gpu(cp, arr, block):
+    # @args: arr - the frame on the device, block - the cell size
+    # @return: (grid, ys, xs), the block medians and the cell edges
+    # The mirror of register._block_grid. The vectorised reshape is the
+    # common case (a frame that divides by the block) and the loop is the
+    # rare one, exactly as on the CPU.
+    h, w = arr.shape
+    bh = max(1, h // block)
+    bw = max(1, w // block)
+    ys = cp.linspace(0, h, bh + 1).astype(cp.int64)
+    xs = cp.linspace(0, w, bw + 1).astype(cp.int64)
+    if h % block == 0 and w % block == 0:
+        return cp.median(arr.reshape(bh, block, bw, block),
+                         axis=(1, 3)), ys, xs
+    grid = cp.empty((bh, bw), dtype=cp.float64)
+    for j in range(bh):
+        y0, y1 = int(ys[j]), max(int(ys[j + 1]), int(ys[j]) + 1)
+        for i in range(bw):
+            x0, x1 = int(xs[i]), max(int(xs[i + 1]), int(xs[i]) + 1)
+            grid[j, i] = cp.median(arr[y0:y1, x0:x1])
+    return grid, ys, xs
+
+
+def _background_gpu(cp, data, block=_BG_BLOCK):
+    # @args: data - the frame on the device, block - the grid block size
+    # @return: the smooth background, same shape, on the device
+    # The mirror of register._background: block medians, then a bilinear
+    # re-expansion. The median shrugs off the stars a mean would drag up.
+    arr = cp.asarray(data, dtype=cp.float64)
+    h, w = arr.shape
+    grid, ys, xs = _block_grid_gpu(cp, arr, block)
+    bh = grid.shape[0]
+    cy = (ys[:-1] + ys[1:] - 1) / 2.0
+    cx = (xs[:-1] + xs[1:] - 1) / 2.0
+    px = cp.arange(w, dtype=cp.float64)
+    tmp = cp.empty((bh, w), dtype=cp.float64)
+    for j in range(bh):
+        tmp[j] = cp.interp(px, cx, grid[j])
+    py = cp.arange(h, dtype=cp.float64)
+    jy = cp.clip(cp.searchsorted(cy, py) - 1, 0, bh - 2)
+    dy = cy[jy + 1] - cy[jy]
+    wy = cp.where(dy > 0, (py - cy[jy]) / cp.where(dy > 0, dy, 1.0), 0.0)
+    return tmp[jy] * (1.0 - wy)[:, None] + tmp[jy + 1] * wy[:, None]
+
+
+def _source_image_gpu(cp, arr, block=_BG_BLOCK):
+    # @return: the source image on the device (sky removed, negatives clipped)
+    return cp.clip(cp.asarray(arr, dtype=cp.float64)
+                   - _background_gpu(cp, arr, block), 0.0, None)
+
+
+def _refine_gpu(cp, src, xs, ys):
+    # The mirror of register._refine: a 7x7 centroid on the source image, its
+    # background from the patch's border ring, the positives weighted.
+    h, w = src.shape
+    half = 3
+    off = cp.arange(-half, half + 1)
+    cx = cp.clip(cp.rint(xs).astype(cp.int64), half, w - 1 - half)
+    cy = cp.clip(cp.rint(ys).astype(cp.int64), half, h - 1 - half)
+    ii = cp.clip(cx[:, None] + off[None, :], 0, w - 1)
+    jj = cp.clip(cy[:, None] + off[None, :], 0, h - 1)
+    patch = src[jj[:, :, None], ii[:, None, :]]
+    border = cp.concatenate([patch[:, 0, :], patch[:, -1, :],
+                             patch[:, :, 0], patch[:, :, -1]], axis=1)
+    base = cp.median(border, axis=1)[:, None, None]
+    weight = cp.clip(patch - base, 0.0, None)
+    tot = weight.sum(axis=(1, 2))
+    wx = (weight * off[None, None, :]).sum(axis=(1, 2))
+    wy = (weight * off[None, :, None]).sum(axis=(1, 2))
+    good = tot > 0.0
+    out_x = cp.where(good, cx + wx / cp.where(good, tot, 1.0), xs)
+    out_y = cp.where(good, cy + wy / cp.where(good, tot, 1.0), ys)
+    return out_x.astype(cp.float64), out_y.astype(cp.float64)
+
+
+def _detect_stars_gpu(cp, src, nmax=60, k=8.0, margin=8, sat=None, factor=2):
+    # The mirror of register.detect_stars: local maxima at least k robust
+    # sigmas over the pixel noise, brightest first, refined to subpixel. The
+    # search runs on a decimated copy and the positions are refined at full
+    # resolution, exactly as on the CPU, so the two lists are comparable.
+    import math
+    empty = cp.empty((0, 3), dtype=cp.float64)
+    arr = cp.asarray(src, dtype=cp.float64)
+    h, w = arr.shape
+    f = int(max(1, factor))
+    if f > 1 and min(h, w) >= 4 * f:
+        hh, ww = (h // f) * f, (w // f) * f
+        small = arr[:hh, :ww].reshape(hh // f, f, ww // f, f).mean(axis=(1, 3))
+    else:
+        f = 1
+        small = arr
+    diffs = cp.concatenate([cp.diff(small, axis=1).ravel(),
+                            cp.diff(small, axis=0).ravel()])
+    diffs = diffs - cp.median(diffs)
+    noise = 1.4826 * float(cp.median(cp.abs(diffs))) / math.sqrt(2.0)
+    if not (noise > 0.0):
+        return empty
+    loc = cp.ones(small.shape, dtype=bool)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dy == 0 and dx == 0:
+                continue
+            loc &= small >= cp.roll(cp.roll(small, -dy, 0), -dx, 1)
+    cand = loc & (small > k * noise)
+    m = max(2, int(round(margin / f)))
+    if 2 * m >= min(h, w):
+        return empty
+    cand[:m, :] = False
+    cand[-m:, :] = False
+    cand[:, :m] = False
+    cand[:, -m:] = False
+    ys, xs = cp.nonzero(cand)
+    if xs.size == 0:
+        return empty
+    peaks = small[ys, xs]
+    if sat is not None and sat > 0:
+        keep = peaks < float(sat)
+        ys, xs, peaks = ys[keep], xs[keep], peaks[keep]
+        if xs.size == 0:
+            return empty
+    order = cp.argsort(peaks)[::-1][:nmax]
+    xs = (xs[order] + 0.5) * f
+    ys = (ys[order] + 0.5) * f
+    peaks = peaks[order]
+    fx, fy = _refine_gpu(cp, arr, xs, ys)
+    return cp.column_stack([fx, fy, peaks])
+
+
+def frame_stars(data, sat=None):
+    # @args: data - a frame's pixels (ADU, any shape), sat - saturation
+    #        ceiling (None keeps every peak, as the CPU path does)
+    # @return: (source image (numpy float64), stars (N, 3) numpy) or None when
+    #          the backend cannot serve the call
+    # ONE upload per frame for BOTH kernels: the frame goes up once, the
+    # source image and the stars are built on the device and only the results
+    # come back. The frame is the biggest thing moved and it is moved once.
+    if not available():
+        return None
+    cp = _state["cp"]
+    try:
+        arr = cp.asarray(np.asarray(data, dtype=np.float64))
+        src = _source_image_gpu(cp, arr)
+        stars = _detect_stars_gpu(cp, src, sat=sat)
+        return cp.asnumpy(src), cp.asnumpy(stars)
+    except Exception as err:
+        logger.warning("GPU registration kernels failed, falling back to CPU: "
+                       "%s", err)
+        return None

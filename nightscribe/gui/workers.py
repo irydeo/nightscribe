@@ -1437,6 +1437,45 @@ class CalibrationWorker(QThread):
                             "flat_file": flat_file})
 
 
+class _WholeFrameCache:
+    # A loader that reads each frame ONCE and slices every later box from
+    # memory. The comps' windows all need the SAME frames, so without this a
+    # set of twelve comps opens and reads every file twelve times, and the
+    # reads are the whole cost of that stage (measured: 120 box reads 118 ms
+    # against 120 whole-frame reads 283 ms). The cache is BOUNDED: past the
+    # budget it stops storing and serves the box the slow way, so a huge visit
+    # pays the old price instead of the machine's memory.
+    def __init__(self, base, budget_bytes=1024 ** 3):
+        self._base = base
+        self._budget = int(budget_bytes)
+        self._used = 0
+        self._cache = {}
+
+    def __call__(self, path, box=None):
+        # @args: path - the frame, box - (x0, y0, x1, y1) or None for the whole
+        # @return: the pixels (and header) the base loader gives for that box
+        import numpy as np
+        key = str(path)
+        got = self._cache.get(key)
+        if got is None:
+            got = self._base(path)                 # the WHOLE frame, once
+            data = got[0] if isinstance(got, tuple) else got
+            size = int(np.asarray(data).nbytes)
+            if self._used + size > self._budget:
+                # over the budget: serve this box without keeping the frame
+                if box is None:
+                    return got
+                x0, y0, x1, y1 = box
+                return np.asarray(data)[y0:y1, x0:x1]
+            self._cache[key] = got
+            self._used += size
+        data = got[0] if isinstance(got, tuple) else got
+        if box is None:
+            return got
+        x0, y0, x1, y1 = box
+        return data[y0:y1, x0:x1]
+
+
 class TrackStackWorker(QThread):
     # The whole track & stack pipeline off the GUI thread (astrometry plan,
     # phases 2-6 wired by phase 7): solve the reference, register, stack the
@@ -1947,8 +1986,18 @@ class TrackStackWorker(QThread):
         # measured on 2025 UR: SNR 2), but only in the pixels it occupies.
         # A window around each comp is ~1 % of the frame, and the whole
         # star stack measured 74 s for the very same zero point.
+        #
+        # The windows are stacked in a SERIAL loop with ONE cached read per
+        # frame: every comp re-reads the SAME frames and the reads are the
+        # whole cost of this stage (measured: 120 box reads 118 ms against 120
+        # whole-frame reads 283 ms, and a twelve-comp set pays the reads
+        # twelve times). Parallelising the loop was tried and REJECTED: each
+        # per-comp stack already uses the machine's cores, so the outer walk
+        # only oversubscribed them (measured x1.08).
         from ..core import track_stack
+        from ..core import calibration
         half = self._window_half()
+        cached = _WholeFrameCache(self._loader or calibration.read_image)
         out = []
         for e in entries:
             star = e.get("star") or {}
@@ -1963,7 +2012,7 @@ class TrackStackWorker(QThread):
                 continue
             small, _rep = track_stack.stack_group(
                 frames, group, (cx, cy), self._method, box, shape,
-                cfg=self._cfg, track=False, loader=self._loader,
+                cfg=self._cfg, track=False, loader=cached,
                 order=self._warp_order())
             if small is None:
                 continue

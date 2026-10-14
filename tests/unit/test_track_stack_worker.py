@@ -15,6 +15,7 @@
 two as if the baseline were two minutes, returning exactly HALF the real
 rate (measured on 2025 UR: 15.25 instead of 30.6"/min)."""
 
+import numpy as np
 import pytest
 
 from nightscribe.gui.workers import _rate_pa
@@ -418,3 +419,30 @@ def test_the_trail_seed_reaches_the_engine(monkeypatch):
     assert len(cands) == 2
     for rate, pa in cands:
         assert rate > 0.0 and 0.0 <= pa < 360.0
+
+
+def test_the_whole_frame_cache_reads_once_and_matches(tmp_path):
+    # The comps' windows all need the SAME frames, so the cache reads each
+    # one ONCE and slices every later box from memory. It has to give EXACTLY
+    # what the plain loader gives, or the zero point moves, and it has to stay
+    # bounded: past its budget it stops keeping frames and still answers.
+    from astropy.io import fits
+    from nightscribe.core import calibration
+    from nightscribe.gui.workers import _WholeFrameCache
+    img = np.random.default_rng(1).normal(1000.0, 4.0, (200, 200)).astype(
+        np.int16)
+    hdu = fits.PrimaryHDU(img)
+    hdu.header["BZERO"] = 32768          # the real camera case
+    path = tmp_path / "f.fits"
+    hdu.writeto(str(path), overwrite=True)
+    cache = _WholeFrameCache(calibration.read_image)
+    for box in [(10, 20, 90, 100), (0, 0, 200, 200)]:
+        plain = calibration.read_image(str(path), box)[0]
+        assert np.array_equal(plain, cache(str(path), box))
+    assert len(cache._cache) == 1        # one frame, read once
+    # a zero budget never keeps a frame and still answers exactly
+    tiny = _WholeFrameCache(calibration.read_image, budget_bytes=0)
+    assert np.array_equal(
+        calibration.read_image(str(path), (10, 20, 90, 100))[0],
+        tiny(str(path), (10, 20, 90, 100)))
+    assert len(tiny._cache) == 0

@@ -120,6 +120,23 @@ tenga tarjeta. El recorte es **median-bound** (un solo `nanmedian` de
 - La escala por **media y desviación** en vez de MAD es x1,95 pero deja de ser
   robusta, que es justo para lo que existe el recorte. Descartado.
 
+**Nota (2026-10-14): medir por frame y las ventanas de comparsas, medido.** El
+punto 4 pedía paralelizar las dos, y **ninguna de las dos gana**:
+
+- **`measure_frames` en paralelo**: los frames son independientes y la
+  combinación no depende del orden, pero el trabajo por frame es una caja
+  pequeña y un centroide pequeño y el coste de los hilos se lo come. Medido en
+  120 × 1024²: 2824 ms en serie contra 5043 ms a 16 hilos (**x0,56**).
+  **Rechazado**, y escrito en el comentario de `measure_frames`.
+- **Ventanas de comparsas en paralelo**: cada `stack_group` ya usa los núcleos,
+  así que el bucle exterior solo los sobre-suscribe (**x1,08**). **Rechazado**.
+- **El lever real es leer cada frame UNA vez**: cada comparsa relee los MISMOS
+  ficheros y la lectura es el coste entero de la etapa (medido: 120 lecturas de
+  caja 118 ms contra 120 lecturas del frame entero 283 ms, y un juego de doce
+  comparsas paga las lecturas doce veces). Un caché acotado que lee cada frame
+  una vez y sirve todas las cajas desde memoria baja las ventanas de **2954 a
+  699 ms (x4,2)**, con paridad exacta (probada, con `BZERO`/`BSCALE`).
+
 ## English
 
 **Context**: ADR-062's speed campaign (`docs/PLANS/astrometry-perf/`) cut the
@@ -236,3 +253,20 @@ there are four per clip), and two roads were tried:
   shortcut. It stays a decision **measured and not taken**.
 - A **mean-and-standard-deviation** scale instead of MAD is x1.95 but stops being
   robust, which is exactly what the clip exists for. Rejected.
+
+**Note (2026-10-14): measuring per frame and the comps' windows, measured.**
+Point 4 asked to parallelise both, and **neither one wins**:
+
+- **`measure_frames` in parallel**: the frames are independent and the
+  combination is order-free, but the per-frame work is a small box and a small
+  centroid and the thread overhead eats it. Measured on 120 x 1024^2: 2824 ms
+  serial against 5043 ms over 16 threads (**x0.56**). **Rejected**, and written
+  into the comment of `measure_frames`.
+- **Comps' windows in parallel**: each `stack_group` already uses the cores, so
+  the outer loop only oversubscribes them (**x1.08**). **Rejected**.
+- **The real lever is reading each frame ONCE**: every comp re-reads the SAME
+  files and the reads are the whole cost of the stage (measured: 120 box reads
+  118 ms against 120 whole-frame reads 283 ms, and a twelve-comp set pays the
+  reads twelve times). A bounded cache that reads each frame once and serves
+  every box from memory takes the windows from **2954 to 699 ms (x4.2)**, with
+  exact parity (tested, with `BZERO`/`BSCALE`).

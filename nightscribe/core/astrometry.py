@@ -264,6 +264,13 @@ def measure_frames(frames, group, wcs_of, mjd=None, fwhm=None,
     # one) and the positions are combined with inverse-variance weights:
     # the mean's error falls as sqrt(N), which is what makes measuring per
     # frame worth the trouble.
+    #
+    # A PARALLEL WALK WAS TRIED AND REJECTED (2026-10-14, ADR-089): the frames
+    # are independent and the combination is order-free, so it looked like a
+    # free win, but the per-frame work is a small box and a small centroid and
+    # the thread overhead eats it. Measured on 120 x 1024^2: 2824 ms serial
+    # against 5043 ms over 16 threads (x0.56). The loop below is the one that
+    # wins, and it is the tested one.
     from . import calibration
     points = []
     for i in range(*group):

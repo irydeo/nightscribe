@@ -35,6 +35,11 @@ dependencies = [
     "astropy>=6.0",
     "scipy>=1.11",
     "photutils>=1.10",
+    # The portable GPU backend travels with the app (ADR-091): pyopencl is a
+    # normal dependency so OpenCL works out of the box on NVIDIA, AMD and Intel.
+    # The GPU PATH itself stays off by default and the app runs unchanged on a
+    # machine with no OpenCL device or no ICD loader; CuPy (CUDA) stays manual.
+    "pyopencl>=2024.1",
 ]
 
 [project.optional-dependencies]

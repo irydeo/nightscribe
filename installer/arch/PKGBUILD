@@ -8,6 +8,11 @@
 #   * python-imageio-ffmpeg (OPTIONAL: only the MP4 animation export).
 # The AUR helper resolves them.
 #
+# python-pyopencl is a HARD dependency (ADR-091): it is the portable GPU
+# backend (NVIDIA, AMD, Intel) and the app ships it, so OpenCL works out of
+# the box. It pulls ocl-icd with it. The acceleration itself stays off by
+# default and the CPU path runs unchanged with no OpenCL device.
+#
 # Find_Orb is shipped inside the package, in /usr/lib/nightscribe/findorb,
 # which is where the app looks for it (paths.findorb_bundle_dir). It is GPLv2
 # with an extra commercial-use clause from Project Pluto: fine for this
@@ -22,7 +27,8 @@ url="https://github.com/irydeo/nightscribe"
 license=('GPL3')
 depends=('python' 'pyside6' 'python-astropy' 'python-scipy' 'python-numpy'
          'python-matplotlib' 'python-photutils' 'python-lxml'
-         'python-requests' 'python-yaml' 'python-platformdirs' 'python-pillow')
+         'python-requests' 'python-yaml' 'python-platformdirs' 'python-pillow'
+         'python-pyopencl')
 optdepends=('python-imageio-ffmpeg: export the animation as MP4')
 makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
 # source=("$pkgname-$pkgver.tar.gz")

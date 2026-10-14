@@ -23,7 +23,9 @@ documented as a manual install, not supported by this package.
 
 imageio-ffmpeg is a RECOMMENDATION, not a dependency: it only powers the
 MP4 animation export, and Fedora does not package it. Without it the GIF and
-the montage keep working.
+the montage keep working. pyopencl IS a dependency (ADR-091): it is the
+portable GPU backend and the app ships it, though the acceleration stays off
+by default and the CPU path runs unchanged with no OpenCL device.
 
 Find_Orb is shipped INSIDE the package (usr/lib/nightscribe/findorb), so the
 orbit check works out of the box. It is GPLv2 with an extra commercial-use
@@ -66,6 +68,11 @@ DEPENDS = [
     "python3-yaml",
     "python3-platformdirs",
     "python3-pil",
+    # The portable GPU backend travels with the app (ADR-091), so OpenCL works
+    # out of the box on NVIDIA, AMD and Intel. python3-pyopencl pulls the ICD
+    # loader (ocl-icd-libopencl1) with it. The acceleration itself is off by
+    # default and the app runs unchanged with no OpenCL device.
+    "python3-pyopencl",
 ]
 RECOMMENDS = ["python3-imageio-ffmpeg"]
 

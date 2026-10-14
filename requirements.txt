@@ -10,3 +10,7 @@ imageio-ffmpeg>=0.5
 astropy>=6.0
 scipy>=1.11
 photutils>=1.10
+# The portable GPU backend (ADR-091): shipped with the app so OpenCL works out
+# of the box. The acceleration is off by default and degrades to the CPU with
+# no OpenCL device; CuPy (CUDA) is the manual one.
+pyopencl>=2024.1

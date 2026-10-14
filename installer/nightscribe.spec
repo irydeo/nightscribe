@@ -40,6 +40,15 @@ try:
     datas += copy_metadata("nightscribe")
 except Exception:
     pass  # no installed metadata (bare source tree): keep the fallback
+# pyopencl (the portable GPU backend, ADR-091) ships .cl kernels its own
+# elementwise helpers compile at runtime. Our backend writes its kernels inline
+# and does not use them, but collecting the package's data keeps a frozen build
+# honest the day it does. Guarded, so a bare build env without pyopencl still
+# produces a CPU-only bundle.
+try:
+    datas += collect_data_files("pyopencl")
+except Exception:
+    pass  # no pyopencl here: the app runs on the CPU exactly as before
 for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm",
                 "nightscribe/assets/*"):
     for f in glob.glob(os.path.join(ROOT, pattern)):
@@ -85,7 +94,13 @@ a = Analysis(
                    "astropy.units", "astropy.time", "astropy.utils.iers",
                    "scipy.ndimage", "scipy.optimize", "scipy.stats",
                    "photutils.centroids", "photutils.detection",
-                   "photutils.aperture"],
+                   "photutils.aperture",
+                   # pyopencl is imported LAZILY by core/gpu_opencl.py (inside
+                   # its probe, so a machine without it pays nothing), which
+                   # means the import graph does not reach it; naming it here
+                   # bundles the portable GPU backend (ADR-091). CuPy is NOT
+                   # named: the CUDA path stays manual.
+                   "pyopencl"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter"],

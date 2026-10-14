@@ -46,6 +46,8 @@ class UfeReportDialog(QDialog):
         self.cmb_format.addItem(self.tr("MPC 1992 (80 columns)"), "mpc80")
         self.txt_report = self._ui.txt_report
         self.lbl_report_hint = self._ui.lbl_report_hint
+        self.lbl_report_state = self._ui.lbl_report_state
+        self.btn_regen = self._ui.btn_regen
         self.btn_copy = self._ui.btn_copy
         self.btn_save = self._ui.btn_save
         self.btn_send = self._ui.btn_send

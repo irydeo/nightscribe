@@ -419,17 +419,21 @@ class FindOrbRecheckWorker(QThread):
 class MpcAliasWorker(QThread):
     # Looks up whether a NEOCP object was CONFIRMED under a new name since
     # the visit (A11HPKO -> 2026 TQ8), off the GUI thread. It is cached by
-    # the source, so opening the same project does not hammer the MPC.
+    # the source, so opening the same project does not hammer the MPC; the
+    # ACTIVE callers (the report) pass force=True to see a confirmation that
+    # landed inside the cache window.
     finished = Signal(dict)         # {"designation","mpec","mpec_url"} or {}
 
-    def __init__(self, name):
+    def __init__(self, name, force=False):
         super().__init__()
         self._name = name
+        self._force = bool(force)
 
     def run(self):
         from ..core.sources import mpc_obs
         try:
-            hit = mpc_obs.resolve_neocp_alias(self._name) or {}
+            hit = mpc_obs.resolve_neocp_alias(self._name,
+                                              force=self._force) or {}
         except Exception as err:      # network never crashes the GUI
             logger.warning("NEOCP alias lookup failed: %s", err)
             hit = {}

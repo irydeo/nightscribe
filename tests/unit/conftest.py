@@ -130,9 +130,10 @@ def _fake_alias_worker(monkeypatch):
     class _FakeAliasWorker(QObject):
         finished = Signal(dict)
 
-        def __init__(self, name):
+        def __init__(self, name, force=False):
             super().__init__()
             self._name = name
+            self._force = force
 
         def start(self):
             pass

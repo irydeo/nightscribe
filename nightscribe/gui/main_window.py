@@ -15,6 +15,7 @@ import datetime
 import datetime as _dt
 import logging
 import re
+import time
 import uuid
 from pathlib import Path
 
@@ -393,6 +394,11 @@ class MainWindow(QMainWindow):
     # holds the Sky calendar, the observing journal, and the contextual
     # Explore/Post/Blink dialogs.
 
+    # The per-project guard on the NEOCP alias lookup (ADR-077 rev): short,
+    # because a confirmation can land mid-session, but not zero, because the
+    # hub repaints on every selection.
+    _ALIAS_GUARD_S = 300.0
+
     # @args: snapshot - the pre-migration backup dict from core/backup.py
     #        (the Welcome view's data report), or None when there is no
     #        database yet
@@ -433,6 +439,12 @@ class MainWindow(QMainWindow):
         self._active_tab = None  # key of the visible tab page (or None)
         self._advisor_dismissed = None  # A2: id of the project whose advisor
         #                                the user dismissed this session
+        # The NEOCP alias lookup (ADR-077 rev): one in flight at a time and a
+        # per-project guard, so repainting the hub does not spawn a worker on
+        # every keystroke. The guard is short because an object can be
+        # confirmed at any moment during a night.
+        self._alias_pending = None
+        self._alias_looked = {}
 
         # Observatory integration (ADR-030, ADR-081). The connection survives
         # project switches: the observatory does not re-connect per target.
@@ -1597,6 +1609,11 @@ class MainWindow(QMainWindow):
         # here instead of the browser)
         self.projects.lbl_mast_camp.linkActivated.connect(
             self._campaign_link_clicked)
+        # The rename banner carries two links (ADR-077 rev): the object at
+        # the MPC (browser) and the one-click "use the confirmed name".
+        # openExternalLinks is off in the .ui so linkActivated fires here.
+        self.projects.lbl_confirm.linkActivated.connect(
+            self._confirm_link_clicked)
         # A4 (rewritten): the project files window (ADR-019, UX v3). The
         # masthead "Files (n)" button is the single entry; the dialog
         # owns its row menus and the main window owns the two open
@@ -4854,39 +4871,45 @@ class MainWindow(QMainWindow):
             advisor.setVisible(False)
         # The rename notice (the observer's idea): an object visited while
         # still on the confirmation page and CONFIRMED SINCE is shown as
-        # such, very visibly, with the circular that published it. The
-        # lookup is cached and runs once, off the GUI thread.
+        # such, very visibly, with the circular that published it. The lookup
+        # runs off the GUI thread; for an object that is still unconfirmed
+        # (the planner's NEOCP flag, or a PCCP) it is read FRESH, because the
+        # confirmation can land at any moment during a night.
         conf = ctx.get("confirmed") or {}
-        self._paint_confirmation(conf)
+        self._paint_confirmation(conf, p)
         if not conf.get("designation") and self._could_be_renamed(p, ctx):
-            self._start_alias_lookup(p)
+            force = bool(ctx.get("neocp")) or p.get("kind") == "pccp"
+            self._start_alias_lookup(p, force=force)
 
     def _could_be_renamed(self, p, ctx):
         # @args: p - the project row, ctx - its context
         # @return: True when the object may have been confirmed under a new
-        #          name since the visit, so the alias lookup is worth a call:
-        #          either the planner flagged it as a NEOCP object, or its
-        #          name still IS a temporary NEOCP/PCCP designation (a project
-        #          created by hand, or one whose context lost the flag). A
-        #          name that is already a confirmed designation has nothing to
-        #          announce (ADR-077 rev).
+        #          name since the visit, so the alias lookup is worth a call.
+        #          NEOCP/PCCP tags have NO reliable shape (every survey or
+        #          group names them as it likes), so nothing is guessed from
+        #          the name: the project's own flags say "unconfirmed"
+        #          (ctx["neocp"], set by the planner from NEOfixer, or a PCCP
+        #          kind) and the rolling list is the only judge. A hand-made
+        #          project whose flags are gone is still checked when it is a
+        #          NEO or a comet: the lookup answers nothing for a name that
+        #          is already a confirmed designation, so it can only be right
+        #          (ADR-077 rev).
         if ctx.get("neocp"):
             return True
-        if p.get("kind") not in ("neo", "comet", "pccp"):
-            return False
-        from ..core.mpc_astrometry import is_temporary_designation
-        return is_temporary_designation(p.get("object_name"))
+        return p.get("kind") in ("neo", "comet", "pccp")
 
-    def _paint_confirmation(self, conf):
-        # @args: conf - {"designation","mpec","mpec_url","ours_published"} or {}
+    def _paint_confirmation(self, conf, p=None):
+        # @args: conf - {"designation","mpec","mpec_url","ours_published"} or
+        #        {}, p - the project row (for the one-click apply)
         # @return: None. The banner reads as data (the new name and the
         #          circular), never as a code: the observer sees what it
         #          means without looking anything up. Whether OUR observations
         #          are in that circular is said ONLY when it is known (the
         #          check block writes it into the context); otherwise the
         #          banner links to the object at the MPC and claims nothing,
-        #          so it never asserts a participation that did not happen
-        #          (ADR-077 rev).
+        #          so it never asserts a participation that did not happen.
+        #          When the project still carries the OLD name, the banner
+        #          also offers the one-click apply (ADR-077 rev).
         lbl = self.projects.lbl_confirm
         desig = (conf or {}).get("designation")
         if not desig:
@@ -4915,19 +4938,35 @@ class MainWindow(QMainWindow):
             text += ". " + self.tr(
                 '<a href="%1">see the object at the MPC</a>').replace(
                     "%1", obj_url)
+        current = (p or {}).get("object_name") or ""
+        if current and current != desig:
+            text += " · " + self.tr(
+                "<a href='ns://use-confirmed'>Use the confirmed name</a>")
         lbl.setText(text)
         lbl.setVisible(True)
 
-    def _start_alias_lookup(self, p):
-        # @args: p - the project row (its id and object_name)
+    def _start_alias_lookup(self, p, force=False):
+        # @args: p - the project row (its id and object_name),
+        #        force - True bypasses the source cache (a fresh read)
         # @return: None. Asks the MPC, off the GUI thread, whether this
         #          object was confirmed under a new name; the answer is
         #          written into the project's context so the banner is
         #          instant the next time and the visit window can read it.
+        #          One in flight, and a short per-project guard so repainting
+        #          the hub is not a network call on every keystroke.
         from .workers import MpcAliasWorker, hold
-        name = p["object_name"]
-        worker = hold(MpcAliasWorker(name))
         pid = p["id"]
+        if self._alias_pending == pid:
+            return
+        # The guard applies to EVERY lookup, forced or not: `force` only says
+        # whether the source cache is bypassed, not whether we may call at
+        # all. Without it a NEOCP project would hit the MPC on every repaint.
+        now = time.monotonic()
+        if now - self._alias_looked.get(pid, 0.0) < self._ALIAS_GUARD_S:
+            return
+        self._alias_looked[pid] = now
+        self._alias_pending = pid
+        worker = hold(MpcAliasWorker(p["object_name"], force=force))
         worker.finished.connect(
             lambda hit, pid=pid: self._on_confirmation(pid, hit))
         worker.start()
@@ -4935,12 +4974,62 @@ class MainWindow(QMainWindow):
     def _on_confirmation(self, pid, hit):
         # @args: pid - the project id, hit - {"designation","mpec",...} or {}
         # @return: None
+        self._alias_pending = None
         if not hit or not hit.get("designation"):
             return
         project.merge_confirmed(db, pid, hit)
         cur = self._current_project
         if cur and cur.get("id") == pid:
-            self._paint_confirmation(hit)
+            self._paint_confirmation(hit, cur)
+
+    def _confirm_link_clicked(self, url):
+        # @args: url - the clicked href in the rename banner
+        # @return: None. The banner carries the object at the MPC and the
+        #          one-click "use the confirmed name": the first opens in the
+        #          browser, the second adopts the new designation.
+        if url.startswith("ns://use-confirmed"):
+            self._apply_confirmation(self._current_project)
+            return
+        self._open_url(url)
+
+    def _apply_confirmation(self, p):
+        # @args: p - the project row
+        # @return: None. Adopts the confirmed designation (ADR-077 rev): the
+        #          project is renamed and its identity context follows, so the
+        #          MPC report, the check, the orbit and the ephemeris stop
+        #          using the temporary NEOCP name. The temporary name is kept
+        #          as temp_id for the NEOfixer fallback, and the orbit is
+        #          re-read from the confirmed sources on the next render
+        #          (Horizons/SBDB now know the object).
+        if not p:
+            return
+        ctx = p.get("context") or {}
+        conf = ctx.get("confirmed") or {}
+        desig = (conf.get("designation") or "").strip()
+        old = (p.get("object_name") or "").strip()
+        if not desig or desig == old:
+            return
+        # `id` was the key the sources knew the object by (NEOfixer's packed
+        # tag for a NEOCP); the confirmed name is what Horizons and SBDB now
+        # resolve, so `id`/`name` move to it and the OLD key is kept as
+        # `temp_id` (and `packed`, which is the NEOfixer fallback key) so the
+        # preliminary route still works if the confirmed sources miss.
+        old_id = ctx.get("id") or old
+        patch = {
+            "id": desig,
+            "name": desig,
+            "neocp": False,
+            "temp_id": ctx.get("temp_id") or old_id,
+            "packed": ctx.get("packed") or old_id,
+            "confirmed": dict(conf),
+        }
+        project.rename_object(db, p["id"], desig, patch)
+        self.on_refresh_projects()
+        self._select_project_row(p["id"])
+        self.statusBar().showMessage(
+            self.tr("Renamed to %1: the report, the check and the orbit now "
+                    "use the confirmed designation.").replace("%1", desig),
+            8000)
 
     def _advisor_dismiss(self):
         # A2: dismiss the close-advisor banner for the current project.
@@ -13022,7 +13111,8 @@ class MainWindow(QMainWindow):
         # object, never a folder dialog. No visit (or no FITS in it): the
         # tabs stay disarmed and say why.
         # @args: pid - project id, session_id - the visit or None
-        # @return: {"pid", "session_id", "paths", "object_name"} or None
+        # @return: {"pid", "session_id", "paths", "object_name", "confirmed",
+        #           "neocp"} or None
         if session_id is None:
             return None
         files = project.files_for_session(db, session_id)
@@ -13039,8 +13129,14 @@ class MainWindow(QMainWindow):
         seq = ctx.get("sequence") or {}
         comps = [e for e in (seq.get("entries") or [])
                  if (e.get("kind") or "comp") == "comp"]
+        # The CONFIRMED identity rides along (ADR-077 rev): the report and the
+        # check must name the object as the MPC knows it NOW, not by the
+        # temporary NEOCP tag. The context used to drop both keys, so the
+        # report fell back to the old name and the packer could not place it.
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "object_name": p.get("object_name") or "",
+                "confirmed": dict(ctx.get("confirmed") or {}),
+                "neocp": bool(ctx.get("neocp")),
                 "packed": ctx.get("packed") or ctx.get("id"),
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}

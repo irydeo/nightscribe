@@ -56,28 +56,14 @@ _CENTURY = {18: "I", 19: "J", 20: "K", 21: "L"}
 _COMET_RE = re.compile(r"^\s*(\d+)?\s*([CPDXAcpdxa])\s*/", re.IGNORECASE)
 _COMET_NUMBERED_RE = re.compile(r"^\s*(\d+)\s*([PDpd])\s*(?:-([A-Za-z]))?\s*$")
 
-# A NEOCP/PCCP temporary designation (the tracklet tag the MPC hands out
-# before the object is confirmed): one letter, two digits and four
-# alphanumerics, e.g. A11HPKO, P11ABCD, P10x99x. It is the only kind of name
-# that can turn into a confirmed one, so it is what the rename notice watches
-# for (ADR-077 rev): a project created by hand, without the planner's `neocp`
-# flag, still gets the confirmation announced.
-_TEMPORARY_DESIG_RE = re.compile(r"^[A-Za-z]\d{2}[A-Za-z0-9]{4}$")
-
-# A packed PROVISIONAL designation ("K21E03Q" for 2021 EQ3) shares the shape
-# of a NEOCP tag (a letter, two digits, four alphanumerics) but is ALREADY a
-# confirmed object: it must not trigger the rename lookup.
-_PACKED_PROVISIONAL_RE = re.compile(r"^[IJKL]\d{2}[A-HJ-Y]\d{2}[A-HJ-Y]$")
-
-
-def is_temporary_designation(name):
-    # @args: name - an object name as the app stores it
-    # @return: True when it looks like a NEOCP/PCCP temporary designation
-    #          (the tag that can be replaced by a confirmed name)
-    raw = (name or "").strip()
-    if _PACKED_PROVISIONAL_RE.match(raw):
-        return False
-    return bool(_TEMPORARY_DESIG_RE.match(raw))
+# There used to be an `is_temporary_designation(name)` here that guessed a
+# NEOCP/PCCP tag from the name's SHAPE. It is gone on purpose: the tags have
+# no reliable shape (every survey or group names them as it likes, and the
+# MPC's own styles changed over the years), so a pattern either misses real
+# ones (the classic "Sar2949" style) or flags confirmed names. The rename
+# decision now rests on the project's own flags (ctx["neocp"], a PCCP kind)
+# and on the rolling NEOCP list, which is the only authority on whether a
+# temporary designation became a confirmed one (ADR-077 rev).
 
 # Filter name -> MPC band code. Case matters for the single letters: the
 # app's filters are Johnson-Cousins (V, B, R, I) in uppercase, while the

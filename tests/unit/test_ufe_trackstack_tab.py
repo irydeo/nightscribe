@@ -1128,9 +1128,11 @@ def test_the_long_texts_are_boxes_with_a_height_and_a_scroll(qapp, tmp_path):
         assert box.isReadOnly(), name
         assert box.minimumHeight() >= 70, name      # a floor to read from
         assert box.maximumHeight() <= 200, name     # a ceiling to live with
-    # the report's box is a read-only box in its own window, with room to read
+    # the report's box is an EDITABLE box in its own window (the observer's
+    # ask, 2026-10-14: fix a designation or a line before sending), with room
+    # to read
     assert isinstance(tab.txt_report, QPlainTextEdit)
-    assert tab.txt_report.isReadOnly()
+    assert not tab.txt_report.isReadOnly()
     assert tab.txt_report.minimumHeight() >= 70
     # the notes keep their own height whatever the text says
     tab.txt_notes.setVisible(True)
@@ -2576,6 +2578,104 @@ def test_the_report_opens_in_its_own_window_with_the_full_header(
     tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("xml"))
     assert tab.txt_report.toPlainText().startswith('<?xml version="1.0"')
     assert "<mpcCode>Z41</mpcCode>" in tab.txt_report.toPlainText()
+
+
+def test_the_report_names_the_confirmed_object_not_the_neocp_tag(
+        qapp, tmp_path, monkeypatch):
+    # ADR-077 rev: an object observed as Sar2949 and confirmed as 2026 TG69
+    # must go out under the CONFIRMED designation (packed K26T69G), never the
+    # temporary tag, which is what the MPC would reject.
+    tab, host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "Sar2949",
+        "neocp": True, "confirmed": {"designation": "2026 TG69",
+                                     "mpec": "MPEC 2026-T237"}}
+    tab._on_report()
+    text = tab.txt_report.toPlainText()
+    assert "K26T69G" in text
+    assert "Sar2949" not in text
+
+
+def test_the_report_uses_the_check_resolved_name(qapp, tmp_path, monkeypatch):
+    # The project may not have adopted the rename yet, but the run's check
+    # resolved it: the report still names the confirmed object.
+    from nightscribe.core.findorb import CheckReport
+    tab, host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "Sar2949",
+        "neocp": True, "confirmed": {}}
+    tab._result["check"] = CheckReport(resolved_desig="2026 TG69")
+    tab._on_report()
+    assert "K26T69G" in tab.txt_report.toPlainText()
+
+
+def test_a_still_unconfirmed_object_keeps_its_temporary_tag(
+        qapp, tmp_path, monkeypatch):
+    tab, host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "Sar2949",
+        "neocp": True, "confirmed": {}}
+    tab._on_report()
+    assert "Sar2949" in tab.txt_report.toPlainText()
+
+
+def test_the_check_field_prefers_the_confirmed_name(qapp, tmp_path, monkeypatch):
+    tab, host = _report_tab(qapp, tmp_path, monkeypatch)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "Sar2949",
+        "neocp": True, "confirmed": {"designation": "2026 TG69"}}
+    assert tab._check_desig() == "2026 TG69"
+
+
+def test_an_edited_report_is_sent_verbatim(qapp, tmp_path, monkeypatch):
+    # The observer's ask (2026-10-14): the report is editable, and an edited
+    # report is sent EXACTLY as it reads (no rebuild that would throw the edit
+    # away). The ACK/target fields are disabled because they no longer apply.
+    from nightscribe.gui import workers
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab.cmb_format.setCurrentIndex(tab.cmb_format.findData("mpc80"))
+    tab._on_report()
+    tab.txt_report.setPlainText("MY EDITED REPORT")
+    assert tab._report_dirty is True
+    tab._open_send_dialog()
+    assert tab._send_dialog.cmb_target.isEnabled() is False
+    assert tab._send_dialog.lbl_edited.text()
+    started = {}
+
+    class _Sig:
+        def connect(self, _fn):
+            pass
+
+    class _Worker:
+        finished = _Sig()
+
+        def __init__(self, *args, **kwargs):
+            started["args"] = args
+            started["kwargs"] = kwargs
+
+        def start(self):
+            started["started"] = True
+
+    monkeypatch.setattr(workers, "MpcSubmitWorker", _Worker)
+    tab._send_dialog.edt_ack_email.setText("obs@example.org")
+    tab._refresh_send_gate()
+    tab._on_mpc_submit()
+    assert started["started"] is True
+    assert started["args"][1] == "MY EDITED REPORT"
+
+
+def test_regenerating_the_report_discards_the_edit(qapp, tmp_path, monkeypatch):
+    tab, _host = _report_tab(qapp, tmp_path, monkeypatch)
+    tab._on_report()
+    generated = tab.txt_report.toPlainText()
+    tab.txt_report.setPlainText("EDITED")
+    assert tab._report_dirty is True
+    tab.btn_regen_report.click()
+    assert tab._report_dirty is False
+    assert tab.txt_report.toPlainText() == generated
 
 
 def test_the_send_dialog_blocks_without_the_contact_email(

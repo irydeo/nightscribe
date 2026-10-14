@@ -211,6 +211,8 @@ class UfeTrackStackTab(QWidget):
         self._send_dialog = MpcSendDialog(self)
         self.cmb_format = self._report_dialog.cmb_format
         self.txt_report = self._report_dialog.txt_report
+        self.btn_regen_report = self._report_dialog.btn_regen
+        self.lbl_report_state = self._report_dialog.lbl_report_state
         self.btn_send_mpc = self._report_dialog.btn_send
         self.btn_copy_report = self._report_dialog.btn_copy
         self.btn_save_report = self._report_dialog.btn_save
@@ -223,6 +225,13 @@ class UfeTrackStackTab(QWidget):
         self.btn_save_report.clicked.connect(self._save_report)
         self.btn_send_mpc.clicked.connect(self._open_send_dialog)
         self.btn_close_report.clicked.connect(self._report_dialog.hide)
+        # The report is EDITABLE (the observer's ask, 2026-10-14): a wrong
+        # designation or a line can be fixed before sending. Regenerate
+        # rebuilds it from the measurements and clears the edit.
+        self._report_dirty = False
+        self.txt_report.textChanged.connect(self._on_report_edited)
+        self.btn_regen_report.clicked.connect(
+            lambda: self._on_report(quiet=True))
         self._send_dialog.btn_close.clicked.connect(self._send_dialog.hide)
         self._send_dialog.btn_send.clicked.connect(self._on_mpc_submit)
         # set before the combo signals below: set_targets() fills the combo and
@@ -1040,7 +1049,7 @@ class UfeTrackStackTab(QWidget):
             self._result = None
             self.cmb_group.clear()
             self.cmb_group.setEnabled(False)
-            self.txt_report.clear()
+            self._fill_report_text("")
             self.txt_notes.setVisible(False)
             self._hide_manual()
             self._hide_residuals()
@@ -1322,7 +1331,7 @@ class UfeTrackStackTab(QWidget):
         self.cmb_group.clear()
         self.cmb_group.setEnabled(False)
         self.tbl_points.setRowCount(0)
-        self.txt_report.clear()
+        self._fill_report_text("")
         self._thumbs.clear()
         self.btn_blink.setEnabled(False)
         self._hide_manual()
@@ -4299,12 +4308,62 @@ class UfeTrackStackTab(QWidget):
         return ((self._context() or {}).get("object_name") or "").strip()
 
     def _check_desig(self):
-        # @return: the designation the check field should carry: the name
-        #          the object is known by NOW (the confirmed one when the
-        #          run resolved a rename), else the visit's own name
+        # @return: the designation the check field should carry: the name the
+        #          object is known by NOW. The confirmed one wins (the
+        #          project's context when the rename was applied, else the run
+        #          that resolved it); a still-unconfirmed object keeps its own
+        #          temporary name.
         check = (self._result or {}).get("check")
         resolved = getattr(check, "resolved_desig", "") if check else ""
-        return resolved or self._current_object_name()
+        if resolved:
+            return resolved
+        ctx = self._context() or {}
+        conf = ctx.get("confirmed") or {}
+        return (conf.get("designation") or self._current_object_name())
+
+    def _report_designation(self, ctx=None):
+        # @args: ctx - the visit context (asked from the host when omitted)
+        # @return: (designation, kind) for the MPC report. The CONFIRMED name
+        #          wins (the project's context when the rename was applied,
+        #          else the run that resolved it), so the packer emits
+        #          K26T69G and not the temporary tag; `kind` is the hint the
+        #          packer uses (None = pack it as a confirmed designation,
+        #          "neocp" = emit the temporary tag as-is).
+        ctx = ctx if ctx is not None else (self._context() or {})
+        conf = ctx.get("confirmed") or {}
+        check = (self._result or {}).get("check")
+        resolved = getattr(check, "resolved_desig", "") if check else ""
+        confirmed = (conf.get("designation") or resolved or "").strip()
+        if confirmed:
+            return confirmed, None
+        return (ctx.get("object_name") or ""), (
+            "neocp" if ctx.get("neocp") else None)
+
+    def _fill_report_text(self, text):
+        # @args: text - the generated report
+        # @return: None. Putting the text in the box fires textChanged; the
+        #          dirty flag is cleared AFTER it, because a freshly generated
+        #          report is not an edit.
+        self.txt_report.setPlainText(text)
+        self._report_dirty = False
+        self._paint_report_state()
+
+    def _on_report_edited(self):
+        # @return: None. The observer touched the report: what is in the box is
+        #          what gets sent, and the send dialog says so.
+        if self.txt_report.toPlainText():
+            self._report_dirty = True
+        self._paint_report_state()
+
+    def _paint_report_state(self):
+        # @return: None. Says, under the box, whether the report is the
+        #          generated one or the observer's edited version.
+        if self._report_dirty:
+            self.lbl_report_state.setText(self.tr(
+                "Edited: this exact text will be sent (Regenerate to rebuild "
+                "it from the measurements)."))
+        else:
+            self.lbl_report_state.setText("")
 
     def _build_residuals_table(self):
         # @return: None. The published observations' table: the columns are
@@ -4622,12 +4681,16 @@ class UfeTrackStackTab(QWidget):
             return
         fmt = self.cmb_format.currentData() or "ades"
         context = mpc_astrometry.report_context(config)
-        kind = "neocp" if ctx.get("neocp") else None
+        # The report names the object as the MPC knows it NOW: the confirmed
+        # designation when the object was renamed since the visit, else the
+        # temporary tag (ADR-077 rev). Before this the report kept the old
+        # NEOCP name even after the confirmation.
+        designation, kind = self._report_designation(ctx)
         rep = mpc_astrometry.generate(
             points, fmt, context.obs_code or str(config.get("mpc_code", "")),
-            ctx.get("object_name") or "", config,
+            designation, config,
             context=context, submission=self._submission, kind=kind)
-        self.txt_report.setPlainText(rep["text"])
+        self._fill_report_text(rep["text"])
         floor = float(config.get("astrometry_submit_snr", 20.0))
         kept = list(rep.get("kept") or [])
         excluded = list(rep.get("excluded") or [])
@@ -4762,6 +4825,9 @@ class UfeTrackStackTab(QWidget):
         idx = self._send_dialog.cmb_target.findData(default_target)
         if idx >= 0:
             self._send_dialog.cmb_target.setCurrentIndex(idx)
+        # an edited report is sent as it reads, so the ACK/target fields do
+        # not apply and the dialog says so (the observer's ask, 2026-10-14)
+        self._send_dialog.set_edited(self._report_dirty)
         self._refresh_send_gate()
         self._refresh_send_intro()
         self._send_dialog.show()
@@ -4806,7 +4872,9 @@ class UfeTrackStackTab(QWidget):
     def _on_mpc_submit(self):
         # @return: None. Builds the report with the chosen acknowledgement
         #          and target, then submits it off the GUI thread. The
-        #          server's own answer lands in the dialog's log.
+        #          server's own answer lands in the dialog's log. When the
+        #          observer EDITED the report, that text is sent verbatim and
+        #          is NOT rebuilt (regenerating it would throw the edit away).
         from .workers import MpcSubmitWorker
         dlg = self._send_dialog
         email = dlg.edt_ack_email.text().strip()
@@ -4814,8 +4882,11 @@ class UfeTrackStackTab(QWidget):
         target = dlg.cmb_target.currentData() or ""
         test = bool(dlg.cmb_mode.currentData())
         self._submission = {"ack": ack, "obj_type": target}
-        # rebuild with the chosen ACK/target so the header carries them
-        self._on_report(quiet=True)
+        if self._report_dirty:
+            dlg.log(self.tr("Sending your edited report as it reads."))
+        else:
+            # rebuild with the chosen ACK/target so the header carries them
+            self._on_report(quiet=True)
         text = self.txt_report.toPlainText()
         if not text.strip():
             dlg.log(self.tr("Nothing to send: the report is empty."))

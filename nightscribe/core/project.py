@@ -341,6 +341,39 @@ def merge_confirmed(db, project_id, patch):
     return True
 
 
+def rename_object(db, project_id, new_name, patch=None):
+    # Applies a CONFIRMED designation to the project (ADR-077 rev): the
+    # object is now known by a new name, so the project's own name changes
+    # and everything that reads it (the MPC report, the check, the orbit and
+    # the ephemeris) follows. The context keeps the identity facts, and
+    # `confirmed` is MERGED (not replaced) exactly like merge_confirmed, so
+    # the alias lookup and the check do not wipe each other's keys.
+    # @args: project_id, new_name - the confirmed designation ("2026 TG69"),
+    #        patch - extra context keys (id/name/neocp/temp_id/confirmed)
+    # @return: True if the project was found and updated
+    row = db.execute(
+        "SELECT context FROM projects WHERE id=?", (project_id,),
+    ).fetchone()
+    if not row:
+        return False
+    existing = json.loads(row[0] or "{}")
+    patch = dict(patch or {})
+    conf = dict(existing.get("confirmed") or {})
+    conf.update({k: v for k, v in (patch.pop("confirmed", None) or {}).items()
+                 if v is not None})
+    existing.update({k: v for k, v in patch.items() if v is not None})
+    if conf:
+        existing["confirmed"] = conf
+    db.execute(
+        "UPDATE projects SET object_name=?, context=?, updated=? WHERE id=?",
+        (new_name,
+         json.dumps(existing, ensure_ascii=False, default=_json_default),
+         _now(), project_id),
+    )
+    db.commit()
+    return True
+
+
 def set_status(db, project_id, status):
     # @return: True if the project was found and updated
     cur = db.execute(

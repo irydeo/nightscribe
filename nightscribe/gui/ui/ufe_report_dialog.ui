@@ -19,6 +19,7 @@
     <layout class="QHBoxLayout" name="row_format_dlg">
      <item><widget class="QLabel" name="lbl_format"><property name="text"><string>Format:</string></property></widget></item>
      <item><widget class="QComboBox" name="cmb_format"><property name="toolTip"><string>ADES XML is the format the MPC prefers, then ADES PSV, then the classic 80-column one; all three carry the submission header</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_regen"><property name="text"><string>Regenerate</string></property><property name="toolTip"><string>Rebuild the report from the measured points and the current settings, discarding your edits. The report is editable; when you change it, that text is what gets sent</string></property></widget></item>
      <item>
       <spacer name="hsp_format_dlg">
        <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -30,10 +31,12 @@
    <item>
     <widget class="QPlainTextEdit" name="txt_report">
      <property name="minimumSize"><size><width>640</width><height>320</height></size></property>
-     <property name="readOnly"><bool>true</bool></property>
+     <property name="readOnly"><bool>false</bool></property>
      <property name="font"><font><family>Monospace</family></font></property>
+     <property name="toolTip"><string>The report is editable: fix a designation, a line or the header before sending. What you see is what gets sent. Use Regenerate to rebuild it from the measurements</string></property>
     </widget>
    </item>
+   <item><widget class="QLabel" name="lbl_report_state"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="styleSheet"><string notr="true">color: #e0c060;</string></property></widget></item>
    <item><widget class="QLabel" name="lbl_report_hint"><property name="text"><string>The report carries the observer, the telescope and the catalogue header the MPC needs, then one line (or row) per observation. It is what the send dialog submits.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_report_actions">

@@ -241,6 +241,75 @@ class Client:
         self.call("Telescope_abortmotion")
         return True
 
+    # -- autoguider (ADR-084 rev) ----------------------------------------------
+
+    def guider_state(self):
+        # The guider's connection and guiding state, live. A slew (the
+        # astrometric goto of a follow run) stops the guider, so the run has
+        # to know whether it is guiding again before it captures.
+        # @return: {"connected": bool|None, "guiding": bool|None}
+        try:
+            connected = bool(truthy(self.call("Autoguider_Connected")))
+        except CCDcielError:
+            connected = None
+        try:
+            guiding = bool(truthy(self.call("Autoguider_Guiding")))
+        except CCDcielError:
+            guiding = None
+        return {"connected": connected, "guiding": guiding}
+
+    def guider_connect(self):
+        # @return: True when the server accepted the connect
+        self.call("Autoguider_Connect")
+        return True
+
+    def guider_start(self, calibrate=False):
+        # Start guiding. CCDciel's `Autoguider_StartGuiding` runs `Guide(true)`
+        # with recalibrate=FALSE, so it uses the calibration already stored: a
+        # fresh calibration is a SEPARATE command, only when the observer asks
+        # (ADR-084 rev: calibrate only if needed).
+        # @args: calibrate - True to run a full calibration first
+        # @return: True when the server accepted the start
+        if calibrate:
+            self.call("Autoguider_Calibrate")
+        self.call("Autoguider_StartGuiding")
+        return True
+
+    def guider_stop(self):
+        # @return: True when the server accepted the stop
+        self.call("Autoguider_StopGuiding")
+        return True
+
+    # -- capture folder and progress (ADR-084 rev) -----------------------------
+
+    def capture_dir(self):
+        # The folder CCDciel saves the frames in (its "Light" base path).
+        # NightScribe uses it to group each observation's frames into its own
+        # subfolder, but only when the folder is reachable from here (same
+        # machine or a mounted share): in remote operation it is not, and the
+        # grouping falls back to the manifest (ADR-084 rev).
+        # @return: the path, or None when the server does not answer
+        try:
+            value = self.call("CaptureDir")
+        except CCDcielError:
+            return None
+        return str(value) if value else None
+
+    def capture_progress(self):
+        # Live capture progress for the follow run's feedback. The `status`
+        # method's `capture` section carries the frame count and the numbers
+        # the observer watches: current/total frames, remaining exposure, HFD
+        # and drift. It is read UNCACHED (the dashboard cache would freeze a
+        # counter that changes every second).
+        # @return: {"running", "current", "total", "exposure",
+        #          "exposure_remaining", "hfd", "drift"} (empty on failure)
+        try:
+            result = self.call("status", "capture")
+        except CCDcielError:
+            return {}
+        cap = (result or {}).get("capture") if isinstance(result, dict) else None
+        return cap if isinstance(cap, dict) else {}
+
     # -- coordinates and motion -------------------------------------------------
 
     def apparent(self, ra_deg, dec_deg):

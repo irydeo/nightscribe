@@ -1102,11 +1102,15 @@ class UfeTrackStackTab(QWidget):
         # stays "–": an estimate without a measurement would be invented.
         # @return: None
         from ..core import track_stack
-        # the spinbox's floor is 1, but a tab whose visit was never armed
-        # can still be repainted: a zero would divide inside split_groups
+        # ADR-084 rev: when a follow run produced these frames, its own
+        # grouping (subfolders or manifest) decides how many observations there
+        # are; the manual count is the fallback.
+        groups, source = self._resolved_groups()
         rows = track_stack.preview_groups(self._frames or [],
                                           max(1, self.spn_nobs.value()),
-                                          base_snr=self._base_snr)
+                                          base_snr=self._base_snr,
+                                          groups=groups)
+        self._apply_group_source(source, len(rows))
         floor = float(config.get("astrometry_submit_snr", 20.0))
         tbl = self.tbl_snr
         tbl.setRowCount(len(rows))
@@ -1132,6 +1136,64 @@ class UfeTrackStackTab(QWidget):
             self.tr("Expected SNR: %1").replace("%1", " · ".join(parts))
             if parts else "")
         self._sync_plan_line()
+
+    def _follow_manifest(self):
+        # @return: the project's most recent follow run manifest, or None. It
+        #          is what lets the reduction group the frames per observation
+        #          even when the subfolders are not reachable (ADR-084 rev).
+        ctx = self._context() or {}
+        runs = ctx.get("follow_runs") or []
+        return runs[-1] if runs else None
+
+    def _resolved_groups(self):
+        # @return: (groups, source): the per-observation groups the reduction
+        #          should use. The follow run's subfolders win, then its
+        #          manifest, then the re-point gaps; when none applies, None is
+        #          returned and the manual count decides (source "manual").
+        from ..core import follow
+        frames = self._frames or []
+        if not frames:
+            return None, "manual"
+        groups, source = follow.resolve_groups(
+            frames, manifest=self._follow_manifest(),
+            n_obs=self.spn_nobs.value(),
+            follow_s=config.get("follow_s"))
+        if source in ("folders", "manifest", "gaps"):
+            return groups, source
+        return None, source
+
+    def _apply_group_source(self, source, n_groups):
+        # @args: source - "folders"|"manifest"|"gaps"|"manual"|"single",
+        #        n_groups - how many observations came out
+        # @return: None. The observation count is the follow run's when it can
+        #          group the frames; then the spinbox is locked and says where
+        #          the number comes from. Otherwise it is the observer's.
+        spn = self.spn_nobs
+        auto = source in ("folders", "manifest", "gaps")
+        if auto:
+            spn.blockSignals(True)
+            spn.setRange(1, max(1, len(self._frames or [])))
+            spn.setValue(max(1, int(n_groups)))
+            spn.blockSignals(False)
+        spn.setEnabled(not auto)
+        if auto:
+            spn.setToolTip(self.tr(
+                "Set by the follow run: its %1 observations, grouped by %2."
+            ).replace("%1", str(n_groups)).replace(
+                "%2", self._group_source_word(source)))
+        else:
+            spn.setToolTip(self.tr(
+                "How many observations the frames are split into (an equal "
+                "split). A follow run sets this on its own."))
+
+    def _group_source_word(self, source):
+        # @args: source - the grouping rule that won
+        # @return: the plain-words name of the rule, for the tooltip
+        if source == "folders":
+            return self.tr("the subfolder of each observation")
+        if source == "manifest":
+            return self.tr("the follow run's own record")
+        return self.tr("the gaps between observations")
 
     def _snr_text(self, est, floor):
         # @args: est - the expected SNR or None, floor - the recommended
@@ -1223,7 +1285,8 @@ class UfeTrackStackTab(QWidget):
             save_star_stack=self.chk_starstack.isChecked(),
             calibrate=self.chk_calibrate.isChecked(),
             manual_ref=manual_ref,
-            packed=ctx.get("packed") or ctx.get("id")))
+            packed=ctx.get("packed") or ctx.get("id"),
+            groups=self._resolved_groups()[0]))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

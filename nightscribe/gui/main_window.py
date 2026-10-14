@@ -464,6 +464,10 @@ class MainWindow(QMainWindow):
         # whether it is in flight). One run at a time.
         self._ccd_follow_worker = None
         self._ccd_follow_running = False
+        # ADR-084 rev: the run's progress and where its manifest goes
+        self._ccd_follow_pid = None
+        self._ccd_follow_total = 0
+        self._ccd_follow_frames = 0
         self._ccd_gain = None          # the camera's gain setting (from the software)
         self._ccd_offset = None        # the camera's offset setting (from the software)
         # The last-frame preview (ADR-082): its own timer and worker; the
@@ -6223,6 +6227,21 @@ class MainWindow(QMainWindow):
         bl.addLayout(prev_col)
         bl.addStretch(1)
         gv.addWidget(box)
+        # ADR-084 rev: the follow run's progress, in the window and not only in
+        # the status bar. Hidden until a run starts (an empty bar is noise).
+        follow_box = QWidget()
+        follow_box.setVisible(False)
+        fl = QVBoxLayout(follow_box)
+        fl.setContentsMargins(0, 0, 0, 0)
+        fl.setSpacing(4)
+        lbl_follow = QLabel("")
+        lbl_follow.setWordWrap(True)
+        prg_follow = QProgressBar()
+        prg_follow.setRange(0, 100)
+        prg_follow.setTextVisible(True)
+        fl.addWidget(lbl_follow)
+        fl.addWidget(prg_follow)
+        gv.addWidget(follow_box)
         layout.addWidget(grp)
 
         self._obs_widgets = {
@@ -6248,6 +6267,9 @@ class MainWindow(QMainWindow):
             "capture_preview_img": lbl_prev,
             "capture_caption": lbl_prev_cap,
             "capture_open": btn_prev_open,
+            "follow_box": follow_box,
+            "follow_label": lbl_follow,
+            "follow_bar": prg_follow,
         }
         btn_c.clicked.connect(self._ccd_connect)
         btn_d.clicked.connect(self._ccd_disconnect)
@@ -7131,6 +7153,10 @@ class MainWindow(QMainWindow):
                 "the observation ends.").replace(
                     "%1", str(plan["frames"])).replace(
                     "%2", str(plan.get("crossing_frames") or 0))
+        if bool(config.get("follow_guide", True)):
+            text += "\n\n" + self.tr(
+                "The guider is put back before each observation (a slew stops "
+                "it), using the calibration you already have.")
         # the "why" of the loop, from the one house of explanations (ADR-058)
         from ..core import explain
         short = explain.short(explain.FOLLOW)
@@ -7143,12 +7169,24 @@ class MainWindow(QMainWindow):
     def _ccd_follow_start(self, p, ctx, plan):
         # @args: p - the project, ctx - its context, plan - follow.plan_run
         from .workers import FollowWorker, hold
+        from ..core import project as project_mod
         options = self._capture_options_from_widgets()
         site = config.get("mpc_code", "")
+        guide = bool(config.get("follow_guide", True))
+        calibrate = bool(config.get("follow_calibrate", False))
+        try:
+            project_dir = str(project_mod.storage_dir(p))
+        except Exception:                 # never block the run on a path
+            project_dir = None
         worker = FollowWorker(self._ccd_client, plan, p["object_name"],
-                                ctx, options=options, site=site)
+                              ctx, options=options, site=site, guide=guide,
+                              calibrate=calibrate, project_dir=project_dir)
         self._ccd_follow_worker = hold(worker)
+        self._ccd_follow_pid = p["id"]
+        self._ccd_follow_total = int(plan.get("n_obs") or 1)
+        self._ccd_follow_frames = int(plan.get("frames") or 1)
         worker.progress.connect(self._ccd_follow_progress)
+        worker.result.connect(self._ccd_follow_result)
         worker.finished.connect(self._ccd_follow_finished)
         self._ccd_follow_running = True
         # the loop owns the client: stop the dashboard poll so two workers do
@@ -7157,36 +7195,118 @@ class MainWindow(QMainWindow):
         w = self._ccd_widgets()
         if w.get("ccd_follow"):
             w["ccd_follow"].setText(self.tr("Stop following"))
+        self._ccd_follow_show(0, self.tr("Follow run started."))
         self._ccd_apply_state()
         worker.start()
         self.statusBar().showMessage(
             self.tr("Follow run started."), 5000)
 
+    def _ccd_follow_show(self, percent, text):
+        # @args: percent - 0..100 overall progress, text - the one-line state
+        # @return: None. The follow run's own progress area (ADR-084 rev): a
+        #          bar and a line that say which observation, how many frames
+        #          and how much is left, so the run is not a black box that
+        #          only talks through the status bar.
+        w = self._ccd_widgets()
+        box = w.get("follow_box")
+        if box is not None:
+            box.setVisible(True)
+        bar = w.get("follow_bar")
+        if bar is not None:
+            bar.setValue(max(0, min(100, int(percent))))
+        lbl = w.get("follow_label")
+        if lbl is not None:
+            lbl.setText(text or "")
+
+    def _ccd_follow_hide(self):
+        # @return: None. The progress area belongs to the run that filled it.
+        box = self._ccd_widgets().get("follow_box")
+        if box is not None:
+            box.setVisible(False)
+
     def _ccd_follow_cancel(self):
         if self._ccd_follow_worker is not None:
             self._ccd_follow_worker.cancel()
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Stopping the follow run…"))
             self.statusBar().showMessage(
                 self.tr("Stopping the follow run…"), 5000)
 
+    def _ccd_follow_percent(self, i=None, frac=0.0):
+        # @return: the overall progress in percent from the observation index
+        #          (1-based) and the fraction of it already captured
+        n = max(1, int(self._ccd_follow_total or 1))
+        done = (max(0, int(i or 1) - 1) + max(0.0, min(1.0, frac)))
+        return int(100.0 * done / n)
+
     def _ccd_follow_progress(self, info):
-        # @args: info - {event, i, n, frames, ...} from the run
+        # @args: info - {event, i, n, frames, current, total, ...} from the run
         info = info or {}
         event = info.get("event")
         i, n = info.get("i"), info.get("n")
         if event == "centering":
             msg = self.tr("Observation %1 of %2: centering…").replace(
                 "%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "guiding":
+            msg = self.tr("Observation %1 of %2: starting the guider…").replace(
+                "%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "guide_failed":
+            msg = self.tr(
+                "Observation %1 of %2: the guider did not start; capturing "
+                "unguided.").replace("%1", str(i)).replace("%2", str(n))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
         elif event == "capturing":
             msg = self.tr("Observation %1 of %2: capturing %3 frames…").replace(
                 "%1", str(i)).replace("%2", str(n)).replace(
                     "%3", str(info.get("frames")))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
+        elif event == "progress":
+            cur, total = info.get("current"), info.get("total")
+            frac = 0.0
+            if cur is not None and total:
+                try:
+                    frac = float(cur) / float(total)
+                except (TypeError, ValueError):
+                    frac = 0.0
+            remain = info.get("exposure_remaining")
+            msg = self.tr("Observation %1 of %2 · frame %3/%4").replace(
+                "%1", str(i)).replace("%2", str(n)).replace(
+                    "%3", str(cur if cur is not None else "–")).replace(
+                    "%4", str(total if total else "–"))
+            if remain is not None:
+                msg += " · " + self.tr("%1 s left").replace(
+                    "%1", f"{float(remain):.0f}")
+            self._ccd_follow_show(self._ccd_follow_percent(i, frac), msg)
         elif event == "capture_timeout":
             msg = self.tr(
                 "Observation %1: the software did not report the end; going "
                 "on.").replace("%1", str(i))
+            self._ccd_follow_show(self._ccd_follow_percent(i), msg)
         else:
             return
         self.statusBar().showMessage(msg, 0)
+
+    def _ccd_follow_result(self, payload):
+        # @args: payload - {"manifest": {...}, "status": str}
+        # @return: None. The run's manifest is what lets the editor group the
+        #          frames per observation, so it is kept in the project even
+        #          when the run was stopped part way (ADR-084 rev).
+        manifest = (payload or {}).get("manifest") or {}
+        pid = self._ccd_follow_pid
+        if pid is None or not manifest.get("observations"):
+            return
+        p = project.get(db, pid) or {}
+        t0 = manifest.get("t0")
+        manifest["date"] = manifest.get("date") or time.strftime(
+            "%Y-%m-%d", time.localtime(t0) if t0 else time.localtime())
+        manifest["object"] = p.get("object_name") or ""
+        ctx = dict(p.get("context") or {})
+        runs = list(ctx.get("follow_runs") or [])
+        runs.append(manifest)
+        ctx["follow_runs"] = runs[-20:]
+        project.update_context(db, pid, ctx)
 
     def _ccd_follow_finished(self, status, error):
         # @args: status - done|cancelled|failed, error - message or ""
@@ -7198,17 +7318,26 @@ class MainWindow(QMainWindow):
             w["ccd_follow"].setText(self.tr("Start and follow…"))
         self._ccd_apply_state()
         if error:
+            self._ccd_follow_show(0, self.tr("Follow run failed: %1").replace(
+                "%1", str(error)))
             self.statusBar().showMessage(error, 10000)
         elif status == "cancelled":
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Follow run stopped."))
             self.statusBar().showMessage(
                 self.tr("Follow run stopped."), 8000)
         elif status == "done":
+            self._ccd_follow_show(100, self.tr("Follow run finished."))
             self.statusBar().showMessage(
                 self.tr("Follow run finished."), 8000)
         else:
+            self._ccd_follow_show(self._ccd_follow_percent(),
+                                  self.tr("Follow run ended: %1").replace(
+                                      "%1", str(status)))
             self.statusBar().showMessage(
                 self.tr("Follow run ended: %1").replace(
                     "%1", str(status)), 8000)
+        self._ccd_follow_pid = None
 
     # -- last-frame preview (ADR-082) -------------------------------------
 
@@ -13137,6 +13266,7 @@ class MainWindow(QMainWindow):
                 "object_name": p.get("object_name") or "",
                 "confirmed": dict(ctx.get("confirmed") or {}),
                 "neocp": bool(ctx.get("neocp")),
+                "follow_runs": list(ctx.get("follow_runs") or []),
                 "packed": ctx.get("packed") or ctx.get("id"),
                 "comps": comps,
                 "target_mag": seq.get("target_mag") or ctx.get("mag")}

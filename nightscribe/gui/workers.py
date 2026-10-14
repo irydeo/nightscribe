@@ -13,11 +13,26 @@
 
 import logging
 import math
+import os
+import re
+import shutil
+import threading
+import time
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
+from ..core.sources.observatory import ObservatoryError
+
 logger = logging.getLogger(__name__)
+
+
+def _safe_name(name):
+    # @args: name - an object name
+    # @return: a filesystem-safe stem (the follow subfolders are named after it)
+    raw = re.sub(r"[^A-Za-z0-9._-]+", "_", str(name or "").strip())
+    return raw.strip("._") or "object"
+
 
 # Network and scoring never run on the GUI thread (see ARCHITECTURE).
 # Each worker emits a single "finished" signal with its payload.
@@ -934,13 +949,16 @@ class FollowWorker(QThread):
     # ADR-084: drives the "start and follow" loop (core/follow.FollowRun) off
     # the GUI thread, with the real observatory client behind the injected
     # callables. It emits one progress dict per event (the GUI owns the
-    # wording) and a final (status, error). Cancel is a flag the loop reads
+    # wording), a result with the run's manifest (so the reduction can group
+    # the frames), and a final (status, error). Cancel is a flag the loop reads
     # between steps: a Stop never leaves a half-issued command behind.
     progress = Signal(dict)
+    result = Signal(dict)            # {"manifest": {...}, "status": str}
     finished = Signal(str, str)      # status: done|cancelled|failed, error
 
     def __init__(self, client, plan, object_name, ctx, options=None,
-                 site=""):
+                 site="", guide=True, calibrate=False, project_dir=None,
+                 guide_timeout_s=120.0):
         super().__init__()
         self._client = client
         self._plan = plan
@@ -948,7 +966,15 @@ class FollowWorker(QThread):
         self._ctx = dict(ctx or {})
         self._options = dict(options or {})
         self._site = site
+        self._guide_enabled = bool(guide)
+        self._calibrate = bool(calibrate)
+        self._project_dir = project_dir
+        self._guide_timeout = max(5.0, float(guide_timeout_s))
         self._cancel = False
+        self._base = None
+        self._safe = _safe_name(object_name)
+        self._date = time.strftime("%Y%m%d")
+        self.manifest = {}
 
     def cancel(self):
         # @return: None. The loop checks it between steps.
@@ -972,6 +998,187 @@ class FollowWorker(QThread):
                     "source": "snapshot", "fell_back": True}
         return None
 
+    def _center(self, ra, dec):
+        # The astrometric goto, made CANCELLABLE (ADR-084 rev): a blocking
+        # goto (up to two minutes) is what made Stop look dead. CCDciel's
+        # async job is polled here; NINA's blocking call runs in a helper
+        # thread so a Stop can abort the slew and unblock it.
+        client = self._client
+        if hasattr(client, "astrometry_goto_async"):
+            client.astrometry_goto_async(ra, dec)
+            deadline = time.monotonic() + 180.0
+            while client.astrometry_goto_running():
+                if self._cancelled():
+                    try:
+                        client.abort_motion()
+                    except Exception:
+                        pass
+                    return
+                if time.monotonic() >= deadline:
+                    raise ObservatoryError("the astrometric goto timed out")
+                time.sleep(1.0)
+            if client.astrometry_goto_result() is False:
+                raise ObservatoryError("the astrometric goto did not settle")
+            return
+        box = {}
+
+        def _do():
+            try:
+                box["ok"] = client.astrometry_goto(ra, dec)
+            except Exception as err:      # re-raised on the worker thread
+                box["err"] = err
+
+        helper = threading.Thread(target=_do, daemon=True)
+        helper.start()
+        while helper.is_alive():
+            if self._cancelled():
+                try:
+                    client.abort_motion()
+                except Exception:
+                    pass
+                helper.join(timeout=8.0)
+                return
+            time.sleep(0.5)
+        if box.get("err"):
+            raise box["err"]
+
+    def _guider_state(self):
+        # @return: {"connected", "guiding"} (empty when the read fails)
+        try:
+            return self._client.guider_state() or {}
+        except Exception as err:
+            logger.info("guider state failed: %s", err)
+            return {}
+
+    def _guide(self):
+        # Put the guider back before capturing: a slew stops it, and an
+        # unguided observation of a moving object is half wasted. It connects
+        # when the backend lets us (CCDciel), starts guiding WITHOUT
+        # recalibrating (calibrate only if the observer asked), and waits until
+        # the guider says it is really guiding.
+        # @return: True when it is guiding, False when it gave up
+        client = self._client
+        state = self._guider_state()
+        if state.get("connected") is False:
+            try:
+                client.guider_connect()
+            except Exception as err:
+                logger.info("guider connect failed: %s", err)
+            state = self._guider_state()
+        if state.get("connected") is not True:
+            return False
+        if not state.get("guiding"):
+            try:
+                client.guider_start(self._calibrate)
+            except Exception as err:
+                logger.info("guider start failed: %s", err)
+                return False
+        deadline = time.monotonic() + self._guide_timeout
+        while time.monotonic() < deadline:
+            if self._cancelled():
+                return False
+            if self._guider_state().get("guiding"):
+                return True
+            time.sleep(1.0)
+        return False
+
+    def _capture_progress(self):
+        try:
+            return self._client.capture_progress() or {}
+        except Exception as err:
+            logger.info("capture progress failed: %s", err)
+            return {}
+
+    def _group_base(self):
+        # Where the per-observation subfolders live: inside the capture folder
+        # when NightScribe can see it (same machine or a mounted share), else
+        # inside the project. In remote operation the capture folder is not
+        # reachable and the manifest carries the grouping anyway (ADR-084 rev).
+        if self._base is not None:
+            return self._base
+        folder = None
+        try:
+            folder = self._client.capture_dir()
+        except Exception as err:
+            logger.info("capture dir failed: %s", err)
+        if folder and os.path.isdir(folder):
+            self._base = os.path.join(folder, f"{self._safe}_{self._date}")
+        elif self._project_dir:
+            self._base = os.path.join(self._project_dir, "follow", self._date)
+        else:
+            self._base = ""
+        return self._base
+
+    def _file_observation(self, i, t0, t1):
+        # File ONE observation's frames into its own subfolder, so the editor
+        # can group them by folder. From the capture folder when it is
+        # reachable; otherwise NINA's FITS come over HTTP. Returns the number
+        # of frames filed (None when nothing could be filed).
+        # @args: i - observation index, t0/t1 - its wall-clock window
+        base = self._group_base()
+        if not base:
+            return None
+        folder = None
+        try:
+            folder = self._client.capture_dir()
+        except Exception:
+            folder = None
+        if folder and os.path.isdir(folder):
+            dest = os.path.join(base, f"obs{i:02d}")
+            os.makedirs(dest, exist_ok=True)
+            n = 0
+            for name in sorted(os.listdir(folder)):
+                path = os.path.join(folder, name)
+                if not os.path.isfile(path):
+                    continue
+                if os.path.splitext(name)[1].lower() not in (
+                        ".fits", ".fit", ".fts"):
+                    continue
+                try:
+                    mtime = os.path.getmtime(path)
+                except OSError:
+                    continue
+                if t0 - 1.0 <= mtime <= t1 + 1.0:
+                    try:
+                        shutil.copy2(path, dest)
+                        n += 1
+                    except OSError as err:
+                        logger.warning("could not file %s: %s", path, err)
+            return n or None
+        data = self._download_last_fits()
+        if data:
+            dest = os.path.join(base, f"obs{i:02d}")
+            os.makedirs(dest, exist_ok=True)
+            out = os.path.join(dest, f"{self._safe}_obs{i:02d}.fits")
+            try:
+                with open(out, "wb") as fh:
+                    fh.write(data)
+            except OSError as err:
+                logger.warning("could not write %s: %s", out, err)
+                return None
+            return 1
+        return None
+
+    def _download_last_fits(self):
+        # NINA/PINS: the FITS comes over HTTP (ADR-082), so a remote run can
+        # still file it. The other backends answer None (no FITS over HTTP).
+        client = self._client
+        if not hasattr(client, "image_fits_bytes"):
+            return None
+        try:
+            frame = client.last_frame_preview() or {}
+        except Exception as err:
+            logger.info("last frame failed: %s", err)
+            return None
+        index = frame.get("index")
+        if index is None:
+            return None
+        try:
+            return client.image_fits_bytes(index)
+        except Exception as err:
+            logger.info("FITS download failed: %s", err)
+            return None
+
     def run(self):
         from ..core import follow
         from ..core.sources import observatory
@@ -989,15 +1196,21 @@ class FollowWorker(QThread):
             run = follow.FollowRun(
                 self._plan,
                 resolve_position=self._resolve,
-                center=lambda ra, dec: client.astrometry_goto(ra, dec),
+                center=self._center,
                 push_plan=_push,
                 start_capture=lambda: client.start_capture(),
                 capturing=lambda: client.capturing(),
                 stop_capture=lambda: client.stop_capture(),
                 cancel=self._cancelled,
                 progress=lambda event, **info: self.progress.emit(
-                    {"event": event, **info}))
+                    {"event": event, **info}),
+                guide=self._guide if self._guide_enabled else None,
+                capture_progress=self._capture_progress,
+                group_observation=self._file_observation,
+                calibrate=self._calibrate)
             status = run.run()
+            self.manifest = dict(run.manifest or {})
+            self.result.emit({"manifest": self.manifest, "status": status})
             self.finished.emit(status, "")
         except observatory.ObservatoryError as err:
             logger.info("follow run failed: %s", err)
@@ -1005,6 +1218,7 @@ class FollowWorker(QThread):
         except Exception as err:      # never crash the GUI on a daft payload
             logger.exception("follow worker failed: %s", err)
             self.finished.emit("failed", str(err))
+
 
 
 class SkyBrightnessWorker(QThread):
@@ -1433,7 +1647,7 @@ class TrackStackWorker(QThread):
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
                  phot_enabled=True, save_star_stack=False, calibrate=False,
-                 manual_ref=None, packed=None):
+                 manual_ref=None, packed=None, groups=None):
         super().__init__()
         self._paths = list(paths)
         # ADR-061 applied where the faint object is: calibrate the frames AS
@@ -1452,6 +1666,10 @@ class TrackStackWorker(QThread):
         # name is not what its API wants); None for a confirmed object
         self._packed = packed
         self._n_obs = max(1, int(n_obs))
+        # ADR-084 rev: the explicit per-observation groups when the tab knows
+        # them (the follow run's subfolders/manifest); None keeps the equal
+        # split by _n_obs.
+        self._groups = [(int(a), int(b)) for a, b in (groups or [])] or None
         self._method = method
         self._cfg = cfg
         self._obs_code = obs_code
@@ -2323,7 +2541,11 @@ class TrackStackWorker(QThread):
                 frames, cancel=lambda: self._cancel)
 
             # --- one stack per observation (D22/D23) -----------------------
-            groups = track_stack.split_groups(frames, self._n_obs)
+            # ADR-084 rev: the tab hands the groups when it knows them (the
+            # follow run's subfolders or manifest); otherwise the equal split
+            # by the manual count stands.
+            groups = self._groups or track_stack.split_groups(
+                frames, self._n_obs)
             q_by_group, boxes, mids = [], [], []
             for group in groups:
                 t_mid, q_g = track_stack.group_q(frames, group, w0, motion)

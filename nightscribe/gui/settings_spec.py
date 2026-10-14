@@ -97,6 +97,10 @@ FIELDS = [
     Field("spn_height", "height", "int"),
     Field("edt_aavso_code", "aavso_code", "str", upper=True),
     Field("spn_sky_brightness", "sky_brightness_mag", "float"),
+    # ADR-084 rev: the follow run's guider handling. Both are checkboxes the
+    # Capture step reads when it starts a run.
+    Field("chk_follow_guide", "follow_guide", "bool"),
+    Field("chk_follow_calibrate", "follow_calibrate", "bool"),
     # --- Equipment -----------------------------------------------------
     Field("spn_aperture", "aperture_inches", "float"),
     Field("spn_limit_mag", "limit_mag", "float"),

@@ -3073,3 +3073,44 @@ def test_no_fit_is_said_in_plain_language(qapp, tmp_path):
     tab._result = {"check": findorb.CheckReport(available=True, no_fit=True)}
     tab._fill_check()
     assert "too short an arc" in tab.txt_check.toPlainText()
+
+
+# ------------------------------------- the follow run's grouping (ADR-084 rev)
+
+def test_the_follow_manifest_groups_the_frames(qapp, tmp_path):
+    # ADR-084 rev: a follow run's manifest places the frames by count, so the
+    # observer no longer guesses how many observations there were.
+    from nightscribe.core import track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "2026 QX",
+        "follow_runs": [{"observations": [{"frames": 2}, {"frames": 2}]}]}
+    tab._frames = [track_stack.Frame(path=f"/cap/{i}.fits",
+                                     t_mid_jd=1.0 + i * 1e-5)
+                   for i in range(4)]
+    groups, source = tab._resolved_groups()
+    assert source == "manifest" and groups == [(0, 2), (2, 4)]
+
+
+def test_the_follow_subfolders_group_the_frames(qapp, tmp_path):
+    from nightscribe.core import track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "2026 QX"}
+    tab._frames = [track_stack.Frame(path="/cap/obj/obs01/a.fits", t_mid_jd=1.0),
+                   track_stack.Frame(path="/cap/obj/obs02/b.fits",
+                                     t_mid_jd=1.1)]
+    groups, source = tab._resolved_groups()
+    assert source == "folders" and groups == [(0, 1), (1, 2)]
+
+
+def test_without_a_follow_run_the_manual_count_decides(qapp, tmp_path):
+    from nightscribe.core import track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "2026 QX"}
+    tab._frames = [track_stack.Frame(path=f"/cap/{i}.fits",
+                                     t_mid_jd=1.0 + i * 1e-5)
+                   for i in range(4)]
+    groups, source = tab._resolved_groups()
+    assert groups is None and source == "manual"

@@ -529,3 +529,44 @@ def test_ccdciel_worker_reports_ccdciel_error(qapp):
     _pump(qapp)
     assert seen.get("res") is None
     assert "mount e-stop" in (seen.get("err") or "")
+
+# ---------------- autoguider, capture folder and progress (ADR-084 rev) ------
+
+def test_guider_state_reads_connected_and_guiding(client, fake_post):
+    fake_post.bodies = [_ok(True), _ok(True)]
+    st = client.guider_state()
+    assert st == {"connected": True, "guiding": True}
+    assert fake_post.methods == ["Autoguider_Connected", "Autoguider_Guiding"]
+
+
+def test_guider_start_uses_the_stored_calibration(client, fake_post):
+    # calibrate=False: only StartGuiding (CCDciel's Guide(true) does NOT
+    # recalibrate); calibrate=True adds the separate Calibrate command.
+    assert client.guider_start(calibrate=False) is True
+    assert fake_post.methods == ["Autoguider_StartGuiding"]
+    client.guider_start(calibrate=True)
+    assert fake_post.methods[-2:] == ["Autoguider_Calibrate",
+                                      "Autoguider_StartGuiding"]
+
+
+def test_guider_connect_and_stop(client, fake_post):
+    client.guider_connect()
+    client.guider_stop()
+    assert fake_post.methods == ["Autoguider_Connect",
+                                 "Autoguider_StopGuiding"]
+
+
+def test_capture_dir_reads_the_folder(client, fake_post):
+    fake_post.bodies = [_ok("/data/lights")]
+    assert client.capture_dir() == "/data/lights"
+    assert fake_post.methods == ["CaptureDir"]
+
+
+def test_capture_progress_reads_the_capture_section(client, fake_post):
+    fake_post.bodies = [_ok({"capture": {"running": True, "current": 3,
+                                         "total": 10, "exposureremain": 2.5}})]
+    prog = client.capture_progress()
+    assert prog["current"] == 3 and prog["total"] == 10
+    assert prog["exposureremain"] == 2.5
+    # just the capture section, uncached (a frozen counter is a lie)
+    assert fake_post.calls[0]["json"]["params"] == ["capture"]

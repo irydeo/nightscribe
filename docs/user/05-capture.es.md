@@ -142,17 +142,33 @@ exposición, el coste del re-apuntado y el total, y si cabe en la ventana de
 visibilidad del objeto. Usa **tus** números del paso Plan (los campos **Frames**
 y **Exposure**), no una sugerencia nueva; si tu número de tomas es más de las
 que caben antes de que el objeto llegue al borde del campo, lo dice y lo respeta
-igual. Mientras corre, el botón pasa a **Parar seguimiento** y el panel dice por
-qué observación va. El software comercial usa la palabra *recenter* para cada
-paso (CCDciel) y *Center After Drift* (NINA); la diferencia es que aquí cada
-paso apunta a la **efemérides actualizada** del objeto, no a coordenadas fijas,
-porque el objeto se mueve de verdad.
+igual.
+
+Mientras corre siempre sabes por dónde va: una **barra de progreso** y una línea
+en el paso Captura dicen qué **observación** (i de N), qué **toma** (c de f) y
+cuánta exposición queda, con el porcentaje del run completo. **Parar
+seguimiento** (el mismo botón) detiene la cámara y la montura **ya**, no al
+terminar el paso.
+
+**El guiado se repone antes de cada observación.** Un slew corta el guiado, así
+que sin esto cada observación se capturaría sin guiar. El run conecta el guiado
+cuando puede (CCDciel), lo arranca **con la calibración que ya tienes** (solo se
+calibra de nuevo si lo pides en Configuración) y espera a que diga que guía antes
+de capturar. Si no logra arrancarlo, lo dice y captura igual (las exposiciones
+cortas suelen servir), y tú decides. Desactívalo en Configuración si guías a mano.
+
+**Las tomas se agrupan por observación.** Las tomas de cada observación se copian
+a su propia subcarpeta (en la carpeta de captura cuando NightScribe la ve, en el
+proyecto si no) y el run anota cuántas fueron. El editor FITS entonces **las
+agrupa solo**: se acabó adivinar cuántas observaciones hubo. Cuando las
+subcarpetas no son alcanzables, las agrupa el registro del propio run; si tampoco
+encaja, el hueco que deja el re-apuntado las separa; el número a mano es el
+último recurso.
 
 Dos cosas que hay que saber: necesita un **solver de placa** (el centrado es un
 goto astrométrico), y con **NINA/PINS** cada observación es **un fotograma** (su
 captura es un snapshot de una toma) salvo que cargues la secuencia nativa; con
-CCDciel se respeta el recuento. Cada re-apuntado abre una tanda nueva, así que el
-editor FITS puede tratarlas como observaciones separadas.
+CCDciel se respeta el recuento.
 
 ### Lo que NINA / PINS todavía no hace
 

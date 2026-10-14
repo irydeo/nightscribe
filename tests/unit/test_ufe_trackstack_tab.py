@@ -1596,9 +1596,9 @@ def test_the_diagnosis_note_says_the_night(qapp, tmp_path):
 
 
 def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
-    # The observer asked for it explicitly: applying a pseudo-flat (and the
-    # calibration at all) has to be a choice, visible in the tab where the
-    # faint object is measured, and off unless it is asked for.
+    # The observer asked for it explicitly: applying the calibration (and the
+    # vignetting model at all) has to be a choice, visible in the tab where
+    # the faint object is measured, and off unless it is asked for.
     tab, _host = _tab(qapp, tmp_path)
     assert tab.chk_calibrate.text()
     assert tab.chk_calibrate.isChecked() is False
@@ -1607,11 +1607,12 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     # the exact numbers live in the ADR and in the code, and a help that cites
     # one visit ages badly (2026-10-07, the same rule the other helps follow)
     assert "0.087" not in tab.chk_calibrate.toolTip()
-    # ADR-069: it no longer needs dither (the stars are masked, so a static
-    # field works); what it does need is a dark/bias, or the pedestal
-    # compresses the flat, and the tooltip says so.
+    # ADR-061 rev: it no longer needs dither (the tiles a star spoiled are
+    # thrown away, so a static field works); what it does need is a dark/bias,
+    # or the pedestal compresses the model, and the tooltip says so.
     assert "dark/bias" in tab.chk_calibrate.toolTip()
-    assert "no star in it" in tab.chk_calibrate.toolTip()
+    assert "star" in tab.chk_calibrate.toolTip()
+    assert "thrown away" in tab.chk_calibrate.toolTip()
 
 
 def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(
@@ -1626,15 +1627,15 @@ def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(
     assert "vignetting" in tab.lbl_calibration_hint.text()
     tab.chk_calibrate.setChecked(True)
     assert int(config.get("calib_astrometry")) == 1
-    host.calibration_summary = lambda: "bias · pseudo-flat from the frames"
+    host.calibration_summary = lambda: "bias · vignetting model from the frames"
     tab._sync_calibration_hint()
-    assert "pseudo-flat from the frames" in tab.lbl_calibration_hint.text()
+    assert "vignetting model from the frames" in \
+        tab.lbl_calibration_hint.text()
 
 
 def test_the_calibration_link_opens_the_calibration_tab(qapp, tmp_path):
-    # The recipe, the library and the pseudo-flat policy live in the
-    # Calibration tab: this button is the deep link to it, the same pattern
-    # as the photometry recipe's.
+    # The recipe and the model policy live in the Calibration tab: this button
+    # is the deep link to it, the same pattern as the photometry recipe's.
     tab, host = _tab(qapp, tmp_path)
     seen = []
     host.show_tab = lambda name: seen.append(name)
@@ -2014,12 +2015,13 @@ def test_the_calibration_note_says_what_the_magnitude_was_measured_with(
                                   "flats": ["flatR.fits"], "warnings": []})
     assert "Calibrated 139 frames" in text
     assert "dark120.fits" in text and "flatR.fits" in text
-    # the pseudo-flat says so, and repeats its own warning when it has one
+    # the vignetting model says so, and repeats its own warning when it has
+    # one (a model built without a dark/bias comes out compressed, say)
     text = tab._calibration_note({"n": 12, "offsets": [],
-                                  "flats": ["pseudo-flat"],
-                                  "pseudo_flat": {"note": "the flat still "
-                                                  "carries the stars"}})
-    assert "pseudo-flat" in text and "carries the stars" in text
+                                  "flats": ["vignette-model"],
+                                  "vignette_model": {"note": "the pedestal "
+                                                     "stays in the model"}})
+    assert "vignette-model" in text and "pedestal" in text
     # no masters at all: it says that too, instead of pretending
     assert "no master matched" in tab._calibration_note(
         {"n": 3, "offsets": [], "flats": []})
@@ -3114,3 +3116,39 @@ def test_without_a_follow_run_the_manual_count_decides(qapp, tmp_path):
                    for i in range(4)]
     groups, source = tab._resolved_groups()
     assert groups is None and source == "manual"
+
+
+def test_the_grouping_suggests_but_never_forces_the_count(qapp, tmp_path):
+    # ADR-084 rev: the follow run's grouping PREFILLS the count, it does not
+    # lock it. The observer can type another number, and then the manual split
+    # wins (forcing a number on a sequence the observer knows was wrong).
+    from nightscribe.core import track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "2026 QX",
+        "follow_runs": [{"observations": [{"frames": 2}, {"frames": 2}]}]}
+    tab._frames = [track_stack.Frame(path=f"/cap/{i}.fits",
+                                     t_mid_jd=2461326.5 + i * 1e-5)
+                   for i in range(4)]
+    tab._refresh_preview()
+    assert tab.spn_nobs.value() == 2              # prefilled by the manifest
+    assert tab.spn_nobs.isEnabled() is True       # but NOT locked
+    tab.spn_nobs.setValue(4)                      # the observer takes over
+    groups, source = tab._resolved_groups()
+    assert groups is None and source == "manual"
+
+
+def test_the_gap_suggestion_prefills_but_is_editable(qapp, tmp_path):
+    # The gap heuristic is a hint too: it fills the count, it does not lock it
+    # (a real sequence with re-points kept being forced to its 7 gaps).
+    from nightscribe.core import track_stack
+    tab, host = _tab(qapp, tmp_path)
+    host.astrometry_context = lambda: {
+        "pid": 1, "session_id": 2, "paths": ["x"], "object_name": "2026 QX"}
+    base = 2461326.5
+    times = [base, base + 2 / 86400, base + 64 / 86400, base + 66 / 86400]
+    tab._frames = [track_stack.Frame(path=f"/cap/{i}.fits", t_mid_jd=t)
+                   for i, t in enumerate(times)]
+    tab._refresh_preview()
+    assert tab.spn_nobs.value() == 2
+    assert tab.spn_nobs.isEnabled() is True

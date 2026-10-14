@@ -117,25 +117,25 @@ def test_short_recipe_says_what_the_calibration_will_do(qapp, tmp_path,
                                                         tmp_db, monkeypatch):
     # The one-liner the astrometry hint shows comes from HERE, the single
     # source of the recipe: an empty library says the vignetting stays; the
-    # policy (read from Settings) says a pseudo-flat will stand in; and a
-    # real flat always wins and is named.
+    # policy (read from Settings) says a vignetting model will stand in; and
+    # a real flat always wins and is named.
     import nightscribe.core.db as db_mod
     from nightscribe.config import config
     from nightscribe.core import calibration as cal
     monkeypatch.setattr(db_mod, "db", tmp_db)
-    monkeypatch.setitem(config._data, "calib_pseudo_flat", 0)
+    monkeypatch.setitem(config._data, "calib_vignette_model", 0)
     tab, _host = _tab(qapp, tmp_path)
     text = tab.short_recipe()
     assert "no dark/bias" in text and "vignetting stays" in text
-    config._data["calib_pseudo_flat"] = 1
-    assert "pseudo-flat" in tab.short_recipe()
+    config._data["calib_vignette_model"] = 1
+    assert "vignetting model" in tab.short_recipe()
     flat = _write_fits(tmp_path / "flatR.fits", np.full((64, 64), 5000.0))
     cal.add_master(tmp_db, flat, {"kind": "flat", "camera": "TestCam",
                                   "gain": 2.0, "temp_c": -10.0,
                                   "exptime_s": 5.0, "filter": "R"})
     tab._sync_context()          # re-resolve against the new library
     text = tab.short_recipe()
-    assert "flatR.fits" in text and "pseudo-flat" not in text
+    assert "flatR.fits" in text and "vignetting model" not in text
 
 
 # ------------------------------------------------------------- the recipe

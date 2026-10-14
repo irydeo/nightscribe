@@ -176,7 +176,7 @@ def test_measurement_page(qapp):
     names = _page_widgets(dlg, 3)
     for w in ("grp_photmethod", "chk_phot_matched", "grp_phot_adv",
               "grp_calibration", "btn_master_add", "btn_master_add_dir",
-              "tbl_masters", "btn_master_remove", "chk_calib_pseudo_flat",
+              "tbl_masters", "btn_master_remove", "chk_calib_vignette_model",
               "spn_calib_temp_tol", "grp_astro_gate",
               "grp_astro_sweep", "grp_astro_check", "grp_findorb",
               "grp_solver", "cmb_solver", "edt_astap_path",

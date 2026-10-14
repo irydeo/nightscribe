@@ -1574,16 +1574,16 @@ class CalibrationWorker(QThread):
     failed = Signal(str)             # an unexpected error, in English
 
     def __init__(self, paths, db, export_dir=None, cfg=None,
-                 pseudo_flat=False, flat_path=None):
+                 vignette_model=False, flat_path=None):
         super().__init__()
         self._paths = list(paths)
         self._db = db
-        # P5: build a flat from the frames themselves for the filters the
-        # library has no flat for. It is built ONCE for the whole visit
-        # (it needs every frame) and then applied to each one. `flat_path`
-        # is where the flat itself is written, so it can be LOOKED AT: it is
-        # a product of the visit (ADR-069).
-        self._pseudo_flat = bool(pseudo_flat)
+        # ADR-061 rev: build the VIGNETTING MODEL from the frames themselves
+        # for the filters the library has no flat for. It is built ONCE for
+        # the whole visit (it samples a spread of the frames) and then
+        # applied to each one. `flat_path` is where the model itself is
+        # written, so it can be LOOKED AT: it is a product of the visit.
+        self._vignette_model = bool(vignette_model)
         self._flat_path = str(flat_path) if flat_path else None
         self._export = str(export_dir) if export_dir else None
         self._cfg = cfg
@@ -1597,36 +1597,37 @@ class CalibrationWorker(QThread):
     def run(self):
         from ..core import calibration
         reports, written = [], []
-        flat = None
-        flat_info = None
-        flat_file = None
+        model = None
+        model_info = None
+        model_file = None
         try:
             total = len(self._paths)
             if self._export:
                 Path(self._export).mkdir(parents=True, exist_ok=True)
-            if self._pseudo_flat and self._paths:
-                # P5: the flat is a property of the VISIT (the train did not
-                # change in five minutes), so it is built once here and then
-                # applied to every frame. It needs all the frames at the same
-                # time, which is why it cannot live inside the per-frame loop.
-                # The db goes with it so the pedestal is removed from the
-                # frames before the statistic (ADR-069): without it the flat
-                # comes out compressed.
-                flat, flat_info = calibration.pseudo_flat(
+            if self._vignette_model and self._paths:
+                # The vignetting is a property of the VISIT (the train did
+                # not change in five minutes), so the model is built once
+                # here and then applied to every frame. It samples a SPREAD
+                # of the frames, which is why it cannot live inside the
+                # per-frame loop. The db goes with it so the pedestal is
+                # removed from the frames first (ADR-061 rev): without it the
+                # model comes out compressed.
+                model, model_info = calibration.vignette_model(
                     self._paths, db=self._db, cfg=self._cfg,
                     cancel=lambda: self._cancel,
                     progress=lambda d, t: self.progress.emit(0, total))
-                # The flat itself is written as a product of the visit, so
-                # the observer can open it and see that it has no star in it
-                # (ADR-069). A flat nobody can look at is a flat nobody can
-                # check.
-                if flat is not None and self._flat_path:
+                # The model itself is written as a product of the visit, so
+                # the observer can open it and see that it is smooth and
+                # carries no star and no mote. A model nobody can look at is
+                # a model nobody can check.
+                if model is not None and self._flat_path:
                     try:
                         header = calibration.read_header(self._paths[0])
                     except Exception:                          # noqa: BLE001
                         header = None
-                    flat_file = calibration.export_flat(
-                        flat, self._flat_path, info=flat_info, header=header)
+                    model_file = calibration.export_vignette_model(
+                        model, self._flat_path, info=model_info,
+                        header=header)
             for index, path in enumerate(self._paths, 1):
                 if self._cancel:
                     break
@@ -1634,7 +1635,7 @@ class CalibrationWorker(QThread):
                 # batch entry point resolves, per frame, from its header
                 out = calibration.calibrate_paths(
                     [path], self._db, self._cfg,
-                    cancel=lambda: self._cancel, pseudo_flat=flat)
+                    cancel=lambda: self._cancel, vignette_model=model)
                 if not out:
                     break
                 src, data, header, report = out[0]
@@ -1651,8 +1652,8 @@ class CalibrationWorker(QThread):
             return
         self.finished.emit({"status": "cancelled" if self._cancel else "ok",
                             "reports": reports, "written": written,
-                            "pseudo_flat": flat_info,
-                            "flat_file": flat_file})
+                            "vignette_model": model_info,
+                            "model_file": model_file})
 
 
 class TrackStackWorker(QThread):
@@ -1690,7 +1691,7 @@ class TrackStackWorker(QThread):
         # observer asked to be OPTIONAL: the tab's checkbox, off by default.
         self._calibrate = bool(calibrate)
         self._loader = None
-        self._pseudo_info = None
+        self._vignette_info = None
         self._name = name
         # the packed designation the NEOfixer route keys on (the readable
         # name is not what its API wants); None for a confirmed object
@@ -2311,8 +2312,8 @@ class TrackStackWorker(QThread):
         # @return: a calibration.FrameCalibrator ready to be used as the
         #          engine's loader, or None when it cannot be built
         # The recipe is the Calibration tab's (the library of masters). When
-        # the library has NO flat for the visit's filter, a pseudo-flat is
-        # built from the frames themselves, and ONLY then: it is the
+        # the library has NO flat for the visit's filter, a vignetting model
+        # is built from the frames themselves, and ONLY then: it is the
         # fallback, opt-in (the setting), and a real flat always wins.
         from ..core import calibration
         from ..core.db import db
@@ -2326,21 +2327,22 @@ class TrackStackWorker(QThread):
         if self._cfg is not None:
             tol = self._cfg.get("calib_temp_tol_c", None)
         recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
-        flat = None
-        want_pseudo = bool(self._cfg_get("calib_pseudo_flat", False))
-        if recipe.flat is None and want_pseudo:
-            self.progress.emit("pseudoflat", 0, len(self._paths))
-            # The pedestal goes with it: the pseudo-flat is built from the
-            # frames with the SAME offset removed as the light, or the
-            # division mixes two different things and the flat's shape comes
-            # out compressed (measured on 1 s twilight frames: 44 % of the
+        model = None
+        want_model = bool(self._cfg_get("calib_vignette_model", False))
+        if recipe.flat is None and want_model:
+            self.progress.emit("vignette", 0, len(self._paths))
+            # The pedestal goes with it: the model is built from the frames
+            # with the SAME offset removed as the light, or the division
+            # mixes two different things and the model's shape comes out
+            # compressed (measured on 1 s twilight frames: 44 % of the
             # correction). See calibration._OffsetSubtractor.
-            flat, info = calibration.pseudo_flat(
+            model, info = calibration.vignette_model(
                 self._paths, db=db, cfg=self._cfg,
                 cancel=lambda: self._cancel,
-                progress=lambda d, t: self.progress.emit("pseudoflat", d, t))
-            self._pseudo_info = info
-        return calibration.FrameCalibrator(db, self._cfg, pseudo_flat=flat)
+                progress=lambda d, t: self.progress.emit("vignette", d, t))
+            self._vignette_info = info
+        return calibration.FrameCalibrator(db, self._cfg,
+                                           vignette_model=model)
 
     def run(self):
         import math
@@ -2723,7 +2725,8 @@ class TrackStackWorker(QThread):
             # calibrated and with which masters
             if self._loader is not None:
                 summary = self._loader.summary()
-                summary["pseudo_flat"] = getattr(self, "_pseudo_info", None)
+                summary["vignette_model"] = getattr(
+                    self, "_vignette_info", None)
                 out["calibration"] = summary
             self.finished.emit(out)
         except Exception as err:      # never crash the GUI thread

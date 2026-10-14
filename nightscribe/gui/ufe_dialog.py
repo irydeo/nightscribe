@@ -1433,7 +1433,7 @@ class UfeDialog(QWidget):
 
     def calibration_summary(self):
         # @return: the Calibration tab's one-line summary of what the recipe
-        #          will do to the pixels (offset, flat or pseudo-flat), or
+        #          will do to the pixels (offset, flat or model), or
         #          None when there is no tab
         # The astrometry tab's hint shows it BEFORE a run, so the observer
         # learns the vignetting's fate where the run is launched. The recipe

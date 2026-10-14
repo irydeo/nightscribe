@@ -87,11 +87,11 @@
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btn_flat">
+      <widget class="QPushButton" name="btn_model">
        <property name="enabled"><bool>false</bool></property>
-       <property name="text"><string>See the flat</string></property>
+       <property name="text"><string>See the model</string></property>
        <property name="toolTip">
-        <string>Opens the flat that was built from the frames in the editor's own viewer, so it can be looked at: a flat carrying a star is not a flat, and the way to know is to see it. The figures it was built with (how many sources were masked, how much was filled, how many hot pixels were kept, and how far it still deviates over the masked pixels) are in the note above and in the FITS header</string>
+        <string>Opens the vignetting model that was built from the frames in the editor's own viewer, so it can be looked at: it must be a smooth surface with no star and no mote in it, and the way to know is to see it. The figures it was built with (how many frames the sky was sampled from, the tile size, and how many tiles the fit kept) are in the note above and in the FITS header</string>
        </property>
       </widget>
      </item>

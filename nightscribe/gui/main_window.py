@@ -12783,7 +12783,7 @@ class MainWindow(QMainWindow):
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(self._ufe_mpc_send)
-            # ADR-061 rev: the master library and the pseudo-flat policy live
+            # ADR-061 rev: the master library and the model policy live
             # in Settings, their single home; the editor's Calibration tab
             # only READS them, and this hook is its "Calibration settings…"
             # door. The tab used to carry a second copy of both, which is how

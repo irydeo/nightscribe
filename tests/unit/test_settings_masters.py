@@ -128,7 +128,7 @@ def test_the_calibration_library_lives_on_the_measurement_page(qapp):
     names = _names(dlg, found)
     for w in ("lblH_masters", "btn_master_add", "btn_master_add_dir",
               "tbl_masters", "btn_master_remove", "lbl_master_status",
-              "lblH_master_kind", "chk_calib_pseudo_flat",
+              "lblH_master_kind", "chk_calib_vignette_model",
               "spn_calib_temp_tol", "lblH_calib_tol"):
         assert w in names, f"{w} expected on the calibration page"
     dlg.deleteLater()

@@ -129,10 +129,12 @@ DEFAULTS = {
     "calib_root": "",           # empty -> the data dir's calib/ folder
     "calib_temp_tol_c": 3.0,
     "calib_export": False,
-    # P5: build a flat from the frames themselves for the filters the master
-    # library has no flat for. Off by default: a real flat always wins, and
-    # a pseudo-flat needs the sequence to be dithered.
-    "calib_pseudo_flat": False,
+    # ADR-061 rev: build a VIGNETTING MODEL from the frames themselves for
+    # the filters the master library has no flat for. Off by default: a real
+    # flat always wins, and the model is smooth (it carries no dust). It used
+    # to be called the "pseudo-flat"; the name went with the masked
+    # full-resolution flat it no longer is.
+    "calib_vignette_model": False,
     # The photometry METHOD a new plate starts with: the matched filter
     # (weigh each pixel by the star's shape) or the plain aperture. It is a
     # measured decision, not a taste (1.6x the signal-to-noise and no
@@ -305,6 +307,14 @@ class Config:
                 ["neo", "sn", "comet", "pccp", "transit", "alert",
                  "hads"]):
             self._data["enabled_kinds"] = list(DEFAULTS["enabled_kinds"])
+        # ADR-061 rev: the "pseudo-flat" became the VIGNETTING MODEL (it was
+        # never a flat: it is a smooth surface sampled from the sky). A
+        # switch the observer had already set keeps its value under the new
+        # name instead of silently falling back to the default.
+        if "calib_vignette_model" not in self._data \
+                and "calib_pseudo_flat" in self._data:
+            self._data["calib_vignette_model"] = self._data.pop(
+                "calib_pseudo_flat")
 
     def save(self):
         # Writes the current configuration to disk

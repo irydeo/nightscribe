@@ -97,14 +97,15 @@ def flat_candidates(db=None, cfg=None, progress=True):
     #          median of one, so the comparison is of the shape alone
     lights = sorted(glob.glob(LIGHTS))
     if progress:
-        print(f"construyendo los flats sobre {len(lights)} tomas")
-    out = []
-    # the library has no flat for this filter, so the app builds one; with the
-    # mask turned off it is what the old engine produced
-    old, _info_old = calibration.pseudo_flat(lights, mask_sigma=1e9)
-    masked, info = calibration.pseudo_flat(lights)
+        print(f"construyendo el modelo de viñeteo sobre {len(lights)} tomas")
+    # ADR-061 rev: the app builds a VIGNETTING MODEL from the sky now (a
+    # smooth surface sampled on a grid), so this is what the bench compares
+    # against the real master. The old masked full-resolution flat lived here
+    # too; it is gone from the app and `bench_flat.py` still builds it by hand
+    # for the "before" of the comparison.
+    model, info = calibration.vignette_model(lights)
 
-    # the pedestal: the same flat, built from frames with the offset removed.
+    # the pedestal: the same model, built from frames with the offset removed.
     # It is done with the loader, which is exactly what _OffsetSubtractor does
     # when the library has a dark/bias.
     def sub(path, box):
@@ -112,16 +113,14 @@ def flat_candidates(db=None, cfg=None, progress=True):
         return (np.asarray(calibration.read_image(path, box)[0],
                            dtype=np.float32) - PEDESTAL_ADU)
 
-    masked_ped, _info_ped = calibration.pseudo_flat(lights, loader=sub)
+    model_ped, _info_ped = calibration.vignette_model(lights, loader=sub)
     # the truth: the author's own real flat of that same night
     master, _s = D_flat_master()
-    out = [("sin flat", None), ("flat de hoy (sin mascara)", old),
-           ("enmascarado", masked), ("enmasc + pedestal", masked_ped),
-           ("master real", master)]
+    out = [("sin flat", None), ("modelo de viñeteo", model),
+           ("modelo + pedestal", model_ped), ("master real", master)]
     if progress:
-        print(f"  {info.get('n_sources')} fuentes enmascaradas, "
-              f"{info.get('filled_pct'):.2f} % rellenado, "
-              f"{info.get('hot_px')} píxeles calientes")
+        print(f"  tesela {info.get('tile_px')} px, "
+              f"{info.get('n_kept')}/{info.get('n_tiles')} teselas usadas")
     return out, info
 
 

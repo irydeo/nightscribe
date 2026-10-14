@@ -142,6 +142,12 @@ class UfeTrackStackTab(QWidget):
         self._ui = adopt_ui(self, "ufe_trackstack_tab")
         self.lbl_object = self._ui.lbl_object
         self.spn_nobs = self._ui.spn_nobs
+        # ADR-084 rev: the grouping the follow run (or the gaps) suggests. It
+        # prefills the count ONCE and is dropped the moment the observer types
+        # another number: a suggestion, never a cage.
+        self._auto_groups = None
+        self._auto_source = ""
+        self._groups_overridden = False
         self.lbl_snr_line = self._ui.lbl_snr_line
         self.lbl_plan_line = self._ui.lbl_plan_line
         self.tbl_snr = self._ui.tbl_snr
@@ -302,7 +308,7 @@ class UfeTrackStackTab(QWidget):
         # is what the measurement needs (measured on a real visit: the smooth
         # vignetting alone was worth 0.087 mag of systematic error). The
         # stored key is therefore three-state: absent = automatic, 0/1 = what
-        # the observer chose. The recipe, the library and the pseudo-flat
+        # the observer chose. The recipe, the library and the model
         # policy are NOT here: they live in the Calibration tab, their single
         # home, and this tab only decides whether to apply them.
         self.chk_calibrate = self._ui.chk_calibrate
@@ -553,7 +559,7 @@ class UfeTrackStackTab(QWidget):
         # be dragged down to 280 and the label used to run over the button's
         # own edges (asked for 2026-10-06)
         install_hero_fit(self.btn_stack)
-        self.spn_nobs.valueChanged.connect(lambda _v: self._refresh_preview())
+        self.spn_nobs.valueChanged.connect(self._on_nobs_changed)
         self.btn_stack.clicked.connect(self._on_stack)
         self.cmb_group.currentIndexChanged.connect(self._show_group)
         self.chk_force.toggled.connect(lambda _on: self._sync_report_buttons())
@@ -775,7 +781,7 @@ class UfeTrackStackTab(QWidget):
         self._sync_calibration_hint()
 
     def _on_calibration_settings(self):
-        # @return: None. The recipe, the library and the pseudo-flat policy
+        # @return: None. The recipe, the library and the model policy
         #          are edited in the Calibration tab: this is the deep link,
         #          like the one the photometry recipe has.
         show = getattr(host_of(self), "show_tab", None)
@@ -1038,6 +1044,11 @@ class UfeTrackStackTab(QWidget):
             from ..core import track_stack
             self._frames = track_stack.load_sequence(list(paths), config)
             self._ctx_paths = paths
+            # a different visit is a different grouping: forget the previous
+            # suggestion and any manual override (ADR-084 rev)
+            self._auto_groups = None
+            self._auto_source = ""
+            self._groups_overridden = False
             # A frame that could not be read is left out by load_sequence:
             # the visit is not lost, but the count has to say so (a real
             # capture ends with a half-written file).
@@ -1150,6 +1161,9 @@ class UfeTrackStackTab(QWidget):
         #          should use. The follow run's subfolders win, then its
         #          manifest, then the re-point gaps; when none applies, None is
         #          returned and the manual count decides (source "manual").
+        #          A grouping is a SUGGESTION, never a cage (ADR-084 rev): the
+        #          count is prefilled from it ONCE and the observer can type
+        #          another number, which then wins.
         from ..core import follow
         frames = self._frames or []
         if not frames:
@@ -1158,33 +1172,53 @@ class UfeTrackStackTab(QWidget):
             frames, manifest=self._follow_manifest(),
             n_obs=self.spn_nobs.value(),
             follow_s=config.get("follow_s"))
-        if source in ("folders", "manifest", "gaps"):
-            return groups, source
-        return None, source
+        if source not in ("folders", "manifest", "gaps"):
+            return None, source
+        if self._groups_overridden:
+            # the observer chose the number: the automatic grouping steps back
+            return None, "manual"
+        if self._auto_groups is None or len(self._auto_groups) != len(groups):
+            # first time (or the frames changed): prefill the count from the
+            # rule, without firing the spinbox's own change signal
+            self._auto_groups = groups
+            self._auto_source = source
+            spn = self.spn_nobs
+            spn.blockSignals(True)
+            spn.setRange(1, max(1, len(frames)))
+            spn.setValue(max(1, len(groups)))
+            spn.blockSignals(False)
+        if len(self._auto_groups) == self.spn_nobs.value():
+            return self._auto_groups, source
+        return None, "manual"
 
     def _apply_group_source(self, source, n_groups):
         # @args: source - "folders"|"manifest"|"gaps"|"manual"|"single",
         #        n_groups - how many observations came out
-        # @return: None. The observation count is the follow run's when it can
-        #          group the frames; then the spinbox is locked and says where
-        #          the number comes from. Otherwise it is the observer's.
+        # @return: None. The count is the observer's ALWAYS: the follow run
+        #          suggests a number (and the tooltip says where it comes from),
+        #          but typing another one takes over. The spinbox is never
+        #          disabled (ADR-084 rev: forcing 7 observations on a sequence
+        #          the observer knows better was wrong).
         spn = self.spn_nobs
-        auto = source in ("folders", "manifest", "gaps")
-        if auto:
-            spn.blockSignals(True)
-            spn.setRange(1, max(1, len(self._frames or [])))
-            spn.setValue(max(1, int(n_groups)))
-            spn.blockSignals(False)
-        spn.setEnabled(not auto)
-        if auto:
+        spn.setEnabled(True)
+        if source in ("folders", "manifest", "gaps"):
             spn.setToolTip(self.tr(
-                "Set by the follow run: its %1 observations, grouped by %2."
+                "The follow run grouped the frames into %1 observations (%2). "
+                "Type another number to split them yourself."
             ).replace("%1", str(n_groups)).replace(
                 "%2", self._group_source_word(source)))
         else:
             spn.setToolTip(self.tr(
                 "How many observations the frames are split into (an equal "
-                "split). A follow run sets this on its own."))
+                "split). A follow run suggests a number here; you can change "
+                "it."))
+
+    def _on_nobs_changed(self, _value):
+        # @args: _value - the new count (unused)
+        # @return: None. The observer typed a number: it wins over the follow
+        #          run's suggestion for this visit (a re-armed visit resets it).
+        self._groups_overridden = True
+        self._refresh_preview()
 
     def _group_source_word(self, source):
         # @args: source - the grouping rule that won
@@ -1315,7 +1349,7 @@ class UfeTrackStackTab(QWidget):
         # @return: the human text for the status line
         return {
             "calibrate": self.tr("Calibrating the frames…"),
-            "pseudoflat": self.tr("Building a flat from the frames…"),
+            "vignette": self.tr("Modelling the vignetting from the frames…"),
             "solve": self.tr("Solving the reference frame…"),
             "register": self.tr("Registering the frames…"),
             "base": self.tr("Stacking the whole sequence…"),
@@ -2525,14 +2559,9 @@ class UfeTrackStackTab(QWidget):
             text += " (" + " · ".join(bits) + ")"
         else:
             text += " (" + self.tr("no master matched") + ")"
-        info = cal.get("pseudo_flat") or {}
+        info = cal.get("vignette_model") or {}
         if info.get("note"):
-            if info.get("kind") == "vignette_model":
-                # the smooth model is not a caveat, it is what was applied:
-                # it says what it is and what it does not correct
-                text += ". " + info["note"]
-            else:
-                text += ". " + self.tr("Warning:") + " " + info["note"]
+            text += ". " + self.tr("Warning:") + " " + info["note"]
         return text + "."
 
     def _shape_note(self, phot):

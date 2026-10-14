@@ -87,8 +87,15 @@ between pages.
   filter). An already measured plate keeps its own recipe; the plate's
   switch lives in the Photometry tab, beside the measurement (chapter 06).
 - **Calibration masters**: the library of bias, dark and flat frames the
-  editor's Calibration tab resolves its recipe against. The files are
-  linked, never copied or moved.
+  editor's Calibration tab resolves its recipe against, plus the
+  calibration's policy (model the vignetting when no real flat is there, and
+  the dark's temperature tolerance). The files are linked, never copied or
+  moved, and they go in **by files or by folder**: each frame is classified
+  by its own header (`IMAGETYP`), so you never say which is a dark and which
+  is a flat. There are **three kinds, not four**: a "dark of the flats" is a
+  dark, and its exposure is what makes it valid. The library lives only
+  here; the editor's Calibration tab **reads** it and links back to this
+  page.
 - **Astrometry**: the detection gate, the MPC submission floor, the
   velocity sweep, the check against other stations (with **Find_Orb**) and
   the worker threads.

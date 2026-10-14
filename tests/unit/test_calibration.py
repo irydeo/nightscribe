@@ -177,6 +177,159 @@ def test_recipe_flat_is_per_filter(tmp_db, tmp_path):
     assert in_v.flat is None
 
 
+def test_a_flat_is_not_matched_by_temperature(tmp_db, tmp_path):
+    # ADR-061 rev, the author's own case: a flat taken at -14.6 C with the
+    # lights at -20.0 C (5.3 C apart). A flat's SHAPE is the optical
+    # train's, which does not care about the sensor's temperature, so it
+    # must be used. Before this the recipe answered "no flat for this
+    # filter" and the flat did nothing at all.
+    _add(tmp_db, tmp_path, "flat.fits", "flat", np.ones((4, 4)),
+         temp_c=-14.6, filter="Clear")
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -20.0, "exptime_s": 3.6,
+                                         "filter": "Clear"}, tol_c=3.0)
+    assert recipe.flat is not None
+    assert recipe.flat.path.endswith("flat.fits")
+
+
+def test_a_bias_is_not_matched_by_temperature(tmp_db, tmp_path):
+    # A bias is a read-out pedestal: its pattern barely moves with the
+    # temperature, and matching it against the light's would leave the
+    # library almost always empty.
+    _add(tmp_db, tmp_path, "bias.fits", "bias", np.zeros((4, 4)),
+         temp_c=-5.0, exptime_s=0.0)
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -20.0, "exptime_s": 30.0,
+                                         "filter": "R"}, tol_c=3.0)
+    assert recipe.offset is not None and recipe.offset_kind == "bias"
+
+
+def test_the_dark_keeps_its_temperature(tmp_db, tmp_path):
+    # The dark carries the LEVEL (the thermal current), so a dark 9.4 C
+    # away is not the same dark and must not be used.
+    _add(tmp_db, tmp_path, "dark.fits", "dark", np.ones((4, 4)),
+         temp_c=-14.6, exptime_s=30.0)
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -24.0, "exptime_s": 30.0,
+                                         "filter": "R"}, tol_c=3.0)
+    assert recipe.offset is None
+
+
+def test_the_recipe_says_why_a_dark_was_left_out(tmp_db, tmp_path):
+    # The observer who can SEE the dark in the library must learn which
+    # criterion left it out, with the numbers.
+    _add(tmp_db, tmp_path, "dark.fits", "dark", np.ones((4, 4)),
+         temp_c=-14.6, exptime_s=30.0)
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -20.0, "exptime_s": 30.0,
+                                         "filter": "R"}, tol_c=3.0)
+    notes = [n for n in recipe.notes if n["what"] == "dark"]
+    assert notes, "a near-miss dark must be explained"
+    assert notes[0]["reason"] == "temperature"
+    assert notes[0]["master"] == "dark.fits"
+    assert notes[0]["value"] == -14.6 and notes[0]["wanted"] == -20.0
+    assert notes[0]["tol"] == 3.0
+
+
+def test_the_recipe_says_why_a_flat_was_left_out(tmp_db, tmp_path):
+    _add(tmp_db, tmp_path, "flatR.fits", "flat", np.ones((4, 4)), filter="R")
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -10.0, "exptime_s": 30.0,
+                                         "filter": "V"})
+    notes = [n for n in recipe.notes if n["what"] == "flat"]
+    assert notes and notes[0]["reason"] == "filter"
+    assert notes[0]["value"] == "R" and notes[0]["wanted"] == "V"
+
+
+def test_without_a_temperature_the_newest_master_wins(tmp_db, tmp_path):
+    # The list is newest first and there is no temperature to compare: the
+    # first candidate must stand. Walking on would end on the OLDEST.
+    _add(tmp_db, tmp_path, "flat_old.fits", "flat", np.ones((4, 4)),
+         filter="R")
+    _add(tmp_db, tmp_path, "flat_new.fits", "flat", np.ones((4, 4)),
+         filter="R")
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -20.0, "exptime_s": 30.0,
+                                         "filter": "R"}, tol_c=3.0)
+    assert recipe.flat is not None
+    assert recipe.flat.path.endswith("flat_new.fits")
+
+
+def test_a_dark_at_the_flats_exposure_is_the_flats_offset(tmp_db, tmp_path):
+    # A "dark of the flats" is a dark, and the exposure tells them apart:
+    # the same pool feeds both matches.
+    _add(tmp_db, tmp_path, "dark_flat.fits", "dark", np.full((4, 4), 7.0),
+         exptime_s=0.005)
+    _add(tmp_db, tmp_path, "flat.fits", "flat", np.ones((4, 4)),
+         exptime_s=0.005, filter="R")
+    recipe = cal.resolve_recipe(tmp_db, {"camera": "TestCam", "gain": 1.0,
+                                         "temp_c": -10.0, "exptime_s": 30.0,
+                                         "filter": "R"})
+    assert recipe.flat is not None
+    assert recipe.flat_offset is not None
+    assert recipe.flat_offset.path.endswith("dark_flat.fits")
+
+
+def test_the_flat_age_is_warned(tmp_db, tmp_path):
+    # A flat from weeks ago is USED (better than none) but it is SAID: the
+    # train's dust moves between nights. Measured on the author's case: a
+    # flat 53 days older than the lights.
+    path = _write_fits(tmp_path / "flat.fits", np.ones((4, 4)),
+                       INSTRUME="TestCam", FILTER="R",
+                       DATE__OBS="2026-08-21T19:14:23.603")
+    cal.add_master(tmp_db, path, {"kind": "flat"})
+    recipe = cal.resolve_recipe(tmp_db, {
+        "camera": "TestCam", "gain": 1.0, "temp_c": -10.0, "exptime_s": 30.0,
+        "filter": "R", "date_obs": "2026-10-13T19:40:58.875"})
+    assert recipe.flat is not None
+    ages = [n for n in recipe.notes if n["reason"] == "age"]
+    assert ages and ages[0]["days"] == 53
+
+
+def test_a_fresh_flat_is_not_aged(tmp_db, tmp_path):
+    path = _write_fits(tmp_path / "flat.fits", np.ones((4, 4)),
+                       INSTRUME="TestCam", FILTER="R",
+                       DATE__OBS="2026-10-13T01:00:00")
+    cal.add_master(tmp_db, path, {"kind": "flat"})
+    recipe = cal.resolve_recipe(tmp_db, {
+        "camera": "TestCam", "gain": 1.0, "temp_c": -10.0, "exptime_s": 30.0,
+        "filter": "R", "date_obs": "2026-10-13T19:40:58.875"})
+    assert not [n for n in recipe.notes if n["reason"] == "age"]
+
+
+# ------------------------------------------------------- what a frame is
+
+def test_classify_master_reads_imagetyp(tmp_path):
+    flat = _write_fits(tmp_path / "f.fits", np.ones((4, 4)), IMAGETYP="Flat")
+    dark = _write_fits(tmp_path / "d.fits", np.ones((4, 4)),
+                       IMAGETYP="Dark Flat")
+    assert cal.classify_master(flat) == ("flat", None)
+    assert cal.classify_master(dark) == ("dark", None)
+
+
+def test_classify_master_falls_back_to_the_exposure(tmp_path):
+    # Only where the exposure is unambiguous: a bias really is at zero, and
+    # a dark is the usual minutes-long frame. A short non-zero frame (a
+    # flat, or a bias-like flat) is NOT guessed.
+    bias = _write_fits(tmp_path / "b.fits", np.ones((4, 4)), EXPTIME=0.0)
+    dark = _write_fits(tmp_path / "d.fits", np.ones((4, 4)), EXPTIME=300.0)
+    flat = _write_fits(tmp_path / "f.fits", np.ones((4, 4)), EXPTIME=0.005)
+    assert cal.classify_master(bias) == ("bias", None)
+    assert cal.classify_master(dark) == ("dark", None)
+    kind, why = cal.classify_master(flat)
+    assert kind is None and "IMAGETYP" in why
+
+
+def test_classify_master_refuses_a_light_and_an_unknown(tmp_path):
+    light = _write_fits(tmp_path / "l.fits", np.ones((4, 4)),
+                        IMAGETYP="Light")
+    kind, why = cal.classify_master(light)
+    assert kind is None and "LIGHT" in why
+    odd = _write_fits(tmp_path / "x.fits", np.ones((4, 4)), IMAGETYP="Foo")
+    kind, why = cal.classify_master(odd)
+    assert kind is None and "Foo" in why
+
+
 # ---------------------------------------------------------------- arithmetic
 
 def test_calibrate_subtracts_offset_then_divides_flat(tmp_path):

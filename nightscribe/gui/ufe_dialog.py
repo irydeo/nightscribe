@@ -154,7 +154,7 @@ class UfeDialog(QWidget):
                                                # (ADR-065: reopen and SEE it)
         self._point_excluded_hook = None       # an observation left out of
                                                # the report (2026-10-10)
-        self._add_masters_hook = None          # the library is filled from
+        self._open_settings_hook = None        # the library lives in Settings
                                                # the Calibration tab (ADR-061)
         # ADR-044 rev: the tools that used to be tabs (Blink, Calibration,
         # Annotate and the photometric series) live in non-modal windows of
@@ -1433,7 +1433,7 @@ class UfeDialog(QWidget):
 
     def calibration_summary(self):
         # @return: the Calibration tab's one-line summary of what the recipe
-        #          will do to the pixels (offset, flat or pseudo-flat), or
+        #          will do to the pixels (offset, flat or model), or
         #          None when there is no tab
         # The astrometry tab's hint shows it BEFORE a run, so the observer
         # learns the vignetting's fate where the run is launched. The recipe
@@ -1462,23 +1462,26 @@ class UfeDialog(QWidget):
             logger.warning("calibration masters failed: %s", err)
             return None
 
-    def set_add_masters_hook(self, fn):
-        # @args: fn - callable(kind) -> the result in words, or None
-        # @return: None. ADR-061 rev: the Calibration tab fills the library
-        #          from where the recipe is read; the host owns the file
-        #          dialog and the database, as everywhere else.
-        self._add_masters_hook = fn if callable(fn) else None
+    def set_open_settings_hook(self, fn):
+        # @args: fn - callable(page_name) that opens Settings on that page,
+        #        or None
+        # @return: None. ADR-061 rev: the master library and the calibration
+        #          policy live in Settings, their single home, and the
+        #          Calibration tab's button is the door there. The host owns
+        #          the dialog, as everywhere else.
+        self._open_settings_hook = fn if callable(fn) else None
 
-    def add_masters(self, kind):
-        # @args: kind - one of core.calibration.KINDS
-        # @return: what happened, in words, or ""
-        if self._add_masters_hook is None:
-            return ""
+    def open_settings_page(self, page_name):
+        # @args: page_name - a settings page objectName
+        # @return: True when the host opened it, False when there is no hook
+        if self._open_settings_hook is None:
+            return False
         try:
-            return self._add_masters_hook(kind) or ""
+            self._open_settings_hook(page_name)
+            return True
         except Exception as err:
-            logger.warning("add masters hook failed: %s", err)
-            return ""
+            logger.warning("open settings hook failed: %s", err)
+            return False
 
     def set_mpc_send_hook(self, fn):
         # @args: fn - callable(text) -> True when the visit's MPC block

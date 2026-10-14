@@ -261,7 +261,7 @@
          <widget class="QCheckBox" name="chk_calibrate">
           <property name="text"><string>Apply the calibration</string></property>
           <property name="toolTip">
-           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: the smooth vignetting alone is worth a systematic error of a tenth of a magnitude. When the library has no flat for this filter, a flat is built from the frames themselves, with no star in it, and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins. The recipe, the library and the pseudo-flat policy live in the Calibration tab</string>
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: the smooth vignetting alone is worth a systematic error of a tenth of a magnitude. When the library has no flat for this filter, a VIGNETTING MODEL is built from the frames themselves (the sky sampled on a grid, with the tiles a star or a mote spoiled thrown away) and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins, and it is a real flat that carries the dust. The recipe, the library and the model policy live in the Calibration tab</string>
           </property>
          </widget>
         </item>
@@ -269,7 +269,7 @@
          <widget class="QPushButton" name="btn_calibration">
           <property name="text"><string>Calibration…</string></property>
           <property name="toolTip">
-           <string>Opens the Calibration tab: the master library, the resolved recipe and the pseudo-flat policy that this checkbox applies</string>
+           <string>Opens the Calibration tab: the resolved recipe, the reasons a master was left out, and the vignetting model policy that this checkbox applies; the library itself lives in Settings</string>
           </property>
          </widget>
         </item>

@@ -72,7 +72,13 @@ contiguous group of frames with its own middle-of-exposure instant (T_mid).
   frame as it is read. Without it, the optical train's dust and vignetting
   leak into the stack and, since the object and the comparisons do not sit
   in the same place, the smooth vignetting alone is worth a systematic error
-  of a tenth of a magnitude in the brightness.
+  of a tenth of a magnitude in the brightness. The recipe is resolved
+  against the library in **Settings**, and the Calibration tab tells you
+  which master it uses for each piece and **why** it is not using one you
+  can see in the library (a temperature out of tolerance, another exposure,
+  another filter or camera, or a flat much older than the lights). A flat is
+  used whatever the sensor temperature it was taken at: its shape is the
+  optical train's, not the sensor's.
 - **Measure the brightness** and **Keep the star stack**: the magnitude is
   measured on the object's stack and on a second stack aligned on the stars
   (on the object's stack they are streaks). Without comparisons in the

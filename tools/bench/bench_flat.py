@@ -394,13 +394,13 @@ def main():
                                   "value_norm": float(norm[ys2, xs2])}}
 
     lights = H.dataset_paths("2025FG18")
-    print(f"pseudo-flat de hoy sobre {len(lights)} tomas de FG18")
+    print(f"modelo de viñeteo de hoy sobre {len(lights)} tomas de FG18")
     t0 = time.time()
-    flat_now, info_now = calibration.pseudo_flat(lights)
+    flat_now, info_now = calibration.vignette_model(lights)
     report["today_seconds"] = time.time() - t0
     report["today_info"] = {k: v for k, v in (info_now or {}).items()
                             if k != "model_range"}
-    report["today_flat"] = _stats("pseudo-flat de hoy", flat_now)
+    report["today_flat"] = _stats("modelo de viñeteo de hoy", flat_now)
 
     print(f"estadistico crudo (percentil 33) sobre {len(lights)} tomas")
     raw_p33, stat_s = raw_stat(lights, order=0.33)
@@ -428,12 +428,14 @@ def main():
     print(f"  mota mas profunda:  {m['deepest']['value_norm']:.4f} en "
           f"(x={m['deepest']['x']}, y={m['deepest']['y']})")
     print()
-    print("EL PSEUDO-FLAT DE HOY (el 'antes')")
-    print(f"  tipo: {info_now.get('kind')}  residuo: "
-          f"{info_now.get('residual_pct')} %  ({report['today_seconds']:.1f} s)")
+    print("EL MODELO DE VIÑETEO DE HOY (ADR-061 rev)")
+    print(f"  tipo: {info_now.get('kind')}  tesela: "
+          f"{info_now.get('tile_px')} px  teselas usadas: "
+          f"{info_now.get('n_kept')}/{info_now.get('n_tiles')}  "
+          f"({report['today_seconds']:.1f} s)")
     s = report["today_flat"]
     print(f"  min {s['min']:.4f}  max {s['max']:.4f}  p1 {s['p1']:.4f}  "
-          f"p99 {s['p99']:.4f}   <-- un maximo de 2.8 es una ESTRELLA")
+          f"p99 {s['p99']:.4f}   <-- suave: el polvo NO esta")
 
     print()
     print("EL FLAT ENMASCARADO (el 'despues')")
@@ -502,7 +504,7 @@ def main():
     # threshold of 2 % therefore passes everything.
     print()
     print("EL RESIDUO DE PEQUENA ESCALA (el criterio de la app, y no sirve)")
-    for label, cand in (("flat de hoy", flat_now),
+    for label, cand in (("modelo de hoy", flat_now),
                         ("flat enmascarado", flat_m),
                         ("master real", norm)):
         ref = smooth(cand)
@@ -517,7 +519,7 @@ def main():
     print("LA GARANTIA, BIEN PLANTEADA: desviacion sobre el suavizado EN LOS")
     print("PIXELES QUE SE ENMASCARARON (donde habia una estrella). El polvo")
     print("no entra aqui, porque no esta enmascarado y es un hundimiento.")
-    for label, cand in (("flat de hoy", flat_now),
+    for label, cand in (("modelo de hoy", flat_now),
                         ("flat enmascarado", flat_m),
                         ("master real", norm)):
         ref = smooth(cand)
@@ -574,7 +576,7 @@ def main():
     seeds = H.detect_sources(frame0, nmax=6)
     spots0 = [(float(s[0]), float(s[1])) for s in seeds]
     fwhm = float(photometry.estimate_fwhm(frame0, spots0) or 5.0)
-    cands = [("sin flat", None), ("flat de hoy", flat_now),
+    cands = [("sin flat", None), ("modelo de hoy", flat_now),
              ("enmascarado", flat_m), ("enmasc. + pedestal", flat_mp),
              ("master real", norm)]
     sweep, positions = position_sweep(lights, norm, cands, fwhm)

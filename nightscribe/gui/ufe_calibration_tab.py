@@ -15,10 +15,18 @@
 visit's recipe against the master library, in plain language. The
 structure, texts and tooltips live in ui/ufe_calibration_tab.ui
 (ADR-005); this module resolves the recipe for the visit's first frame,
-says which master each piece uses (or what is missing), runs
-gui/workers.CalibrationWorker with progress and Cancel, and exports the
-calibrated copies only when the checkbox says so (D6: calibration works
-in memory, writing hundreds of FITS is explicit).
+says which master each piece uses AND WHY a piece could not be found (the
+criterion that failed and its numbers), runs gui/workers.CalibrationWorker
+with progress and Cancel, and exports the calibrated copies only when the
+checkbox says so (D6: calibration works in memory, writing hundreds of
+FITS is explicit).
+
+ADR-061 rev: the library and the policy (the vignetting model switch, the
+temperature tolerance) live in SETTINGS, their single home; this tab only
+READS them and applies them, and its "Calibration settings…" button is the
+deep link there. The tab used to carry a second copy of the library and of
+the switch, which is how the switch the observer touched came to be one the
+stack never read.
 """
 
 import logging
@@ -58,75 +66,64 @@ class UfeCalibrationTab(QWidget):
         self.lbl_recipe = self._ui.lbl_recipe
         self.lbl_warnings = self._ui.lbl_warnings
         self.lbl_status = self._ui.lbl_status
-        self.chk_pseudo_flat = self._ui.chk_pseudo_flat
         self.chk_export = self._ui.chk_export
         self.btn_calibrate = self._ui.btn_calibrate
         self.prg_calib = self._ui.prg_calib
-        # ADR-061 rev: the library is FILLED from here. It used to be only in
-        # Settings, so this tab could report what was missing and nothing
-        # else; an observer with real flats (measured: 150 of them for one
-        # night) had no way to put them in from where the recipe is read.
-        self.cmb_master_kind = self._ui.cmb_master_kind
-        self.btn_master_add = self._ui.btn_master_add
-        self.lbl_master_status = self._ui.lbl_master_status
-        from ..core import calibration
-        for kind in calibration.KINDS:
-            self.cmb_master_kind.addItem(self._master_kind_label(kind), kind)
-        self.btn_master_add.clicked.connect(self._on_master_add)
+        # ADR-061 rev: the library and the policy are in Settings now; this
+        # tab reads them and its button is the door there.
+        self.btn_settings = self._ui.btn_settings
+        self.btn_settings.clicked.connect(self._on_settings)
         # D6: exporting calibrated copies is explicit; the checkbox's
         # default is the setting's, so the choice survives sessions
         self.chk_export.setChecked(bool(config.get("calib_export", False)))
         self.chk_export.toggled.connect(
             lambda on: config.set("calib_export", 1 if on else 0))
-        # P5: the pseudo-flat is the calibration's OWN policy, and this tab is
-        # its single home (the stack and every other pipeline read the same
-        # key). The switch has to WRITE it: reading it and never saving it is
-        # how the checkbox came to look like it did nothing.
-        self.chk_pseudo_flat.setChecked(
-            bool(config.get("calib_pseudo_flat", False)))
-        self.chk_pseudo_flat.toggled.connect(self._on_pseudo_flat)
         self.btn_calibrate.clicked.connect(self._on_calibrate)
         self._btn_label = self.btn_calibrate.text()
-        # ADR-069: the flat is written as a product of the visit and can be
-        # opened in the editor's own viewer, because the observer's criterion
-        # for "this is a flat" is looking at it and seeing no star in it.
-        self.btn_flat = self._ui.btn_flat
-        self.btn_flat.clicked.connect(self._on_see_flat)
-        self._flat_file = None
+        # The model is written as a product of the visit and can be opened in
+        # the editor's own viewer, because the observer's criterion for "this
+        # is the vignetting and not a map of the stars" is looking at it.
+        self.btn_model = self._ui.btn_model
+        self.btn_model.clicked.connect(self._on_see_model)
+        self._model_file = None
 
-    def _on_pseudo_flat(self, on):
-        # @args: on - the new state of the policy switch
-        # @return: None. The key is shared: the astrometry hint and the next
-        #          stack read it, so the choice has to outlive the session.
-        config.set("calib_pseudo_flat", 1 if on else 0)
-        self._sync_context()      # the recipe line's flat row changes
+    def _vignette_model_on(self):
+        # @return: True when Settings asks for a vignetting model when the
+        #          library has no flat for the filter. It is the SAME key
+        #          the stack reads: one policy, one home (ADR-061 rev).
+        return bool(config.get("calib_vignette_model", False))
 
     def _master_kind_label(self, kind):
         # @args: kind - one of core.calibration.KINDS
-        # @return: its name in the observer's language: the four kinds are
-        #          four different arithmetics, not synonyms.
+        # @return: its name in the observer's language: the kinds are
+        #          different arithmetics, not synonyms.
         return {"bias": self.tr("Bias"), "dark": self.tr("Dark"),
-                "dark_flat": self.tr("Dark of the flats"),
                 "flat": self.tr("Flat")}.get(kind, kind)
 
-    def _on_master_add(self):
-        # @return: None. The host opens the file dialog and indexes what it
-        #          gets (the tab never touches the database, like every other
-        #          panel); the answer comes back as words and the recipe is
-        #          re-resolved, so the line above says what changed.
-        ask = getattr(host_of(self), "add_masters", None)
-        if not callable(ask):
-            self.lbl_master_status.setText(self.tr(
-                "This window has no library to write to."))
-            return
-        kind = self.cmb_master_kind.currentData() or "dark"
+    @staticmethod
+    def _num(value):
+        # @args: value - a number from a note, or None
+        # @return: it formatted for a sentence ("-" when it is not known)
+        if value is None:
+            return "–"
         try:
-            text = ask(kind)
-        except Exception as err:
-            logger.warning("adding masters failed: %s", err)
-            text = self.tr("The masters could not be indexed:") + f" {err}"
-        self.lbl_master_status.setText(text or "")
-        self._sync_context()
+            return f"{float(value):g}"
+        except (TypeError, ValueError):
+            return str(value)
+
+    def _on_settings(self):
+        # @return: None. The library and the policy live in Settings
+        #          (ADR-061 rev): this is the deep link, and it lands on the
+        #          Measurement page, where the calibration library is.
+        opener = getattr(host_of(self), "open_settings_page", None)
+        if callable(opener):
+            try:
+                opener("page_measurement")
+                return
+            except Exception as err:                       # noqa: BLE001
+                logger.warning("opening the settings failed: %s", err)
+        self._say(self.tr(
+            "The master library lives in Settings, under Measurement."))
 
     # ------------------------------------------------------- host wiring
 
@@ -217,8 +214,7 @@ class UfeCalibrationTab(QWidget):
         recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
         self._recipe = recipe
         self.lbl_recipe.setText(self._recipe_text(meta, recipe))
-        self.lbl_warnings.setText("\n".join(
-            "• " + self._warning_text(w) for w in recipe.warnings))
+        self.lbl_warnings.setText("\n".join(self._concern_lines(recipe)))
 
     def has_masters(self):
         # Whether the library has anything that MATCHES this visit, asked by
@@ -252,8 +248,8 @@ class UfeCalibrationTab(QWidget):
         if recipe.flat is not None:
             parts.append(self.tr("flat: %1").replace(
                 "%1", Path(recipe.flat.path).name))
-        elif self.chk_pseudo_flat.isChecked():
-            parts.append(self.tr("pseudo-flat from the frames"))
+        elif self._vignette_model_on():
+            parts.append(self.tr("vignetting model from the frames"))
         else:
             parts.append(self.tr("no flat: the vignetting stays"))
         return " · ".join(parts)
@@ -285,16 +281,36 @@ class UfeCalibrationTab(QWidget):
                     "%1", Path(recipe.flat_offset.path).name)
             else:
                 line += " " + self.tr(
-                    "(no dark-flat: the flat keeps its own pedestal)")
+                    "(no dark at its exposure or bias: the flat keeps its "
+                    "own pedestal)")
             lines.append(line)
-        elif self.chk_pseudo_flat.isChecked():
+        elif self._vignette_model_on():
             lines.append(self.tr(
-                "Flat: none in the library; a pseudo-flat will be built "
-                "from the frames"))
+                "Flat: none in the library; a vignetting model will be "
+                "built from the frames"))
         else:
             lines.append(self.tr(
                 "Flat: missing for this filter (the vignetting stays)"))
         return "\n".join(lines)
+
+    def _concern_lines(self, recipe):
+        # @args: recipe - the resolved Recipe
+        # @return: the warnings and the reasons as bullet lines, translated
+        #          and deduplicated. The warnings are the short, stable
+        #          sentences (a piece is missing); the notes carry WHY a
+        #          master that IS in the library was left out, with the
+        #          numbers, which is what lets the observer fix it instead
+        #          of reading "no flat" and giving up (ADR-061 rev).
+        lines = []
+        for warning in recipe.warnings:
+            line = "• " + self._warning_text(warning)
+            if line not in lines:
+                lines.append(line)
+        for note in getattr(recipe, "notes", None) or []:
+            text = self._note_text(note)
+            if text and ("• " + text) not in lines:
+                lines.append("• " + text)
+        return lines
 
     def _warning_text(self, warning):
         # @args: warning - a core recipe warning (internal English)
@@ -317,6 +333,64 @@ class UfeCalibrationTab(QWidget):
                 "corrected (it matters for the magnitude, little for the "
                 "centroid)")
         return text
+
+    def _note_text(self, note):
+        # @args: note - a core Recipe note dict (what, reason, master,
+        #        value, wanted, tol, days)
+        # @return: WHY that master was left out, with the numbers, in the
+        #          observer's language, or None when the note is not one
+        #          this tab knows (an unknown reason passes through the
+        #          warning, never hidden)
+        what = self._master_kind_label(note.get("what") or "")
+        master = note.get("master") or ""
+        reason = note.get("reason")
+        if reason == "temperature":
+            return self.tr(
+                "There is a %1 (%2) in the library, but its sensor "
+                "temperature is out of tolerance: %3 °C against %4 °C "
+                "(tolerance %5 °C). A dark carries the thermal current, "
+                "so one from another temperature is not the same dark."
+            ).replace("%1", what).replace("%2", master).replace(
+                "%3", self._num(note.get("value"))).replace(
+                "%4", self._num(note.get("wanted"))).replace(
+                "%5", self._num(note.get("tol")))
+        if reason == "exposure":
+            return self.tr(
+                "There is a %1 (%2) in the library, but at %3 s: a dark is "
+                "only valid at the light's own exposure (%4 s)."
+            ).replace("%1", what).replace("%2", master).replace(
+                "%3", self._num(note.get("value"))).replace(
+                "%4", self._num(note.get("wanted")))
+        if reason == "filter":
+            return self.tr(
+                "There is a %1 (%2) in the library, but for filter %3; "
+                "these lights are in %4. A flat is per filter."
+            ).replace("%1", what).replace("%2", master).replace(
+                "%3", self._num(note.get("value"))).replace(
+                "%4", self._num(note.get("wanted")))
+        if reason == "camera":
+            return self.tr(
+                "There is a %1 (%2) in the library, but for another camera "
+                "(%3); these lights are from %4."
+            ).replace("%1", what).replace("%2", master).replace(
+                "%3", self._num(note.get("value"))).replace(
+                "%4", self._num(note.get("wanted")))
+        if reason == "gain":
+            return self.tr(
+                "There is a %1 (%2) in the library, but at gain %3; these "
+                "lights were taken at gain %4. A dark carries the level, "
+                "so the gain is part of its match."
+            ).replace("%1", what).replace("%2", master).replace(
+                "%3", self._num(note.get("value"))).replace(
+                "%4", self._num(note.get("wanted")))
+        if reason == "age":
+            return self.tr(
+                "The flat (%1) is %2 days older than these lights: the "
+                "train's dust moves, so a mote may have appeared or gone. "
+                "It is used anyway."
+            ).replace("%1", master).replace(
+                "%2", self._num(note.get("days")))
+        return None
 
     # --------------------------------------------------------------- run
 
@@ -349,21 +423,22 @@ class UfeCalibrationTab(QWidget):
         base = Path(folder or paths_mod.data_dir())
         if self.chk_export.isChecked():
             export_dir = base / "calibrados"
-        # The flat is a product of the visit like any other, and the whole
-        # point of writing it is being able to LOOK at it (ADR-069).
-        if self.chk_pseudo_flat.isChecked():
-            flat_path = str(base / "pseudo_flat.fits")
+        # The model is a product of the visit like any other, and the whole
+        # point of writing it is being able to LOOK at it.
+        want_model = self._vignette_model_on()
+        if want_model:
+            flat_path = str(base / "vignette_model.fits")
         from ..core.db import db
         from .workers import CalibrationWorker, hold
         self.prg_calib.setVisible(True)
         self.prg_calib.setRange(0, len(paths))
         self.prg_calib.setValue(0)
         self.btn_calibrate.setText(self.tr("Cancel"))
-        self.btn_flat.setEnabled(False)
-        self._flat_file = None
+        self.btn_model.setEnabled(False)
+        self._model_file = None
         self._worker = hold(CalibrationWorker(
             paths, db, export_dir, config,
-            pseudo_flat=self.chk_pseudo_flat.isChecked(),
+            vignette_model=want_model,
             flat_path=flat_path))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
@@ -403,13 +478,19 @@ class UfeCalibrationTab(QWidget):
             return
         # the warnings of EVERY frame, deduplicated: a visit repeats its
         # recipe, and the same missing master said three hundred times
-        # says nothing
-        seen, lines = set(), []
+        # says nothing. The recipe's own notes (WHY a master was left out)
+        # go with them, so the reason does not disappear after a run.
+        lines, seen = [], set()
         for _path, report in reports:
             for warning in (getattr(report, "warnings", None) or []):
                 if warning not in seen:
                     seen.add(warning)
                     lines.append("• " + self._warning_text(warning))
+        if self._recipe is not None:
+            for note in getattr(self._recipe, "notes", None) or []:
+                text = self._note_text(note)
+                if text and ("• " + text) not in lines:
+                    lines.append("• " + text)
         self.lbl_warnings.setText("\n".join(lines))
         if written:
             # the copies register to the visit like any other product
@@ -423,38 +504,19 @@ class UfeCalibrationTab(QWidget):
                         "calibrated export register failed: %s", err)
         self._say(self.tr("Calibrated %1 frames (%2 exported).").replace(
             "%1", str(len(reports))).replace("%2", str(len(written))))
-        # P5: what the pseudo-flat was, and whether it could be trusted: a
-        # flat built from frames that were not dithered still carries the
-        # stars, and saying so beats leaving a wrong flat on the frames
-        info = payload.get("pseudo_flat") or {}
+        # What the vignetting model was made of, so the observer can judge it
+        # instead of trusting it: how many frames the sky was sampled from,
+        # on what grid, and how many tiles the robust fit kept.
+        info = payload.get("vignette_model") or {}
         if info.get("median_adu"):
             note = self.tr(
-                "Pseudo-flat built from %1 frames (median %2 ADU).").replace(
+                "Vignetting model from %1 frames, %2-pixel tiles "
+                "(%3 of %4 tiles kept).").replace(
                     "%1", str(info.get("n_frames"))).replace(
-                    "%2", f"{float(info['median_adu']):.0f}")
-            # P5 rev (ADR-069): what the flat is made of, so the observer can
-            # judge it instead of trusting it. The stars are masked before the
-            # statistic and their pixels are filled from the sky around them;
-            # the two numbers that say whether that worked are how much was
-            # filled and how far the flat still deviates over those pixels.
-            parts = []
-            if info.get("n_sources") is not None:
-                parts.append(self.tr("%1 sources masked").replace(
-                    "%1", str(info["n_sources"])))
-            if info.get("filled_pct") is not None:
-                parts.append(self.tr("%1 % of the pixels filled").replace(
-                    "%1", f"{float(info['filled_pct']):.2f}"))
-            if info.get("hot_px"):
-                parts.append(self.tr(
-                    "%1 hot pixels kept in the flat (the division removes "
-                    "them)").replace("%1", str(info["hot_px"])))
-            if info.get("verify_pct") is not None:
-                parts.append(self.tr(
-                    "deviation over the masked ones: %1 %").replace(
-                        "%1", f"{float(info['verify_pct']):.2f}"))
-            if parts:
-                note += " " + "; ".join(parts) + "."
-            # The pedestal is not a detail: without a dark/bias the flat is
+                    "%2", str(info.get("tile_px"))).replace(
+                    "%3", str(info.get("n_kept"))).replace(
+                    "%4", str(info.get("n_tiles")))
+            # The pedestal is not a detail: without a dark/bias the model is
             # built from frames that carry it, its shape comes out compressed
             # and it corrects only part of the vignetting (measured: 44 % on
             # 1 s twilight frames). It is said, not hidden.
@@ -465,45 +527,39 @@ class UfeCalibrationTab(QWidget):
                         "%1", ", ".join(off.get("applied") or []))
             elif off.get("n_missing"):
                 note += " " + self.tr(
-                    "No dark/bias master: the pedestal stays in the flat, so "
-                    "its shape is compressed and only part of the vignetting "
-                    "is corrected. Index a bias for this camera.")
+                    "No dark/bias master: the pedestal stays in the model, "
+                    "so its shape is compressed and only part of the "
+                    "vignetting is corrected. Index a bias for this camera.")
             if info.get("note"):
-                if info.get("kind") == "vignette_model":
-                    # the smooth model is not a caveat, it is what was
-                    # applied: it says what it is and what it does not
-                    # correct (ADR-061 rev)
-                    note += " " + info["note"]
-                else:
-                    note += " " + self.tr("Warning:") + " " + info["note"]
+                note += " " + self.tr("Warning:") + " " + info["note"]
             self._say(note)
-        # The flat is registered to the visit like any other product and the
-        # door to look at it is opened (ADR-069).
-        flat_file = payload.get("flat_file")
-        self._flat_file = str(flat_file) if flat_file else None
-        self.btn_flat.setEnabled(bool(self._flat_file))
-        if self._flat_file:
+        # The model is registered to the visit like any other product and the
+        # door to look at it is opened.
+        model_file = payload.get("model_file")
+        self._model_file = str(model_file) if model_file else None
+        self.btn_model.setEnabled(bool(self._model_file))
+        if self._model_file:
             notify = getattr(host_of(self), "notify_saved", None)
             if callable(notify):
                 try:
-                    notify([self._flat_file], "fits")
+                    notify([self._model_file], "fits")
                 except Exception as err:                       # noqa: BLE001
-                    logger.warning("flat register failed: %s", err)
+                    logger.warning("model register failed: %s", err)
 
-    def _on_see_flat(self):
-        # @return: None. Opens the flat in the editor's own viewer. The
-        # observer's criterion for "this is a flat" is looking at it and
-        # seeing that no star is in it, and that is not something a note can
-        # replace.
-        path = self._flat_file
+    def _on_see_model(self):
+        # @return: None. Opens the model in the editor's own viewer. The
+        # observer's criterion for "this is the vignetting and not a map of
+        # the stars" is looking at it and seeing a smooth surface, and that
+        # is not something a note can replace.
+        path = self._model_file
         if not path:
             self._say(self.tr(
-                "No flat has been built for this visit yet: run the "
-                "calibration with the pseudo-flat box checked."))
+                "No vignetting model has been built for this visit yet: run "
+                "the calibration with the model box checked in Settings."))
             return
         opener = getattr(host_of(self), "open_plate", None)
         if callable(opener):
             opener(str(path))
         else:
-            self._say(self.tr("The flat is at %1").replace(
+            self._say(self.tr("The model is at %1").replace(
                 "%1", str(path)))

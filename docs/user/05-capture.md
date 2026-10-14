@@ -218,18 +218,22 @@ header, and warns about anything missing (Warnings). **Calibrate the visit**
 applies the recipe to every frame; calibration works in memory and only
 writes FITS copies if you tick the export box.
 
-**If you have no flat for a filter**: the *Build a flat from the frames*
-option builds a pseudo-flat by stacking the lights themselves (dust and
-vignetting stay fixed on the frame; stars move between frames and vanish in
-the low percentile). Use it for what it is: an honest patch that never
-overrides a real flat. You can open it with **See the flat** and judge it: a
-flat with a star in it is not a flat.
+**If you have no flat for a filter**: the *Model the vignetting from the
+frames* option samples the sky on a grid of tiles over a score of spread
+frames and fits a smooth surface to what they have in common: the train's
+vignetting, which is fixed on the frame. The tiles that a star, a galaxy or
+a mote pushed off the trend are thrown away by the fit itself, so no source
+ends up in the model. It corrects the **vignetting** (the systematic that
+matters, about a tenth of a magnitude) and **not the dust**: a smooth
+surface has no fine structure, and that is what a real master is for. It is
+called a model and not a flat for exactly that reason.
 
-> **Why does the pseudo-flat work?** Because in a series with *dithering*
-> (small offsets between frames) the only thing that does not move is what
-> belongs to the instrument: dust, vignetting, hot pixels. A low percentile
-> over many frames keeps what is fixed and rejects what moved. If your field
-> is static (no dithering), the app masks the stars before stacking, for the
-> same reason.
+> **Why is a smooth surface enough?** Because the vignetting is smooth and
+> worth 0.087 mag, while the dust is worth 0.026 mag: measured against a real
+> master, the model reaches 3.93 % against a full-resolution masked flat's
+> 4.26 %, in 3 s instead of 20. It needs neither *dithering* nor the stars to
+> move, because the tiles they spoil are dropped by themselves. You can open
+> it with **See the model** and judge it: it has to be a smooth surface, with
+> no star and no mote.
 
 Next: [06. Photometry](06-photometry.md).

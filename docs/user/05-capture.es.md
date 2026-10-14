@@ -218,18 +218,22 @@ primer frame, y avisa de lo que falte (Avisos). **Calibrar la visita**
 aplica la receta a todos los frames; la calibración trabaja en memoria y
 solo escribe copias FITS si marcas la exportación.
 
-**Si no tienes flat para un filtro**: la opción *Build a flat from the
-frames* construye un pseudo-flat apilando las propias luces (el polvo y el
-viñeteo están fijos en el frame; las estrellas se mueven entre tomas y
-desaparecen en el percentil bajo). Úsalo como lo que es: un parche honesto
-que nunca se antepone a un flat real. Puedes abrirlo con **Ver el flat** y
-juzgarlo: un flat con una estrella dentro no es un flat.
+**Si no tienes flat para un filtro**: la opción *Model the vignetting from
+the frames* muestrea el cielo en una rejilla de teselas sobre una veintena
+de tomas repartidas y ajusta una superficie suave a lo que tienen en común:
+el viñeteo del tren, que está fijo en el fotograma. Las teselas que una
+estrella, una galaxia o una mota desplazan fuera de la tendencia las tira el
+propio ajuste, así que ninguna fuente acaba en el modelo. Corrige el
+**viñeteo** (el sistemático que importa, alrededor de una décima de
+magnitud) y **no el polvo**: una superficie suave no tiene estructura fina, y
+para eso está un master real. Se llama modelo y no flat por eso mismo.
 
-> **¿Por qué funciona el pseudo-flat?** Porque en una serie con *dithering*
-> (pequeños desplazamientos entre tomas) lo único que no se mueve es lo que
-> pertenece al instrumento: polvo, viñeteo, píxeles calientes. Un percentil
-> bajo sobre muchas tomas conserva lo fijo y rechaza lo que se movió. Si tu
-> campo es estático (sin dithering), la app enmascara las estrellas antes de
-> apilar, por la misma razón.
+> **¿Por qué basta una superficie suave?** Porque el viñeteo es suave y vale
+> 0,087 mag, mientras que el polvo vale 0,026 mag: medido contra un master
+> real, el modelo llega al 3,93 % frente al 4,26 % de un flat enmascarado de
+> resolución completa, en 3 s en vez de 20. No necesita *dithering* ni que las
+> estrellas se muevan, porque las teselas que estropean se descartan solas.
+> Lo puedes abrir con **Ver el modelo** y juzgarlo: tiene que ser una
+> superficie lisa, sin ninguna estrella ni mota.
 
 Siguiente: [06. Fotometría](06-photometry.es.md).

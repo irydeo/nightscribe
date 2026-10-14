@@ -72,7 +72,13 @@ frames con su propio instante de media exposición (T_mid).
   cada frame al leerlo. Sin ella, el polvo del tren óptico y el viñeteo se
   cuelan al stack y, como el objeto y las comparadas no caen en el mismo
   sitio, solo el viñeteo ya vale un error sistemático de una décima de
-  magnitud en el brillo.
+  magnitud en el brillo. La receta se resuelve contra la biblioteca de
+  **Ajustes**, y la pestaña Calibración te dice qué master usa para cada
+  pieza y **por qué** no usa uno que sí ves en la biblioteca (una
+  temperatura fuera de tolerancia, otra exposición, otro filtro u otra
+  cámara, o un flat mucho más antiguo que las luces). Un flat se usa
+  cualquiera que sea la temperatura del sensor a la que se tomó: su forma es
+  la del tren óptico, no la del sensor.
 - **Medir el brillo** y **Guardar el apilado de estrellas**: la magnitud se mide
   sobre el stack del objeto y sobre un segundo stack alineado a las
   estrellas (en el del objeto son trazos). Sin comparadas en el campo, el

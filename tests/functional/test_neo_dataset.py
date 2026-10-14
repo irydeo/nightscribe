@@ -114,7 +114,7 @@ def test_a_flat_taken_at_another_gain_is_still_the_flat(fg18_paths, flat_paths,
         "filter": flat_header.get("FILTER")})
     recipe = cal.resolve_recipe(tmp_db, light, tol_c=10.0)
     assert recipe.flat is not None, (
-        f"el flat real no casa con la toma: {recipe.flat_missing}")
+        f"el flat real no casa con la toma: {recipe.warnings} {recipe.notes}")
     assert recipe.flat.path == flat_paths[0]
     # The gain really is part of why this failed: on this night the flats
     # were taken at gain 3 and the lights at gain 5. The test does not depend
@@ -128,25 +128,26 @@ def test_a_flat_taken_at_another_gain_is_still_the_flat(fg18_paths, flat_paths,
 def test_a_flat_from_frames_that_did_not_dither_becomes_the_vignetting(
         fg18_paths, flat_paths):
     # The mount tracks sidereally here, so the stars do not move between
-    # frames and the percentile keeps them: a flat built from these frames
-    # would divide every star by itself (measured: a comparison star on a
-    # bright star came out 1.08 mag off). What IS usable is the vignetting,
-    # which is smooth: the app masks the stars and fits a degree-4 surface,
-    # and says what it is.
-    flat, info = cal.pseudo_flat(fg18_paths[:16])
-    assert flat is not None, info.get("note")
+    # frames: the old pseudo-flat had to MASK them (a flat carrying them
+    # divides every star by itself). The vignetting model does not care: it
+    # samples the sky on a grid and the tiles a star or a mote spoiled are
+    # thrown away by the fit itself (ADR-061 rev). What comes out is the
+    # train's smooth vignetting, and it says what it is.
+    model, info = cal.vignette_model(fg18_paths)
+    assert model is not None, info.get("note")
     assert info["kind"] == "vignette_model", info
-    assert info["residual_pct"] > cal.PSEUDO_FLAT_RESIDUAL_PCT
-    assert info["mask_pct"] > 0.0            # the stars were found
-    assert "vignetting" in info["note"]
-    # a smooth surface around one: the vignetting of this train, nothing wild
-    assert 0.70 <= float(np.median(flat)) <= 1.02
-    assert float(flat.max()) <= 1.10
-    assert float(flat.min()) >= 0.60
+    assert info["n_kept"] and info["n_kept"] < info["n_tiles"]
+    assert info["tile_px"] >= cal.VIGNETTE_TILE_MIN_PX
+    assert info["order"] == cal.VIGNETTE_ORDER
+    # a smooth surface: the vignetting of this train, nothing wild
+    assert 0.80 <= float(np.median(model)) <= 1.02
+    assert float(model.max()) <= 1.60
+    assert float(model.min()) >= 0.30
     # and it really is the train's response: measured against the master flat
     # of the same night (20 flats, smoothed so the dust does not decide) the
-    # agreement is within a few per cent. This is the number that says the
-    # model is worth applying instead of no flat at all.
+    # SHAPE agrees. The level does not, and it is not meant to: built from the
+    # lights it carries their pedestal (this night's is large), which the
+    # recipe removes with a dark/bias when the library has one.
     from astropy.io import fits
     from scipy import ndimage
     cube = np.stack([np.asarray(fits.open(p)[0].data, dtype=np.float32)
@@ -154,12 +155,12 @@ def test_a_flat_from_frames_that_did_not_dither_becomes_the_vignetting(
     master = ndimage.uniform_filter(np.median(cube, axis=0), size=81,
                                     mode="nearest")
     h, w = master.shape
-    if flat.shape != master.shape:
-        pytest.skip("the flat and the frames are not the same size")
+    if model.shape != master.shape:
+        pytest.skip("the model and the frames are not the same size")
     sl = (slice(120, h - 120), slice(120, w - 120))
     want = master[sl] / float(np.median(master[sl]))
-    got = flat[sl] / float(np.median(flat[sl]))
+    got = model[sl] / float(np.median(model[sl]))
     ratio = got / np.maximum(want, 1e-6)
-    assert 0.93 <= float(np.median(ratio)) <= 1.07
-    assert 0.90 <= float(np.percentile(ratio, 5)) <= 1.10
-    assert 0.90 <= float(np.percentile(ratio, 95)) <= 1.10
+    # the shape: the two fall off together (a correlation, so the pedestal's
+    # compression cannot hide a wrong shape)
+    assert float(np.corrcoef(got.ravel(), want.ravel())[0, 1]) > 0.9

@@ -34,9 +34,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 def _write_master(path, **cards):
     # @args: path - where to write, cards - extra FITS header cards
-    # @return: the path as a string, a minimal float32 master
+    # @return: the path as a string, a minimal float32 master. It says what
+    #          it IS in IMAGETYP (a Dark by default), because the library is
+    #          filled by classification now, not by a kind the observer picks
+    #          (ADR-061 rev).
     from astropy.io import fits
     hdu = fits.PrimaryHDU(np.full((16, 16), 100.0, dtype=np.float32))
+    hdu.header["IMAGETYP"] = "Dark"
     for key, value in cards.items():
         hdu.header[key] = value
     hdu.writeto(str(path), overwrite=True)
@@ -92,6 +96,19 @@ def _patch_picker(monkeypatch, files):
     monkeypatch.setattr(mw, "QFileDialog", _Fake)
 
 
+def _patch_dir_picker(monkeypatch, folder):
+    # @args: monkeypatch - pytest's, folder - what the folder picker returns
+    # @return: None. Same idea as _patch_picker, for "Add a folder…".
+    from nightscribe.gui import main_window as mw
+
+    class _Fake:
+        @staticmethod
+        def getExistingDirectory(*_a, **_k):
+            return folder
+
+    monkeypatch.setattr(mw, "QFileDialog", _Fake)
+
+
 def _names(dlg, index):
     # @args: dlg - settings dialog, index - page index in the rail
     # @return: objectName of every widget on that page
@@ -109,22 +126,64 @@ def test_the_calibration_library_lives_on_the_measurement_page(qapp):
             found = i
     assert found is not None, "the master library must live on a page"
     names = _names(dlg, found)
-    for w in ("lblH_masters", "cmb_master_kind", "btn_master_add",
+    for w in ("lblH_masters", "btn_master_add", "btn_master_add_dir",
               "tbl_masters", "btn_master_remove", "lbl_master_status",
-              "lblH_master_kind"):
+              "lblH_master_kind", "chk_calib_vignette_model",
+              "spn_calib_temp_tol", "lblH_calib_tol"):
         assert w in names, f"{w} expected on the calibration page"
     dlg.deleteLater()
 
 
-def test_the_four_kinds_are_offered(qapp, tmp_db, monkeypatch):
-    # The four kinds are four different arithmetics, so the observer picks
-    # one when indexing; the combo carries the core's own keys as data.
+def test_there_are_three_kinds_and_no_combo(qapp, tmp_db, monkeypatch):
+    # ADR-061 rev: a "dark of the flats" is a dark (the exposure tells them
+    # apart), so there are three kinds and the observer does not classify
+    # anything: the frame's own IMAGETYP does.
     from nightscribe.core import calibration
+    assert calibration.KINDS == ("bias", "dark", "flat")
     dlg = _dlg()
     _prep(qapp, tmp_db, monkeypatch, dlg)
-    keys = [dlg.cmb_master_kind.itemData(i)
-            for i in range(dlg.cmb_master_kind.count())]
-    assert keys == list(calibration.KINDS)
+    assert not hasattr(dlg, "cmb_master_kind")
+    dlg.deleteLater()
+
+
+def test_a_batch_is_classified_and_a_light_is_refused(qapp, tmp_db,
+                                                      monkeypatch, tmp_path):
+    # One picker, mixed frames: each goes to its own kind by its header, and
+    # a light is refused (pointing at the wrong folder cannot fill the
+    # library with science frames).
+    from nightscribe.core import calibration
+    dark = _write_master(tmp_path / "dark.fits", IMAGETYP="Dark",
+                         INSTRUME="TestCam", EXPTIME=120.0)
+    flat = _write_master(tmp_path / "flat.fits", IMAGETYP="Flat",
+                         INSTRUME="TestCam", FILTER="R", EXPTIME=2.0)
+    light = _write_master(tmp_path / "light.fits", IMAGETYP="Light",
+                          INSTRUME="TestCam")
+    dlg = _dlg()
+    win = _prep(qapp, tmp_db, monkeypatch, dlg)
+    _patch_picker(monkeypatch, [dark, flat, light])
+    win._settings_master_add(dlg)
+    kinds = sorted(m.kind for m in calibration.list_masters(tmp_db))
+    assert kinds == ["dark", "flat"]
+    text = dlg.lbl_master_status.text()
+    assert "Indexed 2 masters" in text and "1 dark" in text and "1 flat" in text
+    assert "light.fits" in text
+    dlg.deleteLater()
+
+
+def test_a_folder_is_indexed_in_one_go(qapp, tmp_db, monkeypatch, tmp_path):
+    # The usual way: a whole night of darks or flats in one folder. Its
+    # subfolders are walked too.
+    from nightscribe.core import calibration
+    sub = tmp_path / "night"
+    sub.mkdir()
+    _write_master(sub / "d1.fits", INSTRUME="TestCam")
+    _write_master(sub / "d2.fits", INSTRUME="TestCam")
+    dlg = _dlg()
+    win = _prep(qapp, tmp_db, monkeypatch, dlg)
+    _patch_dir_picker(monkeypatch, str(tmp_path))
+    win._settings_master_add_dir(dlg)
+    assert dlg.tbl_masters.rowCount() == 2
+    assert len(calibration.list_masters(tmp_db)) == 2
     dlg.deleteLater()
 
 
@@ -146,7 +205,6 @@ def test_adding_indexes_and_links_the_files(qapp, tmp_db, monkeypatch,
                          GAIN=2.0, **{"CCD-TEMP": -10.0}, EXPTIME=120.0)
     dlg = _dlg()
     win = _prep(qapp, tmp_db, monkeypatch, dlg)
-    dlg.cmb_master_kind.setCurrentIndex(dlg.cmb_master_kind.findData("dark"))
     _patch_picker(monkeypatch, [dark])
     win._settings_master_add(dlg)
     assert dlg.tbl_masters.rowCount() == 1

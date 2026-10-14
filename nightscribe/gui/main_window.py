@@ -2343,7 +2343,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
                 "Could not prepare EXOTIC:\n{0}").format(log[-600:]))
 
-    def on_open_settings(self):
+    def open_settings_page(self, page_name):
+        # @args: page_name - a settings page objectName ("page_measurement")
+        # @return: None. Opens Settings and lands on that page: the editor's
+        #          "Calibration settings…" button uses it to take the
+        #          observer straight to the master library (ADR-061 rev).
+        self.on_open_settings(start_page=page_name)
+
+    def on_open_settings(self, _checked=False, start_page=None):
         # ADR-071: the dialog is a rail of six categories (Observatory,
         # Equipment, Observing, Measurement, Integrations, Interface), a
         # search box and scrollable pages. The .ui carries the structure;
@@ -2366,6 +2373,14 @@ class MainWindow(QMainWindow):
         dlg = _load_ui("settings_dialog")
         settings_view.style_help_labels(dlg)
         settings_view.build_rail(dlg, settings_spec.CATEGORIES, self.tr)
+        if start_page:
+            # ADR-061 rev: the editor's "Calibration settings…" lands on the
+            # page that holds the master library, not on the first one.
+            for row, (page, _label, _stem) in enumerate(
+                    settings_spec.CATEGORIES):
+                if page == start_page:
+                    dlg.lst_categories.setCurrentRow(row)
+                    break
         # ADR-071 rev: every group wears a title bar and nothing folds (the
         # title alone separates the groups); the content is always visible.
         settings_view.title_groups(dlg)
@@ -2609,18 +2624,19 @@ class MainWindow(QMainWindow):
     # ---------------- the master library (ADR-061) ----------------
 
     def _settings_masters_init(self, dlg):
-        # The library of calibration masters lives in Settings. The
-        # editor's Calibration tab resolves a recipe against it and says
-        # which master each piece uses; before this, nothing in the GUI
-        # could put a master IN, so that tab could only ever report what
-        # was missing.
+        # The library of calibration masters lives in Settings, its single
+        # home (ADR-061 rev): the editor's Calibration tab resolves a recipe
+        # against it, says which master each piece uses and WHY one the
+        # observer can see was left out, and links back here. Frames go in
+        # by FILES or by FOLDER and each one is classified by its own
+        # header, so the observer is not asked a question the frame already
+        # answers.
         # @args: dlg - the settings dialog
         # @return: None
-        from ..core import calibration
-        for kind in calibration.KINDS:
-            dlg.cmb_master_kind.addItem(self._master_kind_label(kind), kind)
         dlg.btn_master_add.clicked.connect(
             lambda: self._settings_master_add(dlg))
+        dlg.btn_master_add_dir.clicked.connect(
+            lambda: self._settings_master_add_dir(dlg))
         dlg.btn_master_remove.clicked.connect(
             lambda: self._settings_master_remove(dlg))
         dlg.tbl_masters.itemSelectionChanged.connect(
@@ -2677,36 +2693,48 @@ class MainWindow(QMainWindow):
         item = dlg.tbl_masters.item(rows[0].row(), 0)
         return item.data(Qt.UserRole) if item is not None else None
 
-    def _masters_index_files(self, kind, files):
-        # @args: kind - one of core.calibration.KINDS, files - the FITS paths
-        # @return: (added, repeated, failed) with failed = [(name, why)].
-        # One home for the indexing, shared by the Settings dialog and the
-        # editor's Calibration tab (ADR-061 rev): a master is INDEXED, never
-        # copied or moved, and what makes it valid is read from its own
-        # header.
+    def _masters_index_classified(self, files):
+        # @args: files - the FITS paths to index
+        # @return: (counts, repeated, failed) with counts = {kind: n} and
+        #          failed = [(name, why)]
+        # One home for the indexing, shared by the files picker and the
+        # folder picker: a master is INDEXED, never copied or moved, and
+        # WHAT it is comes from its own header (ADR-061 rev), so the same
+        # frame cannot end up filed under two kinds and the observer is not
+        # asked to classify it by hand.
         from pathlib import Path
         from ..core import calibration
-        known = {m.path for m in calibration.list_masters(db, kind=kind)}
-        added, repeated, failed = 0, 0, []
+        known = {m.path for m in calibration.list_masters(db)}
+        counts, repeated, failed = {}, 0, []
         for path in files:
             if str(path) in known:
                 repeated += 1
                 continue
+            kind, why = calibration.classify_master(path)
+            if kind is None:
+                failed.append((Path(path).name, why))
+                continue
             try:
                 calibration.add_master(db, path, {"kind": kind})
-                added += 1
+                counts[kind] = counts.get(kind, 0) + 1
             except Exception as err:
                 # one unreadable file must not lose the rest of the batch
                 failed.append((Path(path).name, str(err)))
-        return added, repeated, failed
+        return counts, repeated, failed
 
-    def _masters_add_words(self, kind, added, repeated, failed):
-        # @args: kind - the kind indexed, added/repeated - counts, failed -
-        #        [(name, why)]
+    def _masters_add_words(self, counts, repeated, failed):
+        # @args: counts - {kind: how many} indexed, repeated - how many were
+        #        already in the library, failed - [(name, why)]
         # @return: the result in words, for the label that asked for it
-        bits = [self.tr("Indexed %1 masters (%2).").replace(
-            "%1", str(added)).replace("%2", self._master_kind_label(kind))
-            if added else self.tr("Nothing new to index.")]
+        total = sum(counts.values())
+        if total:
+            bits = [self.tr("Indexed %1 masters:").replace(
+                "%1", str(total))]
+            bits[0] += " " + ", ".join(
+                f"{n} {self._master_kind_label(kind).lower()}"
+                for kind, n in sorted(counts.items()) if n)
+        else:
+            bits = [self.tr("Nothing new to index.")]
         if repeated:
             bits.append(self.tr("%1 were already in the library.").replace(
                 "%1", str(repeated)))
@@ -2714,38 +2742,44 @@ class MainWindow(QMainWindow):
             bits.append(f"✕ {name}: {why}")
         return "  ".join(bits)
 
-    def _ufe_add_masters(self, kind):
-        # ADR-061 rev: the editor's Calibration tab fills the library from
-        # where the recipe is read. The tab never touches the database: this
-        # opens the dialog and answers with words.
-        # @args: kind - one of core.calibration.KINDS
-        # @return: what happened, in words ("" when nothing was chosen)
-        files, _sel = QFileDialog.getOpenFileNames(
-            self, self.tr("Add masters"), "",
-            self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
-        if not files:
-            return ""
-        added, repeated, failed = self._masters_index_files(kind, files)
-        return self._masters_add_words(kind, added, repeated, failed)
-
     def _settings_master_add(self, dlg):
         # @args: dlg - the settings dialog
-        # @return: None. The files are INDEXED, never copied or moved: a
-        #          master can be big and the library only needs to know
-        #          where it is and what makes it valid (camera, gain,
-        #          temperature, exposure, filter). Any of those the file's
-        #          own header carries is read from it.
-        from ..core import calibration
+        # @return: None. The files are INDEXED, never copied or moved, and
+        #          each one is classified by its own header (ADR-061 rev):
+        #          what makes a master valid (camera, gain, temperature,
+        #          exposure, filter) is read from the file too.
         files, _sel = QFileDialog.getOpenFileNames(
-            dlg, self.tr("Add masters"), "",
+            dlg, self.tr("Add calibration frames"), "",
             self.tr("FITS images (*.fits *.fit *.fts);;All files (*)"))
         if not files:
             return
-        kind = dlg.cmb_master_kind.currentData() or "dark"
-        added, repeated, failed = self._masters_index_files(kind, files)
+        counts, repeated, failed = self._masters_index_classified(files)
         self._settings_masters_refresh(dlg)
         dlg.lbl_master_status.setText(
-            self._masters_add_words(kind, added, repeated, failed))
+            self._masters_add_words(counts, repeated, failed))
+
+    def _settings_master_add_dir(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. A whole folder (and its subfolders) in one go, the
+        #          usual way: a night of darks or flats sits in one place.
+        #          A light is refused by its own header, so pointing at the
+        #          wrong folder cannot fill the library with science frames.
+        from pathlib import Path
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Add calibration frames"), "")
+        if not folder:
+            return
+        files = sorted(
+            str(p) for p in Path(folder).rglob("*")
+            if p.is_file() and p.suffix.lower() in (".fits", ".fit", ".fts"))
+        if not files:
+            dlg.lbl_master_status.setText(
+                self.tr("No FITS frames in that folder."))
+            return
+        counts, repeated, failed = self._masters_index_classified(files)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self._masters_add_words(counts, repeated, failed))
 
     def _settings_master_remove(self, dlg):
         # @args: dlg - the settings dialog
@@ -12749,12 +12783,14 @@ class MainWindow(QMainWindow):
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(self._ufe_mpc_send)
-            # ADR-061 rev: the Calibration tab fills the master library from
-            # where the recipe is read (it used to be only in Settings, so an
-            # observer with real flats had no way to put them in)
-            masters_hook = getattr(dlg, "set_add_masters_hook", None)
-            if callable(masters_hook):
-                masters_hook(self._ufe_add_masters)
+            # ADR-061 rev: the master library and the model policy live
+            # in Settings, their single home; the editor's Calibration tab
+            # only READS them, and this hook is its "Calibration settings…"
+            # door. The tab used to carry a second copy of both, which is how
+            # the switch the observer touched came to be one nobody read.
+            settings_hook = getattr(dlg, "set_open_settings_hook", None)
+            if callable(settings_hook):
+                settings_hook(self.open_settings_page)
             # the visit's frames, from the editor's preview list (2026-10-06):
             # the panel never touches the registry, it asks the host, and the
             # frames can be taken out of the visit or moved aside
@@ -12874,9 +12910,9 @@ class MainWindow(QMainWindow):
             mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
             if callable(mpc_hook):
                 mpc_hook(None)
-            masters_hook = getattr(dlg, "set_add_masters_hook", None)
-            if callable(masters_hook):
-                masters_hook(None)
+            settings_hook = getattr(dlg, "set_open_settings_hook", None)
+            if callable(settings_hook):
+                settings_hook(None)
             frames_hook = getattr(dlg, "set_visit_frames_hooks", None)
             if callable(frames_hook):
                 frames_hook(None, None)

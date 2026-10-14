@@ -83,24 +83,23 @@ def test_the_loader_applies_the_recipe_from_the_library(tmp_path, tmp_db):
     assert summary["n"] == 1
 
 
-def test_the_pseudo_flat_is_used_only_when_the_library_has_none(tmp_path,
-                                                               tmp_db):
+def test_the_model_is_used_only_when_the_library_has_none(tmp_path, tmp_db):
     light = _light(tmp_path)
     fake = np.full((SIZE, SIZE), 2.0, dtype=np.float32)
-    # nothing in the library: the pseudo-flat the caller built is applied
-    loader = cal.FrameCalibrator(tmp_db, None, pseudo_flat=fake)
+    # nothing in the library: the vignetting model the caller built is used
+    loader = cal.FrameCalibrator(tmp_db, None, vignette_model=fake)
     out = loader(light)
-    # the fake flat is a constant, so it divides but cannot remove the
+    # the fake model is a constant, so it divides but cannot remove the
     # vignetting: what is left is the sky divided by two, vignetting and all
     expected = 1000.0 * float(np.median(_vignetting())) / 2.0
     assert float(np.median(out)) == pytest.approx(expected, rel=0.05)
-    assert loader.summary()["flats"] == ["pseudo-flat"]
+    assert loader.summary()["flats"] == ["vignette-model"]
     # with a real flat in the library, the real one wins
     flat = _write(tmp_path / "flat.fits", np.full((SIZE, SIZE), 1000.0))
     cal.add_master(tmp_db, flat, {"kind": "flat", "camera": "TestCam",
                                   "gain": 2.0, "temp_c": -10.0,
                                   "exptime_s": 3.0, "filter": "R"})
-    loader2 = cal.FrameCalibrator(tmp_db, None, pseudo_flat=fake)
+    loader2 = cal.FrameCalibrator(tmp_db, None, vignette_model=fake)
     out2 = loader2(light)
     assert loader2.summary()["flats"] == ["flat.fits"]
     assert not np.allclose(out, out2)
@@ -139,20 +138,29 @@ def test_read_pixels_accepts_both_loader_conventions(tmp_path):
                           path).shape == (4, 4)
 
 
-def test_the_pseudo_flat_switch_lives_with_the_recipe_not_in_settings(
-        qapp=None):
-    # The policy used to be duplicated: a "default" in Settings AND a checkbox
-    # in the Calibration tab that read it but never wrote it, while the stack
-    # read the Settings copy. Two controls, one key, and the one the observer
-    # touched was not the one that worked. It lives now in ONE place, the
-    # Calibration tab, next to the recipe it belongs to.
+def test_the_calibration_policy_lives_in_settings():
+    # ADR-061 rev: the policy (the pseudo-flat switch, the dark temperature
+    # tolerance) belongs WITH the library it governs, in Settings, its single
+    # home. The editor's Calibration tab only READS it. The policy used to be
+    # duplicated, and two controls on one key is how the switch the observer
+    # touched came to be one nobody read.
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     from nightscribe.gui.main_window import _load_ui
     settings = _load_ui("settings_dialog")
-    assert not hasattr(settings, "chk_calib_pseudo_flat")
-    assert not hasattr(settings, "lblH_calib_pseudo_flat")
+    assert hasattr(settings, "chk_calib_vignette_model")
+    assert hasattr(settings, "spn_calib_temp_tol")
+    assert hasattr(settings, "btn_master_add_dir")
+    assert not hasattr(settings, "cmb_master_kind")
     settings.deleteLater()
+    ui = Path(__file__).parents[2] / "nightscribe" / "gui" / "ui" \
+        / "ufe_calibration_tab.ui"
+    names = {w.get("name") for w in ET.parse(ui).getroot().iter("widget")}
+    assert "btn_settings" in names and "btn_model" in names
+    assert "chk_pseudo_flat" not in names
+    assert "cmb_master_kind" not in names
 
 
 def test_a_flat_does_not_have_to_share_the_lights_gain(tmp_path, tmp_db):

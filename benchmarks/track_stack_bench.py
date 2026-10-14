@@ -154,6 +154,29 @@ def main():
     _time("combine alone (mean, same cube)",
           lambda: track_stack.combine(strip, "mean", cfg=cfg), repeat=1)
 
+    # The GPU path, when there is one (ADR-089): the same two stages with the
+    # backend on, so the table says what the card buys on THIS machine. With no
+    # backend the section says so and the bench stays what it always was.
+    from nightscribe.core import gpu
+    if gpu.available():
+        print(f"\nGPU backend ({gpu.device_name()}):")
+        _time("registration kernels (GPU: source image + stars)",
+              lambda: gpu.frame_stars(ref_data), repeat=3)
+        _time("warp batch (GPU, whole frame)",
+              lambda: gpu.warp_batch(frames, [(0.0, 0.0)] * len(frames),
+                                     final_box, (args.size, args.size)),
+              repeat=1)
+        _time(f"combine alone (GPU, {args.method})",
+              lambda: gpu.combine(strip, args.method), repeat=1)
+        _time(f"stack_group ({args.method}, GPU, final box)",
+              lambda: track_stack.stack_group(
+                  frames, (0, len(frames)), frames[0].object_xy, args.method,
+                  final_box, (args.size, args.size),
+                  cfg={"astrometry_gpu": 1}),
+              repeat=1)
+    else:
+        print("\nGPU backend: not available on this machine (skipped)")
+
 
 if __name__ == "__main__":
     main()

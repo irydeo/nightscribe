@@ -147,6 +147,7 @@ FIELDS = [
     Field("spn_astro_check_floor", "astrometry_check_floor_arcsec", "float"),
     Field("spn_astro_check_window", "astrometry_check_window_days", "int"),
     Field("spn_astro_threads", "astrometry_threads", "int"),
+    Field("chk_astro_gpu", "astrometry_gpu", "bool"),
     Field("spn_astro_fallback_margin", "astrometry_fallback_margin_px",
           "int"),
     Field("spn_astro_disagree_arcsec", "astrometry_disagree_arcsec", "float"),

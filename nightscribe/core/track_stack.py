@@ -45,7 +45,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import (calibration, coords, ephem_minor, fits_meta, outliers,
+from . import (calibration, coords, ephem_minor, fits_meta, gpu, outliers,
                parallel, register, solve)
 
 logger = logging.getLogger(__name__)
@@ -249,16 +249,85 @@ def read_pixels(loader, path, box=None):
     return loaded[0] if isinstance(loaded, tuple) else loaded
 
 
+def _estimate_one(frame, ref_data, ref_stars, ref_src, fwhm_px, allow_rotation,
+                  guess, loader, cfg=None):
+    # @args: frame - the Frame to estimate, ref_data/ref_stars/ref_src - the
+    #        reference frame's pixels, its stars and its source image (shared
+    #        and read only), fwhm_px - the session's point spread for the
+    #        gate, allow_rotation - fit the rotation on the FIRST attempt,
+    #        guess - the previous chunk's transform (a hint for the pairing,
+    #        never trusted), loader - array reader, cfg - Config, so the
+    #        optional GPU kernels can be asked for
+    # @return: (tr, note) with tr the estimate and note "rotation" when the
+    #          second attempt earned its place, "" otherwise
+    # The per-frame half of register_sequence, lifted out so a whole chunk of
+    # frames can run it at once. It touches ONLY its own frame (the pixels it
+    # reads and its own sky_sigma) and the shared, read-only reference, which
+    # is what makes the parallel walk below safe.
+    data = read_pixels(loader, frame.path)
+    # the frame's own noise, measured here because the pixels are already in
+    # hand: the weighted combination needs it and the robust MAD does not
+    # care about the stars or the object sitting on top of the sky
+    frame.sky_sigma = _frame_noise(data)
+    # The source image and the stars are the WHOLE cost of an estimate and
+    # both now pay on the device (ADR-089): the block median that used to make
+    # the source image a loss is a single scatter kernel. A None answer falls
+    # straight back to the CPU inside estimate_transform: the estimate is
+    # never left undone, only done slower.
+    src_src = src_stars = None
+    if gpu.enabled(cfg):
+        got = gpu.frame_stars(data)
+        if got is not None:
+            src_src, src_stars = got
+    tr = register.estimate_transform(
+        ref_data, data, guess=guess, ref_stars=ref_stars,
+        ref_src=ref_src, allow_rotation=allow_rotation,
+        src_src=src_src, src_stars=src_stars)
+    # "Accepted" is not the same as "good": a translation that could not
+    # explain the stars is returned anyway when the rotation is not allowed,
+    # so the retry fires both when the gate rejects the answer AND when the
+    # answer merely passes while the estimator's own trigger says it did not
+    # fit. Measured on 2025 UR: one run-2 frame landed at 1.20 px as a
+    # translation (under the gate) where the rigid fit gives 0.6.
+    note = ""
+    rms = tr.get("rms_px")
+    needs_rotation = (not register.trusted(tr, fwhm_px)
+                      or (rms is not None
+                          and rms > register.ROTATE_TRIGGER_PX))
+    if needs_rotation and not allow_rotation:
+        retry = register.estimate_transform(
+            ref_data, data, guess=guess, ref_stars=ref_stars,
+            ref_src=ref_src, allow_rotation=True,
+            src_src=src_src, src_stars=src_stars)
+        # The retry has to be PROVEN, not hinted: the stars must certify it
+        # (register.trusted's correlation fallback is not enough for a
+        # rotation, see require_stars), and the angle has to be a field
+        # rotation, not a re-point or a collapsed fit. MAX_STEP_DEG has been
+        # in register.py since the beginning and was never enforced; it is
+        # enforced here, which is where an angle can now be applied blind.
+        angle_deg = abs(float(retry.get("angle_deg") or 0.0))
+        if register.trusted(retry, fwhm_px, require_stars=True) \
+                and angle_deg <= register.MAX_STEP_DEG:
+            # the rotation EARNED its place (estimate_transform only keeps
+            # it when it removes a quarter of the residual), so the frame is
+            # kept and the fact is recorded: the tab says how many were
+            # saved this way
+            tr = retry
+            note = "rotation"
+    return tr, note
+
+
 def register_sequence(frames, ref_index=None, allow_rotation=False,
                       progress=None, cancel=None, fwhm_px=None, sat=None,
-                      loader=None):
+                      loader=None, cfg=None):
     # @args: frames - list[Frame] with a solved reference, ref_index -
     #        which frame is the grid (default: the solved one), allow_rotation
     #        - fit a rigid rotation on the FIRST attempt (slower, for alt-az
     #        without derotator; the retry below does it anyway when needed),
     #        progress/cancel - as usual, fwhm_px - the session's point
     #        spread for the quality gate (measured here when None),
-    #        sat - saturation ceiling
+    #        sat - saturation ceiling, cfg - Config, so the optional GPU
+    #        kernels can be asked for (ADR-089)
     # @return: the reference Frame
     # The transform is ESTIMATED by core/register.py (star voting, proven);
     # the RESAMPLING is scipy's spline, which keeps the shape of a point
@@ -283,78 +352,77 @@ def register_sequence(frames, ref_index=None, allow_rotation=False,
     # ONE source image of the reference for the whole sequence: it is the
     # same frame every time, and rebuilding it per frame was ~140 ms of
     # pure waste on a 2048^2 frame (~20 s over 140 frames). The stars are
-    # read from it too, so nothing is computed twice.
-    ref_src = register.source_image(ref_data)
-    ref_stars = register.detect_stars(ref_src)
+    # read from it too, so nothing is computed twice. It is built by the SAME
+    # path the frames use (the device when it is on), so the reference's star
+    # list and the frames' are comparable.
+    ref_src = ref_stars = None
+    if gpu.enabled(cfg):
+        got = gpu.frame_stars(ref_data)
+        if got is not None:
+            ref_src, ref_stars = got
+    if ref_src is None:
+        ref_src = register.source_image(ref_data)
+        ref_stars = register.detect_stars(ref_src)
     ref.sky_sigma = _frame_noise(ref_data)
     if fwhm_px is None:
         fwhm_px = session_fwhm(ref_data, ref_stars, sat=sat)
     previous = None
     total = len(frames)
-    for index, frame in enumerate(frames):
+    # The reference is the grid and is not estimated: it IS the grid.
+    ref.transform = {"angle": 0.0, "dx": 0.0, "dy": 0.0,
+                     "quality": 100.0, "rms_px": 0.0}
+    ref.register_note = "reference"
+    done = 0
+    if progress is not None:
+        done += 1
+        progress(done, total, ref.path)
+
+    # THE SEQUENCE IS WALKED IN CHUNKS, NOT ONE FRAME AT A TIME. Each frame's
+    # estimate is INDEPENDENT: it reads its own pixels and matches them against
+    # the SAME reference, so every frame of a chunk can be estimated at once.
+    # Measured on a 16-core machine, one 2048^2 estimate costs ~124 ms (the
+    # source image, the stars, the vote and the pairing) and a 140-frame visit
+    # paid ~25 s in a single thread; the chunk spreads that over the cores.
+    # The chunk is seeded with the previous chunk's last transform, and that
+    # is a HINT only: `estimate_transform` pairs the stars with a 3 px
+    # tolerance and rejects a seed that does not explain them, so a re-point
+    # in the middle of a chunk costs a vote, never a wrong answer. The trust
+    # gate and the fallback stay SERIAL and in order, which is what keeps the
+    # "inherits the previous transform" rule meaning what it did when the loop
+    # was one frame at a time.
+    workers = parallel.worker_count()
+    todo = [i for i, frame in enumerate(frames) if frame is not ref]
+    for start in range(0, len(todo), workers):
         if solve.is_cancelled(cancel):
             break
-        if frame is ref:
-            frame.transform = {"angle": 0.0, "dx": 0.0, "dy": 0.0,
-                               "quality": 100.0, "rms_px": 0.0}
-            frame.register_note = "reference"
-        else:
-            data = read_pixels(loader, frame.path)
-            # the frame's own noise, measured here because the pixels are
-            # already in hand: the weighted combination needs it and the
-            # robust MAD does not care about the stars or the object
-            # sitting on top of the sky
-            frame.sky_sigma = _frame_noise(data)
-            # the guess is the PREVIOUS frame's transform, never the
-            # reference's identity: a wrong guess drags the star voting
-            # into a bad minimum (measured: a 2 px shift read as -29 px)
-            tr = register.estimate_transform(
-                ref_data, data, guess=previous, ref_stars=ref_stars,
-                ref_src=ref_src, allow_rotation=allow_rotation)
-            # "Accepted" is not the same as "good": a translation that
-            # could not explain the stars is returned anyway when the
-            # rotation is not allowed, so the retry fires both when the
-            # gate rejects the answer AND when the answer merely passes
-            # while the estimator's own trigger says it did not fit.
-            # Measured on 2025 UR: one run-2 frame landed at 1.20 px as a
-            # translation (under the gate) where the rigid fit gives 0.6.
-            rms = tr.get("rms_px")
-            needs_rotation = (not register.trusted(tr, fwhm_px)
-                              or (rms is not None
-                                  and rms > register.ROTATE_TRIGGER_PX))
-            if needs_rotation and not allow_rotation:
-                retry = register.estimate_transform(
-                    ref_data, data, guess=previous, ref_stars=ref_stars,
-                    ref_src=ref_src, allow_rotation=True)
-                # The retry has to be PROVEN, not hinted: the stars must
-                # certify it (register.trusted's correlation fallback is
-                # not enough for a rotation, see require_stars), and the
-                # angle has to be a field rotation, not a re-point or a
-                # collapsed fit. MAX_STEP_DEG has been in register.py since
-                # the beginning and was never enforced; it is enforced
-                # here, which is where an angle can now be applied blind.
-                angle_deg = abs(float(retry.get("angle_deg") or 0.0))
-                if register.trusted(retry, fwhm_px, require_stars=True) \
-                        and angle_deg <= register.MAX_STEP_DEG:
-                    # the rotation EARNED its place (estimate_transform
-                    # only keeps it when it removes a quarter of the
-                    # residual), so the frame is kept and the fact is
-                    # recorded: the tab says how many were saved this way
-                    tr = retry
-                    frame.register_note = "rotation"
+        chunk = todo[start:start + workers]
+        seed = previous
+        results = parallel.map_parallel(
+            lambda i: _estimate_one(frames[i], ref_data, ref_stars, ref_src,
+                                    fwhm_px, allow_rotation, seed, loader, cfg),
+            chunk, workers=len(chunk))
+        for i, (tr, note) in zip(chunk, results):
+            frame = frames[i]
             if register.trusted(tr, fwhm_px):
                 frame.transform = tr
+                frame.register_note = note
                 previous = tr
             else:
                 frame.transform = dict(previous) if previous else tr
                 frame.failed_register = True
                 frame.register_note = _register_reason(tr)
+            done += 1
+            if progress is not None:
+                progress(done, total, frame.path)
+    # The per-frame WCS is the reference's composed with the transform; it is
+    # composed HERE, once the transforms are settled, because the transform a
+    # frame ends with (its own or the inherited one) is only known after the
+    # serial gate above has run.
+    for frame in frames:
         if frame.transform and frame.wcs is None:
             shape = (int(frame.header.get("NAXIS1", 1)),
                      int(frame.header.get("NAXIS2", 1)))
             frame.wcs = compose_wcs(ref.wcs, frame.transform, shape=shape)
-        if progress is not None:
-            progress(index + 1, total, frame.path)
     return ref
 
 
@@ -738,9 +806,15 @@ def sequence_motion_solution(frames, name, site="", lat=None, lon=None,
 # Stacking (phase 3)
 # ======================================================================
 
-# How much memory the stacking may use before it switches to strips. The
-# whole point of the region read is that the cutout path never gets near
-# this; the full-frame final stack is where the budget matters.
+# How much memory the stacking may use before it switches to strips. It is a
+# FIXED threshold on purpose: for a stack that does not fit, the STRIPS are
+# FASTER than holding it all in RAM, on the CPU and on the GPU, because the
+# working set stays small. Measured on a 539-frame visit, one 270-frame
+# full-frame stack (4.2 GiB): CPU 37.8 s in strips against 42.5 s in RAM, and
+# the GPU 11.2 s in strips against an OUT-OF-MEMORY fallback in RAM (the
+# combine's intermediates are about five times the stack, so 4.5 GiB of stack
+# needs ~20 GiB of device). Deriving the budget from the free memory was tried
+# and REJECTED for exactly that reason.
 MEMORY_BUDGET_BYTES = 2 * 1024 ** 3
 
 # The interpolation order the warp resamples with, as ONE constant so the
@@ -1265,9 +1339,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, method - one of METHODS, box - the output box,
     #        shape - the native frame size, cfg - Config, loader - array
-    #        reader, budget_bytes - the RAM budget, track - True freezes the
-    #        OBJECT (the stars trail), False freezes the STARS (the object
-    #        trails), order - the warp's interpolation order (None = the
+    #        reader, budget_bytes - the RAM budget (see MEMORY_BUDGET_BYTES:
+    #        a fixed threshold, because the strips win past it), track - True
+    #        freezes the OBJECT (the stars trail), False freezes the STARS (the
+    #        object trails), order - the warp's interpolation order (None = the
     #        module's default, see WARP_ORDER: a knob for the eye and not for
     #        the limit, which is what the measurement says)
     # @return: (stack, report)
@@ -1301,6 +1376,17 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     n = len(indices)
     need = n * out_h * out_w * 4
     if need <= budget_bytes:
+        # The FUSED GPU path, when it is asked for: the warped stack is built
+        # and reduced on the device, so only the frames go up and one image
+        # comes down. It returns None when it cannot serve the call and the
+        # numpy path below runs exactly as before (ADR-089).
+        if gpu.enabled(cfg):
+            fused = gpu.stack_ram([frames[i] for i in indices], offsets, box,
+                                  shape, loader=loader, order=order,
+                                  method=method, sigma=sigma,
+                                  iterations=iterations, weights=weights)
+            if fused is not None:
+                return fused, report
         stack, masks = _warp_batch([frames[i] for i in indices], offsets, box,
                                    shape, loader=loader, cfg=cfg,
                                    order=order)
@@ -1321,11 +1407,21 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         py0 = max(0, y0 - pad)
         py1 = min(out_h, y1 + pad)
         sub_box = (box[0], box[1] + py0, box[2], box[1] + py1)
-        strip, masks = _warp_batch([frames[i] for i in indices], offsets,
-                                   sub_box, shape, loader=loader, cfg=cfg,
-                                   order=order)
-        combined = combine(strip, method, mask=masks, sigma=sigma,
-                           iterations=iterations, weights=weights, cfg=cfg)
+        # The fused GPU path per strip, when it is asked for: the strip's
+        # frames go up once and one strip comes down, the same saving the RAM
+        # path gets (ADR-089). A None answer falls back to numpy.
+        combined = None
+        if gpu.enabled(cfg):
+            combined = gpu.stack_ram([frames[i] for i in indices], offsets,
+                                     sub_box, shape, loader=loader, order=order,
+                                     method=method, sigma=sigma,
+                                     iterations=iterations, weights=weights)
+        if combined is None:
+            strip, masks = _warp_batch([frames[i] for i in indices], offsets,
+                                       sub_box, shape, loader=loader, cfg=cfg,
+                                       order=order)
+            combined = combine(strip, method, mask=masks, sigma=sigma,
+                               iterations=iterations, weights=weights, cfg=cfg)
         out[y0:y1] = combined[y0 - py0:y1 - py0]
     return out, report
 
@@ -1453,13 +1549,25 @@ def _local_sigma(stack, mask, sky):
     return sigma if np.isfinite(sigma) and sigma > 0 else None
 
 
+# The ring the roundness takes its sky from, in pixels (outer radius). It is
+# FIXED, and not "the whole box", on purpose (ADR-089): see _roundness.
+_ROUNDNESS_SKY_PX = 28
+
+
 def _roundness(stack, x, y, radius=4.0):
     # @args: stack, x, y - the source, radius - the moments window
     # @return: b/a of the second moments (1 = circular)
     yy, xx = np.mgrid[0:stack.shape[0], 0:stack.shape[1]]
     d = np.hypot(xx - x, yy - y)
     win = d <= radius
-    sky = _local_sky(stack, ~win)
+    # The sky comes from a FIXED ring around the source, never from the whole
+    # box. The box changes size (the sweep scores in a small window, the
+    # detection in the trail cutout) and a box-sized sky made the SAME source
+    # score differently for no physical reason: measured, 46.1 on a 495 px
+    # trail cutout against 47.2 in a 128 px window, which would have moved the
+    # sweep's significance gate. The ring is the source's own background,
+    # which is exactly what the roundness wants.
+    sky = _local_sky(stack, (d > radius) & (d <= radius + _ROUNDNESS_SKY_PX))
     if sky is None:
         return 0.0
     finite = np.isfinite(stack)
@@ -1740,6 +1848,15 @@ def _rescore(base, deltas, index, rate, pa, q, box, shape, method, cfg,
     # @return: None (appends to grid)
     frame_list = [b[0] for b in base]
     offsets = [deltas[k][index] for k in range(len(base))]
+    # THE SWEEP STAYS ON THE CPU even with the GPU backend on, and that is a
+    # MEASURED decision (ADR-089): its cutout is small (a couple of hundred
+    # pixels) and its regions are already in RAM, so the per-candidate cost of
+    # a GPU trip (the upload plus the launches of a whole candidate) outweighs
+    # the win. Measured on 60 x 2048^2 with a 245 px box: the CPU scores the
+    # 25-candidate grid in 2.39 s and the GPU in 2.60 s (x0.9), and on
+    # 40 x 1024^2 the GPU is even worse (x0.6). The GPU pays where the work is
+    # big and continuous (the final stacks), not on many small re-stacks of
+    # the same pixels.
     stack, masks = _warp_batch(frame_list, offsets, box, shape, loader=loader,
                                cfg=cfg, preloaded=preloaded,
                                order=WARP_ORDER_SWEEP)

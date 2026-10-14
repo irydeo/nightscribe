@@ -182,6 +182,12 @@ DEFAULTS = {
     # memory one task needs (core/parallel.py). A positive value caps it by
     # hand for a machine that is busy with something else.
     "astrometry_threads": 0,
+    # Warp and combine the frames on a graphics card when one is there
+    # (ADR-089). OFF by default: the two stages are memory-bound and a GPU is
+    # several times faster at them, but a missing or unsupported card must
+    # leave the app exactly as it was, and the result does not change (the two
+    # paths are pinned to agree to a fraction of an ADU). 0 = off, 1 = on.
+    "astrometry_gpu": 0,
     "astrometry_disagree_arcsec": 0.5,
     "astrometry_disagree_sigma": 3.0,
     "astrometry_astcat": "Gaia2",

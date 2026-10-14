@@ -85,6 +85,15 @@ def nanmedian_axis0(values):
     # the valid count picks the middle one. It is the single source of the
     # "median that ignores what is not there" used by the stacking clip and
     # the MAD, so the two cannot disagree.
+    #
+    # Sorting a TRANSPOSED copy was tried and REJECTED (2026-10-14): with the
+    # sample axis contiguous the sort itself is x5 faster, but the copy that
+    # buys it adds a whole cube of traffic, and the stacking clip runs on
+    # COLUMN SLICES in parallel, where that traffic contends across the
+    # threads. Measured on (60, 2048, 2048): the serial clip 14120 -> 12249 ms
+    # (x1.15) but the parallel combine 5213 -> 5987 ms (x0.87), and a
+    # single-allocation variant did not fix it (5662 ms). The strided sort
+    # below is the one that wins where it is used.
     # @args: values - array with axis 0 as the sample axis
     # @return: the median over axis 0 (shape values.shape[1:]), NaN where a
     #          whole column is invalid

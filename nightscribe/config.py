@@ -183,16 +183,19 @@ DEFAULTS = {
     # hand for a machine that is busy with something else.
     "astrometry_threads": 0,
     # Warp and combine the frames on a graphics card when one is there
-    # (ADR-089). OFF by default: the two stages are memory-bound and a GPU is
-    # several times faster at them, but a missing or unsupported card must
-    # leave the app exactly as it was, and the result does not change (the two
-    # paths are pinned to agree to a fraction of an ADU). 0 = off, 1 = on.
-    "astrometry_gpu": 0,
-    # WHICH backend serves the GPU path (ADR-089/090). "auto" prefers CUDA
-    # (NVIDIA, the fastest) and falls back to OpenCL, which runs on NVIDIA,
-    # AMD and Intel and is the one the app can ship; "cuda" / "opencl" force
-    # one, for a machine that has both or to compare them.
-    "astrometry_gpu_backend": "auto",
+    # (ADR-089, revised 2026-10-15). ON by default: the two stages are
+    # memory-bound and a card is several times faster at them, OpenCL ships
+    # with the app (ADR-091) so there is nothing to install, and a machine
+    # without a card is untouched (the probe answers False and the numpy path
+    # runs exactly as before). The result does not change: the two paths are
+    # pinned to agree to a fraction of an ADU. 0 = off, 1 = on.
+    "astrometry_gpu": 1,
+    # WHICH backend serves the GPU path (ADR-089/090, revised 2026-10-15).
+    # "opencl" is the default: it is the portable one the app SHIPS (NVIDIA,
+    # AMD and Intel, nothing installed by hand) and it is measured not slower
+    # than the CUDA path. "cuda" (NVIDIA, CuPy installed by hand) and "auto"
+    # (CUDA first, then OpenCL) stay for whoever wants them.
+    "astrometry_gpu_backend": "opencl",
     "astrometry_disagree_arcsec": 0.5,
     "astrometry_disagree_sigma": 3.0,
     "astrometry_astcat": "Gaia2",

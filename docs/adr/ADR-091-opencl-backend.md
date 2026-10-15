@@ -144,6 +144,40 @@ kernel suma fila a fila y luego las filas. Con las dos, el `frame_stars` del
 `double` es **bit a bit** en los cuatro tamaños probados (2048², el 2008² que no
 divide por el bloque, 512² y 128²).
 
+**Nota (2026-10-15): el techo de 128 frames, retirado, y la lectura por región,
+medida.** Dos cosas cambiaron la velocidad del apilado y ninguna es un ajuste
+nuevo: el interruptor sigue siendo `astrometry_gpu`.
+
+1. **El combine escalable.** El kernel de combine guardaba la columna en
+   memoria PRIVADA (arrays de `[128]`), así que una pila base (la secuencia
+   ENTERA, medida en la visita real de 539 tomas) caía a la CPU. Ahora hay un
+   combine que recorre la columna en memoria GLOBAL: `mean`/`sum` en streaming,
+   `median` con un **radix select por píxel** (el mismo truco de bits
+   ordenables del registro) y `sigma`/`weighted` con el recorte y un buffer
+   `keep` acumulativo. Medido en 539 × 1024²: el `sigma` **10,6 s en CPU contra
+   0,93 s en el dispositivo**, y la pila base de punta a punta **6,3 s contra
+   1,2 s**. La paridad es la del contrato (0,5 ADU): mediana **exacta**, `sigma`
+   0,065 ADU. El kernel privado se queda como camino rápido para las columnas
+   CORTAS: medido en 2048², gana ~2x hasta n≈64, empatan hacia n≈96 y el
+   escalable gana desde ~128, así que la línea de despacho es 96
+   (`_PRIVATE_COMBINE_MAX`). Una tarjeta que no puede con el cubo, sus máscaras
+   y el `keep` contesta `None` (`_device_has_room`) y el camino numpy sigue:
+   nunca un OOM silencioso.
+2. **La lectura por región era el cuello de verdad.** `calibration.read_image`
+   leía una ventana con `hdu.section`, que la recorre **fila a fila**: medido,
+   16,5 ms por una ventana de 774² desde un frame de 2048². Leer el frame
+   memmapeado y copiar la ventana cuesta **1,1 ms (x15)**. Es la lectura más
+   caliente del apilado (una por frame y por candidato del barrido), así que el
+   cambio se nota en todas las etapas.
+
+Con las dos, la pila base de 539 × 1024² baja de **13,9 s a 1,2 s** con la GPU
+encendida.
+
+Y con esa cifra delante, el **defecto cambia**: el interruptor pasa a estar
+**encendido** y el backend a **`opencl`** (ADR-089, revisión del 2026-10-15).
+OpenCL es el que se reparte, así que no hay nada que instalar, y la máquina sin
+tarjeta corre igual. `auto` y `cuda` siguen en el selector.
+
 ## English
 
 **Context**: ADR-089 left OpenCL out "for now" and isolated the GPU path in one
@@ -285,3 +319,35 @@ background by 1.1e-13 on a sky of a thousand; it is turned off with
 moved the peak by 9.1e-13; the kernel sums row by row and then the rows. With
 both, the double `frame_stars` is **bit for bit** at the four sizes tested
 (2048², the 2008² that does not divide by the block, 512² and 128²).
+
+**Note (2026-10-15): the 128-frame ceiling is gone, and the region read,
+measured.** Two things changed the stacking's speed and neither is a new
+setting: the switch is still `astrometry_gpu`.
+
+1. **The scalable combine.** The combine kernel kept the column in PRIVATE
+   memory (arrays of `[128]`), so a base stack (the WHOLE sequence, measured on
+   the author's real 539-frame visit) fell to the CPU. There is now a combine
+   that walks the column in GLOBAL memory: `mean`/`sum` in streaming, `median`
+   with a **per-pixel radix select** (the registration's sortable-bit trick) and
+   `sigma`/`weighted` with the clip and a cumulative `keep` buffer. Measured on
+   539 x 1024²: the `sigma` **10.6 s on the CPU against 0.93 s on the device**,
+   and the whole base stack **6.3 s against 1.2 s**. The parity is the
+   contract's (0.5 ADU): the median **exact**, the `sigma` 0.065 ADU. The
+   private kernel stays as the fast path for SHORT columns: measured on 2048²
+   it wins ~2x up to n≈64, the two tie near n≈96 and the scalable wins from
+   ~128, so the dispatch line is 96 (`_PRIVATE_COMBINE_MAX`). A card that
+   cannot hold the cube, its masks and the `keep` answers `None`
+   (`_device_has_room`) and the numpy path runs: never a silent OOM.
+2. **The region read was the real bottleneck.** `calibration.read_image` read a
+   window with `hdu.section`, which walks it **row by row**: measured, 16.5 ms
+   for a 774² window from a 2048² frame. Reading the memmapped frame and copying
+   the window costs **1.1 ms (x15)**. It is the stacking's hottest read (one per
+   frame and per sweep candidate), so the change shows up in every stage.
+
+With both, the 539 x 1024² base stack drops from **13.9 s to 1.2 s** with the
+GPU on.
+
+And with that figure in front, the **default changes**: the switch is now **on**
+and the backend is **`opencl`** (ADR-089, revision of 2026-10-15). OpenCL is the
+one that ships, so there is nothing to install, and a machine with no card runs
+the same. `auto` and `cuda` stay in the selector.

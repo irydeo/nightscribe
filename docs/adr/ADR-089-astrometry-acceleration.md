@@ -169,6 +169,21 @@ franjas contra una caída por falta de memoria en RAM (los intermedios del
 recorte son ~5× la pila, así que 4,5 GiB de pila piden ~20 GiB de dispositivo).
 El tope fijo fuerza la ruta buena.
 
+**Revisión (2026-10-15): la ruta GPU pasa a estar ENCENDIDA por defecto, con
+OpenCL.** El punto 2 la dejaba apagada «porque no es necesaria para llegar a la
+respuesta». La razón sigue siendo cierta, pero el coste de tenerla apagada se
+midió y es alto: con el combine escalable (ADR-091, nota del 2026-10-15) una
+pila base de 539 × 1024² pasa de 6,3 s en CPU a **1,2 s**, y las pilas por
+observación y el star stack también. Como OpenCL **viaja con la app** (no hay
+nada que instalar), la máquina sin tarjeta no paga nada (el sondeo contesta
+`False` y el camino numpy corre igual) y la paridad está fijada por test (misma
+respuesta dentro de una fracción de ADU), el defecto pasa a ser **encendido y
+con OpenCL**. CUDA sigue siendo una vía **manual** (CuPy, NVIDIA solo) y `auto`
+sigue existiendo para quien tenga las dos y quiera compararlas. El punto 4 (la
+CPU es la ruta probada y el defecto *de resultado*) no cambia: la GPU es una
+carretera más rápida a la MISMA respuesta, y la nota del run dice qué dispositivo
+la hizo.
+
 ## English
 
 **Context**: ADR-062's speed campaign (`docs/PLANS/astrometry-perf/`) cut the
@@ -336,3 +351,17 @@ Measured on a 539-frame visit, one 270-frame full-frame stack (4.2 GiB): CPU
 out-of-memory fallback in RAM (the combine's intermediates are ~5x the stack, so
 4.5 GiB of stack asks for ~20 GiB of device). The fixed cap forces the good
 path.
+
+**Revision (2026-10-15): the GPU path is ON by default, with OpenCL.** Point 2
+left it off "because it is not needed to reach the answer". That reason still
+holds, but the cost of leaving it off was measured and it is high: with the
+scalable combine (ADR-091, note of 2026-10-15) a 539 x 1024² base stack goes
+from 6.3 s on the CPU to **1.2 s**, and the per-observation stacks and the star
+stack with it. Since OpenCL **travels with the app** (nothing to install), a
+machine with no card pays nothing (the probe answers `False` and the numpy path
+runs the same) and the parity is pinned by a test (the same answer within a
+fraction of an ADU), the default becomes **on and with OpenCL**. CUDA stays a
+**manual** road (CuPy, NVIDIA only) and `auto` still exists for whoever has both
+and wants to compare them. Point 4 (the CPU is the tested path and the default
+*answer*) does not change: the GPU is a faster road to the SAME answer, and the
+run's note says which device did the work.

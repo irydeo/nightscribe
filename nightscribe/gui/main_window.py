@@ -1929,6 +1929,27 @@ class MainWindow(QMainWindow):
             if btn is not None:
                 btn.setText(self.tr("Download (95 MB)…"))
 
+    def _refresh_gpu_status(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The card the SELECTED backend sees RIGHT NOW, or that
+        #          none was found. It is a fact about the machine and not a
+        #          setting: the switch comes on by default, so "does my card
+        #          work?" is the first question an observer asks, and the
+        #          answer is here instead of a guess.
+        from ..core import gpu
+        lbl = getattr(dlg, "lbl_astro_gpu_status", None)
+        if lbl is None:
+            return
+        cmb = getattr(dlg, "cmb_astro_gpu_backend", None)
+        backend = cmb.currentData() if cmb is not None else "opencl"
+        name = gpu.probe(backend)
+        if name:
+            lbl.setText(self.tr("Card: {0}").format(name))
+            lbl.setStyleSheet(f"color: {theme.C_OK};")
+        else:
+            lbl.setText(self.tr("No card detected: the processor does the work"))
+            lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+
     def _download_findorb_eph(self, dlg):
         # @args: dlg - the settings dialog
         # @return: None. The ~95 MB download runs off the GUI thread and the
@@ -2408,12 +2429,20 @@ class MainWindow(QMainWindow):
         dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
         dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
         dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
-        # which backend serves the GPU path (ADR-090), same id-as-data rule
-        dlg.cmb_astro_gpu_backend.addItem(
-            self.tr("Auto (CUDA, then OpenCL)"), "auto")
-        dlg.cmb_astro_gpu_backend.addItem(self.tr("CUDA (NVIDIA)"), "cuda")
+        # which backend serves the GPU path (ADR-090), same id-as-data rule.
+        # OpenCL is FIRST and the default (ADR-089 rev, 2026-10-15): it is the
+        # one the app ships, so nothing has to be installed by hand.
         dlg.cmb_astro_gpu_backend.addItem(
             self.tr("OpenCL (NVIDIA, AMD, Intel)"), "opencl")
+        dlg.cmb_astro_gpu_backend.addItem(
+            self.tr("Auto (CUDA, then OpenCL)"), "auto")
+        dlg.cmb_astro_gpu_backend.addItem(
+            self.tr("CUDA (NVIDIA, installed by hand)"), "cuda")
+        # "which card does it see?" is the first thing an observer wants to
+        # know when a switch comes on by default, so the answer is shown and
+        # it follows the backend the observer picks
+        dlg.cmb_astro_gpu_backend.currentIndexChanged.connect(
+            lambda _i: self._refresh_gpu_status(dlg))
         dlg.cmb_cam_preset.addItem(self.tr("None"), "")
         for text, key, is_header in cameras.combo_entries():
             dlg.cmb_cam_preset.addItem(text, key)
@@ -2453,6 +2482,8 @@ class MainWindow(QMainWindow):
         apply_search()
         # the DE430t state is not a config field: it is a fact about the disk
         self._findorb_eph_refresh(dlg)
+        # the card the selected backend sees right now, for the same reason
+        self._refresh_gpu_status(dlg)
 
         # combos with an index or a data mapping of their own
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))

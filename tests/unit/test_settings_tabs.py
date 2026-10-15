@@ -678,3 +678,58 @@ def test_selecting_a_preset_loads_its_template(qapp, monkeypatch):
     assert c.model().item(hidx).font().bold()
     assert c.itemText(hidx).isupper()
     dlg.deleteLater()
+
+
+def test_the_gpu_status_names_the_card_the_backend_sees(qapp, monkeypatch):
+    # The switch comes ON by default (ADR-089 rev), so "does my card work?"
+    # is the first question an observer asks. The row answers it for the
+    # SELECTED backend, and the answer follows the combo; a machine with no
+    # card is not an error, it says the processor will do the work.
+    from PySide6.QtWidgets import QComboBox, QDialog
+    from nightscribe.core import gpu
+    from nightscribe.gui import main_window as mw
+
+    class _Cfg:
+        def __init__(self):
+            self.d = {"ui_animations": True}
+
+        def get(self, key, default=None):
+            return self.d.get(key, default)
+
+        def set(self, key, value):
+            self.d[key] = value
+
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win.tr = lambda s: s
+    win._enabled_kinds = lambda: ["neo"]
+    win._tonight_all = False
+    win._welcome = None
+    win.statusBar = lambda: type(
+        "S", (), {"showMessage": lambda *a, **k: None})()
+    win._settings_masters_init = lambda dlg: None
+    win.tonight = type("T", (), {"cmb_filter": QComboBox()})()
+    win._apply_kind_filter = lambda: None
+    win._build_suggestion_grid = lambda: None
+
+    asked = []
+    name = {"v": "Fake Card"}
+    monkeypatch.setattr(
+        gpu, "probe", lambda backend: asked.append(backend) or name["v"])
+    dlg = _dlg()
+    monkeypatch.setattr(dlg, "exec", lambda: QDialog.Rejected)
+    monkeypatch.setattr(mw, "_load_ui", lambda name, parent=None: dlg)
+    monkeypatch.setattr(mw, "config", _Cfg())
+    mw.MainWindow.on_open_settings(win)
+
+    # OpenCL is the default backend, and it is the one probed first
+    assert dlg.cmb_astro_gpu_backend.currentData() == "opencl"
+    assert asked and asked[-1] == "opencl"
+    assert "Fake Card" in dlg.lbl_astro_gpu_status.text()
+    # a machine with no card is not an error: the label says who does the work
+    name["v"] = ""
+    dlg.cmb_astro_gpu_backend.setCurrentIndex(
+        dlg.cmb_astro_gpu_backend.findData("cuda"))
+    qapp.processEvents()
+    assert asked[-1] == "cuda"
+    assert "processor" in dlg.lbl_astro_gpu_status.text().lower()
+    dlg.deleteLater()

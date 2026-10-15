@@ -81,6 +81,21 @@ def test_read_image_box(tmp_path):
     assert np.array_equal(region, data[3:8, 2:6])
 
 
+def test_read_image_box_applies_bscale_bzero(tmp_path):
+    # The region is a SLICE of the memmapped frame (not astropy's hdu.section,
+    # which reads row by row and is 15x slower), and the scaling still has to
+    # be applied to the sliced window.
+    raw = np.array([[10, 20, 30], [40, 50, 60], [70, 80, 90]], dtype=np.uint16)
+    path = tmp_path / "scaled.fits"
+    fits.PrimaryHDU((raw.astype(np.int32) - 32768).astype(np.int16)).writeto(
+        str(path))
+    with fits.open(str(path), mode="update", do_not_scale_image_data=True) as h:
+        h[0].header["BZERO"] = 32768
+        h[0].header["BSCALE"] = 1
+    region, _ = cal.read_image(str(path), box=(1, 1, 3, 3))
+    assert np.array_equal(region, raw[1:3, 1:3].astype(np.float32))
+
+
 def test_meta_from_header_tolerant():
     meta = cal.meta_from_header({"INSTRUME": "ASI2600", "GAIN": 100,
                                  "CCD-TEMP": "-10.5C", "EXPTIME": 60,

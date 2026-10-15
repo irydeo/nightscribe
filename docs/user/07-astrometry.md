@@ -136,8 +136,6 @@ what is measured, and a machine with no card runs on the processor as always.
 
 **Chapter 12** has the whole story: what it accelerates, the **Backend**
 selector (OpenCL by default, CUDA installed by hand) and how to turn it off.
-The exact figures and the caveats are recorded in the project's decision notes
-(ADR-089 and ADR-091, in `docs/adr/`).
 
 ## Reading the result
 

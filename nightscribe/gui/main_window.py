@@ -420,6 +420,11 @@ class MainWindow(QMainWindow):
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
+        # The FITS files the app writes to the system temp for a captured
+        # frame (the camera hands bytes, the editor wants a path): they are
+        # removed when the app closes, and the startup sweep catches the
+        # ones a crash left behind (reported 2026-10-15).
+        self._temp_files = []
         self._current_project = None
         self._project_widgets = {}
         # Which astrometry run the editor must SHOW when a visit is opened:
@@ -7709,7 +7714,8 @@ class MainWindow(QMainWindow):
                                 error or self.tr("No FITS was received."))
             return
         import tempfile
-        fh = tempfile.NamedTemporaryFile(suffix=".fits", delete=False)
+        fh = tempfile.NamedTemporaryFile(prefix="nightscribe-capture-",
+                                         suffix=".fits", delete=False)
         try:
             fh.write(data)
         except OSError as err:
@@ -7717,6 +7723,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, self._ccd_backend_label(), str(err))
             return
         fh.close()
+        # The editor reads it by PATH, so it has to outlive the call: it is
+        # removed when the app closes (and the startup sweep catches the
+        # ones a crash left behind). It used to be left forever.
+        self._temp_files.append(fh.name)
         self._open_frame_path_in_editor(fh.name)
 
     def _open_frame_path_in_editor(self, path):
@@ -14283,4 +14293,12 @@ class MainWindow(QMainWindow):
         for w in threads:
             if w.isRunning():
                 w.wait(3000)
+        # The temp FITS files this session wrote (a captured frame the
+        # editor read by path): only now can they go (reported 2026-10-15).
+        for path in getattr(self, "_temp_files", []):
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        self._temp_files = []
         super().closeEvent(event)

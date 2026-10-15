@@ -226,7 +226,8 @@ def download_ephemeris(url=None, progress=None, cancel=None, timeout=900):
             url, headers={"User-Agent": "NightScribe Find_Orb ephemeris"})
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             total = int(resp.headers.get("Content-Length") or 0)
-            fd, tmp = tempfile.mkstemp(prefix="ns-de430t-", suffix=".tar.bz2")
+            fd, tmp = tempfile.mkstemp(prefix="nightscribe-de430t-",
+                                       suffix=".tar.bz2")
             done = 0
             with os.fdopen(fd, "wb") as out:
                 while True:

@@ -51,7 +51,7 @@ def window(monkeypatch):
     throwaway = coredb.Database(str(Path(tmp) / "t.db"))
     monkeypatch.setattr(coredb, "db", throwaway)
     monkeypatch.setattr(mwmod, "db", throwaway)
-    config.is_configured = lambda: True
+    monkeypatch.setattr(config, "is_configured", lambda: True)
     config.set("app_version", "9.9.9")
     config.set("lat", 40.55)
     config.set("lon", -3.37)

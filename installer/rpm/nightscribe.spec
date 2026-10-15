@@ -65,6 +65,11 @@ find %{buildroot}%{python3_sitelib} -name '__pycache__' -type d \
 # (importlib.metadata.version) and a plain file the version module reads as a
 # last resort. Without the dist-info the installed app reports "0.0.0" and the
 # update detection never fires (ADR-087 rev).
+# %{version} lands in the METADATA verbatim, and RPM's pythondistdeps parses
+# that field with `packaging`, which is strict PEP 440: a local segment must
+# keep its '+'. Passing a mangled version here (e.g. '0.1.0.dev3-g1a2b3c4')
+# makes the generator raise "Invalid version" and fails the build after the
+# package is assembled (hit on 2026-10-15).
 install -d %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info
 printf 'Metadata-Version: 2.1\nName: nightscribe\nVersion: %{version}\n' \
     > %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info/METADATA

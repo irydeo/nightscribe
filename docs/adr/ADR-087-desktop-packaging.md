@@ -191,6 +191,18 @@ funcionar porque la versión es la real. Se revisan también ADR-033 (el
 versionado) y ADR-055 (el primer arranque ya no se confunde con una
 actualización). El `PKGBUILD` de Arch ya usaba un wheel y no estaba afectado.
 
+**Revisión (2026-10-15): la versión del `METADATA` tiene que ser PEP 440.** El
+`.rpm` dejó de construirse: el workflow convertía el `+` del segmento local de
+la versión en `-` (para los nombres de fichero) y el job de RPM lo pasaba a
+`.`, de modo que el `METADATA` del dist-info llevaba `0.1.0a2.dev53.g242f1b98e`.
+El generador de dependencias de RPM (`pythondistdeps.py`) lee ese campo con
+`packaging`, que lo rechaza (`Invalid version`) y aborta la construcción entera
+con `PYTHONDISTDEPS_GENERATORS_FAILED`. Arreglo: la versión viaja sin tocar
+(con su `+`) hasta el spec, porque RPM acepta el `+` (su comparador lo trata
+como separador) y PEP 440 lo exige; sólo la etiqueta que va en los nombres de
+fichero pierde el `+`. Medido: el mismo árbol con `0.1.0a2.dev53+g242f1b98e`
+construye el `.rpm` y el generador emite `python3dist(nightscribe) = 0.1~a2`.
+
 **Revision (2026-10-14): the package shows what it is.** With the `.deb`
 installed on Ubuntu the observer saw three wrong things and a fourth that
 followed: the package showed **no licence and no developer**, the **version was
@@ -221,3 +233,15 @@ in GNOME Software / App Center, and the update detection works again because
 the version is the real one. ADR-033 (versioning) and ADR-055 (the first run is
 no longer confused with an update) are revised too. Arch's `PKGBUILD` already
 used a wheel and was not affected.
+
+**Revision (2026-10-15): the `METADATA` version must be PEP 440.** The `.rpm`
+stopped building: the workflow turned the `+` of the version's local segment
+into `-` (for file names) and the RPM job then turned it into `.`, so the
+dist-info `METADATA` carried `0.1.0a2.dev53.g242f1b98e`. RPM's dependency
+generator (`pythondistdeps.py`) reads that field with `packaging`, which rejects
+it (`Invalid version`) and aborts the whole build with
+`PYTHONDISTDEPS_GENERATORS_FAILED`. Fix: the version travels untouched (with its
+`+`) all the way to the spec, because RPM accepts the `+` (its comparator treats
+it as a separator) and PEP 440 requires it; only the label used in file names
+drops the `+`. Measured: the same tree with `0.1.0a2.dev53+g242f1b98e` builds the
+`.rpm` and the generator emits `python3dist(nightscribe) = 0.1~a2`.

@@ -39,6 +39,7 @@ puedes leerlos de principio a fin o saltar al que necesites:
 | [09. La línea de comandos](09-cli.es.md) | Apéndice: todo lo anterior desde el terminal |
 | [10. Configuración](10-settings.es.md) | Apéndice de referencia: cada sección de Configuración, qué decide y cuándo tocarla |
 | [11. El asistente](11-assistant.es.md) | Preguntar por el objeto, por la app o por el editor |
+| [12. La tarjeta gráfica](12-gpu.es.md) | Qué acelera, cómo encenderla, OpenCL contra CUDA |
 
 Convenciones:
 

@@ -71,6 +71,54 @@ def test_http_get_survives_thread_pool(tmp_db):
     assert not errors, f"threaded access raised: {errors!r}"
 
 
+def test_execute_rows_survive_a_thread_pool(tmp_db):
+    # The engine's pools call db.execute(...).fetchall() from many threads at
+    # once (register_sequence does, through the calibrating loader). The rows
+    # must be read WHILE THE LOCK IS HELD: returning the raw cursor let
+    # another thread's statement reset it and the fetch came back EMPTY, which
+    # is how calibration._row_to_ref died with "not enough values to unpack
+    # (expected 10, got 0)" on a real 539-frame visit (2026-10-15).
+    import threading
+    sql = "SELECT key, source, body FROM http_cache WHERE key='k'"
+    tmp_db.execute("INSERT INTO http_cache (key, source, fetched, ttl, body,"
+                   " content_type) VALUES (?,?,?,?,?,?)",
+                   ("k", "sbdb", time.time(), 1000.0, b"x", ""))
+    tmp_db.commit()
+    errors = []
+    stop = threading.Event()
+
+    def reader():
+        while not stop.is_set():
+            try:
+                rows = tmp_db.execute(sql).fetchall()
+                if rows != [("k", "sbdb", b"x")]:
+                    errors.append(rows)
+                    return
+            except Exception as err:  # noqa: BLE001 - we assert on the list
+                errors.append(err)
+                return
+
+    def writer():
+        i = 0
+        while not stop.is_set():
+            i += 1
+            tmp_db.execute("INSERT OR REPLACE INTO http_cache (key, source,"
+                           " fetched, ttl, body, content_type)"
+                           " VALUES (?,?,?,?,?,?)",
+                           (f"w{i}", "sbdb", time.time(), 1000.0, b"y", ""))
+            tmp_db.commit()
+
+    threads = [threading.Thread(target=reader) for _ in range(6)]
+    threads += [threading.Thread(target=writer) for _ in range(3)]
+    for t in threads:
+        t.start()
+    time.sleep(1.0)
+    stop.set()
+    for t in threads:
+        t.join()
+    assert not errors, f"a concurrent fetch was corrupted: {errors[:3]!r}"
+
+
 def test_cache_get_drops_poisoned_row(tmp_path):
     # A row with NULL fetched/ttl (legacy DB, or an interrupted write from
     # the pre-lock era) must not crash cache_get — it is dropped on sight

@@ -126,39 +126,18 @@ calibrated a second time: it carries the marker and the run says so.
   (on the object's stack they are streaks). Without comparisons in the
   field, the run reports positions only and says so.
 
-### On a graphics card (optional)
+### On a graphics card
 
 The two heaviest stages of a track & stack can run on your **graphics card**
 instead of on the processor: the **registration** (finding where every frame
 sits and which stars it holds) and the **stacking** (deforming every frame onto
-the reference and combining them). It is **off by default** and it does not
-change what is measured: the result is the same, and a machine with no card
-runs exactly as it always did.
+the reference and combining them). It is **on by default**, it does not change
+what is measured, and a machine with no card runs on the processor as always.
 
-The switch is in **Settings → Measurement → Astrometry → Work**: **Warp and
-combine on the GPU**, with a **Backend** selector beside it.
-
-- **Auto** (the default) prefers **CUDA** and falls back to **OpenCL**.
-- **CUDA** (NVIDIA) or **OpenCL** (NVIDIA, AMD, Intel) force one, to compare
-  them or to pick on a machine that has both.
-
-> **Why two backends?** Because CUDA only exists on NVIDIA, while **OpenCL**
-> runs on NVIDIA, AMD and Intel alike: it is the one the app ships, so a card
-> that is not NVIDIA is not left out. Both are measured against the processor
-> and against each other, and neither is the consolation prize.
-
-> **Why is it off by default?** Because it is not needed to reach the answer,
-> and a reduction should be able to say what computed it. When the switch is
-> on, the run's note names the **device** that did the work; when the processor
-> did it, the note stays quiet about it.
-
-The win is largest where the work is largest: the per-frame estimate (the
-source image and the stars) and the stacking of whole frames. As an order of
-magnitude, the estimate goes from a fifth of a second per frame to a few
-hundredths, and the stacking to roughly a third of its processor time. The
-method, the figures and the caveats are recorded in the project's decision
-notes (ADR-089 for the first path and ADR-091 for the portable one, in
-`docs/adr/`).
+**Chapter 12** has the whole story: what it accelerates, the **Backend**
+selector (OpenCL by default, CUDA installed by hand) and how to turn it off.
+The exact figures and the caveats are recorded in the project's decision notes
+(ADR-089 and ADR-091, in `docs/adr/`).
 
 ## Reading the result
 

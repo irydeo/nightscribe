@@ -1964,7 +1964,8 @@ class TrackStackWorker(QThread):
                                              wcs_box)
             else:
                 windows = self._comp_windows(frames, groups[index], entries,
-                                             wcs_box, shape)
+                                             wcs_box, shape,
+                                             cancel=lambda: self._cancel)
                 if not windows:
                     per_obs.append(None)
                     continue
@@ -2210,10 +2211,13 @@ class TrackStackWorker(QThread):
             return None
         return (float(q[0]) - box[0], float(q[1]) - box[1])
 
-    def _comp_windows(self, frames, group, entries, wcs_box, shape):
+    def _comp_windows(self, frames, group, entries, wcs_box, shape,
+                      cancel=None):
         # @args: frames - the sequence, group - the observation's frames,
         #        entries - the comps and the check star, wcs_box - the
-        #        reference WCS shifted to the stack, shape - the frame size
+        #        reference WCS shifted to the stack, shape - the frame size,
+        #        cancel - optional callable() -> bool, handed to the per-comp
+        #        stack so a Cancel during the photometry stops it
         # @return: [(entry, image, x, y), ...] for the ones that landed on
         #          the plate
         # A comp needs averaging as much as the object does (on ONE frame
@@ -2248,7 +2252,7 @@ class TrackStackWorker(QThread):
             small, _rep = track_stack.stack_group(
                 frames, group, (cx, cy), self._method, box, shape,
                 cfg=self._cfg, track=False, loader=cached,
-                order=self._warp_order())
+                order=self._warp_order(), cancel=cancel)
             if small is None:
                 continue
             out.append((e, small, cx - box[0], cy - box[1]))
@@ -2567,7 +2571,15 @@ class TrackStackWorker(QThread):
             base_stack, _rep = track_stack.stack_group(
                 frames, (0, len(frames)), q_all, self._method, box_all,
                 shape, cfg=self._cfg, loader=self._loader,
-                order=self._warp_order())
+                order=self._warp_order(), cancel=lambda: self._cancel)
+            # The base stack is the whole sequence, the longest single call of
+            # the run: if the observer cancelled while it was building there
+            # is nothing to detect on, and the payload must say "cancelled"
+            # and not fail on a None stack.
+            if self._cancel or base_stack is None:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
             q_all_box = (q_all[0] - box_all[0], q_all[1] - box_all[1])
             self.progress.emit("detect", 0, 1)
             detection = track_stack.detect(base_stack, q_all_box, self._cfg)
@@ -2772,6 +2784,14 @@ class TrackStackWorker(QThread):
             else:
                 out["photometry"] = None
                 out["phot_skipped"] = True
+
+            # the photometry walks every observation again (the comp windows
+            # are per-frame stacks): a cancel that landed inside it must end
+            # the run as "cancelled", not as a complete one
+            if self._cancel:
+                out["status"] = "cancelled"
+                self.finished.emit(out)
+                return
 
             # --- the check, delegated to Find_Orb (D25) -------------------
             self.progress.emit("check", 0, 1)

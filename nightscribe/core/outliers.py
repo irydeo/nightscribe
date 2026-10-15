@@ -141,12 +141,24 @@ def scaled_mad(values, axis=None, centre=None):
         work = arr if np.issubdtype(arr.dtype, np.floating) \
             else arr.astype(np.float64)
         ref = nanmedian_axis0(work) if centre is None else centre
-        return MAD_TO_SIGMA * nanmedian_axis0(np.abs(work - ref))
+        return mad_from_deviations(np.abs(work - ref))
     arr = arr.astype(np.float64)
     ref = np.nanmedian(arr, axis=axis) if centre is None else centre
     if axis is None and not np.isfinite(ref):
         return 0.0
     return MAD_TO_SIGMA * np.nanmedian(np.abs(arr - ref), axis=axis)
+
+
+def mad_from_deviations(deviations):
+    # The MAD from deviations that are ALREADY computed. The stacking clip
+    # needs |data - centre| twice per iteration (once for the scale, once for
+    # its keep test), and rebuilding it was a whole extra pass over the cube
+    # (measured on a (539, 700, 700) sigma combine: ~0.6 s of the run). The
+    # formula stays here, in the one home of the MAD, so the scale cannot
+    # drift from the one scaled_mad returns.
+    # @args: deviations - |values - centre| along axis 0
+    # @return: MAD_TO_SIGMA * median(deviations) along axis 0
+    return MAD_TO_SIGMA * nanmedian_axis0(deviations)
 
 
 def median_error(values):

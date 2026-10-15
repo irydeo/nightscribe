@@ -128,37 +128,18 @@ calibra una segunda vez: lleva la marca y el run lo dice.
   estrellas (en el del objeto son trazos). Sin comparadas en el campo, el
   run reporta solo posiciones y lo dice.
 
-### En una tarjeta gráfica (opcional)
+### En una tarjeta gráfica
 
 Las dos etapas más pesadas de un track & stack pueden correr en tu **tarjeta
 gráfica** en vez de en el procesador: el **registro** (dónde cae cada toma y
 qué estrellas tiene) y el **apilado** (deformar cada toma sobre la referencia y
-combinarlas). Está **apagado por defecto** y no cambia lo que se mide: el
-resultado es el mismo, y una máquina sin tarjeta corre exactamente como corría.
+combinarlas). Está **encendido por defecto**, no cambia lo que se mide, y una
+máquina sin tarjeta corre en el procesador como siempre.
 
-El interruptor está en **Ajustes → Medición → Astrometría → Trabajo**:
-**Deformar y combinar en la GPU**, con un selector de **Backend** al lado.
-
-- **Auto** (el defecto) prefiere **CUDA** y cae a **OpenCL**.
-- **CUDA** (NVIDIA) u **OpenCL** (NVIDIA, AMD, Intel) fuerzan uno, para
-  compararlos o para elegir en una máquina que tenga los dos.
-
-> **¿Por qué dos backends?** Porque CUDA solo existe en NVIDIA, mientras que
-> **OpenCL** corre igual en NVIDIA, AMD e Intel: es el que la app reparte, así
-> que una tarjeta que no sea NVIDIA no se queda fuera. Los dos están medidos
-> contra el procesador y entre sí, y ninguno es el premio de consolación.
-
-> **¿Por qué está apagado por defecto?** Porque no hace falta para llegar a la
-> respuesta, y una reducción debería poder decir qué la calculó. Con el
-> interruptor encendido, la nota del run nombra el **dispositivo** que hizo el
-> trabajo; cuando lo hizo el procesador, la nota no dice nada al respecto.
-
-La ganancia es mayor donde el trabajo es mayor: la estimación por toma (la
-imagen fuente y las estrellas) y el apilado a frame completo. Como orden de
-magnitud, la estimación baja de un quinto de segundo por toma a unas
-centésimas, y el apilado a cerca de un tercio de su tiempo en el procesador. El
-método, las cifras y sus matices están en las notas de decisión del proyecto
-(ADR-089 para la primera vía y ADR-091 para la portable, en `docs/adr/`).
+El **capítulo 12** tiene la historia completa: qué acelera, el selector de
+**Backend** (OpenCL por defecto, CUDA instalado a mano) y cómo apagarla. Las
+cifras exactas y sus matices están en las notas de decisión del proyecto
+(ADR-089 y ADR-091, en `docs/adr/`).
 
 ## Leer el resultado
 

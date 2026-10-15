@@ -19,8 +19,9 @@ warp wants a box per candidate of the sweep), so writing calibrated copies
 would cost gigabytes of I/O per visit. `calibration.FrameCalibrator` is a
 loader that applies the recipe on the way in, resolves the recipe from each
 frame's own header and caches it (a visit is one camera, one filter, one
-temperature), and `track_stack.read_pixels` closes the two loader
-conventions (array, or array and header) in one place.
+temperature), caches the MASTER pixels too (one read per run, re-sliced per
+box), and `track_stack.read_pixels` closes the two loader conventions (array,
+or array and header) in one place.
 
 These tests pin that the pixels really come out calibrated, that the
 pseudo-flat is used only when the library has no flat, and that both loader
@@ -123,6 +124,38 @@ def test_the_recipe_is_resolved_once_per_visit(tmp_path, tmp_db, monkeypatch):
         loader(path)
     assert calls["n"] == 1
     assert loader.summary()["n"] == 4
+
+
+def test_the_masters_are_read_once_per_visit(tmp_path, tmp_db, monkeypatch):
+    # The recipe cache remembers WHICH dark and flat apply; a second cache
+    # remembers their PIXELS. Without it the dark and the whole flat were
+    # re-read (and the flat re-median-ed) on EVERY frame: measured on 2048^2
+    # masters, 27 ms per calibrated read against 2.6 ms with the cache, and a
+    # visit is hundreds of frames that the stacking reads several times each
+    # (2026-10-15). A different box re-slices the SAME cached array.
+    from nightscribe.core import calibration as cal_mod
+    light = _light(tmp_path)
+    flat = _write(tmp_path / "flat.fits", _vignetting() * 1200.0)
+    dark = _write(tmp_path / "dark.fits", np.full((SIZE, SIZE), 100.0))
+    cal.add_master(tmp_db, flat, {"kind": "flat", "camera": "TestCam",
+                                  "gain": 2.0, "temp_c": -10.0,
+                                  "exptime_s": 3.0, "filter": "R"})
+    cal.add_master(tmp_db, dark, {"kind": "dark", "camera": "TestCam",
+                                  "gain": 2.0, "temp_c": -10.0,
+                                  "exptime_s": 3.0})
+    reads = []
+    real = cal_mod.read_image
+
+    def _spy(path, box=None):
+        reads.append(os.path.basename(str(path)))
+        return real(path, box)
+    monkeypatch.setattr(cal_mod, "read_image", _spy)
+    loader = cal_mod.FrameCalibrator(tmp_db, None)
+    for _ in range(3):
+        loader(light)                     # the whole frame
+        loader(light, (4, 4, 20, 20))     # and a box: same masters
+    assert reads.count("flat.fits") == 1
+    assert reads.count("dark.fits") == 1
 
 
 def test_read_pixels_accepts_both_loader_conventions(tmp_path):

@@ -389,8 +389,8 @@ tabs, and every figure it shows is explained where it appears.
   the object by eye on the whole-sequence stack) and the **animation** plays
   the observations in the editor to see the asteroid stand still while the
   stars crawl. The two heaviest stages, the **registration** and the
-  **stacking**, can run on a **graphics card** when one is there (off by
-  default, through CUDA or OpenCL, and the result is the same).
+  **stacking**, can run on a **graphics card** when one is there (on by
+  default, through OpenCL, with CUDA by hand, and the result is the same).
 - **Blink and annotate.** Your FITS blinked against a PanSTARRS DR1 g
   reference requested with the exact geometry of your image (animated GIF,
   H.264 MP4, before/after PNG), and an AIJ-compatible annotated copy of the
@@ -503,8 +503,8 @@ from the SBDB elements), transit instants, heliocentric Julian dates, the
 whole 60-day sky calendar and Jupiter's moon events. And the **reduction
 itself**: the registration, the stack, the astrometric and photometric
 measurement, the series, the period search and the light curve are arithmetic
-on your own pixels (on the processor, or on your graphics card if you ask for
-it), with no service involved. Images are credited (NASA/SDO,
+on your own pixels (on the processor, or on your graphics card when one is
+there), with no service involved. Images are credited (NASA/SDO,
 PanSTARRS, DSS); external websites (SolarMonitor, ETD, NEOfixer, TNS…) open in
 your browser, never embedded.
 

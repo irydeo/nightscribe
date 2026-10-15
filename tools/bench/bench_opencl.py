@@ -117,6 +117,61 @@ __kernel void combine_median(
     }
     out[p] = (m % 2) ? v[m / 2] : 0.5f * (v[m / 2 - 1] + v[m / 2]);
 }
+
+// The SCALABLE median: the same per-pixel selection, but the column is walked
+// in GLOBAL memory (a radix select on the sortable bit pattern of the float),
+// so it holds ANY number of frames. It is what the app uses above 96 frames,
+// because the base stack of a real visit is the WHOLE sequence (hundreds); the
+// private one above is the fast path below that. Run the bench with
+// --frames 300 to see the difference.
+static uint _fb(float x) {
+    const uint u = as_uint(x);
+    return (u & 0x80000000u) ? ~u : (u | 0x80000000u);
+}
+static float _bf(uint u) {
+    return as_float((u & 0x80000000u) ? (u & 0x7fffffffu) : ~u);
+}
+static float _select_rank(__global const float *cube, const int hw,
+                          const int p, const int n, int rank) {
+    uint prefix = 0;
+    for (int pass = 0; pass < 4; ++pass) {
+        uint hist[256];
+        for (int i = 0; i < 256; ++i) hist[i] = 0;
+        const int shift = 24 - 8 * pass;
+        for (int k = 0; k < n; ++k) {
+            const float x = cube[(long)k * hw + p];
+            if (!(x == x)) continue;
+            const uint u = _fb(x);
+            if (pass > 0 && (u >> (shift + 8)) != prefix) continue;
+            hist[(u >> shift) & 0xFF]++;
+        }
+        int cum = 0, d = 0;
+        for (d = 0; d < 256; ++d) {
+            if (cum + (int)hist[d] > rank) break;
+            cum += (int)hist[d];
+        }
+        rank -= cum;
+        prefix = (prefix << 8) | (uint)d;
+    }
+    return _bf(prefix);
+}
+__kernel void combine_median_scalable(
+    __global const float *cube, __global float *out,
+    const int n, const int hw)
+{
+    const int p = get_global_id(0);
+    if (p >= hw) return;
+    int count = 0;
+    for (int k = 0; k < n; ++k) {
+        const float x = cube[(long)k * hw + p];
+        if (x == x) count += 1;
+    }
+    if (count == 0) { out[p] = NAN; return; }
+    const int lo = (count - 1) / 2, hi = count / 2;
+    const float a = _select_rank(cube, hw, p, n, lo);
+    const float b = (hi == lo) ? a : _select_rank(cube, hw, p, n, hi);
+    out[p] = (count % 2 == 0) ? 0.5f * (a + b) : a;
+}
 """
 
 
@@ -250,15 +305,17 @@ def _bench_combine(cp, cl, ctx, queue, program, n, h, w):
         src = cl.Buffer(ctx, mf.READ_ONLY | mf.COPY_HOST_PTR, hostbuf=cube)
         dst = cl.Buffer(ctx, mf.WRITE_ONLY, 4 * hw)
         for name, kname in (("mean", "combine_mean"),
-                            ("median", "combine_median")):
+                            ("median", "combine_median"),
+                            ("median_scalable", "combine_median_scalable")):
             kern = cl.Kernel(program, kname)
 
             def run():
                 kern(queue, (hw,), None, src, dst, np.int32(n), np.int32(hw))
                 queue.finish()
             t = _time(run, repeats=2)
-            extra = f"   ratio OpenCL/CuPy {t / cupy[name]:.2f}x" \
-                if cupy.get(name) else ""
+            ref = cupy.get("median") if name.startswith("median") \
+                else cupy.get(name)
+            extra = f"   ratio OpenCL/CuPy {t / ref:.2f}x" if ref else ""
             print(f"  OpenCL  : {name} {1000 * t:8.1f} ms{extra}")
 
 

@@ -125,12 +125,29 @@ def device_name():
     return mod.device_name() if mod is not None else ""
 
 
+def probe(backend):
+    # @args: backend - "auto" | "cuda" | "opencl" (anything else: "auto")
+    # @return: the name of the device that backend would use, or "" when it
+    #          has none
+    # A question about ONE backend, asked WITHOUT changing which one serves
+    # the calls: the Settings dialog shows the card the selected backend sees
+    # right now, so the switch is never a blind guess ("is my card seen?" is
+    # the first thing an observer wants to know). The answer is cached per
+    # name, exactly like the dispatch.
+    name = str(backend or "auto").lower()
+    if name not in ("auto", "cuda", "opencl"):
+        name = "auto"
+    mod = _backend(name)
+    return mod.device_name() if mod is not None else ""
+
+
 def enabled(cfg):
     # @args: cfg - Config, or None
     # @return: True when the observer asked for the backend AND one is there
-    # Two gates, both required: the SETTING (the observer's explicit choice,
-    # off by default) and the HARDWARE. Neither alone is enough, which is what
-    # keeps a machine without a card on the exact path it always took.
+    # Two gates, both required: the SETTING (on by default since the
+    # 2026-10-15 revision of ADR-089) and the HARDWARE. Neither alone is
+    # enough, which is what keeps a machine without a card on the exact path
+    # it always took.
     if cfg is None:
         return False
     try:

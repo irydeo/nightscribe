@@ -128,6 +128,15 @@ def read_image(path, box=None):
     # The scaling is applied by hand: with do_not_scale_image_data the raw
     # values come unscaled (and big-endian), and BSCALE/BZERO are ours to
     # apply. Applying them here, once, keeps every later module honest.
+    #
+    # A region is a SLICE of the memmapped frame, and NOT `hdu.section`:
+    # astropy's section reads a window row by row (a 774^2 window from a
+    # 2048^2 frame cost 16.5 ms), while slicing the memmap and copying the
+    # window costs 1.1 ms, x15 faster (measured 2026-10-15). This is the
+    # single hottest read of the stacking: the warp asks for one region per
+    # frame and per candidate, so the visit's reads went from minutes to
+    # seconds. The copy is made WHILE the file is open, so nothing outlives
+    # the memmap.
     from astropy.io import fits
     with fits.open(path, memmap=True, do_not_scale_image_data=True) as hdul:
         hdu = _first(hdul)
@@ -135,23 +144,21 @@ def read_image(path, box=None):
             raise ValueError(f"{path}: no 2D image HDU")
         if box is not None:
             x0, y0, x1, y1 = box
-            raw = hdu.section[y0:y1, x0:x1]
+            raw = hdu.data[y0:y1, x0:x1]
         else:
             raw = hdu.data
+        data = np.array(raw, dtype=np.float32)
         header = dict(hdu.header)
-    data = np.asarray(raw)
     if data.ndim != 2:
-        # A region that does not touch the frame comes back from astropy's
-        # section as a 1-D EMPTY array, and a 1-D "image" breaks the caller
-        # three layers away: scipy sees input.ndim + 1 == 2, takes our 2x2
-        # rotation for a HOMOGENEOUS matrix, finds the bottom row is not
-        # [0, 1] and refuses it with "Expected homogeneous transformation
-        # matrix with shape (2, 2) for image shape (0,)" (measured on a
-        # real visit). An empty 2-D array says the same thing (there is no
-        # data here) without the trap, and every caller already handles a
-        # zero-sized array.
+        # A region that does not touch the frame comes back EMPTY and can be
+        # 1-D; a 1-D "image" breaks the caller three layers away: scipy sees
+        # input.ndim + 1 == 2, takes our 2x2 rotation for a HOMOGENEOUS matrix,
+        # finds the bottom row is not [0, 1] and refuses it with "Expected
+        # homogeneous transformation matrix with shape (2, 2) for image shape
+        # (0,)" (measured on a real visit). An empty 2-D array says the same
+        # thing (there is no data here) without the trap, and every caller
+        # already handles a zero-sized array.
         data = data.reshape((0, 0))
-    data = data.astype(np.float32)
     bscale = _num(header.get("BSCALE"), 1.0)
     bzero = _num(header.get("BZERO"), 0.0)
     if bscale != 1.0:
@@ -725,38 +732,104 @@ class LoadedMasters:
     flat_norm: float | None = None
 
 
-def load_masters(recipe, loader=None, box=None):
+class MasterCache:
+    # The loaded master arrays of a RUN, read once. The calibrating loader is
+    # asked for every frame of a visit, and the stacking reads each frame
+    # several times (the base stack, every observation, the star stack, the
+    # comp windows): without this the dark and the WHOLE flat were re-read
+    # from disk and the flat re-median-ed on every single read. Measured on
+    # 2048^2 masters: a calibrated read is 27 ms without the cache and 2.6 ms
+    # with it, so a 539-frame visit was paying ~13 s of pure I/O and medians
+    # per pass (2026-10-15). The lock makes the first read of a master happen
+    # ONCE even when sixteen threads ask for it at the same time; after that
+    # it is a dict hit.
+    def __init__(self):
+        import threading
+        # REENTRANT on purpose: building the flat asks the cache for the
+        # flat's own offset (a dark), which is the same lock one level down.
+        # A plain Lock deadlocked there.
+        self._lock = threading.RLock()
+        self._items = {}
+
+    def get(self, key, build):
+        # @args: key - the master's identity (kind + path(s)), build -
+        #        callable that reads it from disk
+        # @return: the cached value
+        with self._lock:
+            if key in self._items:
+                return self._items[key]
+            value = build()
+            self._items[key] = value
+            return value
+
+
+def _normalized_flat(recipe, loader, read):
+    # @args: recipe - Recipe with .flat (and maybe .flat_offset), loader -
+    #        callable(path, box) -> array, read - the cache-aware reader from
+    #        load_masters (so the flat's own offset shares the cache with the
+    #        light's)
+    # @return: (normalised full flat, its full median) or (None, None) when
+    #          the median is not positive (the flat is not applied)
+    # The flat is read WHOLE and normalised by its full median, which is why
+    # the result can be cached as one piece and only sliced per box.
+    flat_full = _as_float32(loader(recipe.flat.path, None))
+    if recipe.flat_offset is not None:
+        flat_off = read(("offset", recipe.flat_offset.path),
+                        lambda: _as_float32(
+                            loader(recipe.flat_offset.path, None)))
+        if flat_off.shape == flat_full.shape:
+            flat_full = flat_full - flat_off
+        else:
+            logger.warning("flat offset %s does not match the flat; "
+                           "ignored", recipe.flat_offset.path)
+    norm = float(np.median(flat_full))
+    if norm > 0:
+        return flat_full / norm, norm
+    logger.warning("flat %s has a non-positive median; not applied",
+                   recipe.flat.path)
+    return None, None
+
+
+def load_masters(recipe, loader=None, box=None, cache=None):
     # @args: recipe - Recipe, loader - callable(path, box) -> array
-    #        (defaults to read_image), box - optional (x0,y0,x1,y1) region
+    #        (defaults to read_image), box - optional (x0,y0,x1,y1) region,
+    #        cache - optional MasterCache shared across the frames of a run
     # @return: LoadedMasters
     # The flat is always read WHOLE, even when only a region is wanted,
     # because its normalisation has to be the full-frame median: cropping
     # first would normalise by whatever the crop happens to contain and
-    # change the frame's flux level from crop to crop.
+    # change the frame's flux level from crop to crop. The box is applied
+    # AFTER, on the (cached) full array, so the same master serves every
+    # region without being read again.
     loader = loader or read_image
+
+    def read(key, build):
+        # one master, once per run when a cache is given
+        return cache.get(key, build) if cache is not None else build()
+
     out = LoadedMasters()
     if recipe.offset is not None:
-        out.offset = _as_float32(loader(recipe.offset.path, box))
+        full = read(("offset", recipe.offset.path),
+                    lambda: _as_float32(loader(recipe.offset.path, None)))
+        out.offset = _crop(full, box)
     if recipe.flat is not None:
-        flat_full = _as_float32(loader(recipe.flat.path, None))
-        if recipe.flat_offset is not None:
-            flat_off = _as_float32(loader(recipe.flat_offset.path, None))
-            if flat_off.shape == flat_full.shape:
-                flat_full = flat_full - flat_off
-            else:
-                logger.warning("flat offset %s does not match the flat; "
-                               "ignored", recipe.flat_offset.path)
-        norm = float(np.median(flat_full))
-        if norm > 0:
-            out.flat = flat_full / norm
+        flat_key = ("flat", recipe.flat.path,
+                    recipe.flat_offset.path if recipe.flat_offset else None)
+        flat_full, norm = read(flat_key,
+                               lambda: _normalized_flat(recipe, loader, read))
+        if flat_full is not None:
+            out.flat = _crop(flat_full, box)
             out.flat_norm = norm
-            if box is not None:
-                x0, y0, x1, y1 = box
-                out.flat = out.flat[y0:y1, x0:x1]
-        else:
-            logger.warning("flat %s has a non-positive median; not applied",
-                           recipe.flat.path)
     return out
+
+
+def _crop(full, box):
+    # @args: full - a whole master array, box - (x0,y0,x1,y1) or None
+    # @return: the boxed view (a view, not a copy)
+    if box is None:
+        return full
+    x0, y0, x1, y1 = box
+    return full[y0:y1, x0:x1]
 
 
 def _as_float32(data):
@@ -1124,6 +1197,10 @@ class FrameCalibrator:
         self._tol = (cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
                      if cfg is not None else _DEFAULT_TEMP_TOL_C)
         self._cache = {}
+        # The masters themselves, read once per run: the recipe cache above
+        # only remembers WHICH dark and flat apply, and without this the
+        # pixels were re-read (and the flat re-median-ed) on every frame.
+        self._masters = MasterCache()
         self.reports = []          # one (path, report) per frame read
 
     def __call__(self, path, box=None):
@@ -1151,7 +1228,8 @@ class FrameCalibrator:
             recipe = resolve_recipe(self._db, meta, tol_c=self._tol)
             self._cache[key] = recipe
         out, report = calibrate(data, recipe, box=box,
-                                vignette_model=self._vignette_model)
+                                vignette_model=self._vignette_model,
+                                master_cache=self._masters)
         self.reports.append((path, report))
         return out
 
@@ -1180,16 +1258,18 @@ class FrameCalibrator:
                 "warnings": warnings[:4]}
 
 
-def calibrate(data, recipe, loader=None, box=None, vignette_model=None):
+def calibrate(data, recipe, loader=None, box=None, vignette_model=None,
+              master_cache=None):
     # @args: data - the light (raw, 2D), recipe - Recipe,
     #        loader - callable(path, box) -> array, box - optional region,
     #        vignette_model - a normalised model built from the frames
     #        themselves (see vignette_model), used ONLY when the library has
-    #        no flat for this filter
+    #        no flat for this filter, master_cache - optional MasterCache so
+    #        the masters are read once per run and not once per frame
     # @return: (calibrated float32 array, CalibrationReport)
     # The order is offset first, flat second: dividing before removing the
     # pedestal would amplify it in the flat's dark corners.
-    masters = load_masters(recipe, loader=loader, box=box)
+    masters = load_masters(recipe, loader=loader, box=box, cache=master_cache)
     report = CalibrationReport(warnings=list(recipe.warnings))
     out = _as_float32(data)
     if masters.offset is not None and masters.offset.shape == out.shape:
@@ -1252,6 +1332,9 @@ def calibrate_paths(paths, db, cfg=None, master_loader=None, box=None,
         tol = cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
     out = []
     total = len(paths)
+    # One master cache for the whole folder: exporting a visit must not
+    # re-read (and re-median) the same dark and flat for every frame either.
+    master_cache = MasterCache()
     for index, path in enumerate(paths, 1):
         if cancel is not None and cancel():
             break
@@ -1269,7 +1352,8 @@ def calibrate_paths(paths, db, cfg=None, master_loader=None, box=None,
         meta = meta_from_header(header)
         recipe = resolve_recipe(db, meta, tol_c=tol)
         data_cal, report = calibrate(data, recipe, loader=master_loader,
-                                     box=box, vignette_model=vignette_model)
+                                     box=box, vignette_model=vignette_model,
+                                     master_cache=master_cache)
         out.append((path, data_cal, header, report))
         if progress is not None:
             progress(index, total, path)

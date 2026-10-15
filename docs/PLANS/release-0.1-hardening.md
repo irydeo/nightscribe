@@ -239,7 +239,9 @@ para todo el worker de xdist.
   corregido (solo la línea que enuncia la regla conserva el carácter). Los comentarios del código
   mantienen las suyas: son historia, y la regla va de prosa.
 - **QA-17**, **A4** (hecho) guarda de tabla en las migraciones v18, v20 y v21, con sus tests
-  (incluido el caso «la tabla no está y aun así llega arriba»).
+  (incluido el caso «la tabla no está y aun así llega arriba»). Al fusionar `main`, ese mismo test
+  cazó el hueco repetido en la **v22** (nueva, de la biblioteca de masters por proyecto) y se
+  guardó también.
 - **DEV-11** (hecho) `docs/DEVELOPING.md` y su gemela ES, con las tres recetas, enlazado desde
   CONTRIBUTING.
 - **QA-18** (mitigado) el conftest acota el pool de hilos del combine por proceso, lo que reduce

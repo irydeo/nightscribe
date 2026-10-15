@@ -29,7 +29,7 @@ def test_v21_folds_the_flat_dark_into_dark(tmp_path):
     db = Database(path)          # the migration runs again
     rows = db.execute("SELECT kind, exptime_s FROM calib_masters").fetchall()
     assert rows == [("dark", 2.5)]
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 21
+    assert db.execute("PRAGMA user_version").fetchone()[0] >= 21
 
 
 def test_v21_is_idempotent(tmp_path):
@@ -46,7 +46,9 @@ def test_v21_is_idempotent(tmp_path):
 
 def test_a_v20_database_without_calib_masters_still_walks(tmp_path):
     # A restored database can be at v20 with the calibration library gone: the
-    # UPDATE used to die with "no such table" and the app would not open.
+    # UPDATE used to die with "no such table" and the app would not open. v22
+    # (main's, 2026-10-15) had the same hole in its ALTER and is guarded too,
+    # which this test also covers.
     path = str(tmp_path / "c.db")
     db = Database(path)
     db.execute("DROP TABLE calib_masters")
@@ -54,4 +56,4 @@ def test_a_v20_database_without_calib_masters_still_walks(tmp_path):
     db.commit()
     db.close()
     db = Database(path)          # must not raise
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 21
+    assert db.execute("PRAGMA user_version").fetchone()[0] >= 21

@@ -645,14 +645,17 @@ def _migrate(conn):
         # project uses it, and a project can ADOPT another project's master
         # with a LINK (a second row on the same file). The recipe prefers the
         # project's own masters, then the shared ones.
-        cols = {row[1] for row in conn.execute(
-            "PRAGMA table_info(calib_masters)")}
-        if "project_id" not in cols:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "calib_masters" in tables:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(calib_masters)")}
+            if "project_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE calib_masters ADD COLUMN project_id INTEGER")
             conn.execute(
-                "ALTER TABLE calib_masters ADD COLUMN project_id INTEGER")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_calib_project"
-            " ON calib_masters(project_id, kind)")
+                "CREATE INDEX IF NOT EXISTS idx_calib_project"
+                " ON calib_masters(project_id, kind)")
         conn.execute("PRAGMA user_version = 22")
     conn.commit()
 

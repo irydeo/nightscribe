@@ -47,4 +47,4 @@ def test_a_v17_database_without_astrometry_points_still_walks(tmp_path):
     db.commit()
     db.close()
     db = Database(path)          # must not raise
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 21
+    assert db.execute("PRAGMA user_version").fetchone()[0] >= 21

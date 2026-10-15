@@ -60,3 +60,16 @@ def test_the_series_guide_and_the_editor_guide_point_at_each_other():
                         ("SEQUENCES.es.md", "UFE.es.md")):
         assert "(" + ufe + ")" in (DOCS / series).read_text(encoding="utf-8")
         assert "(" + series + ")" in (DOCS / ufe).read_text(encoding="utf-8")
+
+
+def test_the_adr_index_lists_every_decision():
+    # The ADR folder is the project's decision log and the index is how it is
+    # read. A new ADR that nobody indexes disappears from the log silently:
+    # the reader sees the folder, not the index, and stops looking. This walks
+    # the folder and fails when a decision is not linked from README.md.
+    adr = DOCS / "adr"
+    index = (adr / "README.md").read_text(encoding="utf-8")
+    linked = set(re.findall(r"\((ADR-[^)]+\.md)\)", index))
+    files = {p.name for p in adr.glob("ADR-*.md")}
+    missing = sorted(files - linked)
+    assert not missing, missing

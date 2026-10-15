@@ -251,8 +251,26 @@ módulos grandes secundarios.
 
 ### P4: pulido
 
-Resto de i18n, tooltips a densidad `short`, colores incrustados, `sys.excepthook`, escrituras
-atómicas de derivados, permisos del FITS, `imageio-ffmpeg`, `_pack_desig`, `obsTime`.
+- **QA-15** (hecho) `sys.excepthook`: una excepción en un slot de Qt llega al registro y avisa,
+  en vez de perderse por un stderr que no existe.
+- **QA-05** (hecho) `Config.save()` atómico; `load()` ya no cae a los valores por defecto en
+  silencio (guarda una copia del fichero ilegible y lo dice).
+- **QA-13** (hecho) la escritura atómica de la WCS conserva los permisos del FITS.
+- **QA-11** (hecho) `_pack_desig` delega en el empaquetador correcto: `K26A12B`, no `mAB12`.
+- **QA-12** (hecho) `obsTime` de ADES con la «Z» final.
+- **UX-08**, **UX-11**, **UX-13**, **UX-19**, **UX-20** (hecho): frases sin traducir, `tr()` que
+  faltaba, tooltip de una pantalla retirada, error crudo y la ayuda del editor independiente del
+  asistente opcional.
+- **DEV-16** (hecho) la divergencia de `imageio-ffmpeg` (dura en pip, opcional en el `.deb`)
+  documentada donde se decide.
+- **UX-18** (revertido a propósito) `lupdate -no-obsolete` dropearía cadenas construidas en
+  runtime (la escala de calidad del cielo) y rompería `test_i18n_coverage`: se deja como está y
+  se explica en `tools/i18n.py`.
+
+*Pendiente, bajo y fuera de la 0.1:* **UX-16** (tooltips ensayo: mover el texto largo a la ficha
+o al documento y dejar densidad `short`), **UX-17** (colores hexadecimales incrustados que
+duplican los tokens del tema), **QA-14** (escrituras no atómicas de productos derivados) y
+**DEV-17** (ficheros de herramientas de IA en la raíz: decisión del autor).
 
 ---
 

@@ -171,19 +171,28 @@ suite unitaria pasa (3576 en verde con `-n 4`) salvo el flake preexistente QA-18
 
 ### P1: honestidad y coherencia (barato y visible)
 
-- **B6** (hecho 2026-10-15) retirar la frase del ajuste de tránsito in-app en
-  `docs/user/06-photometry.md` y su gemela ES. `core/transit_fit.py` se conserva como la vía
-  interna de paridad contra EXOTIC (ADR-015) y el README, que ya dice «100 % external», no se
-  toca.
-- **B7**, **B8**, **B9** correcciones del README y de la guía.
-- **A5** revisión de ADR-091, `gpu.py` coherente y cobertura OpenCL en CI o paso a *opt-in*.
-- **A10** `AGENTS.md`, `ARCHITECTURE.md`, `DESIGN.md` y ADR-070 al día.
-- **A13** README con el asistente, la clave de contaminación lumínica y el recuento de claves.
-- **DEV-13** guardián de completitud del índice de ADR.
-- **UX-09**, **UX-10**, **UX-14**, **UX-15**.
+- **B6** (hecho) retirar la frase del ajuste de tránsito in-app en `docs/user/06-photometry.md` y
+  su gemela ES. `core/transit_fit.py` se conserva como la vía interna de paridad contra EXOTIC
+  (ADR-015) y el README, que ya dice «100 % external», no se toca.
+- **B7**, **B8**, **B9** (hecho) README y guía: la paridad CLI se acota a planificar y publicar,
+  Find_Orb pasa a viajar con los paquetes, y fuera el cuarto tipo de master («flat dark»).
+- **A5** (hecho) ADR-091 con nota de estado, `gpu.py` y el comentario de `pyproject` coherentes
+  con el defecto real (encendido, `opencl`), y CI con `pocl` para que los 32 tests OpenCL corran
+  en vez de saltarse. *Pendiente: confirmarlo en la próxima ejecución de CI (aquí no hay
+  dispositivo OpenCL para reproducirlo).*
+- **A10** (hecho) `AGENTS.md` sin el rango de ADR congelado ni la ruta falsa de `build_site.py`,
+  `ARCHITECTURE.md` con el CLI real, el TTL de ExoClock y el i18n atómico, `DESIGN.md` marcado
+  histórico, y ADR-070 a doce capítulos.
+- **A13** (hecho) README con el asistente, la clave de contaminación lumínica y cinco claves.
+- **DEV-13** (hecho) guardián de completitud del índice de ADR.
+- **UX-09**, **UX-10**, **UX-14**, **UX-15** (hecho).
 
 *Aceptación:* ningún documento contradice al código en los puntos listados; ADR-091 lleva su
 revisión; el índice de ADR tiene guardián.
+
+*Estado (2026-10-15): **implementado**.* Suite verde (3579 con `-n 4`), web regenerada por los
+cambios de README y guía. Lo único sin verificar es la cobertura OpenCL en CI (A5), que necesita
+una ejecución real.
 
 ### P2: primer contacto y UX (lo que hace abandonar)
 

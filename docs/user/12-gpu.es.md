@@ -78,6 +78,3 @@ apilados de **frame completo** o de **muchas tomas**. No paga en recortes
 pequeños, y el **barrido de velocidad se queda en el procesador a propósito**
 (su ventana es pequeña, y releerla para cada candidato cuesta más de lo que
 ahorra).
-
-Las cifras exactas y las advertencias están en las notas de decisión del
-proyecto (ADR-089 y ADR-091, en `docs/adr/`).

@@ -74,6 +74,3 @@ It pays where the work is large and continuous: the per-frame estimate and the
 stacks of **whole frames** or **many frames**. It does not pay on small cutouts,
 and the **velocity sweep stays on the processor on purpose** (its window is
 small, and re-reading it for every candidate costs more than it saves).
-
-The exact figures and the caveats are recorded in the project's decision notes
-(ADR-089 and ADR-091, in `docs/adr/`).

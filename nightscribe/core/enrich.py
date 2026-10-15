@@ -330,7 +330,7 @@ def _enrich_small_body(name, date, site):
     out["next_approach"] = cad.next_approach(body["des"] or name)
     elements = body.get("elements") or {}
     # Our own q-based family, then the MPC's OFFICIAL type on top when it is
-    # one of the NEO families we name the same way (ADR-087): the observer
+    # one of the NEO families we name the same way (ADR-088): the observer
     # compares against the MPC's page, and JPL's orbit_code and our rule can
     # disagree with it. The source is carried so the card can say whose it is.
     family = orbits.classify(elements, body.get("orbit_code"))

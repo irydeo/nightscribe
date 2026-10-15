@@ -137,9 +137,7 @@ combinarlas). Está **encendido por defecto**, no cambia lo que se mide, y una
 máquina sin tarjeta corre en el procesador como siempre.
 
 El **capítulo 12** tiene la historia completa: qué acelera, el selector de
-**Backend** (OpenCL por defecto, CUDA instalado a mano) y cómo apagarla. Las
-cifras exactas y sus matices están en las notas de decisión del proyecto
-(ADR-089 y ADR-091, en `docs/adr/`).
+**Backend** (OpenCL por defecto, CUDA instalado a mano) y cómo apagarla.
 
 ## Leer el resultado
 

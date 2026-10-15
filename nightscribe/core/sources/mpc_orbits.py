@@ -11,7 +11,7 @@
 #
 ############################################################
 
-"""Orbital elements and the OFFICIAL orbit type from the MPC (ADR-087).
+"""Orbital elements and the OFFICIAL orbit type from the MPC (ADR-088).
 
 The MPC publishes an Orbits API (`get-orb`, verified 2026-10-14) that answers
 the MPC_ORB JSON for one designation. It is the MPC's OWN classification, the

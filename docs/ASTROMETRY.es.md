@@ -401,24 +401,31 @@ cual: la receta no se aplica una segunda vez, y el run lo dice.
   qué aperturas y qué cielo se va a medir antes de lanzar: si algo no cuadra,
   ese es el sitio donde mirar.
 
-## 6. Find_Orb: instalación y configuración
+## 6. Find_Orb: de dónde sale
 
-El chequeo se apoya en Find_Orb, que NightScribe **no** distribuye: solo
-detecta tu copia y la ejecuta. Necesita el ejecutable **no interactivo**
-(`fo` en Linux/macOS, `fo64.exe` en Windows).
+El chequeo se apoya en Find_Orb, y **la app lo trae**: los paquetes de Windows
+y Linux lo llevan dentro (con su aviso de licencia y el enlace a su fuente), así
+que una instalación recién hecha tiene el chequeo funcionando sin nada que
+configurar. `findorb.probe()` busca la copia incluida **antes** que el PATH, y el
+chequeo lanza `fo` con un `HOME` **privado**, así que la configuración de
+Find_Orb se queda dentro de NightScribe.
+
+Correr **desde el código** es el caso en que lo instalas tú. Lo que necesita es
+el ejecutable **no interactivo** (`fo` en Linux/macOS, `fo64.exe` en Windows):
 
 - **Linux/macOS**: `micromamba install -c conda-forge findorb` (trae `fo`,
   `find_orb` y las efemérides DE430t). O compilar del código fuente.
 - **Windows**: `find_c64.zip` y `fo64.exe` de Project Pluto, en la misma
   carpeta.
-- En **Ajustes**, apunta el campo Find_Orb al `fo` y pulsa «Probar». El botón
-  **«Instalar…»** te lo hace: primero mira si `fo` ya está en el PATH (el caso
-  habitual: lo instalaste y la app no lo sabía) y apunta la ruta a él; si no
-  está, busca **micromamba**, **mamba** o **conda**, crea un entorno **privado**
-  con el paquete de conda-forge `findorb` (dentro de la carpeta que elijas, sin
-  tocar nada de tu instalación) y te va enseñando lo que hace. Si no encuentra
-  ningún gestor, te dice qué instalar y qué escribir: la app **no** se descarga
-  un gestor de paquetes por su cuenta.
+
+El campo **Find_Orb** de Ajustes es para apuntar a **tu propia** copia (un build
+más nuevo, otra ruta); su botón **«Instalar…»** te lo hace. Primero mira si `fo`
+ya está en el PATH (el caso habitual: lo instalaste y la app no lo sabía) y
+apunta la ruta a él; si no está, busca **micromamba**, **mamba** o **conda**,
+crea un entorno **privado** con el paquete de conda-forge `findorb` (dentro de la
+carpeta que elijas, sin tocar nada de tu instalación) y te va enseñando lo que
+hace. Si no encuentra ningún gestor, te dice qué instalar y qué escribir: la app
+**no** se descarga un gestor de paquetes por su cuenta.
 
 NightScribe escribe el fichero de observaciones, lanza `fo` en una carpeta
 temporal con un entorno propio (`-D`) y un límite de CPU (`-r`), y lee los

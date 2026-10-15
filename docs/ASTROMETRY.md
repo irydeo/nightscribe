@@ -399,25 +399,32 @@ left as it is: the recipe is not applied a second time, and the run says so.
 - **An object recovered after months** may have a drifted orbit: a large
   residual may be the orbit's fault, not yours.
 
-## 6. Find_Orb: installation and setup
+## 6. Find_Orb: where it comes from
 
-The check rests on Find_Orb, which NightScribe does **not** distribute: it
-only detects your copy and runs it. It needs the **non-interactive**
-executable (`fo` on Linux/macOS, `fo64.exe` on Windows).
+The check rests on Find_Orb, and **the app brings it**: the Windows and Linux
+packages carry it (with its licence notice and the link to its source), so a
+fresh install has the check working with nothing to configure. `findorb.probe()`
+looks for the bundled copy **before** the PATH, and the check runs `fo` in a
+**private** `HOME`, so Find_Orb's configuration stays inside NightScribe.
+
+Running **from the source** is the case where you install it yourself. What it
+needs is the **non-interactive** executable (`fo` on Linux/macOS, `fo64.exe` on
+Windows):
 
 - **Linux/macOS**: `micromamba install -c conda-forge findorb` (it brings
   `fo`, `find_orb` and the DE430t ephemerides). Or build from source.
 - **Windows**: `find_c64.zip` and `fo64.exe` from Project Pluto, in the
   same folder.
-- In **Settings**, point the Find_Orb field at `fo` and press "Test". The
-  **Install…** button does it for you: first it checks whether `fo` is
-  already on PATH (the common case: you installed it and the app was never
-  told) and points the path at it; if it is not there, it looks for
-  **micromamba**, **mamba** or **conda**, creates a **private** environment
-  with the conda-forge package `findorb` (inside the folder you choose,
-  touching nothing of your setup) and shows you what it is doing. With no
-  manager found it says what to install and what to type: the app does
-  **not** download a package manager on its own.
+
+The **Find_Orb** field in Settings is for pointing at **your own** copy (a
+newer build, another path); its **Install…** button does it for you. First it
+checks whether `fo` is already on PATH (the common case: you installed it and
+the app was never told) and points the path at it; if it is not there, it looks
+for **micromamba**, **mamba** or **conda**, creates a **private** environment
+with the conda-forge package `findorb` (inside the folder you choose, touching
+nothing of your setup) and shows you what it is doing. With no manager found it
+says what to install and what to type: the app does **not** download a package
+manager on its own.
 
 NightScribe writes the observation file, runs `fo` in a temporary folder
 with its own environment (`-D`) and a CPU limit (`-r`), and reads the

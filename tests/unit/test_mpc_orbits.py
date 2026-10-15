@@ -1,7 +1,7 @@
 ############################################################
 # -*- coding: utf-8 -*-
 #
-# NightScribe - Unit tests: MPC orbits source (ADR-087)
+# NightScribe - Unit tests: MPC orbits source (ADR-088)
 # Python  v3.12
 #
 # Francisco José Calvo Fernández
@@ -142,7 +142,7 @@ def _fake_small_body(monkeypatch, orbit_type):
 
 
 def test_the_mpc_type_overrides_the_local_classification(monkeypatch):
-    # ADR-087: the observer reads the MPC's page, so the MPC's own type wins
+    # ADR-088: the observer reads the MPC's page, so the MPC's own type wins
     # when it is one of the NEO families (and it can differ from JPL and from
     # our q rule).
     enrich = _fake_small_body(monkeypatch, "Amor")

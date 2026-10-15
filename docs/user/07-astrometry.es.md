@@ -48,6 +48,50 @@ frames con su propio instante de media exposición (T_mid).
 > exposición, que en un NEO rápido (5″/min) son decenas de segundos de arco
 > de error sistemático. El MPC espera T_mid; NightScribe lo calcula por ti.
 
+### Qué hace el run, paso a paso
+
+La barra de progreso nombra estas mismas fases, en este orden:
+
+1. **Calibración** (opcional): resuelve la receta contra la biblioteca de
+   masters y la aplica a cada toma **según se lee, en memoria**. No se
+   escriben copias calibradas en disco. Si la biblioteca no tiene flat para el
+   filtro, se construye un modelo de viñeteado con las propias tomas y hace de
+   flat.
+2. **Solve**: obtiene la WCS del frame de referencia (ASTAP, con nova como
+   respaldo), o reutiliza la que ya traiga el FITS.
+3. **Registro**: cada toma vota la transformación que la devuelve a la rejilla
+   de referencia, traslación primero y rotación solo si la traslación no
+   basta. Aquí se mide el ruido de cielo de cada toma (es el peso del método
+   ponderado) y se hacen los chequeos de *dithering* y de «dos tandas».
+4. **Efemérides**: la posición y la velocidad del objeto a lo largo de la
+   visita, de Horizons y, si no responde, de los elementos orbitales
+   propagados en local y después de NEOfixer. Cada toma recibe su posición
+   prevista y su T_mid.
+5. **Apilado base y detección**: se apila toda la secuencia con el objeto
+   congelado y la puerta de detección pregunta si hay algo ahí. No tira el run:
+   por debajo de la puerta el run mide igual, lo dice y pinta la magnitud en
+   rojo.
+6. **Barrido de velocidad**: se puntúa una rejilla pequeña alrededor de la
+   velocidad de la efeméride (unos ±5 %) por SNR y redondez, sembrada por la
+   estela del propio objeto. Solo se adopta un candidato si supera a la
+   efeméride por más que la dispersión de la rejilla.
+7. **Control de la WCS**: la WCS compuesta se contrasta con un solve directo de
+   las tomas, para cazar una rejilla que se va antes de que llegue al reporte.
+8. **Un apilado por observación**: la secuencia se parte en las observaciones
+   que pediste y cada grupo se apila en la posición de su propio instante.
+9. **Medida, por dos vías**: cada observación se mide sobre su apilado y
+   frame a frame con el mismo centroide. Una discrepancia mayor de 0,5″ o 3σ
+   se marca, nunca se resuelve en silencio.
+10. **Brillo** (opcional): se mide sobre el apilado del objeto, con las
+    comparsas en un segundo apilado alineado en las estrellas.
+11. **Chequeo** (opcional): tus puntos se comparan con las observaciones ya
+    publicadas del objeto a través de Find_Orb.
+
+Todas las fases que tocan píxeles leen a través de la misma calibración, así
+que lo que ve la detección y sobre lo que se mide el brillo son las mismas
+tomas. Una toma que NightScribe ya calibró (una copia exportada) **no** se
+calibra una segunda vez: lleva la marca y el run lo dice.
+
 ### Las opciones del stack, y su motivación
 
 - **Método** (cómo se combinan los frames): la **media con sigma-clip** es

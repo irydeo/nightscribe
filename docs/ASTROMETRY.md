@@ -48,10 +48,54 @@ at it.
 If a piece is missing the app says so in plain language; it never fails
 silently or invents a calibration.
 
+The calibration is applied **in memory, as each frame is read**, not as a set
+of calibrated copies on disk: the stack reads every frame many times and in
+pieces (the registration, the sweep, each observation's stack, the comparison
+stars' windows), so writing hundreds of 32 MB FITS would cost gigabytes of I/O
+per visit and they would have to be read back anyway. Exporting the calibrated
+copies is a separate, explicit action in the Calibration tab; those copies
+carry a marker (`NSCALIB`), so feeding one back into a run does not calibrate
+it twice.
+
 ## 3. The flow, step by step
 
 Everything starts in a **visit** (one night of a NEO, comet or PCCP
 project). No visit, no series: that is the house rule.
+
+### What the engine does, in order
+
+The button runs one pipeline, and the progress bar names its stages:
+
+1. **Calibration** (opt-in, on by default when the library has a matching
+   master): the recipe (dark/bias and flat) is resolved from **each frame's own
+   header** and applied **as the pixels are read** (`FrameCalibrator`). Nothing
+   is written to disk. When the library has no flat for the filter, a
+   vignetting model is sampled from the frames themselves and used in its
+   place.
+2. **Solve**: the first frame that already carries a WCS is the reference;
+   otherwise the solver resolves one (ASTAP, or nova).
+3. **Register**: each frame votes its transform onto the reference grid
+   (translation first, rotation as the fallback), its sky noise is measured,
+   and the dithering and "two runs" checks are made.
+4. **Ephemeris**: Horizons (with retries), then the orbital elements propagated
+   locally, then NEOfixer; each frame gets its predicted position and its
+   T_mid.
+5. **Base stack and detection gate** over the whole sequence, the object
+   frozen.
+6. **Velocity sweep**: a small grid around the ephemeris' rate (about ±5 %),
+   seeded by the object's own trail.
+7. **WCS quality control**: the composed WCS against a direct solve.
+8. **One stack per observation**, at the position of its own instant.
+9. **Two measurements per observation**: on the stack and frame by frame, with
+   the same centroid.
+10. **Brightness on the stacks** (optional): the object's stack and a second
+    stack aligned on the stars.
+11. **The check** against the published observations, through Find_Orb.
+
+A frame that NightScribe already calibrated carries the `NSCALIB` card and is
+left as it is: the recipe is not applied a second time, and the run says so.
+
+### What you do
 
 1. **Open the Astrometry tab** from the visit and press the big button:
    **Stack the sequence**. On entering you see three things and nothing else:

@@ -48,6 +48,48 @@ contiguous group of frames with its own middle-of-exposure instant (T_mid).
 > which on a fast NEO (5″/min) means tens of arcseconds of systematic error.
 > The MPC expects T_mid; NightScribe computes it for you.
 
+### What the run does, step by step
+
+The progress bar names these same stages, in this order:
+
+1. **Calibration** (optional): resolves the recipe against the master library
+   and applies it to each frame **as it is read, in memory**. No calibrated
+   copies are written to disk. If the library has no flat for the filter, a
+   vignetting model is built from the frames themselves and stands in for it.
+2. **Solve**: gets the reference frame's WCS (ASTAP, with nova as the
+   fallback), or reuses the one the FITS already carries.
+3. **Registration**: every frame votes the transform that puts it back on the
+   reference grid, translation first and rotation only when translation is not
+   enough. Each frame's sky noise is measured here (it is the weight of the
+   weighted method), and the dithering and the "two runs" checks are done.
+4. **Ephemeris**: the object's position and rate over the visit, from Horizons
+   and, if it does not answer, from the orbital elements propagated locally
+   and then from NEOfixer. Each frame gets its predicted position and its
+   T_mid.
+5. **Base stack and detection**: the whole sequence is stacked with the object
+   frozen, and the detection gate asks whether there is something there. It
+   does not throw the run away: below the gate the run still measures, says so
+   and paints the magnitude red.
+6. **Velocity sweep**: a small grid around the ephemeris' rate (about ±5 %) is
+   scored by SNR and roundness, seeded by the object's own trail. A candidate
+   is adopted only if it beats the ephemeris by more than the grid's scatter.
+7. **WCS quality control**: the composed WCS is checked against a direct solve
+   of the frames, so a drifting grid is caught before it reaches the report.
+8. **One stack per observation**: the sequence is split into the observations
+   you asked for and each group is stacked at the position of its own instant.
+9. **Measurement, twice**: each observation is measured on its stack and frame
+   by frame with the same centroid. A disagreement beyond 0.5″ or 3σ is
+   flagged, never resolved silently.
+10. **Brightness** (optional): measured on the object's stack, with the
+    comparison stars on a second stack aligned on the stars.
+11. **Check** (optional): your points are compared with the object's published
+    observations through Find_Orb.
+
+Every stage that touches pixels reads through the same calibration, so what
+the detection sees and what the brightness is measured on are the same frames.
+A frame that NightScribe already calibrated (an exported copy) is **not**
+calibrated a second time: it carries the marker and the run says so.
+
 ### The stack options, and their motivation
 
 - **Method** (how the frames are combined): the **sigma-clipped mean** is

@@ -47,10 +47,53 @@ las motas del tren óptico. NightScribe usa una **biblioteca de masters**
 Si falta una pieza, la app lo dice en lenguaje llano; nunca falla en
 silencio ni inventa una calibración.
 
+La calibración se aplica **en memoria, según se lee cada toma**, no como un
+juego de copias calibradas en disco: el apilado lee cada toma muchas veces y a
+trozos (el registro, el barrido, el apilado de cada observación, las ventanas
+de las comparsas), así que escribir cientos de FITS de 32 MB costaría GB de
+I/O por visita y habría que releerlos igual. Exportar las copias calibradas es
+una acción aparte y explícita en la pestaña Calibración; esas copias llevan una
+marca (`NSCALIB`), de modo que devolver una a un run no la calibra dos veces.
+
 ## 3. El flujo, paso a paso
 
 Todo empieza en una **visita** (una noche de un proyecto NEO, cometa o
 PCCP). Sin visita no hay serie: es la regla de la casa.
+
+### Qué hace el motor, en orden
+
+El botón ejecuta un solo pipeline, y la barra de progreso nombra sus fases:
+
+1. **Calibración** (opt-in, encendida por defecto cuando la biblioteca tiene un
+   master que encaja): la receta (dark/bias y flat) se resuelve del **header de
+   cada toma** y se aplica **según se leen los píxeles** (`FrameCalibrator`).
+   No se escribe nada en disco. Si la biblioteca no tiene flat para el filtro,
+   se muestrea un modelo de viñeteado de las propias tomas y se usa en su
+   lugar.
+2. **Solve**: el primer frame que ya trae WCS es la referencia; si no, el
+   solver resuelve una (ASTAP, o nova).
+3. **Registro**: cada toma vota su transformación a la rejilla de referencia
+   (traslación primero, rotación como respaldo), se mide su ruido de cielo y se
+   hacen los chequeos de *dithering* y de «dos tandas».
+4. **Efemérides**: Horizons (con reintentos), después los elementos orbitales
+   propagados en local y después NEOfixer; cada toma recibe su posición
+   prevista y su T_mid.
+5. **Apilado base y puerta de detección** sobre toda la secuencia, con el
+   objeto congelado.
+6. **Barrido de velocidad**: una rejilla pequeña alrededor de la velocidad de
+   la efeméride (unos ±5 %), sembrada por la estela del propio objeto.
+7. **Control de la WCS**: la WCS compuesta frente a un solve directo.
+8. **Un apilado por observación**, en la posición de su propio instante.
+9. **Dos medidas por observación**: sobre el apilado y frame a frame, con el
+   mismo centroide.
+10. **Brillo sobre los apilados** (opcional): el del objeto y un segundo
+    apilado alineado en las estrellas.
+11. **El chequeo** contra las observaciones publicadas, a través de Find_Orb.
+
+Una toma que NightScribe ya calibró lleva la tarjeta `NSCALIB` y se deja tal
+cual: la receta no se aplica una segunda vez, y el run lo dice.
+
+### Qué haces tú
 
 1. **Abre la pestaña Astrometría** desde la visita y pulsa el botón grande:
    **Stack the sequence**. Al entrar verás tres cosas y nada más: el objeto con

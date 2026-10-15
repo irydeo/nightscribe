@@ -101,6 +101,11 @@ def _validate(presets, families):
             v = p.get(k)
             if isinstance(v, bool) or not isinstance(v, int) or v <= 0:
                 raise ValueError(f"{where}: missing or bad {k}")
+        # type is optional (the family names the technology when it is
+        # absent), but a value that IS written must be one we understand.
+        if p.get("type") is not None and p["type"] not in (
+                "CMOS", "CCD", "DSLR"):
+            raise ValueError(f"{where}: type must be CMOS, CCD or DSLR")
         if p["bit_depth"] not in (12, 14, 16):
             raise ValueError(f"{where}: bit_depth must be 12, 14 or 16")
         if p["regime"] not in ("short", "normal"):
@@ -205,6 +210,27 @@ def preset(key):
         aliases = [a.strip().lower() for a in p["cameras"].split(",")]
         if want in aliases:
             return p
+    return None
+
+
+def sensor_type(p):
+    # The camera's technology as the type field wants it (CMOS | CCD | DSLR).
+    # A preset carries an explicit `type`; for a camera added by the user
+    # without one, the family names the technology ("... CMOS", "CCD ..."), so
+    # it is read from there. A DSLR body is NOT a sensor type (its sensor is
+    # usually CMOS), which is why a DSLR user picks no preset.
+    # @args: p - a preset dict (or None)
+    # @return: "CMOS" | "CCD" | "DSLR", or None
+    if not p:
+        return None
+    explicit = p.get("type")
+    if explicit in ("CMOS", "CCD", "DSLR"):
+        return explicit
+    family = (p.get("family") or "").lower()
+    if "ccd" in family:
+        return "CCD"
+    if "cmos" in family or "scmos" in family:
+        return "CMOS"
     return None
 
 

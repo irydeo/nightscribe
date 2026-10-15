@@ -381,6 +381,27 @@ un proyecto, este abre la ficha.
 `gui/ui/explore_dialog.ui` + `gui/explore_dialog.py` (el diálogo),
 `gui/main_window.py` (`_nav_explore`, `_tools_explore`).
 
+**Revisión (2026-10-14): una primera ejecución nunca es una actualización.**
+En Ubuntu el observador vio el asistente abrirse en el paso **Datos** con los
+tres primeros marcados como hechos, y volver a aparecer en cada arranque. La
+causa: la app crea su base de datos **mientras** construye Bienvenida, así que
+el siguiente arranque encontraba una BD y `_wizard_needed("")` (versión vacía →
+"mirar de más") la tomaba por una actualización; además la versión empaquetada
+era `0.0.0` (ver ADR-087), con lo que toda comparación de versiones carecía de
+sentido. Cambios:
+
+1. **`is_update(última)` separa "¿hay actualización?" de "¿mostrar Bienvenida?".**
+   Solo es actualización una versión **previa, conocida y estrictamente
+   anterior**. `app_version` vacía es una primera ejecución y jamás dispara el
+   informe de Datos ni marca pasos como hechos.
+2. **El paso 1 se exige antes de Tonight.** Sin observatorio configurado,
+   `_goto_tab(VIEW_TONIGHT)` lleva al paso Observatorio en vez de a una vista
+   que no puede calcular nada. No es una cárcel: el resto de vistas siguen
+   accesibles y la puerta se abre sola en cuanto hay sitio.
+3. **Bienvenida se muestra una vez.** Al configurar el observatorio (o al
+   reconocer el informe) se recuerda `welcome_seen`; un arranque posterior sin
+   proyectos abre en Home, con el acceso en «ⓘ Welcome».
+
 ## English
 
 **Context.** The app was born with "Tonight" as the root screen: on open it
@@ -743,3 +764,23 @@ project, this one opens the card.
 **Entry point**: `gui/ui/main_window.ui` (the box in the navigation row),
 `gui/ui/explore_dialog.ui` + `gui/explore_dialog.py` (the dialog),
 `gui/main_window.py` (`_nav_explore`, `_tools_explore`).
+
+**Revision (2026-10-14): a first run is never an update.** On Ubuntu the
+observer saw the wizard open on the **Data** step with the first three marked as
+done, and appear again on every launch. The cause: the app creates its database
+**while** it builds Welcome, so the next launch found a database and
+`_wizard_needed("")` (empty version -> "take an extra look") took it for an
+update; on top of that the packaged version was `0.0.0` (see ADR-087), so every
+version comparison was meaningless. Changes:
+
+1. **`is_update(last)` separates "is there an update?" from "show Welcome?".**
+   Only a **previous, known and strictly older** version is an update. An empty
+   `app_version` is a first run and never triggers the Data report nor marks
+   steps as done.
+2. **Step 1 is required before Tonight.** With no observatory configured,
+   `_goto_tab(VIEW_TONIGHT)` sends the observer to the Observatory step instead
+   of a view that can compute nothing. It is not a jail: the other views stay
+   reachable and the door opens by itself the moment a site is set.
+3. **Welcome is shown once.** Configuring the observatory (or acknowledging the
+   report) remembers `welcome_seen`; a later launch with no projects opens on
+   Home, with the entry under "ⓘ Welcome".

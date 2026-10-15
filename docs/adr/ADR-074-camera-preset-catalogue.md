@@ -207,3 +207,22 @@ from protecting the measured profile when Settings **opens** (where
 6. **The family headers read as headers**: bold, accent colour, uppercase and a
    faint band (`theme.style_combo_header`), because the "disabled" grey alone
    did not stand out from a camera.
+
+**Revisión (2026-10-14): el preset ya dice el tipo.** Elegir una cámara es
+decir qué cámara es, así que preguntar después CCD/CMOS/DSLR es preguntar lo
+que el observador acaba de contestar. Cada `[[camera]]` gana un campo `type`
+(`"CMOS"` o `"CCD"`; un cuerpo DSLR no es un tipo de sensor, por eso quien usa
+uno no elige preset), y al elegir un preset el combo de tipo se rellena desde
+él, tanto en Bienvenida como en Ajustes. El combo sigue editable por si la
+cámara no está en el catálogo. `cameras.sensor_type(p)` lee el campo y, para una
+cámara añadida por el usuario sin él, lo deduce de la familia («... CMOS»,
+«CCD ...»).
+
+**Revision (2026-10-14): the preset already says the type.** Choosing a camera
+is saying which camera it is, so asking afterwards for CCD/CMOS/DSLR is asking
+what the observer just answered. Every `[[camera]]` gains a `type` field
+(`"CMOS"` or `"CCD"`; a DSLR body is not a sensor type, which is why a DSLR user
+picks no preset), and choosing a preset fills the type combo from it, in both
+Welcome and Settings. The combo stays editable for a camera the catalogue does
+not cover. `cameras.sensor_type(p)` reads the field and, for a user-added camera
+without it, derives it from the family ("... CMOS", "CCD ...").

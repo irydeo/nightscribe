@@ -194,12 +194,15 @@ def test_apply_equipment_writes_and_fills_a_new_preset(qapp, monkeypatch):
     wizard._setup_equipment(h)
     h.spn_aperture.setValue(9.0)
     h.spn_limit_mag.setValue(19.6)
+    # picking a camera already says what it is: the CCD preset overrides the
+    # CMOS that was on screen (2026-10-14)
     h.cmb_camera_type.setCurrentText("CMOS")
     h.cmb_cam_preset.setCurrentIndex(h.cmb_cam_preset.findData("kaf8300"))
+    assert h.cmb_camera_type.currentText() == "CCD"
     wizard._apply_equipment(h)
     assert config.get("aperture_inches") == 9.0
     assert config.get("limit_mag") == 19.6
-    assert config.get("camera_type") == "CMOS"
+    assert config.get("camera_type") == "CCD"
     assert config.get("cam_preset") == "kaf8300"
     assert config.get("ccd_read_noise") == 9.0        # the preset's datasheet
     assert config.get("cam_full_well_e") == 25500.0

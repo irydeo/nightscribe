@@ -39,6 +39,10 @@ DEFAULTS = {
     "min_alt": 30.0,        # degrees above horizon
     "language": "system",   # system | es | en
     "app_version": "",      # last app version the update wizard ran for
+    # True once the first-run setup (Welcome) has been seen and the
+    # observatory is configured: a later start with no project then opens on
+    # Home instead of Welcome (2026-10-14).
+    "welcome_seen": False,
     "neofixer_key": "",     # optional, for reporting observing status
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",

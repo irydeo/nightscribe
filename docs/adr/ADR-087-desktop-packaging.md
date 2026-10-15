@@ -160,3 +160,88 @@ installs at install time, rejected: it needs the network and minutes to install,
 and is not reproducible; (e) a `.deb` with `pip install --no-index` of vendored
 wheels, rejected: it weighs like the self-contained one and adds nothing over
 the tarball.
+
+**Revisión (2026-10-14): el paquete enseña lo que es.** Instalado el `.deb` en
+Ubuntu, el observador vio tres cosas mal y una cuarta encadenada: el paquete
+aparecía **sin licencia y sin editor**, la **versión era `0.0.0`**, y la app se
+comportaba como si cada arranque fuese una actualización (arrancaba en el
+informe de Datos con los tres primeros pasos marcados como hechos, y los
+objetivos no cargaban). Causas y arreglos:
+
+1. **La versión se perdía al copiar el paquete a mano.** `build_deb.py` (y el
+   spec RPM) copiaban `nightscribe/` a `dist-packages` sin `*.dist-info`, así
+   que `importlib.metadata.version("nightscribe")` fallaba y caía al `0.0.0` de
+   respaldo. El paquete escribe ahora `nightscribe-<version>.dist-info/METADATA`
+   (y `usr/share/nightscribe/version` como último recurso), y `version.py` avisa
+   por el log cuando la versión es desconocida. El `0.0.0` hacía que la
+   detección de actualización comparase `(0,0,0)` consigo misma.
+2. **Sin AppStream no hay licencia, editor ni icono en el centro de software.**
+   Un `.desktop` solo no basta. Se añade
+   `installer/io.github.irydeo.nightscribe.metainfo.xml` (id reverse-DNS, que
+   debe coincidir con el nombre del `.desktop`, renombrado a
+   `io.github.irydeo.nightscribe.desktop`), con `project_license`,
+   `developer_name` y `<launchable>`. El CI lo valida con `appstreamcli
+   validate`.
+3. **`usr/share/doc/nightscribe/copyright`** (política Debian), que además
+   nombra la licencia separada del Find_Orb empaquetado.
+
+**Consecuencias**: el `.deb`/`.rpm` enseñan versión, licencia, editor e icono
+en GNOME Software / App Center, y la detección de actualización vuelve a
+funcionar porque la versión es la real. Se revisan también ADR-033 (el
+versionado) y ADR-055 (el primer arranque ya no se confunde con una
+actualización). El `PKGBUILD` de Arch ya usaba un wheel y no estaba afectado.
+
+**Revisión (2026-10-15): la versión del `METADATA` tiene que ser PEP 440.** El
+`.rpm` dejó de construirse: el workflow convertía el `+` del segmento local de
+la versión en `-` (para los nombres de fichero) y el job de RPM lo pasaba a
+`.`, de modo que el `METADATA` del dist-info llevaba `0.1.0a2.dev53.g242f1b98e`.
+El generador de dependencias de RPM (`pythondistdeps.py`) lee ese campo con
+`packaging`, que lo rechaza (`Invalid version`) y aborta la construcción entera
+con `PYTHONDISTDEPS_GENERATORS_FAILED`. Arreglo: la versión viaja sin tocar
+(con su `+`) hasta el spec, porque RPM acepta el `+` (su comparador lo trata
+como separador) y PEP 440 lo exige; sólo la etiqueta que va en los nombres de
+fichero pierde el `+`. Medido: el mismo árbol con `0.1.0a2.dev53+g242f1b98e`
+construye el `.rpm` y el generador emite `python3dist(nightscribe) = 0.1~a2`.
+
+**Revision (2026-10-14): the package shows what it is.** With the `.deb`
+installed on Ubuntu the observer saw three wrong things and a fourth that
+followed: the package showed **no licence and no developer**, the **version was
+`0.0.0`**, and the app behaved as if every launch were an update (it opened on
+the Data report with the first three steps marked as done, and the targets did
+not load). Causes and fixes:
+
+1. **The version was lost when the package was copied by hand.** `build_deb.py`
+   (and the RPM spec) copied `nightscribe/` into `dist-packages` with no
+   `*.dist-info`, so `importlib.metadata.version("nightscribe")` failed and fell
+   back to `0.0.0`. The package now writes
+   `nightscribe-<version>.dist-info/METADATA` (and
+   `usr/share/nightscribe/version` as a last resort), and `version.py` logs a
+   warning when the version is unknown. The `0.0.0` made the update detection
+   compare `(0,0,0)` with itself.
+2. **Without AppStream there is no licence, developer or icon in the software
+   centre.** A `.desktop` entry alone is not enough.
+   `installer/io.github.irydeo.nightscribe.metainfo.xml` is added (reverse-DNS
+   id, which must match the `.desktop` name, renamed to
+   `io.github.irydeo.nightscribe.desktop`), with `project_license`,
+   `developer_name` and `<launchable>`. The CI validates it with
+   `appstreamcli validate`.
+3. **`usr/share/doc/nightscribe/copyright`** (Debian policy), which also names
+   the separate licence of the bundled Find_Orb.
+
+**Consequences**: the `.deb`/`.rpm` show version, licence, developer and icon
+in GNOME Software / App Center, and the update detection works again because
+the version is the real one. ADR-033 (versioning) and ADR-055 (the first run is
+no longer confused with an update) are revised too. Arch's `PKGBUILD` already
+used a wheel and was not affected.
+
+**Revision (2026-10-15): the `METADATA` version must be PEP 440.** The `.rpm`
+stopped building: the workflow turned the `+` of the version's local segment
+into `-` (for file names) and the RPM job then turned it into `.`, so the
+dist-info `METADATA` carried `0.1.0a2.dev53.g242f1b98e`. RPM's dependency
+generator (`pythondistdeps.py`) reads that field with `packaging`, which rejects
+it (`Invalid version`) and aborts the whole build with
+`PYTHONDISTDEPS_GENERATORS_FAILED`. Fix: the version travels untouched (with its
+`+`) all the way to the spec, because RPM accepts the `+` (its comparator treats
+it as a separator) and PEP 440 requires it; only the label used in file names
+drops the `+`. Measured: the same tree with `0.1.0a2.dev53+g242f1b98e` builds the
+`.rpm` and the generator emits `python3dist(nightscribe) = 0.1~a2`.

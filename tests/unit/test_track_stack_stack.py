@@ -175,6 +175,39 @@ def test_ram_and_streaming_agree(tmp_path):
     assert np.allclose(ram, streamed, rtol=1e-3, atol=0.05, equal_nan=True)
 
 
+def test_stack_group_stops_on_cancel(tmp_path):
+    # The cancel has to reach INSIDE a group: the base stack is the WHOLE
+    # sequence (measured on a real visit at 539 frames) and checking it only
+    # between groups left the longest call of the run uninterruptible.
+    frames = _sequence(tmp_path, n=6, rate_px=1.0)
+    q = (24.0 + 1.0 * 2.5, 34.0)
+    box = ts.cutout_box(frames, (0, 6), q, margin_px=10, shape=(64, 64))
+    stack, report = ts.stack_group(frames, (0, 6), q, "mean", box, (64, 64),
+                                   cancel=lambda: True)
+    assert stack is None
+    assert report.n_frames == 6
+
+
+def test_streaming_stack_stops_on_cancel(tmp_path):
+    # the streaming path walks strips, so the cancel is asked once per strip
+    frames = _sequence(tmp_path, n=6, rate_px=1.0)
+    q = (24.0 + 1.0 * 2.5, 34.0)
+    box = ts.cutout_box(frames, (0, 6), q, margin_px=10, shape=(64, 64))
+    stack, report = ts.stack_group(frames, (0, 6), q, "mean", box, (64, 64),
+                                   budget_bytes=6 * 8 * 4,
+                                   cancel=lambda: True)
+    assert report.streamed and stack is None
+
+
+def test_warp_batch_and_combine_stop_on_cancel():
+    # both answer None (the warp as a (None, None) pair) so the caller stops
+    # instead of keeping a stack with holes in it
+    assert ts._warp_batch([], [], (0, 0, 4, 4), (8, 8),
+                          cancel=lambda: True) == (None, None)
+    cube = np.ones((3, 4, 4), dtype=np.float32)
+    assert ts.combine(cube, "mean", cancel=lambda: True) is None
+
+
 def test_stack_does_not_read_more_than_the_cutout(tmp_path):
     # the loader records the boxes it is asked for: none may be the whole
     # frame (that is the point of the region read, D32)

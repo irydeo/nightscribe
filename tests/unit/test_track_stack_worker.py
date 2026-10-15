@@ -314,7 +314,7 @@ def test_photometry_runs_and_keeps_the_plate_shape_for_every_observation(
 
     shapes_seen = []
 
-    def fake_windows(_frames, _group, entries, _wcs_box, shape):
+    def fake_windows(_frames, _group, entries, _wcs_box, shape, cancel=None):
         # the comp windows are the thing that receives the PLATE shape: if
         # the elongation dict clobbered it, this is a dict and the assert
         # below says so

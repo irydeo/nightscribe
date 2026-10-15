@@ -16,10 +16,11 @@ answer.
 
 CuPy cannot be a hard dependency, so the whole file SKIPS on a machine without
 it (which is the normal case, and the CI). When it is there, the two things
-that matter are pinned: the backend is OFF unless the observer asks for it, and
-its warp and combine agree with the numpy path to within a float32 rounding
-(they cannot be bit-identical: a GPU reduces in a different order, and the
-measured worst case is under a third of an ADU on a sky of a thousand).
+that matter are pinned: the backend needs BOTH the observer's switch (on by
+default since the 2026-10-15 revision of ADR-089) and the hardware, and its
+warp and combine agree with the numpy path to within a float32 rounding (they
+cannot be bit-identical: a GPU reduces in a different order, and the measured
+worst case is under a third of an ADU on a sky of a thousand).
 """
 
 import numpy as np
@@ -34,10 +35,24 @@ pytestmark = pytest.mark.skipif(not gpu.available(),
 
 def test_the_backend_is_off_unless_it_is_asked_for():
     # The observer's explicit choice is one gate and the hardware is the
-    # other; a GPU that is merely PRESENT must not change a result.
+    # other; a GPU that is merely PRESENT must not change a result. The
+    # switch now DEFAULTS to on (ADR-089 rev), so the gate is the config
+    # value, not the absence of one.
     assert gpu.enabled(None) is False
     assert gpu.enabled({"astrometry_gpu": 0}) is False
     assert gpu.enabled({"astrometry_gpu": 1}) is True
+
+
+def test_probe_answers_about_a_backend_without_moving_the_dispatch():
+    # The Settings dialog asks "which card does THIS backend see?" so the
+    # switch is never a blind guess. Asking must NOT change the backend that
+    # serves the calls: the answer is a fact about the machine.
+    before = gpu._state["requested"]
+    name = gpu.probe("opencl")
+    assert isinstance(name, str)
+    assert gpu.probe("opencl") == name            # stable
+    assert gpu.probe("nonsense") == gpu.probe("auto")   # anything else: auto
+    assert gpu._state["requested"] == before      # the dispatch did not move
 
 
 @pytest.mark.parametrize("method", ["sum", "mean", "median", "sigma",

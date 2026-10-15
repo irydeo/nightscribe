@@ -1133,14 +1133,17 @@ def _warp_to_box(path, tr, delta, box, shape, loader=None, order=None,
 
 
 def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
-                preloaded=None, order=None):
+                preloaded=None, order=None, cancel=None):
     # Warps a list of frames onto the box, in PARALLEL, keeping the order.
     # @args: frame_list - list[Frame], offsets - one (dx, dy) per frame (same
     #        order), box/shape - the warp's output box and the native frame,
     #        loader - optional array reader, cfg - Config (the thread
     #        override), preloaded - optional list of (array, box) already in
-    #        RAM, one per frame (the sweep)
-    # @return: (stack (n, h, w) float32, masks (n, h, w) bool)
+    #        RAM, one per frame (the sweep), cancel - optional callable()
+    #        -> bool: no new frame is warped once it says True (the frames
+    #        already running finish; a thread cannot be killed)
+    # @return: (stack (n, h, w) float32, masks (n, h, w) bool), or
+    #          (None, None) when the cancel fired (the caller then stops)
     # The warps are INDEPENDENT (each frame reads its own region and writes
     # its own slice), so this is where the pipeline uses the machine's
     # cores: measured, scipy's warp scales x9.7 over 16 threads because it
@@ -1149,6 +1152,10 @@ def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
     n = len(frame_list)
     out_h = box[3] - box[1]
     out_w = box[2] - box[0]
+    # The cancel is asked HERE too and not only inside map_parallel: that one
+    # stays serial for a single item and would then never look at it.
+    if cancel is not None and cancel():
+        return None, None
     # one warp holds its output plus a mask and one temporary of the same
     # size, and that is what bounds the thread count on a big box
     per_task = max(1, out_h * out_w * 4 * 3)
@@ -1158,7 +1165,11 @@ def _warp_batch(frame_list, offsets, box, shape, loader=None, cfg=None,
             frame_list[k].path, frame_list[k].transform, offsets[k], box,
             shape, loader=loader, order=order,
             preloaded=(preloaded[k] if preloaded is not None else None)),
-        range(n), workers=workers)
+        range(n), workers=workers, cancel=cancel)
+    # map_parallel leaves None where it stopped submitting: the run is being
+    # cancelled and the caller wants None, not a stack with holes in it.
+    if any(item is None for item in results):
+        return None, None
     stack = np.empty((n, out_h, out_w), dtype=np.float32)
     masks = np.empty((n, out_h, out_w), dtype=bool)
     for k, (warped, valid) in enumerate(results):
@@ -1216,12 +1227,14 @@ def _combine_slice(data, method, weights, sigma, iterations):
 
 
 def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None,
-            cfg=None):
+            cfg=None, cancel=None):
     # @args: stack - (n, h, w) float32, method - one of METHODS, mask -
     #        optional (n, h, w) validity, sigma/iterations - for sigma-clip,
     #        weights - optional (n,) per-frame weights (see frame_weights),
-    #        cfg - Config (the thread override)
-    # @return: the combined (h, w) float32 image
+    #        cfg - Config (the thread override), cancel - optional callable()
+    #        -> bool: the columns already started finish, no new one begins
+    # @return: the combined (h, w) float32 image, or None when the cancel
+    #          fired (the caller then stops instead of keeping half an image)
     # sum and mean are equivalent in signal (mean is sum / n); both are
     # offered because the user will see them in the concept, but the app
     # says they differ only in scale. sigma-clipped keeps almost all of
@@ -1245,6 +1258,10 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None,
     # only pay when there is work to share.
     if stack.size == 0:
         return stack.reshape(stack.shape[1:]) if stack.ndim == 3 else stack
+    # The cancel is asked before the work starts (map_parallel stays serial
+    # for a single chunk and would not look at it) and again as the chunks go.
+    if cancel is not None and cancel():
+        return None
     data = stack
     if mask is not None:
         data = np.where(mask, stack, np.nan)
@@ -1258,7 +1275,11 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None,
             parts = parallel.map_parallel(
                 lambda cols: _combine_slice(data[:, :, cols], method,
                                             weights, sigma, iterations),
-                chunks, workers=workers)
+                chunks, workers=workers, cancel=cancel)
+            # a None part is a chunk that was never started: half an image is
+            # worse than none, so the caller is told to stop
+            if any(part is None for part in parts):
+                return None
             return np.concatenate(parts, axis=1).astype(np.float32)
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="All-NaN slice.*")
@@ -1281,12 +1302,13 @@ def _combine_weighted(data, weights, sigma, iterations):
     keep = _sigma_clip_keep(data, sigma, iterations)
     w = _weight_row(weights, data.shape[0])
     if w is None:
-        with np.errstate(invalid="ignore"):
-            return np.nanmean(np.where(keep, data, np.nan),
-                              axis=0).astype(np.float32)
+        return _survivor_mean(data, keep)
     ww = np.broadcast_to(w, data.shape)
-    num = np.nansum(np.where(keep, data * ww, np.nan), axis=0)
-    den = np.sum(np.where(keep, ww, 0.0), axis=0)
+    # `where=` skips the non-survivors in the reduction, so the whole
+    # `np.where(keep, ..., np.nan)` cube is not built and read again: on a
+    # (539, 700, 700) cube that copy was 1 GB per reduction.
+    num = np.sum(data * ww, axis=0, where=keep)
+    den = np.sum(ww, axis=0, where=keep)
     with np.errstate(invalid="ignore", divide="ignore"):
         out = np.where(den > 0, num / den, np.nan)
     return out.astype(np.float32)
@@ -1306,7 +1328,24 @@ def _combine_masked(data, method, sigma, iterations):
         return outliers.nanmedian_axis0(data).astype(np.float32)
     # sigma-clipped: clip around the median and average the survivors
     keep = _sigma_clip_keep(data, sigma, iterations)
-    return np.nanmean(np.where(keep, data, np.nan), axis=0).astype(np.float32)
+    return _survivor_mean(data, keep)
+
+
+def _survivor_mean(data, keep):
+    # @args: data - (n, h, w) with the invalid pixels already NaN, keep -
+    #        (n, h, w) "this pixel survives the clip"
+    # @return: the (h, w) float32 mean of the survivors
+    # The mean over the kept frames, read straight out of `data`: the sum
+    # and the count skip the rest with `where=`, so no NaN cube is built (the
+    # old `np.where(keep, data, np.nan)` + `nanmean` wrote and re-read a full
+    # cube, 1 GB on a (539, 700, 700) stack). The answer is the same: kept
+    # pixels are finite, so their sum is finite, and the count is the
+    # denominator. An all-clipped column is NaN, exactly as nanmean gave.
+    count = keep.sum(axis=0)
+    total = np.sum(data, axis=0, where=keep)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        out = np.where(count > 0, total / np.maximum(count, 1), np.nan)
+    return out.astype(np.float32)
 
 
 def _sigma_clip_keep(data, sigma, iterations):
@@ -1319,15 +1358,19 @@ def _sigma_clip_keep(data, sigma, iterations):
     # mean and the weighted one MUST reject the same pixels: the only
     # difference between the two methods is how the survivors are averaged.
     med = outliers.nanmedian_axis0(data)
-    keep = np.isfinite(data)
+    finite = np.isfinite(data)          # the invalid map never changes
+    keep = finite
     for _ in range(max(1, iterations)):
+        # ONE deviation pass per iteration, shared by the MAD and the keep
+        # test; rebuilding |data - med| twice was a whole extra cube pass.
+        dev = np.abs(data - med)
         with np.errstate(invalid="ignore"):
-            mad = outliers.scaled_mad(data, axis=0, centre=med)
+            mad = outliers.mad_from_deviations(dev)
         mad = np.where(mad > 0, mad, np.inf)
-        keep = keep & (np.abs(data - med) <= sigma * mad)
+        keep = keep & (dev <= sigma * mad)
         count = keep.sum(axis=0)
         with np.errstate(invalid="ignore"):
-            new_med = np.nansum(np.where(keep, data, np.nan), axis=0) \
+            new_med = np.sum(data, axis=0, where=keep) \
                 / np.maximum(count, 1)
         med = np.where(count > 0, new_med, med)
     return keep
@@ -1335,7 +1378,7 @@ def _sigma_clip_keep(data, sigma, iterations):
 
 def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
                 budget_bytes=MEMORY_BUDGET_BYTES, sigma=3.0, iterations=3,
-                track=True, order=None):
+                track=True, order=None, cancel=None):
     # @args: frames - list[Frame], group - (start, end), q - the group's
     #        reference point, method - one of METHODS, box - the output box,
     #        shape - the native frame size, cfg - Config, loader - array
@@ -1344,8 +1387,13 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     #        freezes the OBJECT (the stars trail), False freezes the STARS (the
     #        object trails), order - the warp's interpolation order (None = the
     #        module's default, see WARP_ORDER: a knob for the eye and not for
-    #        the limit, which is what the measurement says)
-    # @return: (stack, report)
+    #        the limit, which is what the measurement says), cancel - optional
+    #        callable() -> bool, checked between frames and between strips
+    # @return: (stack, report); stack is None when the cancel fired
+    # A single group can be hundreds of frames (the BASE stack is the whole
+    # sequence, measured on a real visit at 539 frames), so the cancel has to
+    # reach INSIDE the group: checking it only between groups left the longest
+    # call of the run, the one the observer is watching, uninterruptible.
     # In RAM when the warped frames fit the budget (the cutout path always
     # does); otherwise the output is walked in strips and only the region
     # each strip needs is read. The two paths are tested to agree, because
@@ -1389,9 +1437,15 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
                 return fused, report
         stack, masks = _warp_batch([frames[i] for i in indices], offsets, box,
                                    shape, loader=loader, cfg=cfg,
-                                   order=order)
-        return combine(stack, method, mask=masks, sigma=sigma,
-                       iterations=iterations, weights=weights, cfg=cfg), report
+                                   order=order, cancel=cancel)
+        if stack is None:
+            return None, report
+        combined = combine(stack, method, mask=masks, sigma=sigma,
+                           iterations=iterations, weights=weights, cfg=cfg,
+                           cancel=cancel)
+        if combined is None:
+            return None, report
+        return combined, report
     report.streamed = True
     out = np.empty((out_h, out_w), dtype=np.float32)
     strip_h = max(1, int(budget_bytes / max(1, n * out_w * 4)))
@@ -1403,6 +1457,10 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
     # so a truncated region changes its own edges slightly.
     pad = 8
     for y0 in range(0, out_h, strip_h):
+        # the strips are the streaming path's own frames: one more place the
+        # cancel is worth asking, because a strip of a big box is a real wait
+        if cancel is not None and cancel():
+            return None, report
         y1 = min(out_h, y0 + strip_h)
         py0 = max(0, y0 - pad)
         py1 = min(out_h, y1 + pad)
@@ -1419,9 +1477,14 @@ def stack_group(frames, group, q, method, box, shape, cfg=None, loader=None,
         if combined is None:
             strip, masks = _warp_batch([frames[i] for i in indices], offsets,
                                        sub_box, shape, loader=loader, cfg=cfg,
-                                       order=order)
+                                       order=order, cancel=cancel)
+            if strip is None:
+                return None, report
             combined = combine(strip, method, mask=masks, sigma=sigma,
-                               iterations=iterations, weights=weights, cfg=cfg)
+                               iterations=iterations, weights=weights, cfg=cfg,
+                               cancel=cancel)
+            if combined is None:
+                return None, report
         out[y0:y1] = combined[y0 - py0:y1 - py0]
     return out, report
 
@@ -1431,7 +1494,8 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
                  order=None):
     # @args: frames, groups, q_by_group (one q per group), method, boxes
     #        (one box per group), shape, cfg, loader, progress, cancel,
-    #        track - as stack_group (False gives the star stacks)
+    #        track - as stack_group (False gives the star stacks). The cancel
+    #        goes INTO stack_group too: a group is where the wait is
     # @return: list[(stack, report)] one per observation
     out = []
     total = len(groups)
@@ -1440,7 +1504,8 @@ def stack_groups(frames, groups, q_by_group, method, boxes, shape, cfg=None,
             break
         stack, report = stack_group(frames, group, q_by_group[index], method,
                                     boxes[index], shape, cfg=cfg,
-                                    loader=loader, track=track, order=order)
+                                    loader=loader, track=track, order=order,
+                                    cancel=cancel)
         if progress is not None:
             progress(index + 1, total, f"observation {index + 1}")
         # one entry PER GROUP even when it is empty, so the caller's index

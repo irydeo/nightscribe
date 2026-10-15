@@ -18,8 +18,10 @@ pyopencl cannot be a hard dependency, so the whole file SKIPS on a machine
 without it (the normal case, and the CI). When it is there, what is pinned is
 the parity (the warp and the combine agree with the numpy path to within a
 float32 rounding), that the facade can be pointed at it and reaches it, and
-that the registration says so instead of pretending: `frame_stars` is not
-ported and answers None, so the CPU keeps that half.
+that the registration (`frame_stars`) finds the CPU's own stars. The SCALABLE
+combine is pinned too: a cube taller than the private kernel's arrays is served
+by the radix-select kernels (the base stack of a real visit is hundreds of
+frames), and the device-memory guard answers None instead of an OOM.
 """
 
 import numpy as np
@@ -132,6 +134,39 @@ def test_the_engine_takes_the_opencl_path_when_it_is_on(tmp_path, forced_opencl)
     assert np.nanmax(np.abs(cpu - on_gpu)) < 0.5
 
 
+def test_the_engine_takes_the_opencl_path_for_a_tall_cube(tmp_path,
+                                                          forced_opencl):
+    # More frames than the private combine holds: the fused path now serves it
+    # with the SCALABLE combine, so the whole stack (base stack of a real
+    # visit) stays on the device instead of falling to the CPU. The result
+    # must be the CPU's.
+    from astropy.io import fits
+    rng = np.random.default_rng(3)
+    size = 384
+    n = gpu_opencl._PRIVATE_COMBINE_MAX + 24
+    base = rng.normal(1000.0, 4.0, (size, size))
+    frames = []
+    for i in range(n):
+        img = np.roll(base, (i % 3 - 1, i % 2 - 1), axis=(0, 1))
+        path = tmp_path / f"h{i}.fits"
+        fits.PrimaryHDU(img.astype(np.int16)).writeto(str(path),
+                                                      overwrite=True)
+        fr = ts.Frame(path=str(path),
+                      header={"NAXIS1": size, "NAXIS2": size})
+        fr.transform = {"angle": 0.0, "dx": float(i % 3 - 1),
+                        "dy": float(i % 2 - 1), "quality": 100.0, "rms_px": 0.0}
+        fr.object_xy = (size / 2.0, size / 2.0)
+        frames.append(fr)
+    q = (size / 2.0, size / 2.0)
+    box = ts.box_around(q, 300, (size, size))
+    cpu, _ = ts.stack_group(frames, (0, n), q, "sigma", box, (size, size),
+                            cfg={"astrometry_gpu": 0})
+    on_gpu, _ = ts.stack_group(
+        frames, (0, n), q, "sigma", box, (size, size),
+        cfg={"astrometry_gpu": 1, "astrometry_gpu_backend": "opencl"})
+    assert np.nanmax(np.abs(cpu - on_gpu)) < 0.5
+
+
 def _field(size, seed=1, nstars=200):
     # A synthetic star field, the same shape the register bench uses.
     rng = np.random.default_rng(seed)
@@ -194,3 +229,37 @@ def test_the_registration_feeds_the_estimate():
     assert abs(got["dx"] - want["dx"]) < 0.05
     assert abs(got["dy"] - want["dy"]) < 0.05
     assert abs(got["angle"] - want["angle"]) < 1e-4
+
+
+@pytest.mark.parametrize("method", ["sum", "mean", "median", "sigma",
+                                    "weighted"])
+def test_the_scalable_combine_matches_the_numpy_path(method):
+    # More frames than the private combine holds: the base stack of a real
+    # visit is hundreds, so the SCALABLE combine walks the column in global
+    # memory and the ceiling is gone. The parity is the same contract as the
+    # short-cube test above; the median is EXACT (the radix select picks the
+    # same order statistic the CPU's sort does).
+    rng = np.random.default_rng(7)
+    n = gpu_opencl._PRIVATE_COMBINE_MAX + 8
+    cube = rng.normal(1000.0, 4.0, (n, 64, 64)).astype(np.float32)
+    cube[3] += 500.0
+    cube[17] -= 400.0
+    mask = np.ones_like(cube, dtype=bool)
+    mask[0, :4, :4] = False
+    weights = np.linspace(0.5, 2.0, n).astype(np.float32)
+    if method != "weighted":
+        weights = None
+    cpu = ts.combine(cube, method, mask=mask, weights=weights,
+                     cfg={"astrometry_gpu": 0})
+    on_gpu = gpu_opencl.combine(cube, method, mask=mask, weights=weights)
+    assert on_gpu is not None
+    assert np.nanmax(np.abs(cpu - on_gpu)) < 0.5
+
+
+def test_the_device_guard_declines_a_cube_that_does_not_fit(monkeypatch):
+    # A card that cannot hold the cube, its masks and (for the clip) the keep
+    # buffer is a normal "cannot serve this call", and the check runs BEFORE
+    # the upload. A fake small card makes it refuse without allocating.
+    monkeypatch.setitem(gpu_opencl._state, "mem", 128 * 1024 ** 2)
+    assert gpu_opencl._device_has_room(1000, 2048, 2048, keep=True) is False
+    assert gpu_opencl._device_has_room(4, 64, 64, keep=True) is True

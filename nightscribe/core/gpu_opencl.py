@@ -34,6 +34,14 @@ they are a radix SELECT on the sortable bit pattern of the float. Measured on
 the author's RTX 3090, the whole per-frame estimate goes from 169.5 ms on the
 CPU to 12.5 ms (x13.6).
 
+The COMBINE has TWO kernels and the frame count alone picks: a private-array
+one that holds the column in registers (the fast path for the short cubes the
+stacking groups make) and a SCALABLE one that walks the column in GLOBAL
+memory, so the frame ceiling is gone and the base stack (the WHOLE sequence, a
+real visit is hundreds of frames) stays on the device. Measured on 539 frames
+of 1024^2: the sigma combine 0.93 s on the device against 10.6 s on the CPU,
+and the whole base stack 1.2 s against 6.3 s.
+
 The registration runs in FLOAT by default and there is a DOUBLE build (the
 exact-parity one) one line away: measured, the float star list is the same as
 the CPU's (positions to 1.35e-7 px) and the double one is bit-identical, but
@@ -60,10 +68,16 @@ M_SUM, M_MEAN, M_MEDIAN, M_SIGMA, M_WEIGHTED = range(5)
 _METHODS = {"sum": M_SUM, "mean": M_MEAN, "median": M_MEDIAN,
             "sigma": M_SIGMA, "weighted": M_WEIGHTED}
 
-# The most frames a single work-item can hold in private memory. A visit is
-# dozens, not hundreds (the stacking groups are small), and the ceiling keeps
-# the kernel's register use bounded; a bigger cube is served by the CPU.
-_MAX_FRAMES = 128
+# The PRIVATE combine kernel keeps one column in its work-item's private
+# memory, so its arrays are [128] and it can never see a taller cube. Measured
+# on 2048^2 it is FASTER than the scalable one only while the column is SHORT:
+# the median ~2x at n=32-64 and the sigma clip ~2.5x, they tie near n=96 and
+# the scalable wins from ~128 up (measured 2026-10-15). So it serves the short
+# cubes the stacking groups and the star stack make, and the SCALABLE one
+# serves the base stack, which is the WHOLE sequence (a real visit at 539
+# frames). This is the dispatch line, a little under the kernel's own hard
+# limit on purpose.
+_PRIVATE_COMBINE_MAX = 96
 
 KERNELS = r"""
 // The per-frame WARP: the same affine `cupyx.scipy.ndimage.affine_transform`
@@ -216,10 +230,176 @@ __kernel void combine(
     }
     out[p] = den > 0.0f ? num / den : NAN;
 }
+
+// ======================================================================
+// The SCALABLE combine: ANY number of frames.
+//
+// The combine above holds one column in the work-item's PRIVATE memory and so
+// caps at 128 frames; a base stack is the WHOLE sequence and a real visit is
+// hundreds (measured: the author's Sar2949, 539 frames), which left those
+// cubes to the CPU. These kernels instead walk the column in GLOBAL memory,
+// so the ceiling is gone (measured on 539 x 1024^2: the sigma combine 10.6 s
+// on the CPU against 0.93 s here, and the median is exact).
+//
+// The median is a per-pixel RADIX SELECT on the sortable bit pattern of the
+// float, the same trick the registration uses (float_bits/bits_float): four
+// 8-bit passes, each one a 256-bin histogram over the column, so a NaN-aware
+// median costs no sort.
+// ======================================================================
+
+// The sortable mapping: a float's bits reordered so that the UNSIGNED
+// comparison of two mapped values IS the float comparison. Negatives flip
+// every bit, positives only the sign. It mirrors the registration's
+// real_bits/bits_real (the float case); that one is templated for the double
+// build, this one is float-only because the cube is float32.
+static uint float_bits(float x) {
+    const uint u = as_uint(x);
+    return (u & 0x80000000u) ? ~u : (u | 0x80000000u);
+}
+
+static float bits_float(uint u) {
+    return as_float((u & 0x80000000u) ? (u & 0x7fffffffu) : ~u);
+}
+
+// The rank-th smallest FINITE value of this pixel's column (the mask and NaN
+// are skipped, exactly as nanmedian_axis0 skips them), by radix select. With
+// `dev` set it selects |v - centre| instead, which is what the MAD needs.
+static float select_rank(__global const float *cube,
+                         __global const uchar *mask,
+                         const int hw, const int p, const int n,
+                         int rank, const int dev, const float centre) {
+    uint prefix = 0;
+    for (int pass = 0; pass < 4; ++pass) {
+        uint hist[256];
+        for (int i = 0; i < 256; ++i) hist[i] = 0;
+        const int shift = 24 - 8 * pass;
+        for (int k = 0; k < n; ++k) {
+            if (mask != 0 && mask[(long)k * hw + p] == 0) continue;
+            float x = cube[(long)k * hw + p];
+            if (!(x == x)) continue;
+            if (dev) x = fabs(x - centre);
+            const uint u = float_bits(x);
+            if (pass > 0 && (u >> (shift + 8)) != prefix) continue;
+            hist[(u >> shift) & 0xFF]++;
+        }
+        int cum = 0, d = 0;
+        for (d = 0; d < 256; ++d) {
+            if (cum + (int)hist[d] > rank) break;
+            cum += (int)hist[d];
+        }
+        // the rank is relative to the values still in play: the ones the next
+        // pass will look at start AFTER this digit's bin, so the digit's
+        // cumulative count comes off it (the same step _select_device does)
+        rank -= cum;
+        prefix = (prefix << 8) | (uint)d;
+    }
+    return bits_float(prefix);
+}
+
+// The median of the column: the mean of the two central order statistics for
+// an even count, which is what outliers.nanmedian_axis0 returns.
+static float column_median(__global const float *cube,
+                           __global const uchar *mask,
+                           const int hw, const int p, const int n,
+                           const int count) {
+    const int lo = (count - 1) / 2, hi = count / 2;
+    const float a = select_rank(cube, mask, hw, p, n, lo, 0, 0.0f);
+    const float b = (hi == lo) ? a
+                               : select_rank(cube, mask, hw, p, n, hi, 0, 0.0f);
+    return (count % 2 == 0) ? 0.5f * (a + b) : a;
+}
+
+// sum (0) | mean (1): a streaming reduction, one pass, no frame ceiling.
+__kernel void combine_stream(
+    __global const float *cube, __global const uchar *mask,
+    __global float *out, const int n, const int hw, const int method) {
+    const int p = get_global_id(0);
+    if (p >= hw) return;
+    float s = 0.0f;
+    int c = 0;
+    for (int k = 0; k < n; ++k) {
+        if (mask != 0 && mask[(long)k * hw + p] == 0) continue;
+        const float x = cube[(long)k * hw + p];
+        if (x == x) { s += x; c += 1; }
+    }
+    if (c == 0) { out[p] = NAN; return; }
+    out[p] = (method == 1) ? s / (float)c : s;
+}
+
+// median: the per-pixel radix select, no frame ceiling.
+__kernel void combine_median(
+    __global const float *cube, __global const uchar *mask,
+    __global float *out, const int n, const int hw) {
+    const int p = get_global_id(0);
+    if (p >= hw) return;
+    int count = 0;
+    for (int k = 0; k < n; ++k) {
+        if (mask != 0 && mask[(long)k * hw + p] == 0) continue;
+        const float x = cube[(long)k * hw + p];
+        if (x == x) count += 1;
+    }
+    out[p] = (count == 0) ? NAN
+                          : column_median(cube, mask, hw, p, n, count);
+}
+
+// sigma (the clipped mean) and weighted (the inverse-variance mean) share the
+// clip: the MEDIAN centre, the MAD scale, `iterations` passes, the keep
+// CUMULATIVE (a pixel rejected in one pass stays out) and the centre moving to
+// the mean of the survivors each time. It is the same walk as
+// track_stack._sigma_clip_keep, step for step, with the medians as radix
+// selects. The MAD is over the FINITE values and not the survivors, which is
+// what the CPU does (its data still holds every finite frame); `keep`
+// (n * hw bytes) carries the cumulative veto.
+__kernel void combine_clip(
+    __global const float *cube, __global const uchar *mask,
+    __global uchar *keep, __global const float *weights,
+    __global float *out, const int n, const int hw,
+    const float sigma, const int iterations, const int weighted) {
+    const int p = get_global_id(0);
+    if (p >= hw) return;
+    int fcount = 0;
+    for (int k = 0; k < n; ++k) {
+        const float x = cube[(long)k * hw + p];
+        const uchar v = ((mask == 0 || mask[(long)k * hw + p]) && (x == x))
+                        ? (uchar)1 : (uchar)0;
+        keep[(long)k * hw + p] = v;
+        fcount += v;
+    }
+    if (fcount == 0) { out[p] = NAN; return; }
+    float centre = column_median(cube, mask, hw, p, n, fcount);
+    const int mlo = (fcount - 1) / 2, mhi = fcount / 2;
+    for (int it = 0; it < iterations; ++it) {
+        const float da = select_rank(cube, mask, hw, p, n, mlo, 1, centre);
+        const float db = (mhi == mlo) ? da
+                                      : select_rank(cube, mask, hw, p, n, mhi,
+                                                    1, centre);
+        float mad = 1.4826f * ((fcount % 2 == 0) ? 0.5f * (da + db) : da);
+        if (!(mad > 0.0f)) mad = INFINITY;
+        float s = 0.0f;
+        int c = 0;
+        for (int k = 0; k < n; ++k) {
+            if (keep[(long)k * hw + p] == 0) continue;
+            const float x = cube[(long)k * hw + p];
+            if (fabs(x - centre) <= sigma * mad) { s += x; c += 1; }
+            else keep[(long)k * hw + p] = 0;
+        }
+        if (c > 0) centre = s / (float)c;
+    }
+    // the average of the survivors: the plain mean when there are no weights
+    // (w = 1), the inverse-variance mean when there are
+    float num = 0.0f, den = 0.0f;
+    for (int k = 0; k < n; ++k) {
+        if (keep[(long)k * hw + p] == 0) continue;
+        const float w = (weights != 0) ? weights[k] : 1.0f;
+        num += cube[(long)k * hw + p] * w;
+        den += w;
+    }
+    out[p] = (den > 0.0f) ? num / den : NAN;
+}
 """
 
 _state = {"checked": False, "ok": False, "cl": None, "ctx": None,
-          "queue": None, "program": None, "name": ""}
+          "queue": None, "program": None, "name": "", "mem": 0}
 
 
 def _build():
@@ -245,7 +425,8 @@ def _build():
         queue = cl.CommandQueue(ctx)
         program = cl.Program(ctx, KERNELS).build()
         _state.update(cl=cl, ctx=ctx, queue=queue, program=program, ok=True,
-                      name=ctx.devices[0].name.strip())
+                      name=ctx.devices[0].name.strip(),
+                      mem=int(ctx.devices[0].global_mem_size))
     except Exception as err:                                   # noqa: BLE001
         logger.info("no OpenCL backend: %s", err)
         return False
@@ -335,11 +516,13 @@ def _warp_stack(frame_list, offsets, box, shape, loader, preloaded):
         if src_box is None:
             # this frame does not cover the box: no data here, and saying so
             # is the honest answer (the same None the CPU path returns)
-            queue.enqueue_fill_buffer(stack, np.float32(0.0),
-                                      k * out_h * out_w * 4,
-                                      out_h * out_w * 4)
-            queue.enqueue_fill_buffer(masks, np.uint8(0),
-                                      k * out_h * out_w, out_h * out_w)
+            # (enqueue_fill_buffer is a MODULE function in pyopencl, not a
+            # method of the queue: calling it on the queue is an
+            # AttributeError that a frame covering the box never triggers)
+            cl.enqueue_fill_buffer(queue, stack, np.float32(0.0),
+                                   k * out_h * out_w * 4, out_h * out_w * 4)
+            cl.enqueue_fill_buffer(queue, masks, np.uint8(0),
+                                   k * out_h * out_w, out_h * out_w)
             continue
         data = None
         if preloaded is not None:
@@ -391,7 +574,18 @@ def stack_ram(frame_list, offsets, box, shape, loader=None, order=None,
     # @return: the combined (h, w) float32, or None
     # THE FUSED PATH: warp and combine in one trip, so the only things that
     # cross the bus are the frames going up and the single image coming down.
+    # ANY number of frames: a cube taller than the private arrays goes to the
+    # SCALABLE combine, so the ceiling that used to send the base stack to the
+    # CPU is gone (ADR-091 note, 2026-10-15).
     if not available():
+        return None
+    out_h = box[3] - box[1]
+    out_w = box[2] - box[0]
+    # A card that cannot hold the cube, its masks and (for the clip) the keep
+    # buffer is a normal "cannot serve this call": better to know it BEFORE
+    # uploading hundreds of frames.
+    keep = _METHODS.get(method, M_SIGMA) in (M_SIGMA, M_WEIGHTED)
+    if not _device_has_room(len(frame_list), out_h, out_w, keep=keep):
         return None
     try:
         got = _warp_stack(frame_list, offsets, box, shape, loader, preloaded)
@@ -399,8 +593,6 @@ def stack_ram(frame_list, offsets, box, shape, loader=None, order=None,
             return None
         stack, masks = got
         n = len(frame_list)
-        out_h = box[3] - box[1]
-        out_w = box[2] - box[0]
         out = _combine_device(stack, masks, n, out_h, out_w, method, sigma,
                               iterations, weights)
         return _read(out, (out_h, out_w)).astype(np.float32)
@@ -411,15 +603,74 @@ def stack_ram(frame_list, offsets, box, shape, loader=None, order=None,
 
 # ---------------------------------------------------------------- combine
 
+def _device_has_room(n, h, w, keep=False):
+    # @args: n/h/w - the cube's shape, keep - True when the combine also needs
+    #        the cumulative `keep` buffer (the clip methods)
+    # @return: True when the estimated device footprint fits the card
+    # The fused path holds the cube, its masks, the output and (for the clip)
+    # the keep buffer on the device AT ONCE. A card that cannot hold them is a
+    # normal "cannot serve this call": the caller keeps numpy and the run
+    # finishes. The estimate leaves a fifth of the card for the driver and the
+    # warp's own source buffers.
+    mem = _state.get("mem") or 0
+    if mem <= 0:
+        return True
+    hw = int(h) * int(w)
+    need = int(n) * hw * 4          # the warped cube
+    need += int(n) * hw             # its masks (uchar)
+    if keep:
+        need += int(n) * hw         # the clip's cumulative veto
+    need += hw * 4 * 2              # the output and a scratch
+    return need <= 0.8 * mem
+
+
+def _combine_scalable(stack, masks, n, h, w, method, sigma, iterations,
+                      weights):
+    # @args: stack - the (n, h, w) cube ON the device, masks - the (n, h, w)
+    #        validity ON the device (or None), the rest - the method's knobs
+    # @return: the combined (h, w) ON the device
+    # The combine for a cube TALLER than the private arrays: the column is
+    # walked in GLOBAL memory, so there is no frame ceiling. The median is a
+    # per-pixel radix select; sigma and weighted carry a cumulative `keep`
+    # (n * hw bytes) for the clip.
+    cl = _state["cl"]
+    queue = _state["queue"]
+    hw = h * w
+    out = _empty((h, w))
+    wbuf = _f32_buffer(np.asarray(weights, dtype=np.float32)) \
+        if weights is not None else None
+    m = _METHODS.get(method, M_SIGMA)
+    if m in (M_SUM, M_MEAN):
+        kern = _kernel("combine_stream")
+        kern(queue, (hw,), None, stack, masks, out,
+             np.int32(n), np.int32(hw), np.int32(m))
+    elif m == M_MEDIAN:
+        kern = _kernel("combine_median")
+        kern(queue, (hw,), None, stack, masks, out, np.int32(n), np.int32(hw))
+    else:
+        keep = cl.Buffer(_state["ctx"], cl.mem_flags.READ_WRITE, n * hw)
+        kern = _kernel("combine_clip")
+        kern(queue, (hw,), None, stack, masks, keep, wbuf, out,
+             np.int32(n), np.int32(hw), np.float32(sigma),
+             np.int32(iterations), np.int32(1 if m == M_WEIGHTED else 0))
+    return out
+
+
 def _combine_device(stack, masks, n, h, w, method, sigma, iterations,
                     weights):
     # @args: stack - the (n, h, w) cube ON the device, masks - the (n, h, w)
     #        validity ON the device (or None), the rest - the method's knobs
     # @return: the combined (h, w) ON the device
+    # TWO kernels, one job, and the frame count alone decides. The private
+    # one keeps the column in registers (no global buffer, one pass over the
+    # cube) and is the fast path for the SHORT cubes the stacking groups and
+    # the star stack make; the SCALABLE one removes the frame ceiling for the
+    # base stack, which is the WHOLE sequence (measured: a real visit at 539).
+    if n > _PRIVATE_COMBINE_MAX:
+        return _combine_scalable(stack, masks, n, h, w, method, sigma,
+                                 iterations, weights)
     cl = _state["cl"]
     queue = _state["queue"]
-    if n > _MAX_FRAMES:
-        raise ValueError(f"the OpenCL combine holds {_MAX_FRAMES} frames")
     hw = h * w
     out = _empty((h, w))
     wbuf = _f32_buffer(np.asarray(weights, dtype=np.float32)) \
@@ -435,10 +686,15 @@ def combine(stack, method, mask=None, sigma=3.0, iterations=3, weights=None):
     # @return: the combined (h, w) float32, or None
     if not available():
         return None
+    data = np.ascontiguousarray(stack, dtype=np.float32)
+    if data.ndim != 3:
+        return None
+    n, h, w = data.shape
+    keep = _METHODS.get(method, M_SIGMA) in (M_SIGMA, M_WEIGHTED)
+    if not _device_has_room(n, h, w, keep=keep):
+        return None
     try:
         cl = _state["cl"]
-        data = np.ascontiguousarray(stack, dtype=np.float32)
-        n, h, w = data.shape
         cube = cl.Buffer(_state["ctx"],
                          cl.mem_flags.READ_ONLY | cl.mem_flags.COPY_HOST_PTR,
                          hostbuf=data)

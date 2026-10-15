@@ -19,9 +19,21 @@ from pathlib import Path
 
 from . import __app_name__, config, paths
 from .config import config as cfg
-from .core.db import db
 
 logger = logging.getLogger(__name__)
+
+
+def _db():
+    # The shared connection, imported HERE and never at module level.
+    # Importing core.db opens the connection and migrates the schema in
+    # place, and the GUI must snapshot the database BEFORE that happens
+    # (ADR-042). Importing this entry point (also reached by launcher.py)
+    # used to migrate on the spot, so the "before" picture the Welcome
+    # view shows was already the migrated one and there was nothing to
+    # roll back to.
+    # @return: the shared Database instance
+    from .core.db import db
+    return db
 
 
 def _setup_logging(verbose):
@@ -92,7 +104,7 @@ def cmd_tonight(args):
     print(f"Noche / Night: {date or datetime.date.today()}  "
           f"(lat {cfg.get('lat')}, lon {cfg.get('lon')})")
     targets = planner.build_tonight(cfg, date)
-    top, all_scored = suggest.top_n(targets, cfg, db, args.top)
+    top, all_scored = suggest.top_n(targets, cfg, _db(), args.top)
     medals = ["🥇", "🥈", "🥉"] + ["•"] * max(args.top - 3, 0)
     print("\n=== LO MEJOR DE ESTA NOCHE / BEST OF TONIGHT ===")
     n_beyond = 0
@@ -155,7 +167,7 @@ def cmd_post(args):
         written = post.save_outputs(rendered, outdir, args.objeto)
     for k, p in written.items():
         print(f"[{k}] -> {p}")
-    db.mark_posted(args.objeto)
+    _db().mark_posted(args.objeto)
 
 
 def cmd_solar(args):
@@ -185,7 +197,7 @@ def cmd_history(args):
     # Observing journal (ADR-036): the derived activity view, grouped by
     # observing night (noon-to-noon local).
     from .core import journal
-    nights = journal.build_journal(db, days=90)
+    nights = journal.build_journal(_db(), days=90)
     if not nights:
         print("Sin actividad registrada / No activity recorded yet")
         return
@@ -280,7 +292,7 @@ def cmd_blink(args):
                                     resources=resources)
         for k, p in written.items():
             print(f"[{k}] -> {p}")
-        db.mark_posted(pair["name"])
+        _db().mark_posted(pair["name"])
 def cmd_gui(args):
     # Desktop application.
     from .gui import app
@@ -507,12 +519,12 @@ def cmd_project(args):
     # Minimal project management from the CLI (ADR-019, GUI-first).
     from .core import project as proj_mod
     if args.action == "list":
-        projects = proj_mod.list_projects(db, args.status)
+        projects = proj_mod.list_projects(_db(), args.status)
         if not projects:
             print("No projects / Sin proyectos")
             return
         for p in projects:
-            cur = proj_mod.current_step(db, p["id"])
+            cur = proj_mod.current_step(_db(), p["id"])
             step = cur or "done"
             star = "★ " if p.get("favorite") else ""
             outcome = f"  ({p['outcome']})" if p.get("outcome") else ""
@@ -520,22 +532,22 @@ def cmd_project(args):
                   f"{p['object_name']:<24s} {p['status']:8s} "
                   f"step={step}{outcome}")
     elif args.action == "create":
-        p = proj_mod.create(db, args.kind, args.name)
+        p = proj_mod.create(_db(), args.kind, args.name)
         if p:
             print(f"Created project {p['id']}: [{p['kind']}] {p['object_name']}")
         else:
             print(f"Bad kind '{args.kind}' (valid: {', '.join(proj_mod.VALID_KINDS)})")
             return 1
     elif args.action == "advance":
-        p = proj_mod.advance(db, args.id)
+        p = proj_mod.advance(_db(), args.id)
         if p:
-            cur = proj_mod.current_step(db, p["id"]) or "done"
+            cur = proj_mod.current_step(_db(), p["id"]) or "done"
             print(f"Project {p['id']} -> step={cur}, status={p['status']}")
         else:
             print(f"Project {args.id} not found")
             return 1
     elif args.action == "close":
-        p = proj_mod.close(db, args.id, outcome=args.outcome)
+        p = proj_mod.close(_db(), args.id, outcome=args.outcome)
         if p:
             print(f"Closed project {p['id']}: status={p['status']}"
                   f" outcome={p.get('outcome')}")
@@ -543,14 +555,14 @@ def cmd_project(args):
             print(f"Project {args.id} not found or not active")
             return 1
     elif args.action == "reopen":
-        p = proj_mod.reopen(db, args.id)
+        p = proj_mod.reopen(_db(), args.id)
         if p:
             print(f"Reopened project {p['id']}: status={p['status']}")
         else:
             print(f"Project {args.id} not found")
             return 1
     elif args.action == "show":
-        p = proj_mod.get(db, args.id)
+        p = proj_mod.get(_db(), args.id)
         if not p:
             print(f"Project {args.id} not found")
             return 1
@@ -561,7 +573,7 @@ def cmd_project(args):
         for f in p["files"]:
             print(f"  file: {f['kind']:10s} {f['path']}")
     elif args.action == "files":
-        files = proj_mod.list_files(db, args.id)
+        files = proj_mod.list_files(_db(), args.id)
         if not files:
             print(f"Project {args.id} has no files")
             return

@@ -499,7 +499,11 @@ class UfeTrackStackTab(QWidget):
         area = QScrollArea(self)
         area.setWidgetResizable(True)
         area.setFrameShape(QFrame.NoFrame)
-        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # The column should FIT (the rows are built for it), but a window can
+        # be narrower than the content's own minimum: then the content is
+        # SCROLLED, never silently cut (it was AlwaysOff, so the Astrometry
+        # panel's right edge was clipped, reported 2026-10-15).
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         area.setWidget(inner)
         lay.addWidget(area)
         # the combination methods of core/track_stack (D11), with the

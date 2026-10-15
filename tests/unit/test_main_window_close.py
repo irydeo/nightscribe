@@ -139,6 +139,57 @@ def test_close_event_closes_the_non_modal_ufe(window, qapp):
     assert closed == [True]
 
 
+def test_the_workbench_entry_is_disabled_while_it_is_the_view(window, qapp):
+    # Reported 2026-10-15: pressing the entry while the workbench was
+    # already open reset the session and the plate went black. The entry is
+    # disabled while the workbench IS the view, and back on when it is not.
+    from nightscribe.gui.main_window import VIEW_PROJECTS, VIEW_UFE
+    window._goto_tab(VIEW_UFE)
+    assert window._menus.action_ufe.isEnabled() is False
+    window._goto_tab(VIEW_PROJECTS)
+    assert window._menus.action_ufe.isEnabled() is True
+
+
+def test_close_event_removes_the_temp_fits(window, qapp):
+    # The FITS the app writes to the system temp for a captured frame is
+    # removed when the app closes (it used to be left forever).
+    import os
+    import tempfile
+    fh = tempfile.NamedTemporaryFile(prefix="nightscribe-capture-",
+                                     suffix=".fits", delete=False)
+    fh.write(b"x")
+    fh.close()
+    window._temp_files = [fh.name]
+    window.show()
+    window.close()
+    assert not os.path.exists(fh.name)
+
+
+def test_building_the_workbench_runs_under_the_busy_dialog(window, qapp):
+    # The FIRST build loads every tab's Designer file: it runs under the
+    # same "Please wait" the run opens use (reported 2026-10-15).
+    from nightscribe.gui import main_window as mw
+    saved = getattr(window, "_ufe", None)
+    window._ufe = None
+    seen = []
+    real = mw.MainWindow._with_busy
+
+    def spy(self, label, fn):
+        seen.append(label)
+        return real(self, label, fn)
+
+    window._with_busy = spy.__get__(window, mw.MainWindow)
+    try:
+        window._ufe_build()
+    finally:
+        window._with_busy = real
+        ufe = getattr(window, "_ufe", None)
+        if ufe is not None:
+            ufe.close()
+        window._ufe = saved
+    assert seen and "workbench" in seen[0].lower()
+
+
 def test_close_event_shuts_down_a_live_series_worker(window, qapp, tmp_path):
     # The issue's exact scenario: quitting while the Measure tab's Live
     # watch runs. The worker lives inside the UfeDialog; closing the

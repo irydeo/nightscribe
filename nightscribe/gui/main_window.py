@@ -420,6 +420,11 @@ class MainWindow(QMainWindow):
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
+        # The FITS files the app writes to the system temp for a captured
+        # frame (the camera hands bytes, the editor wants a path): they are
+        # removed when the app closes, and the startup sweep catches the
+        # ones a crash left behind (reported 2026-10-15).
+        self._temp_files = []
         self._current_project = None
         self._project_widgets = {}
         # Which astrometry run the editor must SHOW when a visit is opened:
@@ -622,6 +627,14 @@ class MainWindow(QMainWindow):
         # its plate and stretch survive); its workers are only shut down
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
         self._shell_stack().setCurrentIndex(index)
+        # The workbench is a PAGE now, and its menu entry OPENS it: while it
+        # IS the view there is nothing to open, and pressing it reset the
+        # session (the plate went black, reported 2026-10-15). Disabled, not
+        # removed: the entry still says where the workbench lives.
+        menus = getattr(self, "_menus", None)
+        action = getattr(menus, "action_ufe", None)
+        if action is not None:
+            action.setEnabled(index != VIEW_UFE)
         self._sync_sky_bar(index)
         if index != VIEW_UFE:
             # the workbench's tool windows (Blink, Calibrate, Annotate, the
@@ -7877,7 +7890,8 @@ class MainWindow(QMainWindow):
                                 error or self.tr("No FITS was received."))
             return
         import tempfile
-        fh = tempfile.NamedTemporaryFile(suffix=".fits", delete=False)
+        fh = tempfile.NamedTemporaryFile(prefix="nightscribe-capture-",
+                                         suffix=".fits", delete=False)
         try:
             fh.write(data)
         except OSError as err:
@@ -7885,6 +7899,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, self._ccd_backend_label(), str(err))
             return
         fh.close()
+        # The editor reads it by PATH, so it has to outlive the call: it is
+        # removed when the app closes (and the startup sweep catches the
+        # ones a crash left behind). It used to be left forever.
+        self._temp_files.append(fh.name)
         self._open_frame_path_in_editor(fh.name)
 
     def _open_frame_path_in_editor(self, path):
@@ -12881,7 +12899,12 @@ class MainWindow(QMainWindow):
         if getattr(self, "_ufe", None) is not None:
             return self._ufe
         from .ufe_dialog import UfeDialog
-        self._ufe = UfeDialog(lang=self._lang(), parent=self)
+        # The FIRST build loads every tab's Designer file and takes a visible
+        # moment: the same "Please wait" the run opens use, so the window does
+        # not read as frozen while it happens (reported 2026-10-15).
+        self._ufe = self._with_busy(
+            self.tr("Opening the image workbench…"),
+            lambda: UfeDialog(lang=self._lang(), parent=self))
         return self._ufe
 
     def _ufe_page(self):
@@ -12926,6 +12949,11 @@ class MainWindow(QMainWindow):
 
     def _tools_ufe(self):
         # Menu Tools → FITS editor… (ADR-044)
+        # Already there: the entry is disabled while the workbench is the
+        # view, and this is the guard for a programmatic call. Re-opening it
+        # reset the session and the plate went black (reported 2026-10-15).
+        if self._shell_stack().currentIndex() == VIEW_UFE:
+            return
         dlg = self._ufe_build()
         begin = getattr(dlg, "begin_session", None)
         if callable(begin):
@@ -14451,4 +14479,12 @@ class MainWindow(QMainWindow):
         for w in threads:
             if w.isRunning():
                 w.wait(3000)
+        # The temp FITS files this session wrote (a captured frame the
+        # editor read by path): only now can they go (reported 2026-10-15).
+        for path in getattr(self, "_temp_files", []):
+            try:
+                Path(path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        self._temp_files = []
         super().closeEvent(event)

@@ -129,6 +129,46 @@ C_EVENT = "#e5484d"
 # and washed out, no matter how saturated the hue.
 C_CHIP_TEXT_DARK = "#11141d"   # the label color on bright surfaces
 
+# One glyph and one colour per LEVEL of a message, so a warning reads as a
+# warning before it is read and a failure cannot pass for news. It used to be
+# three private copies: the window's status line kept its own glyph table and
+# its own two colours (a hand-picked yellow for a warning and the charts'
+# DANGER for an error), and every tab GUESSED the level from a "⚠" glued to
+# the front of the text. A message written once and read in two places (the
+# tab's own line and the window's) cannot say two different things.
+LEVEL_GLYPHS = {"info": "ⓘ", "warn": "⚠", "error": "✕"}
+LEVEL_COLOURS = {
+    "info": C_TEXT_DIM,    # a note: context, not a problem
+    "warn": C_WARN,        # something is missing or off, and it is said
+    "error": C_EVENT,      # it failed: the app could not do the thing
+}
+
+
+def level_colour(level):
+    # @args: level - "info" | "warn" | "error" (anything else reads as info)
+    # @return: the #rrggbb a message of that level wears
+    return LEVEL_COLOURS.get(str(level), LEVEL_COLOURS["info"])
+
+
+def level_glyph(level):
+    # @args: level - "info" | "warn" | "error" (anything else reads as info)
+    # @return: the glyph that goes before the message, so the level is read
+    #          before the sentence is
+    return LEVEL_GLYPHS.get(str(level), LEVEL_GLYPHS["info"])
+
+
+def paint_level(widget, level, key="_level_painted"):
+    # @args: widget - anything with a stylesheet, level - "info" | "warn" |
+    #        "error", key - the attribute that remembers what is painted
+    # @return: None. A stylesheet forces a full re-layout of the widget, so
+    #          it is written only when the LEVEL changes: a tab that says
+    #          twenty things in a row must not re-lay the panel twenty times.
+    level = level if level in LEVEL_COLOURS else "info"
+    if getattr(widget, key, None) == level:
+        return
+    widget.setStyleSheet(f"color: {level_colour(level)};")
+    setattr(widget, key, level)
+
 
 def _lum(hex_):
     # @args: a #rrggbb hex string

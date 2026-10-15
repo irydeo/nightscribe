@@ -4,57 +4,57 @@
 <context>
     <name></name>
     <message>
-        <location filename="../main_window.py" line="4375"/>
+        <location filename="../main_window.py" line="4388"/>
         <source>You follow no campaigns yet — create one below and its stars will show up here.</source>
         <translation>You follow no campaigns yet — create one below and its stars will show up here.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4378"/>
+        <location filename="../main_window.py" line="4391"/>
         <source>Measured within their campaign&apos;s cadence</source>
         <translation>Measured within their campaign&apos;s cadence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4381"/>
+        <location filename="../main_window.py" line="4394"/>
         <source>Up to date: %1 of %2 campaign projects</source>
         <translation>Up to date: %1 of %2 campaign projects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4408"/>
+        <location filename="../main_window.py" line="4421"/>
         <source>✨ All calm — when a star you follow erupts, dims or nears a predicted extremum, it will show up here.</source>
         <translation>✨ All calm — when a star you follow erupts, dims or nears a predicted extremum, it will show up here.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4421"/>
+        <location filename="../main_window.py" line="4434"/>
         <source>%1 mag %2 in %3 — measure tonight</source>
         <translation>%1 mag %2 in %3 — measure tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4425"/>
+        <location filename="../main_window.py" line="4438"/>
         <source>%1 expected in %2 d</source>
         <translation>%1 expected in %2 d</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4703"/>
+        <location filename="../main_window.py" line="4716"/>
         <source>today</source>
         <translation>today</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4705"/>
+        <location filename="../main_window.py" line="4718"/>
         <source>yesterday</source>
         <translation>yesterday</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4706"/>
+        <location filename="../main_window.py" line="4719"/>
         <source>%1 d ago</source>
         <translation>%1 d ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4733"/>
+        <location filename="../main_window.py" line="4746"/>
         <source>✕ not up tonight</source>
         <translation>✕ not up tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4433"/>
+        <location filename="../main_window.py" line="4446"/>
         <source>%1 mag %2 in ZTF %3 (baseline %4)</source>
         <translation>%1 mag %2 in ZTF %3 (baseline %4)</translation>
     </message>
@@ -925,87 +925,87 @@
 <context>
     <name>FramePreviews</name>
     <message>
-        <location filename="../widgets/frame_previews.py" line="356"/>
+        <location filename="../widgets/frame_previews.py" line="362"/>
         <source>unreadable</source>
         <translation>unreadable</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="358"/>
+        <location filename="../widgets/frame_previews.py" line="364"/>
         <source>not registered</source>
         <translation>not registered</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="365"/>
+        <location filename="../widgets/frame_previews.py" line="371"/>
         <source>Frame %1</source>
         <translation>Frame %1</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="378"/>
+        <location filename="../widgets/frame_previews.py" line="384"/>
         <source>Could not be read:</source>
         <translation>Could not be read:</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="382"/>
+        <location filename="../widgets/frame_previews.py" line="388"/>
         <source>%1 × %2 px</source>
         <translation>%1 × %2 px</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="386"/>
+        <location filename="../widgets/frame_previews.py" line="392"/>
         <source>%1 MB on disk</source>
         <translation>%1 MB on disk</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="390"/>
+        <location filename="../widgets/frame_previews.py" line="396"/>
         <source>sky %1 ADU</source>
         <translation>sky %1 ADU</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="401"/>
+        <location filename="../widgets/frame_previews.py" line="407"/>
         <source>No astrometric solution</source>
         <translation>No astrometric solution</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="403"/>
+        <location filename="../widgets/frame_previews.py" line="409"/>
         <source>The last run could not register it</source>
         <translation>The last run could not register it</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="472"/>
+        <location filename="../widgets/frame_previews.py" line="496"/>
         <source>Open in the editor</source>
         <translation>Open in the editor</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="476"/>
+        <location filename="../widgets/frame_previews.py" line="500"/>
         <source>Open the folder</source>
         <translation>Open the folder</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="482"/>
+        <location filename="../widgets/frame_previews.py" line="506"/>
         <source>Take %1 frames out of the visit</source>
         <translation>Take %1 frames out of the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="484"/>
+        <location filename="../widgets/frame_previews.py" line="508"/>
         <source>Take it out of the visit</source>
         <translation>Take it out of the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="486"/>
+        <location filename="../widgets/frame_previews.py" line="510"/>
         <source>The visit stops measuring them. The files are NOT touched: they stay where they are and can be attached again</source>
         <translation>The visit stops measuring them. The files are NOT touched: they stay where they are and can be attached again</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="491"/>
+        <location filename="../widgets/frame_previews.py" line="515"/>
         <source>Move %1 frames to discarded/…</source>
         <translation>Move %1 frames to discarded/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="493"/>
+        <location filename="../widgets/frame_previews.py" line="517"/>
         <source>Move it to discarded/…</source>
         <translation>Move it to discarded/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="495"/>
+        <location filename="../widgets/frame_previews.py" line="519"/>
         <source>The files move into the project&apos;s discarded/ folder and the registry follows them: nothing is deleted and they can be brought back</source>
         <translation>The files move into the project&apos;s discarded/ folder and the registry follows them: nothing is deleted and they can be brought back</translation>
     </message>
@@ -1266,13 +1266,13 @@
         <translation type="vanished">Blink</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="815"/>
-        <location filename="../main_window.py" line="1381"/>
+        <location filename="../main_window.py" line="828"/>
+        <location filename="../main_window.py" line="1394"/>
         <source>Projects</source>
         <translation>Projects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="820"/>
+        <location filename="../main_window.py" line="833"/>
         <source>Campaigns</source>
         <translation>Campaigns</translation>
     </message>
@@ -1322,12 +1322,12 @@
         <translation>What the application has been doing, written while it runs: if something failed without saying why, the answer is in here</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2503"/>
+        <location filename="../main_window.py" line="2516"/>
         <source>System</source>
         <translation>System</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2504"/>
+        <location filename="../main_window.py" line="2517"/>
         <source>English</source>
         <translation>English</translation>
     </message>
@@ -1450,22 +1450,22 @@
         <translation type="vanished">Ready — press &apos;Compute tonight&apos;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2701"/>
+        <location filename="../main_window.py" line="2714"/>
         <source>Settings saved</source>
         <translation>Settings saved</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3214"/>
+        <location filename="../main_window.py" line="3227"/>
         <source>Plan your night, understand every object, tell your science.</source>
         <translation>Plan your night, understand every object, tell your science.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3220"/>
+        <location filename="../main_window.py" line="3233"/>
         <source>Data sources</source>
         <translation>Data sources</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3221"/>
+        <location filename="../main_window.py" line="3234"/>
         <source>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</source>
         <translation>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</translation>
     </message>
@@ -1474,139 +1474,139 @@
         <translation type="vanished">Documentation not found at %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3309"/>
-        <location filename="../main_window.py" line="3386"/>
+        <location filename="../main_window.py" line="3322"/>
+        <location filename="../main_window.py" line="3399"/>
         <source>Computing tonight…</source>
         <translation>Computing tonight…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3391"/>
+        <location filename="../main_window.py" line="3404"/>
         <source>Computing…</source>
         <translation>Computing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3401"/>
+        <location filename="../main_window.py" line="3414"/>
         <source>no sources answered</source>
         <translation>no sources answered</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3404"/>
+        <location filename="../main_window.py" line="3417"/>
         <source>Error: %1</source>
         <translation>Error: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3427"/>
+        <location filename="../main_window.py" line="3440"/>
         <source>No targets found</source>
         <translation>No targets found</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3428"/>
+        <location filename="../main_window.py" line="3441"/>
         <source>Check your network and try again.</source>
         <translation>Check your network and try again.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3437"/>
+        <location filename="../main_window.py" line="3450"/>
         <source>No data</source>
         <translation>No data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3456"/>
+        <location filename="../main_window.py" line="3469"/>
         <source>%1  ·  Night %2–%3 (UTC)</source>
         <translation>%1  ·  Night %2–%3 (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3462"/>
+        <location filename="../main_window.py" line="3475"/>
         <source>%1  ·  no astronomical night tonight</source>
         <translation>%1  ·  no astronomical night tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3475"/>
+        <location filename="../main_window.py" line="3488"/>
         <source>Moon: %1% lit now, %2% by dawn</source>
         <translation>Moon: %1% lit now, %2% by dawn</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3877"/>
+        <location filename="../main_window.py" line="3890"/>
         <source>mag &gt;%1</source>
         <translation>mag &gt;%1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3879"/>
+        <location filename="../main_window.py" line="3892"/>
         <source>Predicted magnitude beyond your limiting magnitude by %1 mags. Still scored for its scientific priority, but it will need a longer exposure.</source>
         <translation>Predicted magnitude beyond your limiting magnitude by %1 mags. Still scored for its scientific priority, but it will need a longer exposure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4002"/>
+        <location filename="../main_window.py" line="4015"/>
         <source>Hide full list</source>
         <translation>Hide full list</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4006"/>
-        <location filename="../main_window.py" line="4173"/>
+        <location filename="../main_window.py" line="4019"/>
+        <location filename="../main_window.py" line="4186"/>
         <source>Show all targets (%1)</source>
         <translation>Show all targets (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3413"/>
+        <location filename="../main_window.py" line="3426"/>
         <source>%1 targets evaluated</source>
         <translation>%1 targets evaluated</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3792"/>
-        <location filename="../main_window.py" line="3931"/>
+        <location filename="../main_window.py" line="3805"/>
+        <location filename="../main_window.py" line="3944"/>
         <source>now</source>
         <translation>now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3807"/>
+        <location filename="../main_window.py" line="3820"/>
         <source>close to the Moon (%1)</source>
         <translation>close to the Moon (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3811"/>
+        <location filename="../main_window.py" line="3824"/>
         <source>high illumination (%1)</source>
         <translation>high illumination (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3814"/>
+        <location filename="../main_window.py" line="3827"/>
         <source>Moon at %1 separation, %2 illuminated — bright night sky, faint targets need longer exposures. Reason: %3</source>
         <translation>Moon at %1 separation, %2 illuminated — bright night sky, faint targets need longer exposures. Reason: %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3817"/>
+        <location filename="../main_window.py" line="3830"/>
         <source> and </source>
         <translation> and </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3819"/>
+        <location filename="../main_window.py" line="3832"/>
         <source>Moon %1 · %2</source>
         <translation>Moon %1 · %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4014"/>
+        <location filename="../main_window.py" line="4027"/>
         <source>Supernova</source>
         <translation>Supernova</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4015"/>
-        <location filename="../main_window.py" line="4641"/>
-        <location filename="../main_window.py" line="4750"/>
+        <location filename="../main_window.py" line="4028"/>
+        <location filename="../main_window.py" line="4654"/>
+        <location filename="../main_window.py" line="4763"/>
         <source>Comet</source>
         <translation>Comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4016"/>
+        <location filename="../main_window.py" line="4029"/>
         <source>Possible comet</source>
         <translation>Possible comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4017"/>
-        <location filename="../main_window.py" line="4642"/>
-        <location filename="../main_window.py" line="4751"/>
+        <location filename="../main_window.py" line="4030"/>
+        <location filename="../main_window.py" line="4655"/>
+        <location filename="../main_window.py" line="4764"/>
         <source>Transit</source>
         <translation>Transit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4018"/>
+        <location filename="../main_window.py" line="4031"/>
         <source>Close approach</source>
         <translation>Close approach</translation>
     </message>
@@ -1615,42 +1615,42 @@
         <translation type="vanished">Capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5836"/>
+        <location filename="../main_window.py" line="5849"/>
         <source>Frames:</source>
         <translation>Frames:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5839"/>
+        <location filename="../main_window.py" line="5852"/>
         <source>Exposure (s):</source>
         <translation>Exposure (s):</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5843"/>
+        <location filename="../main_window.py" line="5856"/>
         <source>Filter:</source>
         <translation>Filter:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11586"/>
+        <location filename="../main_window.py" line="11604"/>
         <source>Export capture sequence</source>
         <translation>Export capture sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6025"/>
+        <location filename="../main_window.py" line="6038"/>
         <source>Export sequence…</source>
         <translation>Export sequence…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6031"/>
+        <location filename="../main_window.py" line="6044"/>
         <source>Export ephemeris for planetarium</source>
         <translation>Export ephemeris for planetarium</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6032"/>
+        <location filename="../main_window.py" line="6045"/>
         <source>Export ephemeris…</source>
         <translation>Export ephemeris…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10703"/>
+        <location filename="../main_window.py" line="10721"/>
         <source>Browse…</source>
         <translation>Browse…</translation>
     </message>
@@ -1659,228 +1659,228 @@
         <translation type="vanished">Your projects: one object with its three steps: capture, track, follow-up — and what needs your attention</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1779"/>
+        <location filename="../main_window.py" line="1792"/>
         <source>Select the ASTAP executable</source>
         <translation>Select the ASTAP executable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1780"/>
-        <location filename="../main_window.py" line="1797"/>
-        <location filename="../main_window.py" line="2069"/>
+        <location filename="../main_window.py" line="1793"/>
+        <location filename="../main_window.py" line="1810"/>
+        <location filename="../main_window.py" line="2082"/>
         <source>Executables (*)</source>
         <translation>Executables (*)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1789"/>
+        <location filename="../main_window.py" line="1802"/>
         <source>ASTAP</source>
         <translation>ASTAP</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2068"/>
+        <location filename="../main_window.py" line="2081"/>
         <source>Select the Python 3.10 interpreter</source>
         <translation>Select the Python 3.10 interpreter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2077"/>
+        <location filename="../main_window.py" line="2090"/>
         <source>Select the EXOTIC environment folder</source>
         <translation>Select the EXOTIC environment folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2188"/>
+        <location filename="../main_window.py" line="2201"/>
         <source>Sensor: {0}</source>
         <translation>Sensor: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2203"/>
+        <location filename="../main_window.py" line="2216"/>
         <source>dark {0} e-/pix/s @ {1} °C</source>
         <translation>dark {0} e-/pix/s @ {1} °C</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2206"/>
+        <location filename="../main_window.py" line="2219"/>
         <source>regime: {0}</source>
         <translation>regime: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2207"/>
+        <location filename="../main_window.py" line="2220"/>
         <source>short (group frames)</source>
         <translation>short (group frames)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2208"/>
+        <location filename="../main_window.py" line="2221"/>
         <source>normal</source>
         <translation>normal</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2212"/>
+        <location filename="../main_window.py" line="2225"/>
         <source>full well ≈ {0:.0f} ADU at your gain</source>
         <translation>full well ≈ {0:.0f} ADU at your gain</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2349"/>
-        <location filename="../main_window.py" line="2359"/>
-        <location filename="../main_window.py" line="2398"/>
-        <location filename="../main_window.py" line="2401"/>
-        <location filename="../main_window.py" line="10058"/>
-        <location filename="../main_window.py" line="10107"/>
-        <location filename="../main_window.py" line="10137"/>
-        <location filename="../main_window.py" line="10143"/>
-        <location filename="../main_window.py" line="10159"/>
-        <location filename="../main_window.py" line="10189"/>
-        <location filename="../main_window.py" line="10239"/>
-        <location filename="../main_window.py" line="10261"/>
-        <location filename="../main_window.py" line="10271"/>
-        <location filename="../main_window.py" line="10304"/>
-        <location filename="../main_window.py" line="10341"/>
-        <location filename="../main_window.py" line="10346"/>
-        <location filename="../main_window.py" line="10392"/>
-        <location filename="../main_window.py" line="10488"/>
-        <location filename="../main_window.py" line="10497"/>
-        <location filename="../main_window.py" line="10519"/>
+        <location filename="../main_window.py" line="2362"/>
+        <location filename="../main_window.py" line="2372"/>
+        <location filename="../main_window.py" line="2411"/>
+        <location filename="../main_window.py" line="2414"/>
+        <location filename="../main_window.py" line="10076"/>
+        <location filename="../main_window.py" line="10125"/>
+        <location filename="../main_window.py" line="10155"/>
+        <location filename="../main_window.py" line="10161"/>
+        <location filename="../main_window.py" line="10177"/>
+        <location filename="../main_window.py" line="10207"/>
+        <location filename="../main_window.py" line="10257"/>
+        <location filename="../main_window.py" line="10279"/>
+        <location filename="../main_window.py" line="10289"/>
+        <location filename="../main_window.py" line="10322"/>
+        <location filename="../main_window.py" line="10359"/>
+        <location filename="../main_window.py" line="10364"/>
+        <location filename="../main_window.py" line="10410"/>
+        <location filename="../main_window.py" line="10506"/>
+        <location filename="../main_window.py" line="10515"/>
+        <location filename="../main_window.py" line="10537"/>
         <source>EXOTIC</source>
         <translation>EXOTIC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2360"/>
+        <location filename="../main_window.py" line="2373"/>
         <source>No Python 3.10 interpreter found: install it or point to one above.</source>
         <translation>No Python 3.10 interpreter found: install it or point to one above.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2368"/>
+        <location filename="../main_window.py" line="2381"/>
         <source>Preparing EXOTIC: {0}</source>
         <translation>Preparing EXOTIC: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2373"/>
+        <location filename="../main_window.py" line="2386"/>
         <source>Preparing the EXOTIC environment…</source>
         <translation>Preparing the EXOTIC environment…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2327"/>
-        <location filename="../main_window.py" line="10117"/>
-        <location filename="../main_window.py" line="10118"/>
+        <location filename="../main_window.py" line="2340"/>
+        <location filename="../main_window.py" line="10135"/>
+        <location filename="../main_window.py" line="10136"/>
         <source>Checking the EXOTIC environment…</source>
         <translation>Checking the EXOTIC environment…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2392"/>
+        <location filename="../main_window.py" line="2405"/>
         <source>Could not prepare EXOTIC: {0}</source>
         <translation>Could not prepare EXOTIC: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2391"/>
-        <location filename="../main_window.py" line="2399"/>
+        <location filename="../main_window.py" line="2404"/>
+        <location filename="../main_window.py" line="2412"/>
         <source>EXOTIC environment ready.</source>
         <translation>EXOTIC environment ready.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2402"/>
+        <location filename="../main_window.py" line="2415"/>
         <source>Could not prepare EXOTIC:
 {0}</source>
         <translation>Could not prepare EXOTIC:
 {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2471"/>
+        <location filename="../main_window.py" line="2484"/>
         <source>Auto (ASTAP, then nova)</source>
         <translation>Auto (ASTAP, then nova)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2472"/>
+        <location filename="../main_window.py" line="2485"/>
         <source>ASTAP (local)</source>
         <translation>ASTAP (local)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2473"/>
+        <location filename="../main_window.py" line="2486"/>
         <source>Astrometry.net (nova)</source>
         <translation>Astrometry.net (nova)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2488"/>
+        <location filename="../main_window.py" line="2501"/>
         <source>None</source>
         <translation>None</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2497"/>
+        <location filename="../main_window.py" line="2510"/>
         <source>Ring with ticks (classic)</source>
         <translation>Ring with ticks (classic)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2499"/>
+        <location filename="../main_window.py" line="2512"/>
         <source>Full-frame cross with box</source>
         <translation>Full-frame cross with box</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2503"/>
+        <location filename="../main_window.py" line="2516"/>
         <source>Spanish</source>
         <translation>Spanish</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2674"/>
+        <location filename="../main_window.py" line="2687"/>
         <source>Enable at least one object kind.</source>
         <translation>Enable at least one object kind.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2698"/>
+        <location filename="../main_window.py" line="2711"/>
         <source>Settings saved — restart the app to change the language</source>
         <translation>Settings saved — restart the app to change the language</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3058"/>
+        <location filename="../main_window.py" line="3071"/>
         <source>Choose the limit file</source>
         <translation>Choose the limit file</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3069"/>
+        <location filename="../main_window.py" line="3082"/>
         <source>Choose the projects folder</source>
         <translation>Choose the projects folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3138"/>
+        <location filename="../main_window.py" line="3151"/>
         <source>Could not be read as a limit file — the flat minimum altitude is used instead</source>
         <translation>Could not be read as a limit file — the flat minimum altitude is used instead</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3144"/>
+        <location filename="../main_window.py" line="3157"/>
         <source>peak at azimuth %1°</source>
         <translation>peak at azimuth %1°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3337"/>
+        <location filename="../main_window.py" line="3350"/>
         <source>Loading NEOfixer targets…</source>
         <translation>Loading NEOfixer targets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3338"/>
+        <location filename="../main_window.py" line="3351"/>
         <source>Loading supernovae…</source>
         <translation>Loading supernovae…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3339"/>
+        <location filename="../main_window.py" line="3352"/>
         <source>Locating comets…</source>
         <translation>Locating comets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3340"/>
+        <location filename="../main_window.py" line="3353"/>
         <source>Checking PCCP candidates…</source>
         <translation>Checking PCCP candidates…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3341"/>
+        <location filename="../main_window.py" line="3354"/>
         <source>Scanning exoplanet transits…</source>
         <translation>Scanning exoplanet transits…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3346"/>
+        <location filename="../main_window.py" line="3359"/>
         <source>Fetching close approaches…</source>
         <translation>Fetching close approaches…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3347"/>
+        <location filename="../main_window.py" line="3360"/>
         <source>Scoring targets…</source>
         <translation>Scoring targets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3352"/>
+        <location filename="../main_window.py" line="3365"/>
         <source>Step %1 of %2 — %3</source>
         <translation>Step %1 of %2 — %3</translation>
     </message>
@@ -1889,42 +1889,42 @@
         <translation type="vanished">Due for a revisit: click to open its Follow-up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3664"/>
+        <location filename="../main_window.py" line="3677"/>
         <source>All</source>
         <translation>All</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3759"/>
+        <location filename="../main_window.py" line="3772"/>
         <source>Best time to observe: visible %1–%2 UTC (above the limit)</source>
         <translation>Best time to observe: visible %1–%2 UTC (above the limit)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3774"/>
+        <location filename="../main_window.py" line="3787"/>
         <source>Safe window %1–%2 UTC — the planned session fits, latest safe start ≤ %3</source>
         <translation>Safe window %1–%2 UTC — the planned session fits, latest safe start ≤ %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3784"/>
+        <location filename="../main_window.py" line="3797"/>
         <source>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</source>
         <translation>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3793"/>
+        <location filename="../main_window.py" line="3806"/>
         <source>Above the limit right now</source>
         <translation>Above the limit right now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3798"/>
+        <location filename="../main_window.py" line="3811"/>
         <source>Rises above the limit at %1 UTC</source>
         <translation>Rises above the limit at %1 UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3961"/>
+        <location filename="../main_window.py" line="3974"/>
         <source>Resume the active project for this object</source>
         <translation>Resume the active project for this object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3972"/>
+        <location filename="../main_window.py" line="3985"/>
         <source>Open the object in the Explore dialog (you can also create a project from there)</source>
         <translation>Open the object in the Explore dialog (you can also create a project from there)</translation>
     </message>
@@ -1933,7 +1933,7 @@
         <translation type="vanished">A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: capture, track, follow-up.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4883"/>
+        <location filename="../main_window.py" line="4896"/>
         <source>Analyse your data</source>
         <translation>Analyse your data</translation>
     </message>
@@ -1946,12 +1946,12 @@
         <translation type="vanished">Filters (add rows for multi-band)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5994"/>
+        <location filename="../main_window.py" line="6007"/>
         <source>Add filter</source>
         <translation>Add filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6017"/>
+        <location filename="../main_window.py" line="6030"/>
         <source>Export format</source>
         <translation>Export format</translation>
     </message>
@@ -1960,12 +1960,12 @@
         <translation type="vanished">Telescope</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6505"/>
+        <location filename="../main_window.py" line="6518"/>
         <source>Quick slew to the freshly-computed position of a moving target: J2000_to_Apparent + Telescope_slewasync, no plate-solve. Fast, but assumes the ephemeris is already accurate.</source>
         <translation>Quick slew to the freshly-computed position of a moving target: J2000_to_Apparent + Telescope_slewasync, no plate-solve. Fast, but assumes the ephemeris is already accurate.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6511"/>
+        <location filename="../main_window.py" line="6524"/>
         <source>Slew + capture + plate-solve and correct to the true sky position. Absorbs residual ephemeris error; the reliable route for NEOCPs and preliminary orbits.</source>
         <translation>Slew + capture + plate-solve and correct to the true sky position. Absorbs residual ephemeris error; the reliable route for NEOCPs and preliminary orbits.</translation>
     </message>
@@ -1986,56 +1986,56 @@
         <translation type="vanished">Uses the current project&apos;s saved plan (its Capture step holds frames × exposure).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2469"/>
-        <location filename="../main_window.py" line="6689"/>
+        <location filename="../main_window.py" line="2482"/>
+        <location filename="../main_window.py" line="6702"/>
         <source>CCDciel</source>
         <translation>CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7012"/>
+        <location filename="../main_window.py" line="7025"/>
         <source>Position at %1 UT</source>
         <translation>Position at %1 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7013"/>
+        <location filename="../main_window.py" line="7026"/>
         <source>Position from the plan (not refreshed)</source>
         <translation>Position from the plan (not refreshed)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7014"/>
+        <location filename="../main_window.py" line="7027"/>
         <source>Fixed coordinates</source>
         <translation>Fixed coordinates</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7088"/>
+        <location filename="../main_window.py" line="7101"/>
         <source>No fresh ephemeris; using the plan coordinates.</source>
         <translation>No fresh ephemeris; using the plan coordinates.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7098"/>
-        <location filename="../main_window.py" line="7146"/>
-        <location filename="../main_window.py" line="7294"/>
-        <location filename="../main_window.py" line="7457"/>
+        <location filename="../main_window.py" line="7111"/>
+        <location filename="../main_window.py" line="7159"/>
+        <location filename="../main_window.py" line="7307"/>
+        <location filename="../main_window.py" line="7470"/>
         <source>Open a project first (the Capture step needs one)</source>
         <translation>Open a project first (the Capture step needs one)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9051"/>
+        <location filename="../main_window.py" line="9069"/>
         <source>Reduce the series with FotoDif (its AUTO mode follows the capture live) or AIJ. FotoDif writes the AAVSO Extended File Format report directly; the cadence and exposure are in the Capture step.</source>
         <translation>Reduce the series with FotoDif (its AUTO mode follows the capture live) or AIJ. FotoDif writes the AAVSO Extended File Format report directly; the cadence and exposure are in the Capture step.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10434"/>
+        <location filename="../main_window.py" line="10452"/>
         <source>Reducing frame {0} of {1}…</source>
         <translation>Reducing frame {0} of {1}…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10443"/>
+        <location filename="../main_window.py" line="10461"/>
         <source>Comparing apertures and comparison stars…</source>
         <translation>Comparing apertures and comparison stars…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10489"/>
+        <location filename="../main_window.py" line="10507"/>
         <source>EXOTIC ran past its time limit and was stopped. The last lines of its log:
 
 {0}</source>
@@ -2044,22 +2044,22 @@
 {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10564"/>
+        <location filename="../main_window.py" line="10582"/>
         <source>EXOTIC ran, but left no fitted result.</source>
         <translation>EXOTIC ran, but left no fitted result.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10569"/>
+        <location filename="../main_window.py" line="10587"/>
         <source>T_mid {0} ± {1}</source>
         <translation>T_mid {0} ± {1}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10572"/>
+        <location filename="../main_window.py" line="10590"/>
         <source>Rp/Rs {0} ± {1}</source>
         <translation>Rp/Rs {0} ± {1}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10644"/>
+        <location filename="../main_window.py" line="10662"/>
         <source>No EXOTIC folder yet: run a reduction first.</source>
         <translation>No EXOTIC folder yet: run a reduction first.</translation>
     </message>
@@ -2068,112 +2068,117 @@
         <translation type="vanished">Generate post…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10860"/>
+        <location filename="../main_window.py" line="10878"/>
         <source>Last visit: {} days ago</source>
         <translation>Last visit: {} days ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10881"/>
+        <location filename="../main_window.py" line="10899"/>
         <source>No visits yet. Add one to start the follow-up.</source>
         <translation>No visits yet. Add one to start the follow-up.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10986"/>
+        <location filename="../main_window.py" line="11004"/>
         <source>Paste photometry…</source>
         <translation>Paste photometry…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10988"/>
+        <location filename="../main_window.py" line="11006"/>
         <source>Import file…</source>
         <translation>Import file…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11031"/>
+        <location filename="../main_window.py" line="11049"/>
         <source>Campaign summary</source>
         <translation>Campaign summary</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10942"/>
+        <location filename="../main_window.py" line="10960"/>
         <source>{n} nights · {p} points</source>
         <translation>{n} nights · {p} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10949"/>
+        <location filename="../main_window.py" line="10967"/>
         <source> · {:.2f} mag/day</source>
         <translation> · {:.2f} mag/day</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10952"/>
+        <location filename="../main_window.py" line="10970"/>
         <source> · {:.2f} mag from peak</source>
         <translation> · {:.2f} mag from peak</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10954"/>
+        <location filename="../main_window.py" line="10972"/>
         <source>consistent with the typical curve</source>
         <translation>consistent with the typical curve</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10955"/>
+        <location filename="../main_window.py" line="10973"/>
         <source>fading faster than typical</source>
         <translation>fading faster than typical</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10956"/>
+        <location filename="../main_window.py" line="10974"/>
         <source>fading slower than typical</source>
         <translation>fading slower than typical</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10957"/>
+        <location filename="../main_window.py" line="10975"/>
         <source>no template to compare against</source>
         <translation>no template to compare against</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10958"/>
+        <location filename="../main_window.py" line="10976"/>
         <source>no data</source>
         <translation>no data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10960"/>
+        <location filename="../main_window.py" line="10978"/>
         <source> · verdict: {}</source>
         <translation> · verdict: {}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12377"/>
+        <location filename="../main_window.py" line="12395"/>
         <source>Building the draft…</source>
         <translation>Building the draft…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12410"/>
+        <location filename="../main_window.py" line="12428"/>
         <source>The model is drafting. A reasoning model can take a couple of minutes.</source>
         <translation>The model is drafting. A reasoning model can take a couple of minutes.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12439"/>
+        <location filename="../main_window.py" line="12457"/>
         <source>The long report failed; the short post was written: </source>
         <translation>The long report failed; the short post was written: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13281"/>
+        <location filename="../main_window.py" line="12906"/>
+        <source>Opening the image workbench…</source>
+        <translation>Opening the image workbench…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="13309"/>
         <source>Point not saved: no magnitude to record</source>
         <translation>Point not saved: no magnitude to record</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13285"/>
+        <location filename="../main_window.py" line="13313"/>
         <source>Point not saved: the plate has no observation date</source>
         <translation>Point not saved: the plate has no observation date</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13299"/>
+        <location filename="../main_window.py" line="13327"/>
         <source>Point not saved: %1</source>
         <translation>Point not saved: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13313"/>
+        <location filename="../main_window.py" line="13341"/>
         <source>Point saved without plate state: this plate is not registered in the project.</source>
         <translation>Point saved without plate state: this plate is not registered in the project.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13317"/>
+        <location filename="../main_window.py" line="13345"/>
         <source>Point saved: {} band, {:.3f} mag</source>
         <translation>Point saved: {} band, {:.3f} mag</translation>
     </message>
@@ -2182,69 +2187,69 @@
         <translation type="vanished">Enable the unified editor in Settings → Development to measure from the editor</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11170"/>
+        <location filename="../main_window.py" line="11188"/>
         <source>Paste photometry</source>
         <translation>Paste photometry</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11173"/>
+        <location filename="../main_window.py" line="11191"/>
         <source>Paste your AIJ / Tycho / CSV measurements.
 One per line: date  magnitude  [error]  filter</source>
         <translation>Paste your AIJ / Tycho / CSV measurements.
 One per line: date  magnitude  [error]  filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11182"/>
+        <location filename="../main_window.py" line="11200"/>
         <source>Default filter:</source>
         <translation>Default filter:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11185"/>
+        <location filename="../main_window.py" line="11203"/>
         <source>Preview:</source>
         <translation>Preview:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11218"/>
+        <location filename="../main_window.py" line="11236"/>
         <source>({} lines skipped)</source>
         <translation>({} lines skipped)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11237"/>
+        <location filename="../main_window.py" line="11255"/>
         <source>Import photometry file</source>
         <translation>Import photometry file</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11245"/>
+        <location filename="../main_window.py" line="11263"/>
         <source>Cannot read file: %1</source>
         <translation>Cannot read file: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11249"/>
+        <location filename="../main_window.py" line="11267"/>
         <source>{} points parsed</source>
         <translation>{} points parsed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11251"/>
+        <location filename="../main_window.py" line="11269"/>
         <source>, {} lines skipped</source>
         <translation>, {} lines skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11253"/>
+        <location filename="../main_window.py" line="11271"/>
         <source>Import</source>
         <translation>Import</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5728"/>
+        <location filename="../main_window.py" line="5741"/>
         <source>pending</source>
         <translation>pending</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5730"/>
+        <location filename="../main_window.py" line="5743"/>
         <source>skipped</source>
         <translation>skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6022"/>
+        <location filename="../main_window.py" line="6035"/>
         <source>CSV (generic)</source>
         <translation>CSV (generic)</translation>
     </message>
@@ -2253,7 +2258,7 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">NINA (JSON)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6019"/>
+        <location filename="../main_window.py" line="6032"/>
         <source>CCDciel (targets)</source>
         <translation>CCDciel (targets)</translation>
     </message>
@@ -2262,27 +2267,27 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Calibration</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5060"/>
+        <location filename="../main_window.py" line="5073"/>
         <source>Files ({})</source>
         <translation>Files ({})</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5182"/>
+        <location filename="../main_window.py" line="5195"/>
         <source>Files (0)</source>
         <translation>Files (0)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5948"/>
+        <location filename="../main_window.py" line="5961"/>
         <source>Darks:</source>
         <translation>Darks:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5952"/>
+        <location filename="../main_window.py" line="5965"/>
         <source>Dark exposure (s):</source>
         <translation>Dark exposure (s):</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5955"/>
+        <location filename="../main_window.py" line="5968"/>
         <source>Bias:</source>
         <translation>Bias:</translation>
     </message>
@@ -2291,22 +2296,22 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">CCDciel control</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6466"/>
+        <location filename="../main_window.py" line="6479"/>
         <source>Connect CCDciel</source>
         <translation>Connect CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6467"/>
+        <location filename="../main_window.py" line="6480"/>
         <source>Disconnect</source>
         <translation>Disconnect</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6468"/>
+        <location filename="../main_window.py" line="6481"/>
         <source>Refresh</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6765"/>
+        <location filename="../main_window.py" line="6778"/>
         <source>CCDciel: not connected</source>
         <translation>CCDciel: not connected</translation>
     </message>
@@ -2331,38 +2336,38 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Slew:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6540"/>
+        <location filename="../main_window.py" line="6553"/>
         <source>Filter on wheel:</source>
         <translation>Filter on wheel:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6542"/>
+        <location filename="../main_window.py" line="6555"/>
         <source>Send plan</source>
         <translation>Send plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6550"/>
-        <location filename="../main_window.py" line="7411"/>
+        <location filename="../main_window.py" line="6563"/>
+        <location filename="../main_window.py" line="7424"/>
         <source>Start capture</source>
         <translation>Start capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6503"/>
+        <location filename="../main_window.py" line="6516"/>
         <source>Point telescope</source>
         <translation>Point telescope</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6509"/>
+        <location filename="../main_window.py" line="6522"/>
         <source>Astrometric Goto</source>
         <translation>Astrometric Goto</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7176"/>
+        <location filename="../main_window.py" line="7189"/>
         <source>Astrometric pointing finished.</source>
         <translation>Astrometric pointing finished.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6975"/>
+        <location filename="../main_window.py" line="6988"/>
         <source>No filter</source>
         <translation>No filter</translation>
     </message>
@@ -2371,58 +2376,58 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Could not connect to CCDciel.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6771"/>
-        <location filename="../main_window.py" line="6772"/>
-        <location filename="../main_window.py" line="6773"/>
-        <location filename="../main_window.py" line="6775"/>
-        <location filename="../main_window.py" line="6794"/>
-        <location filename="../main_window.py" line="6820"/>
-        <location filename="../main_window.py" line="6844"/>
-        <location filename="../main_window.py" line="6904"/>
-        <location filename="../main_window.py" line="6913"/>
-        <location filename="../main_window.py" line="6930"/>
-        <location filename="../main_window.py" line="7364"/>
+        <location filename="../main_window.py" line="6784"/>
+        <location filename="../main_window.py" line="6785"/>
+        <location filename="../main_window.py" line="6786"/>
+        <location filename="../main_window.py" line="6788"/>
+        <location filename="../main_window.py" line="6807"/>
+        <location filename="../main_window.py" line="6833"/>
+        <location filename="../main_window.py" line="6857"/>
+        <location filename="../main_window.py" line="6917"/>
+        <location filename="../main_window.py" line="6926"/>
+        <location filename="../main_window.py" line="6943"/>
+        <location filename="../main_window.py" line="7377"/>
         <source>—</source>
         <translation>—</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6933"/>
-        <location filename="../main_window.py" line="7111"/>
+        <location filename="../main_window.py" line="6946"/>
+        <location filename="../main_window.py" line="7124"/>
         <source>Slewing…</source>
         <translation>Slewing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6937"/>
-        <location filename="../main_window.py" line="7129"/>
+        <location filename="../main_window.py" line="6950"/>
+        <location filename="../main_window.py" line="7142"/>
         <source>Idle</source>
         <translation>Idle</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6920"/>
+        <location filename="../main_window.py" line="6933"/>
         <source>Stopped</source>
         <translation>Stopped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6489"/>
-        <location filename="../main_window.py" line="6916"/>
+        <location filename="../main_window.py" line="6502"/>
+        <location filename="../main_window.py" line="6929"/>
         <source>Tracking</source>
         <translation>Tracking</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7129"/>
+        <location filename="../main_window.py" line="7142"/>
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7008"/>
-        <location filename="../main_window.py" line="7106"/>
-        <location filename="../main_window.py" line="7154"/>
-        <location filename="../main_window.py" line="7472"/>
+        <location filename="../main_window.py" line="7021"/>
+        <location filename="../main_window.py" line="7119"/>
+        <location filename="../main_window.py" line="7167"/>
+        <location filename="../main_window.py" line="7485"/>
         <source>This object has no coordinates yet.</source>
         <translation>This object has no coordinates yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7135"/>
+        <location filename="../main_window.py" line="7148"/>
         <source>Telescope pointed at the object.</source>
         <translation>Telescope pointed at the object.</translation>
     </message>
@@ -2435,213 +2440,213 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Capture started in CCDciel.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11327"/>
-        <location filename="../main_window.py" line="11623"/>
+        <location filename="../main_window.py" line="11345"/>
+        <location filename="../main_window.py" line="11641"/>
         <source>Format:</source>
         <translation>Format:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11621"/>
-        <location filename="../main_window.py" line="11660"/>
+        <location filename="../main_window.py" line="11639"/>
+        <location filename="../main_window.py" line="11678"/>
         <source>Export ephemeris</source>
         <translation>Export ephemeris</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3342"/>
+        <location filename="../main_window.py" line="3355"/>
         <source>Checking HADS variables…</source>
         <translation>Checking HADS variables…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3343"/>
+        <location filename="../main_window.py" line="3356"/>
         <source>Checking campaigns…</source>
         <translation>Checking campaigns…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3344"/>
+        <location filename="../main_window.py" line="3357"/>
         <source>Checking vigils…</source>
         <translation>Checking vigils…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3345"/>
+        <location filename="../main_window.py" line="3358"/>
         <source>Checking the AAVSO channel…</source>
         <translation>Checking the AAVSO channel…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3847"/>
+        <location filename="../main_window.py" line="3860"/>
         <source>Next expected extremum (VSX epoch)</source>
         <translation>Next expected extremum (VSX epoch)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3854"/>
+        <location filename="../main_window.py" line="3867"/>
         <source>👁 ZTF %1 %2</source>
         <translation>👁 ZTF %1 %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3857"/>
+        <location filename="../main_window.py" line="3870"/>
         <source>Vigil alert: the latest ZTF point shows it at %1 mag versus its %2 baseline (Δ %3)</source>
         <translation>Vigil alert: the latest ZTF point shows it at %1 mag versus its %2 baseline (Δ %3)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3871"/>
+        <location filename="../main_window.py" line="3884"/>
         <source>📣 AAVSO</source>
         <translation>📣 AAVSO</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4019"/>
+        <location filename="../main_window.py" line="4032"/>
         <source>HADS star</source>
         <translation>HADS star</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4020"/>
+        <location filename="../main_window.py" line="4033"/>
         <source>Variable star</source>
         <translation>Variable star</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4088"/>
+        <location filename="../main_window.py" line="4101"/>
         <source>max</source>
         <translation>max</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4089"/>
+        <location filename="../main_window.py" line="4102"/>
         <source>min</source>
         <translation>min</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4247"/>
+        <location filename="../main_window.py" line="4260"/>
         <source>All campaigns</source>
         <translation>All campaigns</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4644"/>
-        <location filename="../main_window.py" line="4753"/>
+        <location filename="../main_window.py" line="4657"/>
+        <location filename="../main_window.py" line="4766"/>
         <source>Variable</source>
         <translation>Variable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4993"/>
-        <location filename="../main_window.py" line="11730"/>
+        <location filename="../main_window.py" line="5006"/>
+        <location filename="../main_window.py" line="11748"/>
         <source>Show in folder</source>
         <translation>Show in folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7616"/>
-        <location filename="../main_window.py" line="7618"/>
+        <location filename="../main_window.py" line="7629"/>
+        <location filename="../main_window.py" line="7631"/>
         <source>Stopping the follow run…</source>
         <translation>Stopping the follow run…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10226"/>
-        <location filename="../main_window.py" line="10237"/>
+        <location filename="../main_window.py" line="10244"/>
+        <location filename="../main_window.py" line="10255"/>
         <source>The first frame has no WCS: solving it…</source>
         <translation>The first frame has no WCS: solving it…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10248"/>
+        <location filename="../main_window.py" line="10266"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10262"/>
+        <location filename="../main_window.py" line="10280"/>
         <source>The first frame has no WCS and it could not be solved. Check the solver in Settings: ASTAP path or Astrometry.net key.</source>
         <translation>The first frame has no WCS and it could not be solved. Check the solver in Settings: ASTAP path or Astrometry.net key.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10272"/>
+        <location filename="../main_window.py" line="10290"/>
         <source>The solution of the first frame is not usable (non-TAN WCS).</source>
         <translation>The solution of the first frame is not usable (non-TAN WCS).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10289"/>
+        <location filename="../main_window.py" line="10307"/>
         <source>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</source>
         <translation>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10342"/>
+        <location filename="../main_window.py" line="10360"/>
         <source>The target position is unknown: attach the object to the project or set its coordinates.</source>
         <translation>The target position is unknown: attach the object to the project or set its coordinates.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10347"/>
+        <location filename="../main_window.py" line="10365"/>
         <source>No comparison stars: build the sequence in the editor (Photometry, «Build the sequence…») before reducing with EXOTIC.</source>
         <translation>No comparison stars: build the sequence in the editor (Photometry, «Build the sequence…») before reducing with EXOTIC.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10670"/>
+        <location filename="../main_window.py" line="10688"/>
         <source>Turn this observation into a post. The template works offline; the AI (experimental) drafts from your own data.</source>
         <translation>Turn this observation into a post. The template works offline; the AI (experimental) drafts from your own data.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10680"/>
+        <location filename="../main_window.py" line="10698"/>
         <source>Write with AI (experimental)…</source>
         <translation>Write with AI (experimental)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10682"/>
+        <location filename="../main_window.py" line="10700"/>
         <source>Experimental: an optional language model drafts the post from your own data; the offline template is the other button.</source>
         <translation>Experimental: an optional language model drafts the post from your own data; the offline template is the other button.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10686"/>
+        <location filename="../main_window.py" line="10704"/>
         <source>Experimental: show exactly what leaves your machine when you generate with the model.</source>
         <translation>Experimental: show exactly what leaves your machine when you generate with the model.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10737"/>
+        <location filename="../main_window.py" line="10755"/>
         <source>Long report</source>
         <translation>Long report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10803"/>
+        <location filename="../main_window.py" line="10821"/>
         <source>AI model (experimental): {0}</source>
         <translation>AI model (experimental): {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10808"/>
+        <location filename="../main_window.py" line="10826"/>
         <source>long report on; a local model costs nothing</source>
         <translation>long report on; a local model costs nothing</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10811"/>
+        <location filename="../main_window.py" line="10829"/>
         <source>long report on; a cloud model spends many tokens and may cost</source>
         <translation>long report on; a cloud model spends many tokens and may cost</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10819"/>
+        <location filename="../main_window.py" line="10837"/>
         <source>The AI is off: the template writes the post.</source>
         <translation>The AI is off: the template writes the post.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11732"/>
+        <location filename="../main_window.py" line="11750"/>
         <source>Change folder…</source>
         <translation>Change folder…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5115"/>
+        <location filename="../main_window.py" line="5128"/>
         <source>Choose the project folder</source>
         <translation>Choose the project folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5124"/>
+        <location filename="../main_window.py" line="5137"/>
         <source>Project folder changed — new files will go there</source>
         <translation>Project folder changed — new files will go there</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5254"/>
+        <location filename="../main_window.py" line="5267"/>
         <source>This project has been idle for {} days. Consider closing it. (click to dismiss)</source>
         <translation>This project has been idle for {} days. Consider closing it. (click to dismiss)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4879"/>
+        <location filename="../main_window.py" line="4892"/>
         <source>Measure tonight — %1 d since the last visit</source>
         <translation>Measure tonight — %1 d since the last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="531"/>
+        <location filename="../main_window.py" line="536"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="810"/>
+        <location filename="../main_window.py" line="823"/>
         <source>Welcome</source>
         <translation>Welcome</translation>
     </message>
@@ -2650,12 +2655,12 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Home</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="817"/>
+        <location filename="../main_window.py" line="830"/>
         <source>New project</source>
         <translation>New project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="833"/>
+        <location filename="../main_window.py" line="846"/>
         <source>Image Workbench</source>
         <translation>Image Workbench</translation>
     </message>
@@ -2672,41 +2677,41 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Open campaigns →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1397"/>
+        <location filename="../main_window.py" line="1410"/>
         <source>⌂ Home</source>
         <translation>⌂ Home</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1401"/>
+        <location filename="../main_window.py" line="1414"/>
         <source>ⓘ Welcome</source>
         <translation>ⓘ Welcome</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1403"/>
+        <location filename="../main_window.py" line="1416"/>
         <source>Setup guide and observatory</source>
         <translation>Setup guide and observatory</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1412"/>
+        <location filename="../main_window.py" line="1425"/>
         <source>+ New project…</source>
         <translation>+ New project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1796"/>
+        <location filename="../main_window.py" line="1809"/>
         <source>Select the Find_Orb executable</source>
         <translation>Select the Find_Orb executable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1807"/>
-        <location filename="../main_window.py" line="1830"/>
-        <location filename="../main_window.py" line="1925"/>
-        <location filename="../main_window.py" line="1927"/>
+        <location filename="../main_window.py" line="1820"/>
+        <location filename="../main_window.py" line="1843"/>
+        <location filename="../main_window.py" line="1938"/>
         <location filename="../main_window.py" line="1940"/>
+        <location filename="../main_window.py" line="1953"/>
         <source>Find_Orb</source>
         <translation>Find_Orb</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1831"/>
+        <location filename="../main_window.py" line="1844"/>
         <source>Find_Orb is already installed:
 %1
 
@@ -2717,19 +2722,19 @@ The path now points at it.</source>
 The path now points at it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1836"/>
-        <location filename="../main_window.py" line="1848"/>
-        <location filename="../main_window.py" line="1884"/>
+        <location filename="../main_window.py" line="1849"/>
+        <location filename="../main_window.py" line="1861"/>
+        <location filename="../main_window.py" line="1897"/>
         <source>Install Find_Orb</source>
         <translation>Install Find_Orb</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1841"/>
+        <location filename="../main_window.py" line="1854"/>
         <source>Folder for the Find_Orb environment</source>
         <translation>Folder for the Find_Orb environment</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1849"/>
+        <location filename="../main_window.py" line="1862"/>
         <source>Run this command?
 
 %1
@@ -2742,7 +2747,7 @@ The environment is private, inside the folder you chose, so nothing of your exis
 The environment is private, inside the folder you chose, so nothing of your existing setup is touched. The download takes a few minutes.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1862"/>
+        <location filename="../main_window.py" line="1875"/>
         <source>NightScribe did not find micromamba, mamba or conda, and it does not download a package manager on its own.
 
 The easy road on Linux and macOS is the conda-forge package &quot;findorb&quot;: it brings the precompiled binaries and the DE430t ephemerides the perturbations need, in one command:
@@ -2763,13 +2768,13 @@ On Windows, Project Pluto ships the binaries as zips: download the console versi
 The whole guide is in the documentation.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1882"/>
-        <location filename="../main_window.py" line="1893"/>
+        <location filename="../main_window.py" line="1895"/>
+        <location filename="../main_window.py" line="1906"/>
         <source>Installing Find_Orb…</source>
         <translation>Installing Find_Orb…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1928"/>
+        <location filename="../main_window.py" line="1941"/>
         <source>The installation did not finish. The last lines of the package manager were:
 
 %1
@@ -2782,27 +2787,27 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
 You can still install Find_Orb by hand (the guide is in the documentation) and point the path above at it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1941"/>
+        <location filename="../main_window.py" line="1954"/>
         <source>The installation failed:</source>
         <translation>The installation failed:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2734"/>
+        <location filename="../main_window.py" line="2747"/>
         <source>Bias</source>
         <translation>Bias</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2735"/>
+        <location filename="../main_window.py" line="2748"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2736"/>
+        <location filename="../main_window.py" line="2749"/>
         <source>Dark of the flats</source>
         <translation>Dark of the flats</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2737"/>
+        <location filename="../main_window.py" line="2750"/>
         <source>Flat</source>
         <translation>Flat</translation>
     </message>
@@ -2811,7 +2816,7 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Add masters</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2865"/>
+        <location filename="../main_window.py" line="2878"/>
         <source>FITS images (*.fits *.fit *.fts);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts);;All files (*)</translation>
     </message>
@@ -2820,7 +2825,7 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Indexed %1 masters (%2).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2501"/>
+        <location filename="../main_window.py" line="2514"/>
         <source>The object type&apos;s colour</source>
         <translation>The object type&apos;s colour</translation>
     </message>
@@ -2829,82 +2834,82 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">The current colour</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2849"/>
+        <location filename="../main_window.py" line="2862"/>
         <source>Nothing new to index.</source>
         <translation>Nothing new to index.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2851"/>
+        <location filename="../main_window.py" line="2864"/>
         <source>%1 were already in the library.</source>
         <translation>%1 were already in the library.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2909"/>
+        <location filename="../main_window.py" line="2922"/>
         <source>Remove from the library</source>
         <translation>Remove from the library</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2910"/>
+        <location filename="../main_window.py" line="2923"/>
         <source>Take %1 out of the master library? The file on disk is not touched.</source>
         <translation>Take %1 out of the master library? The file on disk is not touched.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2917"/>
+        <location filename="../main_window.py" line="2930"/>
         <source>Removed %1 from the library.</source>
         <translation>Removed %1 from the library.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3324"/>
+        <location filename="../main_window.py" line="3337"/>
         <source>Set your observatory in Welcome to get tonight&apos;s targets</source>
         <translation>Set your observatory in Welcome to get tonight&apos;s targets</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4473"/>
+        <location filename="../main_window.py" line="4486"/>
         <source>A campaign groups the projects of one shared observation effort: several nights, several observatories, one goal. A project is one object with its three steps: capture, track, follow-up.</source>
         <translation>A campaign groups the projects of one shared observation effort: several nights, several observatories, one goal. A project is one object with its three steps: capture, track, follow-up.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4800"/>
+        <location filename="../main_window.py" line="4813"/>
         <source>Last curve: {0} · {1} points · the chart&apos;s scale</source>
         <translation>Last curve: {0} · {1} points · the chart&apos;s scale</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4803"/>
+        <location filename="../main_window.py" line="4816"/>
         <source>{0} nights · {1} points</source>
         <translation>{0} nights · {1} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4876"/>
+        <location filename="../main_window.py" line="4889"/>
         <source>First measurement — it opens the series</source>
         <translation>First measurement — it opens the series</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4886"/>
+        <location filename="../main_window.py" line="4899"/>
         <source>Plan the capture</source>
         <translation>Plan the capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4887"/>
+        <location filename="../main_window.py" line="4900"/>
         <source>Draft the post</source>
         <translation>Draft the post</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4888"/>
+        <location filename="../main_window.py" line="4901"/>
         <source>All steps done — consider closing the project</source>
         <translation>All steps done — consider closing the project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5311"/>
+        <location filename="../main_window.py" line="5324"/>
         <source>published in &lt;a href=&quot;%1&quot;&gt;%2&lt;/a&gt;</source>
         <translation>published in &lt;a href=&quot;%1&quot;&gt;%2&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5314"/>
+        <location filename="../main_window.py" line="5327"/>
         <source>published in %1</source>
         <translation>published in %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5317"/>
+        <location filename="../main_window.py" line="5330"/>
         <source>Confirmed as &lt;b&gt;%1&lt;/b&gt;</source>
         <translation>Confirmed as &lt;b&gt;%1&lt;/b&gt;</translation>
     </message>
@@ -2913,550 +2918,550 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Your observations of it are in that circular.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5733"/>
+        <location filename="../main_window.py" line="5746"/>
         <source>done %1</source>
         <translation>done %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5753"/>
+        <location filename="../main_window.py" line="5766"/>
         <source>✔ done on %1</source>
         <translation>✔ done on %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5754"/>
+        <location filename="../main_window.py" line="5767"/>
         <source>– skipped</source>
         <translation>– skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5757"/>
+        <location filename="../main_window.py" line="5770"/>
         <source>Reopen step</source>
         <translation>Reopen step</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5832"/>
+        <location filename="../main_window.py" line="5845"/>
         <source>Exposure plan</source>
         <translation>Exposure plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5967"/>
+        <location filename="../main_window.py" line="5980"/>
         <source>Sequence</source>
         <translation>Sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5987"/>
+        <location filename="../main_window.py" line="6000"/>
         <source>Filters</source>
         <translation>Filters</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5989"/>
+        <location filename="../main_window.py" line="6002"/>
         <source>Add a row per band: each one is its own set of frames, exposure and filter (a supernova is worth following in more than one)</source>
         <translation>Add a row per band: each one is its own set of frames, exposure and filter (a supernova is worth following in more than one)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6071"/>
+        <location filename="../main_window.py" line="6084"/>
         <source>Integration</source>
         <translation>Integration</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6072"/>
+        <location filename="../main_window.py" line="6085"/>
         <source>Filter</source>
         <translation>Filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6073"/>
+        <location filename="../main_window.py" line="6086"/>
         <source>Before dawn</source>
         <translation>Before dawn</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6456"/>
+        <location filename="../main_window.py" line="6469"/>
         <source>Telescope and camera</source>
         <translation>Telescope and camera</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6487"/>
+        <location filename="../main_window.py" line="6500"/>
         <source>Version</source>
         <translation>Version</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6488"/>
+        <location filename="../main_window.py" line="6501"/>
         <source>Temperature</source>
         <translation>Temperature</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6490"/>
+        <location filename="../main_window.py" line="6503"/>
         <source>Slew</source>
         <translation>Slew</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6514"/>
-        <location filename="../main_window.py" line="7267"/>
+        <location filename="../main_window.py" line="6527"/>
+        <location filename="../main_window.py" line="7280"/>
         <source>Refresh position</source>
         <translation>Refresh position</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6516"/>
+        <location filename="../main_window.py" line="6529"/>
         <source>Re-query the orbit and the ephemeris now instead of using the cache. A preliminary orbit improves as new astrometry arrives, so a position computed from an old one can be minutes of motion off.</source>
         <translation>Re-query the orbit and the ephemeris now instead of using the cache. A preliminary orbit improves as new astrometry arrives, so a position computed from an old one can be minutes of motion off.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6557"/>
-        <location filename="../main_window.py" line="7703"/>
+        <location filename="../main_window.py" line="6570"/>
+        <location filename="../main_window.py" line="7716"/>
         <source>Start and follow…</source>
         <translation>Start and follow…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6673"/>
-        <location filename="../main_window.py" line="7582"/>
+        <location filename="../main_window.py" line="6686"/>
+        <location filename="../main_window.py" line="7595"/>
         <source>Stop following</source>
         <translation>Stop following</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7235"/>
+        <location filename="../main_window.py" line="7248"/>
         <source>This target has fixed coordinates: there is nothing to refresh.</source>
         <translation>This target has fixed coordinates: there is nothing to refresh.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7246"/>
+        <location filename="../main_window.py" line="7259"/>
         <source>Refreshing…</source>
         <translation>Refreshing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7274"/>
+        <location filename="../main_window.py" line="7287"/>
         <source>No fresh position: no source resolved the object.</source>
         <translation>No fresh position: no source resolved the object.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7279"/>
+        <location filename="../main_window.py" line="7292"/>
         <source>Horizons</source>
         <translation>Horizons</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7280"/>
+        <location filename="../main_window.py" line="7293"/>
         <source>NEOfixer</source>
         <translation>NEOfixer</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7281"/>
+        <location filename="../main_window.py" line="7294"/>
         <source>SBDB (Kepler)</source>
         <translation>SBDB (Kepler)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7282"/>
+        <location filename="../main_window.py" line="7295"/>
         <source>NEOfixer (Kepler)</source>
         <translation>NEOfixer (Kepler)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7285"/>
+        <location filename="../main_window.py" line="7298"/>
         <source>Position refreshed: %1</source>
         <translation>Position refreshed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7325"/>
+        <location filename="../main_window.py" line="7338"/>
         <source>the wheel has no &apos;%1&apos;: the filter is left as it is</source>
         <translation>the wheel has no &apos;%1&apos;: the filter is left as it is</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7466"/>
+        <location filename="../main_window.py" line="7479"/>
         <source>Start and follow is for a moving object: a fixed target does not cross the field.</source>
         <translation>Start and follow is for a moving object: a fixed target does not cross the field.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7478"/>
-        <location filename="../main_window.py" line="7550"/>
+        <location filename="../main_window.py" line="7491"/>
+        <location filename="../main_window.py" line="7563"/>
         <source>Start and follow</source>
         <translation>Start and follow</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7512"/>
+        <location filename="../main_window.py" line="7525"/>
         <source>%1 observations × %2 frames (%3 s each) · a re-point of about %4 s between them</source>
         <translation>%1 observations × %2 frames (%3 s each) · a re-point of about %4 s between them</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7543"/>
+        <location filename="../main_window.py" line="7556"/>
         <source>The guider is put back before each observation (a slew stops it), using the calibration you already have.</source>
         <translation>The guider is put back before each observation (a slew stops it), using the calibration you already have.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7583"/>
-        <location filename="../main_window.py" line="7587"/>
+        <location filename="../main_window.py" line="7596"/>
+        <location filename="../main_window.py" line="7600"/>
         <source>Follow run started.</source>
         <translation>Follow run started.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7637"/>
+        <location filename="../main_window.py" line="7650"/>
         <source>Observation %1 of %2: starting the guider…</source>
         <translation>Observation %1 of %2: starting the guider…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7642"/>
+        <location filename="../main_window.py" line="7655"/>
         <source>Observation %1 of %2: the guider did not start; capturing unguided.</source>
         <translation>Observation %1 of %2: the guider did not start; capturing unguided.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7659"/>
+        <location filename="../main_window.py" line="7672"/>
         <source>Observation %1 of %2 · frame %3/%4</source>
         <translation>Observation %1 of %2 · frame %3/%4</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7664"/>
+        <location filename="../main_window.py" line="7677"/>
         <source>%1 s left</source>
         <translation>%1 s left</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7706"/>
+        <location filename="../main_window.py" line="7719"/>
         <source>Follow run failed: %1</source>
         <translation>Follow run failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7711"/>
-        <location filename="../main_window.py" line="7713"/>
+        <location filename="../main_window.py" line="7724"/>
+        <location filename="../main_window.py" line="7726"/>
         <source>Follow run stopped.</source>
         <translation>Follow run stopped.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7715"/>
-        <location filename="../main_window.py" line="7717"/>
+        <location filename="../main_window.py" line="7728"/>
+        <location filename="../main_window.py" line="7730"/>
         <source>Follow run finished.</source>
         <translation>Follow run finished.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7720"/>
-        <location filename="../main_window.py" line="7723"/>
+        <location filename="../main_window.py" line="7733"/>
+        <location filename="../main_window.py" line="7736"/>
         <source>Follow run ended: %1</source>
         <translation>Follow run ended: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8009"/>
+        <location filename="../main_window.py" line="8027"/>
         <source>Astrometry runs</source>
         <translation>Astrometry runs</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8016"/>
+        <location filename="../main_window.py" line="8034"/>
         <source>Each run is one pass of the track &amp; stack: the positions it measured, the motion it resolved and the brightness it read. The magnitude says WHO wrote it: the run itself (automatic) or a measurement you made by hand in the Photometry tab and sent to the report. The MPC report is drafted in the editor.</source>
         <translation>Each run is one pass of the track &amp; stack: the positions it measured, the motion it resolved and the brightness it read. The magnitude says WHO wrote it: the run itself (automatic) or a measurement you made by hand in the Photometry tab and sent to the report. The MPC report is drafted in the editor.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8025"/>
-        <location filename="../main_window.py" line="8107"/>
+        <location filename="../main_window.py" line="8043"/>
+        <location filename="../main_window.py" line="8125"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8025"/>
+        <location filename="../main_window.py" line="8043"/>
         <source>Observations</source>
         <translation>Observations</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8025"/>
-        <location filename="../main_window.py" line="8108"/>
+        <location filename="../main_window.py" line="8043"/>
+        <location filename="../main_window.py" line="8126"/>
         <source>Motion</source>
         <translation>Motion</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8026"/>
-        <location filename="../main_window.py" line="8107"/>
+        <location filename="../main_window.py" line="8044"/>
+        <location filename="../main_window.py" line="8125"/>
         <source>Magnitude</source>
         <translation>Magnitude</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8026"/>
-        <location filename="../main_window.py" line="8108"/>
+        <location filename="../main_window.py" line="8044"/>
+        <location filename="../main_window.py" line="8126"/>
         <source>Check</source>
         <translation>Check</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8026"/>
+        <location filename="../main_window.py" line="8044"/>
         <source>State</source>
         <translation>State</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6604"/>
-        <location filename="../main_window.py" line="8045"/>
-        <location filename="../main_window.py" line="8131"/>
+        <location filename="../main_window.py" line="6617"/>
+        <location filename="../main_window.py" line="8063"/>
+        <location filename="../main_window.py" line="8149"/>
         <source>Open in the editor</source>
         <translation>Open in the editor</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1978"/>
+        <location filename="../main_window.py" line="1991"/>
         <source>Card: {0}</source>
         <translation>Card: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1981"/>
+        <location filename="../main_window.py" line="1994"/>
         <source>No card detected: the processor does the work</source>
         <translation>No card detected: the processor does the work</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2482"/>
+        <location filename="../main_window.py" line="2495"/>
         <source>CUDA (NVIDIA, installed by hand)</source>
         <translation>CUDA (NVIDIA, installed by hand)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2774"/>
+        <location filename="../main_window.py" line="2787"/>
         <source>Shared</source>
         <translation>Shared</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2796"/>
+        <location filename="../main_window.py" line="2809"/>
         <source>Stop sharing</source>
         <translation>Stop sharing</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2797"/>
+        <location filename="../main_window.py" line="2810"/>
         <source>Share with every project</source>
         <translation>Share with every project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2930"/>
+        <location filename="../main_window.py" line="2943"/>
         <source>Build masters from a folder of calibration frames</source>
         <translation>Build masters from a folder of calibration frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2963"/>
+        <location filename="../main_window.py" line="2976"/>
         <source>Building masters… %1 of %2</source>
         <translation>Building masters… %1 of %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2973"/>
+        <location filename="../main_window.py" line="2986"/>
         <source>Building masters…</source>
         <translation>Building masters…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2989"/>
+        <location filename="../main_window.py" line="3002"/>
         <source>Built %1 masters:</source>
         <translation>Built %1 masters:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2995"/>
+        <location filename="../main_window.py" line="3008"/>
         <source>A group had a single frame, so its master is a copy of that frame and not an average: one more frame is what brings the noise down.</source>
         <translation>A group had a single frame, so its master is a copy of that frame and not an average: one more frame is what brings the noise down.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2999"/>
+        <location filename="../main_window.py" line="3012"/>
         <source>Nothing was built.</source>
         <translation>Nothing was built.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3002"/>
+        <location filename="../main_window.py" line="3015"/>
         <source>%1 frames were left out: they are not calibration frames.</source>
         <translation>%1 frames were left out: they are not calibration frames.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3008"/>
+        <location filename="../main_window.py" line="3021"/>
         <source>Cancelled: the masters built so far are kept.</source>
         <translation>Cancelled: the masters built so far are kept.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3031"/>
+        <location filename="../main_window.py" line="3044"/>
         <source>Shared (every project)</source>
         <translation>Shared (every project)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3042"/>
+        <location filename="../main_window.py" line="3055"/>
         <source>Who owns this master</source>
         <translation>Who owns this master</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3051"/>
+        <location filename="../main_window.py" line="3064"/>
         <source>%1 now belongs to %2.</source>
         <translation>%1 now belongs to %2.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5322"/>
+        <location filename="../main_window.py" line="5335"/>
         <source>your observations are among them: your data is in that MPEC</source>
         <translation>your observations are among them: your data is in that MPEC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5328"/>
+        <location filename="../main_window.py" line="5341"/>
         <source>&lt;a href=&quot;%1&quot;&gt;see the object at the MPC&lt;/a&gt;</source>
         <translation>&lt;a href=&quot;%1&quot;&gt;see the object at the MPC&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5333"/>
+        <location filename="../main_window.py" line="5346"/>
         <source>&lt;a href=&apos;ns://use-confirmed&apos;&gt;Use the confirmed name&lt;/a&gt;</source>
         <translation>&lt;a href=&apos;ns://use-confirmed&apos;&gt;Use the confirmed name&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5419"/>
+        <location filename="../main_window.py" line="5432"/>
         <source>Renamed to %1: the report, the check and the orbit now use the confirmed designation.</source>
         <translation>Renamed to %1: the report, the check and the orbit now use the confirmed designation.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5853"/>
+        <location filename="../main_window.py" line="5866"/>
         <source>Set suggested values</source>
         <translation>Set suggested values</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5855"/>
+        <location filename="../main_window.py" line="5868"/>
         <source>Recompute the suggested frames, exposure and capture options for this object and fill them in. It overwrites what is there.</source>
         <translation>Recompute the suggested frames, exposure and capture options for this object and fill them in. It overwrites what is there.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5861"/>
-        <location filename="../main_window.py" line="6170"/>
+        <location filename="../main_window.py" line="5874"/>
+        <location filename="../main_window.py" line="6183"/>
         <source>Why these values?</source>
         <translation>Why these values?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5942"/>
+        <location filename="../main_window.py" line="5955"/>
         <source>Capture options and calibration</source>
         <translation>Capture options and calibration</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6020"/>
+        <location filename="../main_window.py" line="6033"/>
         <source>NINA (sequence)</source>
         <translation>NINA (sequence)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6021"/>
+        <location filename="../main_window.py" line="6034"/>
         <source>NINA (plan summary)</source>
         <translation>NINA (plan summary)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6177"/>
+        <location filename="../main_window.py" line="6190"/>
         <source>Dither between frames</source>
         <translation>Dither between frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6187"/>
+        <location filename="../main_window.py" line="6200"/>
         <source>Dither:</source>
         <translation>Dither:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6188"/>
-        <location filename="../main_window.py" line="6205"/>
+        <location filename="../main_window.py" line="6201"/>
+        <location filename="../main_window.py" line="6218"/>
         <source>every</source>
         <translation>every</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6188"/>
+        <location filename="../main_window.py" line="6201"/>
         <source>frames ·</source>
         <translation>frames ·</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6189"/>
+        <location filename="../main_window.py" line="6202"/>
         <source>px</source>
         <translation>px</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6193"/>
+        <location filename="../main_window.py" line="6206"/>
         <source>Refocus during the run</source>
         <translation>Refocus during the run</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6204"/>
+        <location filename="../main_window.py" line="6217"/>
         <source>Refocus:</source>
         <translation>Refocus:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6205"/>
+        <location filename="../main_window.py" line="6218"/>
         <source>min · ΔT</source>
         <translation>min · ΔT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6206"/>
+        <location filename="../main_window.py" line="6219"/>
         <source>°C</source>
         <translation>°C</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6230"/>
+        <location filename="../main_window.py" line="6243"/>
         <source>Camera:</source>
         <translation>Camera:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6231"/>
+        <location filename="../main_window.py" line="6244"/>
         <source>gain</source>
         <translation>gain</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6231"/>
+        <location filename="../main_window.py" line="6244"/>
         <source>offset</source>
         <translation>offset</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6232"/>
+        <location filename="../main_window.py" line="6245"/>
         <source>binning</source>
         <translation>binning</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6238"/>
+        <location filename="../main_window.py" line="6251"/>
         <source>Delay between frames:</source>
         <translation>Delay between frames:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6239"/>
+        <location filename="../main_window.py" line="6252"/>
         <source>s</source>
         <translation>s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6351"/>
+        <location filename="../main_window.py" line="6364"/>
         <source>Suggested capture values applied.</source>
         <translation>Suggested capture values applied.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6401"/>
+        <location filename="../main_window.py" line="6414"/>
         <source>Numbers used</source>
         <translation>Numbers used</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6405"/>
+        <location filename="../main_window.py" line="6418"/>
         <source>The target would saturate: consider a lower gain, binning, defocus or a neutral filter.</source>
         <translation>The target would saturate: consider a lower gain, binning, defocus or a neutral filter.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6408"/>
+        <location filename="../main_window.py" line="6421"/>
         <source>The sky is faint and the read noise high: longer exposures than saturation allows would be needed; binning or more frames helps.</source>
         <translation>The sky is faint and the read noise high: longer exposures than saturation allows would be needed; binning or more frames helps.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6412"/>
+        <location filename="../main_window.py" line="6425"/>
         <source>The object moves: the exposure is capped so it does not trail.</source>
         <translation>The object moves: the exposure is capped so it does not trail.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6415"/>
+        <location filename="../main_window.py" line="6428"/>
         <source>The object crosses the field of view before the night ends: the frame count is capped so the run does not end up full of frames without it.</source>
         <translation>The object crosses the field of view before the night ends: the frame count is capped so the run does not end up full of frames without it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6419"/>
+        <location filename="../main_window.py" line="6432"/>
         <source>The object moves but the field of view or its rate is unknown: the count cannot be bounded by the field. Pick your camera preset and check the rate.</source>
         <translation>The object moves but the field of view or its rate is unknown: the count cannot be bounded by the field. Pick your camera preset and check the rate.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6423"/>
+        <location filename="../main_window.py" line="6436"/>
         <source>The object crosses the field in less time than even a handful of frames: shorten the exposure or re-point during the run.</source>
         <translation>The object crosses the field in less time than even a handful of frames: shorten the exposure or re-point during the run.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6426"/>
+        <location filename="../main_window.py" line="6439"/>
         <source>Watch out</source>
         <translation>Watch out</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6432"/>
+        <location filename="../main_window.py" line="6445"/>
         <source>Why these values</source>
         <translation>Why these values</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6524"/>
-        <location filename="../main_window.py" line="7211"/>
+        <location filename="../main_window.py" line="6537"/>
+        <location filename="../main_window.py" line="7224"/>
         <source>Stop goto</source>
         <translation>Stop goto</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6526"/>
+        <location filename="../main_window.py" line="6539"/>
         <source>Stop the telescope movement now. Use it if a slew or an astrometric goto is heading somewhere it should not: it halts the mount immediately, without waiting for the pointing to finish.</source>
         <translation>Stop the telescope movement now. Use it if a slew or an astrometric goto is heading somewhere it should not: it halts the mount immediately, without waiting for the pointing to finish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6544"/>
+        <location filename="../main_window.py" line="6557"/>
         <source>Prepare the current project&apos;s saved plan (object, frames × exposure, filter, binning, gain, offset, dither) in the observatory software and read it back to show what it is really holding. The autofocus cadence is NOT applied live (CCDciel&apos;s API does not expose it): it travels with the exported sequence. With NINA the frame count is information only.</source>
         <translation>Prepare the current project&apos;s saved plan (object, frames × exposure, filter, binning, gain, offset, dither) in the observatory software and read it back to show what it is really holding. The autofocus cadence is NOT applied live (CCDciel&apos;s API does not expose it): it travels with the exported sequence. With NINA the frame count is information only.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6552"/>
-        <location filename="../main_window.py" line="7413"/>
+        <location filename="../main_window.py" line="6565"/>
+        <location filename="../main_window.py" line="7426"/>
         <source>Start the staged capture in the observatory software</source>
         <translation>Start the staged capture in the observatory software</translation>
     </message>
@@ -3465,19 +3470,19 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Auto-recenter…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6559"/>
+        <location filename="../main_window.py" line="6572"/>
         <source>Run N observations of a moving object without re-pointing by hand: each one captures as many frames as fit before the object reaches the edge of the field, then the telescope points again at the object&apos;s fresh position and the next one starts. Needs a moving object and a plate solver (astrometric goto).</source>
         <translation>Run N observations of a moving object without re-pointing by hand: each one captures as many frames as fit before the object reaches the edge of the field, then the telescope points again at the object&apos;s fresh position and the next one starts. Needs a moving object and a plate solver (astrometric goto).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6599"/>
-        <location filename="../main_window.py" line="7760"/>
-        <location filename="../main_window.py" line="7761"/>
+        <location filename="../main_window.py" line="6612"/>
+        <location filename="../main_window.py" line="7773"/>
+        <location filename="../main_window.py" line="7774"/>
         <source>Waiting for the first frame…</source>
         <translation>Waiting for the first frame…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6606"/>
+        <location filename="../main_window.py" line="6619"/>
         <source>Load this frame in the image workbench to measure, annotate or calibrate it. It is the frame on disk, not a copy.</source>
         <translation>Load this frame in the image workbench to measure, annotate or calibrate it. It is the frame on disk, not a copy.</translation>
     </message>
@@ -3486,82 +3491,82 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Stop auto-recenter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6752"/>
+        <location filename="../main_window.py" line="6765"/>
         <source>Connect %1</source>
         <translation>Connect %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6762"/>
+        <location filename="../main_window.py" line="6775"/>
         <source>NINA / PINS: not connected</source>
         <translation>NINA / PINS: not connected</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6813"/>
+        <location filename="../main_window.py" line="6826"/>
         <source>Could not connect to %1.</source>
         <translation>Could not connect to %1.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7196"/>
+        <location filename="../main_window.py" line="7209"/>
         <source>Stopping…</source>
         <translation>Stopping…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7216"/>
+        <location filename="../main_window.py" line="7229"/>
         <source>Telescope movement stopped.</source>
         <translation>Telescope movement stopped.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7371"/>
+        <location filename="../main_window.py" line="7384"/>
         <source>bin %1</source>
         <translation>bin %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7373"/>
+        <location filename="../main_window.py" line="7386"/>
         <source>dither every %1</source>
         <translation>dither every %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7375"/>
+        <location filename="../main_window.py" line="7388"/>
         <source>Staged: %1</source>
         <translation>Staged: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7379"/>
+        <location filename="../main_window.py" line="7392"/>
         <source>the frame count is information only here</source>
         <translation>the frame count is information only here</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7383"/>
+        <location filename="../main_window.py" line="7396"/>
         <source>not applied: %1</source>
         <translation>not applied: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7394"/>
+        <location filename="../main_window.py" line="7407"/>
         <source>Capture plan sent.</source>
         <translation>Capture plan sent.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7406"/>
+        <location filename="../main_window.py" line="7419"/>
         <source>Stop capture</source>
         <translation>Stop capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7408"/>
+        <location filename="../main_window.py" line="7421"/>
         <source>Stop the capture in progress. It stops the CAMERA, not the mount (that is Stop goto).</source>
         <translation>Stop the capture in progress. It stops the CAMERA, not the mount (that is Stop goto).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7427"/>
+        <location filename="../main_window.py" line="7440"/>
         <source>Capture started.</source>
         <translation>Capture started.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7440"/>
+        <location filename="../main_window.py" line="7453"/>
         <source>Capture stopped.</source>
         <translation>Capture stopped.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7462"/>
+        <location filename="../main_window.py" line="7475"/>
         <source>Connect the observatory first.</source>
         <translation>Connect the observatory first.</translation>
     </message>
@@ -3574,7 +3579,7 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Auto-recenter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7479"/>
+        <location filename="../main_window.py" line="7492"/>
         <source>Observations to capture:</source>
         <translation>Observations to capture:</translation>
     </message>
@@ -3583,27 +3588,27 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">%1 observations × %2 frames (%3 s each) · a re-center of about %4 s between them</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7518"/>
+        <location filename="../main_window.py" line="7531"/>
         <source>Total: about %1 min.</source>
         <translation>Total: about %1 min.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7522"/>
+        <location filename="../main_window.py" line="7535"/>
         <source>No visibility window for this object: the total cannot be checked against the night.</source>
         <translation>No visibility window for this object: the total cannot be checked against the night.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7526"/>
+        <location filename="../main_window.py" line="7539"/>
         <source>Warning: this does not fit the visibility window (%1 min); the object may set before the run ends.</source>
         <translation>Warning: this does not fit the visibility window (%1 min); the object may set before the run ends.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7531"/>
+        <location filename="../main_window.py" line="7544"/>
         <source>The per-observation size could not be bounded by the field (no camera preset or no rate): the frames may run past the edge.</source>
         <translation>The per-observation size could not be bounded by the field (no camera preset or no rate): the frames may run past the edge.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7536"/>
+        <location filename="../main_window.py" line="7549"/>
         <source>Your %1 frames are more than fit before the object reaches the edge of the field (%2): it may leave the field before the observation ends.</source>
         <translation>Your %1 frames are more than fit before the object reaches the edge of the field (%2): it may leave the field before the observation ends.</translation>
     </message>
@@ -3616,17 +3621,17 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Stopping the auto-recenter run…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7633"/>
+        <location filename="../main_window.py" line="7646"/>
         <source>Observation %1 of %2: centering…</source>
         <translation>Observation %1 of %2: centering…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7646"/>
+        <location filename="../main_window.py" line="7659"/>
         <source>Observation %1 of %2: capturing %3 frames…</source>
         <translation>Observation %1 of %2: capturing %3 frames…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7669"/>
+        <location filename="../main_window.py" line="7682"/>
         <source>Observation %1: the software did not report the end; going on.</source>
         <translation>Observation %1: the software did not report the end; going on.</translation>
     </message>
@@ -3643,393 +3648,393 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Auto-recenter run ended: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7812"/>
+        <location filename="../main_window.py" line="7825"/>
         <source>Could not read the frame</source>
         <translation>Could not read the frame</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7841"/>
+        <location filename="../main_window.py" line="7854"/>
         <source>Last frame</source>
         <translation>Last frame</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7868"/>
+        <location filename="../main_window.py" line="7881"/>
         <source>This program serves the frame as a picture, not the FITS: to open it in the editor, NightScribe must see the file where the observatory saved it.</source>
         <translation>This program serves the frame as a picture, not the FITS: to open it in the editor, NightScribe must see the file where the observatory saved it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7877"/>
+        <location filename="../main_window.py" line="7890"/>
         <source>No FITS was received.</source>
         <translation>No FITS was received.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8047"/>
+        <location filename="../main_window.py" line="8065"/>
         <source>Open the visit&apos;s frames in the editor with the track &amp; stack tab on stage, to re-measure or to draft the report</source>
         <translation>Open the visit&apos;s frames in the editor with the track &amp; stack tab on stage, to re-measure or to draft the report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8051"/>
-        <location filename="../main_window.py" line="8711"/>
+        <location filename="../main_window.py" line="8069"/>
+        <location filename="../main_window.py" line="8729"/>
         <source>Undo this run</source>
         <translation>Undo this run</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8053"/>
+        <location filename="../main_window.py" line="8071"/>
         <source>Undo the execution whole: its positions and its frame manifest go, and the run stays marked as undone for the audit</source>
         <translation>Undo the execution whole: its positions and its frame manifest go, and the run stays marked as undone for the audit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8087"/>
+        <location filename="../main_window.py" line="8105"/>
         <source>Combined report</source>
         <translation>Combined report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8094"/>
+        <location filename="../main_window.py" line="8112"/>
         <source>All the project&apos;s measurements in one place: tick the ones you want, check them together against the other observers and build ONE MPC report. Untick an observation to leave it out (nothing is deleted).</source>
         <translation>All the project&apos;s measurements in one place: tick the ones you want, check them together against the other observers and build ONE MPC report. Untick an observation to leave it out (nothing is deleted).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8100"/>
+        <location filename="../main_window.py" line="8118"/>
         <source>%1 re-measured observations were merged (the newest run&apos;s measurement is kept).</source>
         <translation>%1 re-measured observations were merged (the newest run&apos;s measurement is kept).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8107"/>
+        <location filename="../main_window.py" line="8125"/>
         <source>Include</source>
         <translation>Include</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8119"/>
+        <location filename="../main_window.py" line="8137"/>
         <source>Check together</source>
         <translation>Check together</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8121"/>
+        <location filename="../main_window.py" line="8139"/>
         <source>One Find_Orb check with all the ticked observations: our points against the published ones, so you see how they line up before sending them</source>
         <translation>One Find_Orb check with all the ticked observations: our points against the published ones, so you see how they line up before sending them</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8126"/>
+        <location filename="../main_window.py" line="8144"/>
         <source>Combined report…</source>
         <translation>Combined report…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8128"/>
+        <location filename="../main_window.py" line="8146"/>
         <source>Build ONE MPC report with the ticked observations</source>
         <translation>Build ONE MPC report with the ticked observations</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8133"/>
+        <location filename="../main_window.py" line="8151"/>
         <source>Open the newest ticked observation&apos;s run in the editor, to work on it there (re-measure, review, re-check)</source>
         <translation>Open the newest ticked observation&apos;s run in the editor, to work on it there (re-measure, review, re-check)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8178"/>
+        <location filename="../main_window.py" line="8196"/>
         <source>Untick to leave this observation out of the combined check and report</source>
         <translation>Untick to leave this observation out of the combined check and report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8240"/>
+        <location filename="../main_window.py" line="8258"/>
         <source>Tick at least one observation to check them.</source>
         <translation>Tick at least one observation to check them.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8251"/>
+        <location filename="../main_window.py" line="8269"/>
         <source>Checking the %1 ticked observations together…</source>
         <translation>Checking the %1 ticked observations together…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8262"/>
+        <location filename="../main_window.py" line="8280"/>
         <source>The combined check failed: no answer from Find_Orb.</source>
         <translation>The combined check failed: no answer from Find_Orb.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8301"/>
+        <location filename="../main_window.py" line="8319"/>
         <source>The check is not available (Find_Orb not set up).</source>
         <translation>The check is not available (Find_Orb not set up).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8303"/>
+        <location filename="../main_window.py" line="8321"/>
         <source>No other observations to compare with yet.</source>
         <translation>No other observations to compare with yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8305"/>
+        <location filename="../main_window.py" line="8323"/>
         <source>The published arc is too short to fit an orbit.</source>
         <translation>The published arc is too short to fit an orbit.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8307"/>
+        <location filename="../main_window.py" line="8325"/>
         <source>Our points are an outlier against the others.</source>
         <translation>Our points are an outlier against the others.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8309"/>
+        <location filename="../main_window.py" line="8327"/>
         <source>The combined check passes.</source>
         <translation>The combined check passes.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8311"/>
+        <location filename="../main_window.py" line="8329"/>
         <source>Our residual: %1″ / %2″ · %3 stations</source>
         <translation>Our residual: %1″ / %2″ · %3 stations</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8317"/>
+        <location filename="../main_window.py" line="8335"/>
         <source>Your data is already among the published ones.</source>
         <translation>Your data is already among the published ones.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8330"/>
+        <location filename="../main_window.py" line="8348"/>
         <source>Each of our observations:</source>
         <translation>Each of our observations:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8346"/>
+        <location filename="../main_window.py" line="8364"/>
         <source>Tick at least one observation to open it.</source>
         <translation>Tick at least one observation to open it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8407"/>
+        <location filename="../main_window.py" line="8425"/>
         <source>The newest ticked observation has no visit to open the editor on.</source>
         <translation>The newest ticked observation has no visit to open the editor on.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8411"/>
+        <location filename="../main_window.py" line="8429"/>
         <source>Opening the combined set in the editor…</source>
         <translation>Opening the combined set in the editor…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8426"/>
+        <location filename="../main_window.py" line="8444"/>
         <source>Tick at least one observation for the report.</source>
         <translation>Tick at least one observation for the report.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8444"/>
+        <location filename="../main_window.py" line="8462"/>
         <source>Combined MPC report</source>
         <translation>Combined MPC report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8452"/>
+        <location filename="../main_window.py" line="8470"/>
         <source>Save…</source>
         <translation>Save…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8472"/>
+        <location filename="../main_window.py" line="8490"/>
         <source>Save MPC report</source>
         <translation>Save MPC report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8482"/>
+        <location filename="../main_window.py" line="8500"/>
         <source>The report could not be written:</source>
         <translation>The report could not be written:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8512"/>
+        <location filename="../main_window.py" line="8530"/>
         <source>Showing the runs of the selected visit. Click the visit again (or another) to change it.</source>
         <translation>Showing the runs of the selected visit. Click the visit again (or another) to change it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8540"/>
+        <location filename="../main_window.py" line="8558"/>
         <source>Run %1 of %2</source>
         <translation>Run %1 of %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8581"/>
+        <location filename="../main_window.py" line="8599"/>
         <source>by hand</source>
         <translation>by hand</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8582"/>
+        <location filename="../main_window.py" line="8600"/>
         <source>automatic</source>
         <translation>automatic</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8590"/>
+        <location filename="../main_window.py" line="8608"/>
         <source>not checked</source>
         <translation>not checked</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8591"/>
+        <location filename="../main_window.py" line="8609"/>
         <source>in order</source>
         <translation>in order</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8592"/>
+        <location filename="../main_window.py" line="8610"/>
         <source>see the note</source>
         <translation>see the note</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8597"/>
+        <location filename="../main_window.py" line="8615"/>
         <source>complete</source>
         <translation>complete</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8598"/>
+        <location filename="../main_window.py" line="8616"/>
         <source>not detected</source>
         <translation>not detected</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8599"/>
+        <location filename="../main_window.py" line="8617"/>
         <source>incomplete</source>
         <translation>incomplete</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8600"/>
+        <location filename="../main_window.py" line="8618"/>
         <source>undone</source>
         <translation>undone</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8661"/>
+        <location filename="../main_window.py" line="8679"/>
         <source>This run has no visit behind it: open the editor from the visit whose frames you want to re-measure.</source>
         <translation>This run has no visit behind it: open the editor from the visit whose frames you want to re-measure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8666"/>
+        <location filename="../main_window.py" line="8684"/>
         <source>That run was undone: its positions are gone, so there is nothing to open. Re-measure it from its visit if you want it back.</source>
         <translation>That run was undone: its positions are gone, so there is nothing to open. Re-measure it from its visit if you want it back.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8675"/>
+        <location filename="../main_window.py" line="8693"/>
         <source>Opening the run in the editor…</source>
         <translation>Opening the run in the editor…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8689"/>
+        <location filename="../main_window.py" line="8707"/>
         <source>Please wait</source>
         <translation>Please wait</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8712"/>
+        <location filename="../main_window.py" line="8730"/>
         <source>Undo run %1 whole? Its positions and its frame manifest go; the run stays marked as undone for the audit.</source>
         <translation>Undo run %1 whole? Its positions and its frame manifest go; the run stays marked as undone for the audit.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8722"/>
+        <location filename="../main_window.py" line="8740"/>
         <source>Run %1 undone: %2 positions removed.</source>
         <translation>Run %1 undone: %2 positions removed.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8768"/>
+        <location filename="../main_window.py" line="8786"/>
         <source>{n} frames</source>
         <translation>{n} frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8771"/>
+        <location filename="../main_window.py" line="8789"/>
         <source>{n} frames · {span} min</source>
         <translation>{n} frames · {span} min</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8825"/>
+        <location filename="../main_window.py" line="8843"/>
         <source>{n} × {s} s</source>
         <translation>{n} × {s} s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8829"/>
+        <location filename="../main_window.py" line="8847"/>
         <source>fits: {used} min of {dark} h</source>
         <translation>fits: {used} min of {dark} h</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8834"/>
+        <location filename="../main_window.py" line="8852"/>
         <source>does not fit before dawn</source>
         <translation>does not fit before dawn</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8839"/>
+        <location filename="../main_window.py" line="8857"/>
         <source>fits</source>
         <translation>fits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8839"/>
+        <location filename="../main_window.py" line="8857"/>
         <source>does not fit</source>
         <translation>does not fit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8858"/>
+        <location filename="../main_window.py" line="8876"/>
         <source>Show:</source>
         <translation>Show:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8860"/>
+        <location filename="../main_window.py" line="8878"/>
         <source>This visit</source>
         <translation>This visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8861"/>
+        <location filename="../main_window.py" line="8879"/>
         <source>All the nights</source>
         <translation>All the nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8863"/>
+        <location filename="../main_window.py" line="8881"/>
         <source>Which curve the chart draws: the one of the visit selected above (its own pass of the night, the normal way to look at one night) or the whole project, which is the curve of every night together, one pass per night (that is the one a period search needs)</source>
         <translation>Which curve the chart draws: the one of the visit selected above (its own pass of the night, the normal way to look at one night) or the whole project, which is the curve of every night together, one pass per night (that is the one a period search needs)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8880"/>
+        <location filename="../main_window.py" line="8898"/>
         <source>Period and phase…</source>
         <translation>Period and phase…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8882"/>
+        <location filename="../main_window.py" line="8900"/>
         <source>Search the project&apos;s curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say. It works on «All the nights»</source>
         <translation>Search the project&apos;s curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say. It works on «All the nights»</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8916"/>
+        <location filename="../main_window.py" line="8934"/>
         <source>The whole project: {0} night(s), {1} points</source>
         <translation>The whole project: {0} night(s), {1} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8922"/>
+        <location filename="../main_window.py" line="8940"/>
         <source>No visit selected: the whole project ({0} points).</source>
         <translation>No visit selected: the whole project ({0} points).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8928"/>
+        <location filename="../main_window.py" line="8946"/>
         <source>Visit {0}: {1} points</source>
         <translation>Visit {0}: {1} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8987"/>
+        <location filename="../main_window.py" line="9005"/>
         <source>Reduce the photometry with EXOTIC (NASA/JPL), in your own Python ≤3.10 environment.</source>
         <translation>Reduce the photometry with EXOTIC (NASA/JPL), in your own Python ≤3.10 environment.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8998"/>
+        <location filename="../main_window.py" line="9016"/>
         <source>Export to EXOTIC (inits.json)…</source>
         <translation>Export to EXOTIC (inits.json)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9000"/>
+        <location filename="../main_window.py" line="9018"/>
         <source>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter — EXOTIC skips its wizard where it can</source>
         <translation>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter — EXOTIC skips its wizard where it can</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9014"/>
+        <location filename="../main_window.py" line="9032"/>
         <source>See the last reduction…</source>
         <translation>See the last reduction…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9016"/>
+        <location filename="../main_window.py" line="9034"/>
         <source>The fitted parameters, the light curve EXOTIC drew and every file the reduction wrote, each one a double click from the system</source>
         <translation>The fitted parameters, the light curve EXOTIC drew and every file the reduction wrote, each one a double click from the system</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9060"/>
+        <location filename="../main_window.py" line="9078"/>
         <source>Your AAVSO observer code: %1</source>
         <translation>Your AAVSO observer code: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9064"/>
+        <location filename="../main_window.py" line="9082"/>
         <source>No AAVSO observer code yet — set it in Settings</source>
         <translation>No AAVSO observer code yet — set it in Settings</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9068"/>
+        <location filename="../main_window.py" line="9086"/>
         <source>Open AAVSO WebObs…</source>
         <translation>Open AAVSO WebObs…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9070"/>
+        <location filename="../main_window.py" line="9088"/>
         <source>Submit the FotoDif/AAVSO report to the AAVSO database</source>
         <translation>Submit the FotoDif/AAVSO report to the AAVSO database</translation>
     </message>
@@ -4038,276 +4043,276 @@ You can still install Find_Orb by hand (the guide is in the documentation) and p
         <translation type="vanished">Enable the unified editor in Settings → Development to work from the editor</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9216"/>
+        <location filename="../main_window.py" line="9234"/>
         <source>This visit has no FITS frames to stack.</source>
         <translation>This visit has no FITS frames to stack.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9308"/>
+        <location filename="../main_window.py" line="9326"/>
         <source>Register what you keep from the session: the FITS frames and the annotated images (e.g. from Tycho). The MPC report is registered automatically when you save it.</source>
         <translation>Register what you keep from the session: the FITS frames and the annotated images (e.g. from Tycho). The MPC report is registered automatically when you save it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9314"/>
+        <location filename="../main_window.py" line="9332"/>
         <source>Register FITS…</source>
         <translation>Register FITS…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9316"/>
+        <location filename="../main_window.py" line="9334"/>
         <source>One or more FITS from the session — date, filter and exposure are read from each header</source>
         <translation>One or more FITS from the session — date, filter and exposure are read from each header</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9320"/>
+        <location filename="../main_window.py" line="9338"/>
         <source>Register annotated image…</source>
         <translation>Register annotated image…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9322"/>
+        <location filename="../main_window.py" line="9340"/>
         <source>Annotated image with the object marked (e.g. Tycho-Tracker output)</source>
         <translation>Annotated image with the object marked (e.g. Tycho-Tracker output)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9329"/>
+        <location filename="../main_window.py" line="9347"/>
         <source>Motion animation</source>
         <translation>Motion animation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9331"/>
+        <location filename="../main_window.py" line="9349"/>
         <source>GIF/MP4 following the predicted position — if a point stays under the marker while the stars drift, it is that object</source>
         <translation>GIF/MP4 following the predicted position — if a point stays under the marker while the stars drift, it is that object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9335"/>
+        <location filename="../main_window.py" line="9353"/>
         <source>Zoom:</source>
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9340"/>
+        <location filename="../main_window.py" line="9358"/>
         <source>Crop zoom (1 = full frame)</source>
         <translation>Crop zoom (1 = full frame)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9378"/>
+        <location filename="../main_window.py" line="9396"/>
         <source>Choose session FITS</source>
         <translation>Choose session FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9402"/>
+        <location filename="../main_window.py" line="9420"/>
         <source>Choose annotated images</source>
         <translation>Choose annotated images</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9403"/>
+        <location filename="../main_window.py" line="9421"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp);;All files (*)</source>
         <translation>Images (*.png *.jpg *.jpeg *.bmp);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9426"/>
+        <location filename="../main_window.py" line="9444"/>
         <source>Register at least 2 session FITS first</source>
         <translation>Register at least 2 session FITS first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9440"/>
+        <location filename="../main_window.py" line="9458"/>
         <source>Motion animation failed: %1</source>
         <translation>Motion animation failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9446"/>
+        <location filename="../main_window.py" line="9464"/>
         <source>Need at least 2 frames with WCS and ephemeris (skipped: {})</source>
         <translation>Need at least 2 frames with WCS and ephemeris (skipped: {})</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9463"/>
+        <location filename="../main_window.py" line="9481"/>
         <source>Motion animation saved ({} frames)</source>
         <translation>Motion animation saved ({} frames)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9465"/>
+        <location filename="../main_window.py" line="9483"/>
         <source> — {} skipped (no WCS/date/ephemeris)</source>
         <translation> — {} skipped (no WCS/date/ephemeris)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9489"/>
+        <location filename="../main_window.py" line="9507"/>
         <source>Registered {} file(s)</source>
         <translation>Registered {} file(s)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9506"/>
-        <location filename="../main_window.py" line="9689"/>
+        <location filename="../main_window.py" line="9524"/>
+        <location filename="../main_window.py" line="9707"/>
         <source>Transit capture plan</source>
         <translation>Transit capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9576"/>
+        <location filename="../main_window.py" line="9594"/>
         <source>Capture (with baselines): {cs} → {ce} UTC  ·  ({cs_l} → {ce_l} local)
 Ingress {i} · Mid {m} · Egress {e} UTC</source>
         <translation>Capture (with baselines): {cs} → {ce} UTC  ·  ({cs_l} → {ce_l} local)
 Ingress {i} · Mid {m} · Egress {e} UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9589"/>
+        <location filename="../main_window.py" line="9607"/>
         <source>⚠ The out-of-transit baseline does not fit in your night — the light curve will lack a comparison level</source>
         <translation>⚠ The out-of-transit baseline does not fit in your night — the light curve will lack a comparison level</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9618"/>
+        <location filename="../main_window.py" line="9636"/>
         <source>Max cadence to resolve the ingress: {cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</source>
         <translation>Max cadence to resolve the ingress: {cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9624"/>
+        <location filename="../main_window.py" line="9642"/>
         <source>⚠ slower than the ingress — shorten the exposure</source>
         <translation>⚠ slower than the ingress — shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9635"/>
-        <location filename="../main_window.py" line="9826"/>
+        <location filename="../main_window.py" line="9653"/>
+        <location filename="../main_window.py" line="9844"/>
         <source>Max altitude: {:.0f}°</source>
         <translation>Max altitude: {:.0f}°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9641"/>
-        <location filename="../main_window.py" line="9832"/>
+        <location filename="../main_window.py" line="9659"/>
+        <location filename="../main_window.py" line="9850"/>
         <source>Moon: {:.0f}% at {:.0f}°</source>
         <translation>Moon: {:.0f}% at {:.0f}°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9648"/>
-        <location filename="../main_window.py" line="9838"/>
+        <location filename="../main_window.py" line="9666"/>
+        <location filename="../main_window.py" line="9856"/>
         <source>Pre-flight checklist</source>
         <translation>Pre-flight checklist</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9651"/>
+        <location filename="../main_window.py" line="9669"/>
         <source>Test shot: the star&apos;s peak stays below saturation (~50-70% of the detector range)</source>
         <translation>Test shot: the star&apos;s peak stays below saturation (~50-70% of the detector range)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9653"/>
+        <location filename="../main_window.py" line="9671"/>
         <source>Small, constant defocus (spread the light over more pixels; do not refocus mid-run)</source>
         <translation>Small, constant defocus (spread the light over more pixels; do not refocus mid-run)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9655"/>
+        <location filename="../main_window.py" line="9673"/>
         <source>Comparison star in the FOV: similar brightness and colour, not variable</source>
         <translation>Comparison star in the FOV: similar brightness and colour, not variable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9657"/>
+        <location filename="../main_window.py" line="9675"/>
         <source>Session flats with the light filter (+ darks/bias as usual)</source>
         <translation>Session flats with the light filter (+ darks/bias as usual)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9659"/>
+        <location filename="../main_window.py" line="9677"/>
         <source>Broad-band L/R filter, the same one you will report (ExoClock logs the filter)</source>
         <translation>Broad-band L/R filter, the same one you will report (ExoClock logs the filter)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9717"/>
+        <location filename="../main_window.py" line="9735"/>
         <source>HADS capture plan</source>
         <translation>HADS capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9745"/>
+        <location filename="../main_window.py" line="9763"/>
         <source>Period {p:.2f} h · amplitude Δ{a:.1f} mag
 Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then fold)</source>
         <translation>Period {p:.2f} h · amplitude Δ{a:.1f} mag
 Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then fold)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9756"/>
+        <location filename="../main_window.py" line="9774"/>
         <source>Start around {bt} UTC ({bl} local)</source>
         <translation>Start around {bt} UTC ({bl} local)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9759"/>
+        <location filename="../main_window.py" line="9777"/>
         <source>latest safe start {ls} UTC</source>
         <translation>latest safe start {ls} UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9762"/>
+        <location filename="../main_window.py" line="9780"/>
         <source>{n:.1f} full cycles fit tonight</source>
         <translation>{n:.1f} full cycles fit tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9771"/>
+        <location filename="../main_window.py" line="9789"/>
         <source>⚠ Two full cycles don&apos;t fit back to back tonight — capture the longest contiguous run you can</source>
         <translation>⚠ Two full cycles don&apos;t fit back to back tonight — capture the longest contiguous run you can</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9781"/>
-        <location filename="../main_window.py" line="9903"/>
+        <location filename="../main_window.py" line="9799"/>
+        <location filename="../main_window.py" line="9921"/>
         <source>Recommended exposure</source>
         <translation>Recommended exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9783"/>
+        <location filename="../main_window.py" line="9801"/>
         <source>honest guide — confirm with a test shot at MAXIMUM brightness</source>
         <translation>honest guide — confirm with a test shot at MAXIMUM brightness</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9809"/>
+        <location filename="../main_window.py" line="9827"/>
         <source>Cadence to resolve the pulsation: one point every ≤{cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</source>
         <translation>Cadence to resolve the pulsation: one point every ≤{cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9815"/>
+        <location filename="../main_window.py" line="9833"/>
         <source>⚠ slower than P/12 — shorten the exposure</source>
         <translation>⚠ slower than P/12 — shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9841"/>
+        <location filename="../main_window.py" line="9859"/>
         <source>Focus locked at imaging temperature</source>
         <translation>Focus locked at imaging temperature</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9842"/>
+        <location filename="../main_window.py" line="9860"/>
         <source>Comparison stars identified (VSX chart)</source>
         <translation>Comparison stars identified (VSX chart)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9843"/>
+        <location filename="../main_window.py" line="9861"/>
         <source>Cadence ≤ P/12 set in the capture sequence</source>
         <translation>Cadence ≤ P/12 set in the capture sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9844"/>
+        <location filename="../main_window.py" line="9862"/>
         <source>Exposure checked at MAXIMUM brightness (no saturation)</source>
         <translation>Exposure checked at MAXIMUM brightness (no saturation)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9845"/>
+        <location filename="../main_window.py" line="9863"/>
         <source>Continuous run covering 2 periods planned</source>
         <translation>Continuous run covering 2 periods planned</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9867"/>
+        <location filename="../main_window.py" line="9885"/>
         <source>Variable star plan</source>
         <translation>Variable star plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9878"/>
+        <location filename="../main_window.py" line="9896"/>
         <source>one measurement every %1 night(s) per filter</source>
         <translation>one measurement every %1 night(s) per filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9888"/>
+        <location filename="../main_window.py" line="9906"/>
         <source>Maximum</source>
         <translation>Maximum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9889"/>
+        <location filename="../main_window.py" line="9907"/>
         <source>Minimum</source>
         <translation>Minimum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9890"/>
+        <location filename="../main_window.py" line="9908"/>
         <source>%1 expected in ~%2 days</source>
         <translation>%1 expected in ~%2 days</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9904"/>
+        <location filename="../main_window.py" line="9922"/>
         <source>guide, not SNR — confirm with a test shot</source>
         <translation>guide, not SNR — confirm with a test shot</translation>
     </message>
@@ -4316,61 +4321,61 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">⚠ Bright star: watch the saturation — a slight defocus helps (T CrB lesson)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9944"/>
-        <location filename="../main_window.py" line="10044"/>
-        <location filename="../main_window.py" line="10045"/>
+        <location filename="../main_window.py" line="9962"/>
+        <location filename="../main_window.py" line="10062"/>
+        <location filename="../main_window.py" line="10063"/>
         <source>Gathering planet data for EXOTIC…</source>
         <translation>Gathering planet data for EXOTIC…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10008"/>
+        <location filename="../main_window.py" line="10026"/>
         <source>No planet data — check the name and retry</source>
         <translation>No planet data — check the name and retry</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10019"/>
+        <location filename="../main_window.py" line="10037"/>
         <source>Export EXOTIC inits.json</source>
         <translation>Export EXOTIC inits.json</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10030"/>
+        <location filename="../main_window.py" line="10048"/>
         <source>inits.json written — run EXOTIC in your Python ≤3.10 environment</source>
         <translation>inits.json written — run EXOTIC in your Python ≤3.10 environment</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10190"/>
+        <location filename="../main_window.py" line="10208"/>
         <source>This project has no FITS frames in a visit yet.</source>
         <translation>This project has no FITS frames in a visit yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10378"/>
-        <location filename="../main_window.py" line="10390"/>
+        <location filename="../main_window.py" line="10396"/>
+        <location filename="../main_window.py" line="10408"/>
         <source>Running EXOTIC (this can take a while)…</source>
         <translation>Running EXOTIC (this can take a while)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1883"/>
-        <location filename="../main_window.py" line="1996"/>
-        <location filename="../main_window.py" line="10057"/>
-        <location filename="../main_window.py" line="10238"/>
-        <location filename="../main_window.py" line="10391"/>
-        <location filename="../main_window.py" line="13373"/>
+        <location filename="../main_window.py" line="1896"/>
+        <location filename="../main_window.py" line="2009"/>
+        <location filename="../main_window.py" line="10075"/>
+        <location filename="../main_window.py" line="10256"/>
+        <location filename="../main_window.py" line="10409"/>
+        <location filename="../main_window.py" line="13401"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10457"/>
-        <location filename="../main_window.py" line="10458"/>
+        <location filename="../main_window.py" line="10475"/>
+        <location filename="../main_window.py" line="10476"/>
         <source>Cancelling EXOTIC…</source>
         <translation>Cancelling EXOTIC…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10483"/>
+        <location filename="../main_window.py" line="10501"/>
         <source>EXOTIC cancelled: nothing was imported.</source>
         <translation>EXOTIC cancelled: nothing was imported.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10498"/>
+        <location filename="../main_window.py" line="10516"/>
         <source>EXOTIC did not finish. The last lines of its log:
 
 {0}</source>
@@ -4379,13 +4384,13 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
 {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10492"/>
-        <location filename="../main_window.py" line="10500"/>
+        <location filename="../main_window.py" line="10510"/>
+        <location filename="../main_window.py" line="10518"/>
         <source>(the log is empty)</source>
         <translation>(the log is empty)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10512"/>
+        <location filename="../main_window.py" line="10530"/>
         <source>EXOTIC finished: {0} points imported.
 T_mid = {1} (BJD_TDB)
 Rp/Rs = {2}</source>
@@ -4394,46 +4399,46 @@ T_mid = {1} (BJD_TDB)
 Rp/Rs = {2}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10864"/>
+        <location filename="../main_window.py" line="10882"/>
         <source>multiperiodic stars want consecutive nights</source>
         <translation>multiperiodic stars want consecutive nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14070"/>
-        <location filename="../main_window.py" line="14110"/>
+        <location filename="../main_window.py" line="14098"/>
+        <location filename="../main_window.py" line="14138"/>
         <source>Series saved: {} points</source>
         <translation>Series saved: {} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14124"/>
+        <location filename="../main_window.py" line="14152"/>
         <source>ExoClock submission prepared; outcome recorded.</source>
         <translation>ExoClock submission prepared; outcome recorded.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14153"/>
+        <location filename="../main_window.py" line="14181"/>
         <source>Run undone: {} points removed</source>
         <translation>Run undone: {} points removed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14327"/>
+        <location filename="../main_window.py" line="14355"/>
         <source>The plate&apos;s saved state was cleared.</source>
         <translation>The plate&apos;s saved state was cleared.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4654"/>
-        <location filename="../main_window.py" line="9875"/>
-        <location filename="../main_window.py" line="10890"/>
+        <location filename="../main_window.py" line="4667"/>
+        <location filename="../main_window.py" line="9893"/>
+        <location filename="../main_window.py" line="10908"/>
         <source>Campaign: %1</source>
         <translation>Campaign: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10892"/>
+        <location filename="../main_window.py" line="10910"/>
         <source>cadence every %1 night(s)</source>
         <translation>cadence every %1 night(s)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9881"/>
-        <location filename="../main_window.py" line="10895"/>
+        <location filename="../main_window.py" line="9899"/>
+        <location filename="../main_window.py" line="10913"/>
         <source>filters: %1</source>
         <translation>filters: %1</translation>
     </message>
@@ -4442,107 +4447,107 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">SN due: %1 (%2 d)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3829"/>
+        <location filename="../main_window.py" line="3842"/>
         <source>Part of this observing campaign — click to open it</source>
         <translation>Part of this observing campaign — click to open it</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4285"/>
+        <location filename="../main_window.py" line="4298"/>
         <source>%1 projects · %2 due</source>
         <translation>%1 projects · %2 due</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4290"/>
+        <location filename="../main_window.py" line="4303"/>
         <source>(finished)</source>
         <translation>(finished)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4492"/>
+        <location filename="../main_window.py" line="4505"/>
         <source>active</source>
         <translation>active</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4493"/>
+        <location filename="../main_window.py" line="4506"/>
         <source>finished</source>
         <translation>finished</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4504"/>
+        <location filename="../main_window.py" line="4517"/>
         <source>One measurement every %1 night(s) per filter</source>
         <translation>One measurement every %1 night(s) per filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4507"/>
+        <location filename="../main_window.py" line="4520"/>
         <source>Filters: %1</source>
         <translation>Filters: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4510"/>
+        <location filename="../main_window.py" line="4523"/>
         <source>Comparison stars: %1</source>
         <translation>Comparison stars: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4527"/>
+        <location filename="../main_window.py" line="4540"/>
         <source>Report form</source>
         <translation>Report form</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4530"/>
+        <location filename="../main_window.py" line="4543"/>
         <source>Data</source>
         <translation>Data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4535"/>
+        <location filename="../main_window.py" line="4548"/>
         <source>Object</source>
         <translation>Object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4535"/>
+        <location filename="../main_window.py" line="4548"/>
         <source>Kind</source>
         <translation>Kind</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4535"/>
+        <location filename="../main_window.py" line="4548"/>
         <source>Last visit</source>
         <translation>Last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4536"/>
+        <location filename="../main_window.py" line="4549"/>
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4550"/>
+        <location filename="../main_window.py" line="4563"/>
         <source>%1 d ago</source>
         <translation>%1 d ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4553"/>
+        <location filename="../main_window.py" line="4566"/>
         <source>⚡ brightness event</source>
         <translation>⚡ brightness event</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4555"/>
+        <location filename="../main_window.py" line="4568"/>
         <source>● never visited</source>
         <translation>● never visited</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4557"/>
+        <location filename="../main_window.py" line="4570"/>
         <source>⚠ %1 d overdue</source>
         <translation>⚠ %1 d overdue</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4560"/>
+        <location filename="../main_window.py" line="4573"/>
         <source>✓ up to date</source>
         <translation>✓ up to date</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5224"/>
+        <location filename="../main_window.py" line="5237"/>
         <source>campaign</source>
         <translation>campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10666"/>
+        <location filename="../main_window.py" line="10684"/>
         <source>Draft</source>
         <translation>Draft</translation>
     </message>
@@ -4555,114 +4560,114 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">Write with AI…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10684"/>
+        <location filename="../main_window.py" line="10702"/>
         <source>What will be sent…</source>
         <translation>What will be sent…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10699"/>
+        <location filename="../main_window.py" line="10717"/>
         <source>Save to:</source>
         <translation>Save to:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10702"/>
+        <location filename="../main_window.py" line="10720"/>
         <source>Folder for the drafts and charts</source>
         <translation>Folder for the drafts and charts</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10719"/>
+        <location filename="../main_window.py" line="10737"/>
         <source>Text</source>
         <translation>Text</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8451"/>
-        <location filename="../main_window.py" line="10726"/>
-        <location filename="../main_window.py" line="10745"/>
+        <location filename="../main_window.py" line="8469"/>
+        <location filename="../main_window.py" line="10744"/>
+        <location filename="../main_window.py" line="10763"/>
         <source>Copy</source>
         <translation>Copy</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10822"/>
+        <location filename="../main_window.py" line="10840"/>
         <source>No language model configured: the template writes the post.</source>
         <translation>No language model configured: the template writes the post.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10898"/>
+        <location filename="../main_window.py" line="10916"/>
         <source>comparison stars: %1</source>
         <translation>comparison stars: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10916"/>
+        <location filename="../main_window.py" line="10934"/>
         <source>⚠ Possible brightness drop (Δ≈+%1 mag, filter %2): consider raising the cadence tonight</source>
         <translation>⚠ Possible brightness drop (Δ≈+%1 mag, filter %2): consider raising the cadence tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10918"/>
+        <location filename="../main_window.py" line="10936"/>
         <source>⚠ Possible outburst (Δ≈−%1 mag, filter %2): top priority tonight</source>
         <translation>⚠ Possible outburst (Δ≈−%1 mag, filter %2): top priority tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10991"/>
+        <location filename="../main_window.py" line="11009"/>
         <source>Export photometry report…</source>
         <translation>Export photometry report…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10993"/>
+        <location filename="../main_window.py" line="11011"/>
         <source>CSV or AAVSO EFF with heliocentric dates, for the campaign form / WebObs</source>
         <translation>CSV or AAVSO EFF with heliocentric dates, for the campaign form / WebObs</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10998"/>
+        <location filename="../main_window.py" line="11016"/>
         <source>Download survey photometry…</source>
         <translation>Download survey photometry…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11000"/>
+        <location filename="../main_window.py" line="11018"/>
         <source>ASAS-SN/ZTF context points, drawn in grey and never mixed with your own measurements</source>
         <translation>ASAS-SN/ZTF context points, drawn in grey and never mixed with your own measurements</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11052"/>
+        <location filename="../main_window.py" line="11070"/>
         <source>Generate animation</source>
         <translation>Generate animation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11054"/>
+        <location filename="../main_window.py" line="11072"/>
         <source>GIF/MP4 of the photometric evolution across visits</source>
         <translation>GIF/MP4 of the photometric evolution across visits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11057"/>
+        <location filename="../main_window.py" line="11075"/>
         <source>Export annotated FITS</source>
         <translation>Export annotated FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11151"/>
+        <location filename="../main_window.py" line="11169"/>
         <source>No stacked images registered</source>
         <translation>No stacked images registered</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11090"/>
+        <location filename="../main_window.py" line="11108"/>
         <source>Project has no coordinates</source>
         <translation>Project has no coordinates</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11083"/>
+        <location filename="../main_window.py" line="11101"/>
         <source>Need at least 2 stacked images</source>
         <translation>Need at least 2 stacked images</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11122"/>
+        <location filename="../main_window.py" line="11140"/>
         <source>Animation written to %1</source>
         <translation>Animation written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11126"/>
+        <location filename="../main_window.py" line="11144"/>
         <source>Animation failed: %1</source>
         <translation>Animation failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11162"/>
+        <location filename="../main_window.py" line="11180"/>
         <source>SN follow-up</source>
         <translation>SN follow-up</translation>
     </message>
@@ -4671,44 +4676,44 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">Annotated FITS written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11322"/>
-        <location filename="../main_window.py" line="11392"/>
+        <location filename="../main_window.py" line="11340"/>
+        <location filename="../main_window.py" line="11410"/>
         <source>Export photometry report</source>
         <translation>Export photometry report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11325"/>
+        <location filename="../main_window.py" line="11343"/>
         <source>CSV (group format)</source>
         <translation>CSV (group format)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11326"/>
+        <location filename="../main_window.py" line="11344"/>
         <source>AAVSO EFF (WebObs)</source>
         <translation>AAVSO EFF (WebObs)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11328"/>
+        <location filename="../main_window.py" line="11346"/>
         <source>Include quick-look (indicative) points</source>
         <translation>Include quick-look (indicative) points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11365"/>
+        <location filename="../main_window.py" line="11383"/>
         <source>No photometry points to export</source>
         <translation>No photometry points to export</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11422"/>
+        <location filename="../main_window.py" line="11440"/>
         <source>The project has no coordinates</source>
         <translation>The project has no coordinates</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11453"/>
+        <location filename="../main_window.py" line="11471"/>
         <source>No survey data for this position</source>
         <translation>No survey data for this position</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5787"/>
-        <location filename="../main_window.py" line="11773"/>
+        <location filename="../main_window.py" line="5800"/>
+        <location filename="../main_window.py" line="11791"/>
         <source>Close project</source>
         <translation>Close project</translation>
     </message>
@@ -4721,171 +4726,171 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">Observing campaigns: several nights, several observatories, one shared goal</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1049"/>
-        <location filename="../main_window.py" line="11714"/>
+        <location filename="../main_window.py" line="1062"/>
+        <location filename="../main_window.py" line="11732"/>
         <source>Filters ▾</source>
         <translation>Filters ▾</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1049"/>
-        <location filename="../main_window.py" line="11714"/>
+        <location filename="../main_window.py" line="1062"/>
+        <location filename="../main_window.py" line="11732"/>
         <source>Filters ▸</source>
         <translation>Filters ▸</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1588"/>
+        <location filename="../main_window.py" line="1601"/>
         <source>The AI is off: turn it on in Settings → Integrations.</source>
         <translation>The AI is off: turn it on in Settings → Integrations.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1953"/>
+        <location filename="../main_window.py" line="1966"/>
         <source>installed</source>
         <translation>installed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1956"/>
+        <location filename="../main_window.py" line="1969"/>
         <source>Re-download…</source>
         <translation>Re-download…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1958"/>
+        <location filename="../main_window.py" line="1971"/>
         <source>not installed (optional)</source>
         <translation>not installed (optional)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1961"/>
+        <location filename="../main_window.py" line="1974"/>
         <source>Download (95 MB)…</source>
         <translation>Download (95 MB)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1995"/>
+        <location filename="../main_window.py" line="2008"/>
         <source>Downloading the DE430t ephemeris…</source>
         <translation>Downloading the DE430t ephemeris…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1997"/>
-        <location filename="../main_window.py" line="2047"/>
-        <location filename="../main_window.py" line="2051"/>
-        <location filename="../main_window.py" line="2061"/>
+        <location filename="../main_window.py" line="2010"/>
+        <location filename="../main_window.py" line="2060"/>
+        <location filename="../main_window.py" line="2064"/>
+        <location filename="../main_window.py" line="2074"/>
         <source>DE430t ephemeris</source>
         <translation>DE430t ephemeris</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2022"/>
+        <location filename="../main_window.py" line="2035"/>
         <source>Downloading the DE430t ephemeris… %1 MB of %2 MB</source>
         <translation>Downloading the DE430t ephemeris… %1 MB of %2 MB</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2048"/>
+        <location filename="../main_window.py" line="2061"/>
         <source>The ephemeris is in place: the orbit fit will use planetary perturbations from now on.</source>
         <translation>The ephemeris is in place: the orbit fit will use planetary perturbations from now on.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2052"/>
+        <location filename="../main_window.py" line="2065"/>
         <source>The download did not finish: %1</source>
         <translation>The download did not finish: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2062"/>
+        <location filename="../main_window.py" line="2075"/>
         <source>The download failed:</source>
         <translation>The download failed:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2120"/>
+        <location filename="../main_window.py" line="2133"/>
         <source>Asking the endpoint…</source>
         <translation>Asking the endpoint…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2136"/>
+        <location filename="../main_window.py" line="2149"/>
         <source>{0} models</source>
         <translation>{0} models</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2151"/>
+        <location filename="../main_window.py" line="2164"/>
         <source>Testing…</source>
         <translation>Testing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2179"/>
+        <location filename="../main_window.py" line="2192"/>
         <source>My cameras file could not be read: {0}</source>
         <translation>My cameras file could not be read: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2185"/>
+        <location filename="../main_window.py" line="2198"/>
         <source>Plate scale: {0:.2f}″/pixel</source>
         <translation>Plate scale: {0:.2f}″/pixel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2190"/>
+        <location filename="../main_window.py" line="2203"/>
         <source>{0:g} × {1:g} mm sensor</source>
         <translation>{0:g} × {1:g} mm sensor</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2196"/>
+        <location filename="../main_window.py" line="2209"/>
         <source>FOV {0:.2f}° × {1:.2f}°</source>
         <translation>FOV {0:.2f}° × {1:.2f}°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2199"/>
+        <location filename="../main_window.py" line="2212"/>
         <source>{0}-bit ADC</source>
         <translation>{0}-bit ADC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2216"/>
+        <location filename="../main_window.py" line="2229"/>
         <source>linearity ≈ {0:.0f} ADU</source>
         <translation>linearity ≈ {0:.0f} ADU</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2257"/>
-        <location filename="../main_window.py" line="2263"/>
-        <location filename="../main_window.py" line="2279"/>
-        <location filename="../main_window.py" line="2305"/>
+        <location filename="../main_window.py" line="2270"/>
+        <location filename="../main_window.py" line="2276"/>
+        <location filename="../main_window.py" line="2292"/>
+        <location filename="../main_window.py" line="2318"/>
         <source>Measure my gain</source>
         <translation>Measure my gain</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2264"/>
+        <location filename="../main_window.py" line="2277"/>
         <source>That folder has fewer than two FITS frames: the gain needs a pair of the same exposure.</source>
         <translation>That folder has fewer than two FITS frames: the gain needs a pair of the same exposure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2280"/>
+        <location filename="../main_window.py" line="2293"/>
         <source>The gain could not be measured there: it needs two frames of the same exposure with a usable sky.</source>
         <translation>The gain could not be measured there: it needs two frames of the same exposure with a usable sky.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2295"/>
+        <location filename="../main_window.py" line="2308"/>
         <source>Gain {0} e-/ADU</source>
         <translation>Gain {0} e-/ADU</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2299"/>
+        <location filename="../main_window.py" line="2312"/>
         <source>read noise {0} e-</source>
         <translation>read noise {0} e-</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2302"/>
+        <location filename="../main_window.py" line="2315"/>
         <source>{0} sky boxes</source>
         <translation>{0} sky boxes</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2306"/>
+        <location filename="../main_window.py" line="2319"/>
         <source>Measured on your own frames: {0}. It is remembered for this camera, so a single image reuses it.</source>
         <translation>Measured on your own frames: {0}. It is remembered for this camera, so a single image reuses it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2455"/>
+        <location filename="../main_window.py" line="2468"/>
         <source>No setting matches that search.</source>
         <translation>No setting matches that search.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2470"/>
-        <location filename="../main_window.py" line="6688"/>
+        <location filename="../main_window.py" line="2483"/>
+        <location filename="../main_window.py" line="6701"/>
         <source>NINA / PINS</source>
         <translation>NINA / PINS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2480"/>
+        <location filename="../main_window.py" line="2493"/>
         <source>Auto (CUDA, then OpenCL)</source>
         <translation>Auto (CUDA, then OpenCL)</translation>
     </message>
@@ -4894,191 +4899,191 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">CUDA (NVIDIA)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2478"/>
+        <location filename="../main_window.py" line="2491"/>
         <source>OpenCL (NVIDIA, AMD, Intel)</source>
         <translation>OpenCL (NVIDIA, AMD, Intel)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2509"/>
+        <location filename="../main_window.py" line="2522"/>
         <source>Custom…</source>
         <translation>Custom…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2511"/>
+        <location filename="../main_window.py" line="2524"/>
         <source>OpenRouter</source>
         <translation>OpenRouter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2512"/>
+        <location filename="../main_window.py" line="2525"/>
         <source>Groq</source>
         <translation>Groq</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2513"/>
+        <location filename="../main_window.py" line="2526"/>
         <source>Google AI Studio</source>
         <translation>Google AI Studio</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2515"/>
+        <location filename="../main_window.py" line="2528"/>
         <source>Ollama (local)</source>
         <translation>Ollama (local)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2516"/>
+        <location filename="../main_window.py" line="2529"/>
         <source>LM Studio (local)</source>
         <translation>LM Studio (local)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2843"/>
+        <location filename="../main_window.py" line="2856"/>
         <source>Indexed %1 masters:</source>
         <translation>Indexed %1 masters:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2864"/>
-        <location filename="../main_window.py" line="2881"/>
+        <location filename="../main_window.py" line="2877"/>
+        <location filename="../main_window.py" line="2894"/>
         <source>Add calibration frames</source>
         <translation>Add calibration frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2889"/>
-        <location filename="../main_window.py" line="2939"/>
+        <location filename="../main_window.py" line="2902"/>
+        <location filename="../main_window.py" line="2952"/>
         <source>No FITS frames in that folder.</source>
         <translation>No FITS frames in that folder.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3082"/>
-        <location filename="../main_window.py" line="3105"/>
+        <location filename="../main_window.py" line="3095"/>
+        <location filename="../main_window.py" line="3118"/>
         <source>Sky brightness</source>
         <translation>Sky brightness</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3083"/>
+        <location filename="../main_window.py" line="3096"/>
         <source>Set the light-pollution API key first (Integrations), or read the value off the map.</source>
         <translation>Set the light-pollution API key first (Integrations), or read the value off the map.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3106"/>
+        <location filename="../main_window.py" line="3119"/>
         <source>No answer from the atlas.</source>
         <translation>No answer from the atlas.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3237"/>
+        <location filename="../main_window.py" line="3250"/>
         <source>No log yet: %1</source>
         <translation>No log yet: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3546"/>
+        <location filename="../main_window.py" line="3559"/>
         <source>From the solar-system calendar — click to open the Sky calendar</source>
         <translation>From the solar-system calendar — click to open the Sky calendar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3558"/>
+        <location filename="../main_window.py" line="3571"/>
         <source>tonight</source>
         <translation>tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3567"/>
+        <location filename="../main_window.py" line="3580"/>
         <source>🌘 Lunar eclipse %1</source>
         <translation>🌘 Lunar eclipse %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3569"/>
+        <location filename="../main_window.py" line="3582"/>
         <source>🌘 Solar eclipse %1</source>
         <translation>🌘 Solar eclipse %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3571"/>
+        <location filename="../main_window.py" line="3584"/>
         <source>🔭 %1&apos;s shadow %2 UT</source>
         <translation>🔭 %1&apos;s shadow %2 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3574"/>
+        <location filename="../main_window.py" line="3587"/>
         <source>🔭 %1 transit %2 UT</source>
         <translation>🔭 %1 transit %2 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3577"/>
+        <location filename="../main_window.py" line="3590"/>
         <source>🔴 %1 at opposition %2</source>
         <translation>🔴 %1 at opposition %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3580"/>
+        <location filename="../main_window.py" line="3593"/>
         <source>%1 %2 greatest elongation</source>
         <translation>%1 %2 greatest elongation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3583"/>
+        <location filename="../main_window.py" line="3596"/>
         <source>✨ %1–%2 %3°</source>
         <translation>✨ %1–%2 %3°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3587"/>
+        <location filename="../main_window.py" line="3600"/>
         <source>🌙 Moon–%1 %2°</source>
         <translation>🌙 Moon–%1 %2°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3590"/>
+        <location filename="../main_window.py" line="3603"/>
         <source>☄️ %1 %2</source>
         <translation>☄️ %1 %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3594"/>
+        <location filename="../main_window.py" line="3607"/>
         <source>🌕 Full moon</source>
         <translation>🌕 Full moon</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3595"/>
+        <location filename="../main_window.py" line="3608"/>
         <source>🌑 New moon</source>
         <translation>🌑 New moon</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3596"/>
+        <location filename="../main_window.py" line="3609"/>
         <source>🌓 First quarter</source>
         <translation>🌓 First quarter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3597"/>
+        <location filename="../main_window.py" line="3610"/>
         <source>🌗 Last quarter</source>
         <translation>🌗 Last quarter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3600"/>
+        <location filename="../main_window.py" line="3613"/>
         <source>🌕 Perigee Moon %1</source>
         <translation>🌕 Perigee Moon %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4331"/>
+        <location filename="../main_window.py" line="4344"/>
         <source>measure %1 tonight</source>
         <translation>measure %1 tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4336"/>
+        <location filename="../main_window.py" line="4349"/>
         <source>measure %1 — %2 d since the last visit</source>
         <translation>measure %1 — %2 d since the last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4341"/>
+        <location filename="../main_window.py" line="4354"/>
         <source>all up to date ✓</source>
         <translation>all up to date ✓</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4470"/>
-        <location filename="../main_window.py" line="12127"/>
+        <location filename="../main_window.py" line="4483"/>
+        <location filename="../main_window.py" line="12145"/>
         <source>What is a campaign?</source>
         <translation>What is a campaign?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4491"/>
+        <location filename="../main_window.py" line="4504"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4765"/>
+        <location filename="../main_window.py" line="4778"/>
         <source>closed %1</source>
         <translation>closed %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4768"/>
+        <location filename="../main_window.py" line="4781"/>
         <source>archived</source>
         <translation>archived</translation>
     </message>
@@ -5131,48 +5136,48 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">✨ All quiet — nothing needs you tonight. Clear skies!</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5788"/>
+        <location filename="../main_window.py" line="5801"/>
         <source>All steps are done. Close this project?</source>
         <translation>All steps are done. Close this project?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7305"/>
+        <location filename="../main_window.py" line="7318"/>
         <source>Save the plan in the project&apos;s Plan section first</source>
         <translation>Save the plan in the project&apos;s Plan section first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7992"/>
+        <location filename="../main_window.py" line="8010"/>
         <source>What you kept from the session</source>
         <translation>What you kept from the session</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8990"/>
+        <location filename="../main_window.py" line="9008"/>
         <source>Open the visit in the editor (reduce with EXOTIC)…</source>
         <translation>Open the visit in the editor (reduce with EXOTIC)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8992"/>
+        <location filename="../main_window.py" line="9010"/>
         <source>Open this project&apos;s visit in the editor: build the comparison sequence there and run «Reduce and fit with EXOTIC…» next to it</source>
         <translation>Open this project&apos;s visit in the editor: build the comparison sequence there and run «Reduce and fit with EXOTIC…» next to it</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9040"/>
+        <location filename="../main_window.py" line="9058"/>
         <source>This project has no visit yet: attach the frames first.</source>
         <translation>This project has no visit yet: attach the frames first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10089"/>
+        <location filename="../main_window.py" line="10107"/>
         <source>EXOTIC cancelled</source>
         <translation>EXOTIC cancelled</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10108"/>
+        <location filename="../main_window.py" line="10126"/>
         <source>No planet data was found for «{0}»: check the name or the connection and retry.</source>
         <translation>No planet data was found for «{0}»: check the name or the connection and retry.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10160"/>
-        <location filename="../main_window.py" line="10305"/>
+        <location filename="../main_window.py" line="10178"/>
+        <location filename="../main_window.py" line="10323"/>
         <source>The EXOTIC reduction could not be prepared:
 
 {0}</source>
@@ -5181,32 +5186,32 @@ Rp/Rs = {2}</translation>
 {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10946"/>
+        <location filename="../main_window.py" line="10964"/>
         <source> · {0} without magnitude ignored</source>
         <translation> · {0} without magnitude ignored</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10983"/>
+        <location filename="../main_window.py" line="11001"/>
         <source>⋯ Photometry tools</source>
         <translation>⋯ Photometry tools</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8855"/>
+        <location filename="../main_window.py" line="8873"/>
         <source>Light curve</source>
         <translation>Light curve</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="932"/>
+        <location filename="../main_window.py" line="945"/>
         <source>My projects</source>
         <translation>My projects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="936"/>
+        <location filename="../main_window.py" line="949"/>
         <source>+ NEW PROJECT</source>
         <translation>+ NEW PROJECT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="939"/>
+        <location filename="../main_window.py" line="952"/>
         <source>Create a project from tonight&apos;s targets</source>
         <translation>Create a project from tonight&apos;s targets</translation>
     </message>
@@ -5219,12 +5224,12 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">See all →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8873"/>
+        <location filename="../main_window.py" line="8891"/>
         <source>Show template</source>
         <translation>Show template</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9912"/>
+        <location filename="../main_window.py" line="9930"/>
         <source>⚠ Bright star: watch the saturation — a slight defocus helps</source>
         <translation>⚠ Bright star: watch the saturation — a slight defocus helps</translation>
     </message>
@@ -5237,160 +5242,160 @@ Rp/Rs = {2}</translation>
         <translation type="vanished">No language model configured: the dialog writes the post with the template.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11050"/>
+        <location filename="../main_window.py" line="11068"/>
         <source>Animation and annotated FITS</source>
         <translation>Animation and annotated FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11203"/>
+        <location filename="../main_window.py" line="11221"/>
         <source>⚠ date outside 1966–2086 — check</source>
         <translation>⚠ date outside 1966–2086 — check</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11445"/>
+        <location filename="../main_window.py" line="11463"/>
         <source>Survey download failed</source>
         <translation>Survey download failed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11459"/>
+        <location filename="../main_window.py" line="11477"/>
         <source>Cannot store survey points: %1</source>
         <translation>Cannot store survey points: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11464"/>
+        <location filename="../main_window.py" line="11482"/>
         <source>Survey data (ZTF via ALeRCE): %1 new, %2 updated, %3 unchanged, %4 removed; MJD %5 → %6; bands %7</source>
         <translation>Survey data (ZTF via ALeRCE): %1 new, %2 updated, %3 unchanged, %4 removed; MJD %5 → %6; bands %7</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11599"/>
+        <location filename="../main_window.py" line="11617"/>
         <source>transit start written as mandatory — validate once against your CCDciel</source>
         <translation>transit start written as mandatory — validate once against your CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11606"/>
+        <location filename="../main_window.py" line="11624"/>
         <source>HADS window is advisory — any contiguous 2-period run inside the safe span works</source>
         <translation>HADS window is advisory — any contiguous 2-period run inside the safe span works</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11630"/>
+        <location filename="../main_window.py" line="11648"/>
         <source>MPC orbit report</source>
         <translation>MPC orbit report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11637"/>
+        <location filename="../main_window.py" line="11655"/>
         <source>Force fresh data (bypass cache)</source>
         <translation>Force fresh data (bypass cache)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11639"/>
+        <location filename="../main_window.py" line="11657"/>
         <source>Re-query JPL SBDB / NEOfixer now instead of using the cached orbit. Use after the MPC has improved the preliminary orbit.</source>
         <translation>Re-query JPL SBDB / NEOfixer now instead of using the cached orbit. Use after the MPC has improved the preliminary orbit.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11689"/>
+        <location filename="../main_window.py" line="11707"/>
         <source>Archive project</source>
         <translation>Archive project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11690"/>
+        <location filename="../main_window.py" line="11708"/>
         <source>Archive this project? You can reopen it later.</source>
         <translation>Archive this project? You can reopen it later.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11726"/>
+        <location filename="../main_window.py" line="11744"/>
         <source>(no project selected)</source>
         <translation>(no project selected)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11728"/>
+        <location filename="../main_window.py" line="11746"/>
         <source>Edit tags…</source>
         <translation>Edit tags…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11756"/>
+        <location filename="../main_window.py" line="11774"/>
         <source>Edit tags</source>
         <translation>Edit tags</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11757"/>
+        <location filename="../main_window.py" line="11775"/>
         <source>Comma-separated tags:</source>
         <translation>Comma-separated tags:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11775"/>
+        <location filename="../main_window.py" line="11793"/>
         <source>Final outcome:</source>
         <translation>Final outcome:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11786"/>
+        <location filename="../main_window.py" line="11804"/>
         <source>Other (free text)</source>
         <translation>Other (free text)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11819"/>
+        <location filename="../main_window.py" line="11837"/>
         <source>Delete project</source>
         <translation>Delete project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11820"/>
+        <location filename="../main_window.py" line="11838"/>
         <source>Delete this project permanently?</source>
         <translation>Delete this project permanently?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11841"/>
+        <location filename="../main_window.py" line="11859"/>
         <source>Cannot create a project for this target</source>
         <translation>Cannot create a project for this target</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11878"/>
+        <location filename="../main_window.py" line="11896"/>
         <source>Project created: %1</source>
         <translation>Project created: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11951"/>
+        <location filename="../main_window.py" line="11969"/>
         <source>Delete campaign</source>
         <translation>Delete campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11952"/>
+        <location filename="../main_window.py" line="11970"/>
         <source>Delete the campaign “%1”? Its projects are kept, only the link is removed.</source>
         <translation>Delete the campaign “%1”? Its projects are kept, only the link is removed.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11995"/>
-        <location filename="../main_window.py" line="12000"/>
+        <location filename="../main_window.py" line="12013"/>
+        <location filename="../main_window.py" line="12018"/>
         <source>Attach project</source>
         <translation>Attach project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11996"/>
+        <location filename="../main_window.py" line="12014"/>
         <source>No active project without a campaign.</source>
         <translation>No active project without a campaign.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12000"/>
-        <location filename="../main_window.py" line="12022"/>
+        <location filename="../main_window.py" line="12018"/>
+        <location filename="../main_window.py" line="12040"/>
         <source>Project:</source>
         <translation>Project:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12017"/>
-        <location filename="../main_window.py" line="12022"/>
+        <location filename="../main_window.py" line="12035"/>
+        <location filename="../main_window.py" line="12040"/>
         <source>Detach project</source>
         <translation>Detach project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12018"/>
+        <location filename="../main_window.py" line="12036"/>
         <source>This campaign has no projects yet.</source>
         <translation>This campaign has no projects yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12063"/>
+        <location filename="../main_window.py" line="12081"/>
         <source>Edit…</source>
         <translation>Edit…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12128"/>
+        <location filename="../main_window.py" line="12146"/>
         <source>A campaign groups the projects of one shared observation effort: several nights, several observatories, one goal.
 
 A project is one object with its three steps: plan, process, publish.</source>
@@ -5399,12 +5404,12 @@ A project is one object with its three steps: plan, process, publish.</source>
 A project is one object with its three steps: plan, process, publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12290"/>
+        <location filename="../main_window.py" line="12308"/>
         <source>Create project</source>
         <translation>Create project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12291"/>
+        <location filename="../main_window.py" line="12309"/>
         <source>Could not create the project: the object kind could not be determined.</source>
         <translation>Could not create the project: the object kind could not be determined.</translation>
     </message>
@@ -5421,124 +5426,124 @@ A project is one object with its three steps: plan, process, publish.</translati
         <translation type="vanished">Writing with AI…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12431"/>
+        <location filename="../main_window.py" line="12449"/>
         <source>AI draft failed: </source>
         <translation>AI draft failed: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12443"/>
+        <location filename="../main_window.py" line="12461"/>
         <source>AI draft ready. Review it before publishing: the voice is yours.</source>
         <translation>AI draft ready. Review it before publishing: the voice is yours.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12503"/>
+        <location filename="../main_window.py" line="12521"/>
         <source>What will be sent</source>
         <translation>What will be sent</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12755"/>
+        <location filename="../main_window.py" line="12773"/>
         <source>{t} UTC  ·  {l} local</source>
         <translation>{t} UTC  ·  {l} local</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12759"/>
+        <location filename="../main_window.py" line="12777"/>
         <source>Planet</source>
         <translation>Planet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12759"/>
+        <location filename="../main_window.py" line="12777"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12760"/>
+        <location filename="../main_window.py" line="12778"/>
         <source>Rise (UTC)</source>
         <translation>Rise (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12760"/>
+        <location filename="../main_window.py" line="12778"/>
         <source>Max (alt · UTC)</source>
         <translation>Max (alt · UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12761"/>
+        <location filename="../main_window.py" line="12779"/>
         <source>Set (UTC)</source>
         <translation>Set (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12790"/>
+        <location filename="../main_window.py" line="12808"/>
         <source>Never above the horizon within two days of tonight</source>
         <translation>Never above the horizon within two days of tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12792"/>
+        <location filename="../main_window.py" line="12810"/>
         <source>Up already two days ago — it never sets from your site</source>
         <translation>Up already two days ago — it never sets from your site</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12794"/>
+        <location filename="../main_window.py" line="12812"/>
         <source>Still up two days from now — it never sets from your site</source>
         <translation>Still up two days from now — it never sets from your site</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12801"/>
+        <location filename="../main_window.py" line="12819"/>
         <source>Best {alt}° tonight — below 15°, needs optics or a better season</source>
         <translation>Best {alt}° tonight — below 15°, needs optics or a better season</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4491"/>
-        <location filename="../main_window.py" line="4988"/>
-        <location filename="../main_window.py" line="11739"/>
-        <location filename="../main_window.py" line="12065"/>
+        <location filename="../main_window.py" line="4504"/>
+        <location filename="../main_window.py" line="5001"/>
+        <location filename="../main_window.py" line="11757"/>
+        <location filename="../main_window.py" line="12083"/>
         <source>Reopen</source>
         <translation>Reopen</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="984"/>
+        <location filename="../main_window.py" line="997"/>
         <source>Drag to resize the list; double click to reset</source>
         <translation>Drag to resize the list; double click to reset</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="992"/>
+        <location filename="../main_window.py" line="1005"/>
         <source>Campaigns →</source>
         <translation>Campaigns →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="996"/>
+        <location filename="../main_window.py" line="1009"/>
         <source>Observing campaigns: several projects sharing a protocol</source>
         <translation>Observing campaigns: several projects sharing a protocol</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2502"/>
+        <location filename="../main_window.py" line="2515"/>
         <source>One common colour</source>
         <translation>One common colour</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4991"/>
-        <location filename="../main_window.py" line="11745"/>
-        <location filename="../main_window.py" line="12066"/>
+        <location filename="../main_window.py" line="5004"/>
+        <location filename="../main_window.py" line="11763"/>
+        <location filename="../main_window.py" line="12084"/>
         <source>Delete…</source>
         <translation>Delete…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12070"/>
-        <location filename="../main_window.py" line="12110"/>
+        <location filename="../main_window.py" line="12088"/>
+        <location filename="../main_window.py" line="12128"/>
         <source>Attach project…</source>
         <translation>Attach project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12071"/>
-        <location filename="../main_window.py" line="12111"/>
+        <location filename="../main_window.py" line="12089"/>
+        <location filename="../main_window.py" line="12129"/>
         <source>Detach project…</source>
         <translation>Detach project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12103"/>
+        <location filename="../main_window.py" line="12121"/>
         <source>(no campaign selected)</source>
         <translation>(no campaign selected)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12113"/>
+        <location filename="../main_window.py" line="12131"/>
         <source>Delete campaign…</source>
         <translation>Delete campaign…</translation>
     </message>
@@ -5555,12 +5560,12 @@ Example: “T CrB 2026 eruption” (obsSN group) — every night you measure T C
 A project is one object with its three steps: plan, process, publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12139"/>
+        <location filename="../main_window.py" line="12157"/>
         <source>What do the icons mean?</source>
         <translation>What do the icons mean?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12140"/>
+        <location filename="../main_window.py" line="12158"/>
         <source>⚡ — something happened in YOUR measurements: an outburst or a brightness drop beyond our threshold.
 
 ⏳ — a predicted extremum is approaching, with a countdown (maximum or minimum).
@@ -5577,12 +5582,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
 Double-click a row to open its project. This strip reads the cache of the last Tonight run — it never touches the network.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12163"/>
+        <location filename="../main_window.py" line="12181"/>
         <source>Open project</source>
         <translation>Open project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12164"/>
+        <location filename="../main_window.py" line="12182"/>
         <source>Detach from campaign</source>
         <translation>Detach from campaign</translation>
     </message>
@@ -5595,7 +5600,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Object:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12233"/>
+        <location filename="../main_window.py" line="12251"/>
         <source>Explore — %1</source>
         <translation>Explore — %1</translation>
     </message>
@@ -5604,7 +5609,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Post — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12361"/>
+        <location filename="../main_window.py" line="12379"/>
         <source>Choose the folder for the post files</source>
         <translation>Choose the folder for the post files</translation>
     </message>
@@ -5641,47 +5646,47 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Rendering…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12577"/>
+        <location filename="../main_window.py" line="12595"/>
         <source>(cycle 25)</source>
         <translation>(cycle 25)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12582"/>
+        <location filename="../main_window.py" line="12600"/>
         <source>Strongest flare this week: </source>
         <translation>Strongest flare this week: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12591"/>
+        <location filename="../main_window.py" line="12609"/>
         <source>Numbered active regions: </source>
         <translation>Numbered active regions: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12616"/>
+        <location filename="../main_window.py" line="12634"/>
         <source>Refresh the Sun first</source>
         <translation>Refresh the Sun first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12628"/>
+        <location filename="../main_window.py" line="12646"/>
         <source>Saved to: %1</source>
         <translation>Saved to: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12630"/>
+        <location filename="../main_window.py" line="12648"/>
         <source>Sun today</source>
         <translation>Sun today</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12669"/>
+        <location filename="../main_window.py" line="12687"/>
         <source>Moon: %1% lit · %2 km · %3 days</source>
         <translation>Moon: %1% lit · %2 km · %3 days</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12682"/>
+        <location filename="../main_window.py" line="12700"/>
         <source>Kp %1 — mid-latitude auroras possible</source>
         <translation>Kp %1 — mid-latitude auroras possible</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12686"/>
+        <location filename="../main_window.py" line="12704"/>
         <source>See Tonight →</source>
         <translation>See Tonight →</translation>
     </message>
@@ -5694,103 +5699,103 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Reading the FITS image…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11611"/>
-        <location filename="../main_window.py" line="11683"/>
+        <location filename="../main_window.py" line="11629"/>
+        <location filename="../main_window.py" line="11701"/>
         <source>Export failed: %1</source>
         <translation>Export failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11409"/>
-        <location filename="../main_window.py" line="11593"/>
-        <location filename="../main_window.py" line="11680"/>
+        <location filename="../main_window.py" line="11427"/>
+        <location filename="../main_window.py" line="11611"/>
+        <location filename="../main_window.py" line="11698"/>
         <source>Written to %1</source>
         <translation>Written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11625"/>
+        <location filename="../main_window.py" line="11643"/>
         <source>MPC elements (MPOrbit)</source>
         <translation>MPC elements (MPOrbit)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11627"/>
+        <location filename="../main_window.py" line="11645"/>
         <source>One MPOrbit element line per object (the universal MPC elements handover format), importable by any planetarium or orbit reader. Best for orbit handover.</source>
         <translation>One MPOrbit element line per object (the universal MPC elements handover format), importable by any planetarium or orbit reader. Best for orbit handover.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11632"/>
+        <location filename="../main_window.py" line="11650"/>
         <source>Orbital elements, perihelion, P/Q, state vector, MOIDs, Tisserand, encounter speed, diameter and an MPC element footer. Universal: importable by any planetarium or orbit reader. Best for a readable follow-up report.</source>
         <translation>Orbital elements, perihelion, P/Q, state vector, MOIDs, Tisserand, encounter speed, diameter and an MPC element footer. Universal: importable by any planetarium or orbit reader. Best for a readable follow-up report.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11675"/>
+        <location filename="../main_window.py" line="11693"/>
         <source>No orbit record for %1</source>
         <translation>No orbit record for %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12064"/>
+        <location filename="../main_window.py" line="12082"/>
         <source>Close campaign</source>
         <translation>Close campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12068"/>
-        <location filename="../main_window.py" line="12108"/>
+        <location filename="../main_window.py" line="12086"/>
+        <location filename="../main_window.py" line="12126"/>
         <source>New project in this campaign…</source>
         <translation>New project in this campaign…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12521"/>
+        <location filename="../main_window.py" line="12539"/>
         <source>Not found: </source>
         <translation>Not found: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12378"/>
+        <location filename="../main_window.py" line="12396"/>
         <source>Building drafts…</source>
         <translation>Building drafts…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12485"/>
+        <location filename="../main_window.py" line="12503"/>
         <source>Saved to: </source>
         <translation>Saved to: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12486"/>
+        <location filename="../main_window.py" line="12504"/>
         <source>Drafts ready</source>
         <translation>Drafts ready</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3179"/>
+        <location filename="../main_window.py" line="3192"/>
         <source>Unknown code or offline</source>
         <translation>Unknown code or offline</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3185"/>
+        <location filename="../main_window.py" line="3198"/>
         <source>Found: %1</source>
         <translation>Found: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4978"/>
+        <location filename="../main_window.py" line="4991"/>
         <source>Open</source>
         <translation>Open</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4983"/>
+        <location filename="../main_window.py" line="4996"/>
         <source>Unstar</source>
         <translation>Unstar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4984"/>
+        <location filename="../main_window.py" line="4997"/>
         <source>Star as favorite</source>
         <translation>Star as favorite</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4986"/>
-        <location filename="../main_window.py" line="11736"/>
+        <location filename="../main_window.py" line="4999"/>
+        <location filename="../main_window.py" line="11754"/>
         <source>Close project…</source>
         <translation>Close project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4990"/>
-        <location filename="../main_window.py" line="11742"/>
+        <location filename="../main_window.py" line="5003"/>
+        <location filename="../main_window.py" line="11760"/>
         <source>Archive…</source>
         <translation>Archive…</translation>
     </message>
@@ -5803,52 +5808,52 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3841"/>
+        <location filename="../main_window.py" line="3854"/>
         <source>maximum</source>
         <translation>maximum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3842"/>
+        <location filename="../main_window.py" line="3855"/>
         <source>minimum</source>
         <translation>minimum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3843"/>
+        <location filename="../main_window.py" line="3856"/>
         <source>%1 in %2 d</source>
         <translation>%1 in %2 d</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5545"/>
+        <location filename="../main_window.py" line="5558"/>
         <source>Open the {l} tab</source>
         <translation>Open the {l} tab</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9023"/>
+        <location filename="../main_window.py" line="9041"/>
         <source>After the reduction, upload EXOTIC&apos;s output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</source>
         <translation>After the reduction, upload EXOTIC&apos;s output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9075"/>
+        <location filename="../main_window.py" line="9093"/>
         <source>Import the FotoDif measurements («JD mag …» text) with «Import file…» in the photometry tools menu above — the light curve and the phase-folded view update themselves.</source>
         <translation>Import the FotoDif measurements («JD mag …» text) with «Import file…» in the photometry tools menu above — the light curve and the phase-folded view update themselves.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9183"/>
+        <location filename="../main_window.py" line="9201"/>
         <source>This visit has no FITS frames to measure.</source>
         <translation>This visit has no FITS frames to measure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9242"/>
+        <location filename="../main_window.py" line="9260"/>
         <source>This measurement no longer exists.</source>
         <translation>This measurement no longer exists.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9246"/>
+        <location filename="../main_window.py" line="9264"/>
         <source>This point has no plate: it was hand-entered, pasted, or saved before this feature.</source>
         <translation>This point has no plate: it was hand-entered, pasted, or saved before this feature.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9252"/>
+        <location filename="../main_window.py" line="9270"/>
         <source>The plate this point came from is not a usable image anymore.</source>
         <translation>The plate this point came from is not a usable image anymore.</translation>
     </message>
@@ -5857,37 +5862,37 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Enable the unified editor in Settings → Development to open this plate</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9559"/>
+        <location filename="../main_window.py" line="9577"/>
         <source>Click to open in the chart viewer (zoom, pan, export)</source>
         <translation>Click to open in the chart viewer (zoom, pan, export)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10138"/>
+        <location filename="../main_window.py" line="10156"/>
         <source>No Python 3.10 found. Install it (python.org, ticking the py launcher) and run «pip install exotic» in it, or use «Prepare environment» in Settings → EXOTIC.</source>
         <translation>No Python 3.10 found. Install it (python.org, ticking the py launcher) and run «pip install exotic» in it, or use «Prepare environment» in Settings → EXOTIC.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10144"/>
+        <location filename="../main_window.py" line="10162"/>
         <source>This Python has no EXOTIC installed: run «pip install exotic» in it, or use «Prepare environment» in Settings → EXOTIC.</source>
         <translation>This Python has no EXOTIC installed: run «pip install exotic» in it, or use «Prepare environment» in Settings → EXOTIC.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10934"/>
+        <location filename="../main_window.py" line="10952"/>
         <source>No points saved yet. Open a visit&apos;s plate in the editor or add a magnitude by hand: the summary updates after every save.</source>
         <translation>No points saved yet. Open a visit&apos;s plate in the editor or add a magnitude by hand: the summary updates after every save.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10974"/>
+        <location filename="../main_window.py" line="10992"/>
         <source>Comparison chart…</source>
         <translation>Comparison chart…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10976"/>
+        <location filename="../main_window.py" line="10994"/>
         <source>Pick the reference stars for this target: NightScribe proposes them over the field image (brighter, of similar colour, never a known variable)</source>
         <translation>Pick the reference stars for this target: NightScribe proposes them over the field image (brighter, of similar colour, never a known variable)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11059"/>
+        <location filename="../main_window.py" line="11077"/>
         <source>Preview the stacked FITS, place the SN marker and save an annotated copy (AIJ readable)</source>
         <translation>Preview the stacked FITS, place the SN marker and save an annotated copy (AIJ readable)</translation>
     </message>
@@ -5896,17 +5901,17 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Could not open the FITS for annotation: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11270"/>
+        <location filename="../main_window.py" line="11288"/>
         <source>No comparison sequence yet — «Comparison chart…» answers the question: with what do I compare?</source>
         <translation>No comparison sequence yet — «Comparison chart…» answers the question: with what do I compare?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11274"/>
+        <location filename="../main_window.py" line="11292"/>
         <source>Sequence: %1 comparison stars</source>
         <translation>Sequence: %1 comparison stars</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11277"/>
+        <location filename="../main_window.py" line="11295"/>
         <source> + check star</source>
         <translation> + check star</translation>
     </message>
@@ -5951,7 +5956,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Your FITS image</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="8474"/>
+        <location filename="../main_window.py" line="8492"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
@@ -5968,7 +5973,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Also save the sequence to the campaign protocol</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="10677"/>
+        <location filename="../main_window.py" line="10695"/>
         <source>Generate</source>
         <translation>Generate</translation>
     </message>
@@ -5993,47 +5998,47 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Comparison chart ready</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9159"/>
+        <location filename="../main_window.py" line="9177"/>
         <source>This project has no measured points yet: measure the series (or import a curve) first.</source>
         <translation>This project has no measured points yet: measure the series (or import a curve) first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="9166"/>
+        <location filename="../main_window.py" line="9184"/>
         <source>The period search is for light-curve projects (a variable, a HADS star, a supernova).</source>
         <translation>The period search is for light-curve projects (a variable, a HADS star, a supernova).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2230"/>
+        <location filename="../main_window.py" line="2243"/>
         <source>gain {0:.3g} e-/ADU</source>
         <translation>gain {0:.3g} e-/ADU</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2232"/>
+        <location filename="../main_window.py" line="2245"/>
         <source>read noise {0:.3g} e-</source>
         <translation>read noise {0:.3g} e-</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2238"/>
+        <location filename="../main_window.py" line="2251"/>
         <source>the error bar is the CCD equation</source>
         <translation>the error bar is the CCD equation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2242"/>
+        <location filename="../main_window.py" line="2255"/>
         <source>No gain: the error bar of every point is the scatter of the comparison stars, not the CCD equation. Measure it on your own frames, or set it here.</source>
         <translation>No gain: the error bar of every point is the scatter of the comparison stars, not the CCD equation. Measure it on your own frames, or set it here.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="11344"/>
+        <location filename="../main_window.py" line="11362"/>
         <source>The columns of the file. The header always carries the canonical name of each column, so a colleague&apos;s reader does not break because of the language.</source>
         <translation>The columns of the file. The header always carries the canonical name of each column, so a colleague&apos;s reader does not break because of the language.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4517"/>
+        <location filename="../main_window.py" line="4530"/>
         <source>Shared sequence: %1 comparison stars</source>
         <translation>Shared sequence: %1 comparison stars</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="12106"/>
+        <location filename="../main_window.py" line="12124"/>
         <source>Measure the campaign pass…</source>
         <translation>Measure the campaign pass…</translation>
     </message>
@@ -6046,103 +6051,103 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Leave the workbench and return</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13341"/>
+        <location filename="../main_window.py" line="13369"/>
         <source>A pass is already running.</source>
         <translation>A pass is already running.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13372"/>
+        <location filename="../main_window.py" line="13400"/>
         <source>Measuring the pass: {0} objects</source>
         <translation>Measuring the pass: {0} objects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13374"/>
-        <location filename="../main_window.py" line="13439"/>
+        <location filename="../main_window.py" line="13402"/>
+        <location filename="../main_window.py" line="13467"/>
         <source>Campaign pass</source>
         <translation>Campaign pass</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13382"/>
+        <location filename="../main_window.py" line="13410"/>
         <source>Pass over {0} frames with the {1}</source>
         <translation>Pass over {0} frames with the {1}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13384"/>
+        <location filename="../main_window.py" line="13412"/>
         <source>campaign&apos;s shared sequence</source>
         <translation>campaign&apos;s shared sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13386"/>
+        <location filename="../main_window.py" line="13414"/>
         <source>project&apos;s own sequence</source>
         <translation>project&apos;s own sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13432"/>
+        <location filename="../main_window.py" line="13460"/>
         <source>Cancelling the pass… the frames already measured are kept.</source>
         <translation>Cancelling the pass… the frames already measured are kept.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13440"/>
+        <location filename="../main_window.py" line="13468"/>
         <source>The pass failed: {0}</source>
         <translation>The pass failed: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13466"/>
+        <location filename="../main_window.py" line="13494"/>
         <source>Campaign pass: shared frames</source>
         <translation>Campaign pass: shared frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13486"/>
+        <location filename="../main_window.py" line="13514"/>
         <source>Pass saved: {0} objects, {1} frames, {2} points</source>
         <translation>Pass saved: {0} objects, {1} frames, {2} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13492"/>
+        <location filename="../main_window.py" line="13520"/>
         <source>Pass saved. {0} project(s) stayed out of it: see the dialog.</source>
         <translation>Pass saved. {0} project(s) stayed out of it: see the dialog.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13517"/>
+        <location filename="../main_window.py" line="13545"/>
         <source>%1 frames are no longer part of the visit (the files stay where they are).</source>
         <translation>%1 frames are no longer part of the visit (the files stay where they are).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13520"/>
+        <location filename="../main_window.py" line="13548"/>
         <source>Nothing was taken out: those frames are not part of this visit any more.</source>
         <translation>Nothing was taken out: those frames are not part of this visit any more.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13534"/>
+        <location filename="../main_window.py" line="13562"/>
         <source>This project has no folder to move them into.</source>
         <translation>This project has no folder to move them into.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13538"/>
+        <location filename="../main_window.py" line="13566"/>
         <source>%1 frames moved to discarded/.</source>
         <translation>%1 frames moved to discarded/.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13541"/>
+        <location filename="../main_window.py" line="13569"/>
         <source>%1 were not there any more.</source>
         <translation>%1 were not there any more.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14106"/>
+        <location filename="../main_window.py" line="14134"/>
         <source>Series saved: {} points over {} nights, one run each</source>
         <translation>Series saved: {} points over {} nights, one run each</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14146"/>
+        <location filename="../main_window.py" line="14174"/>
         <source>Pass undone: {} points over {} nights</source>
         <translation>Pass undone: {} points over {} nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14298"/>
+        <location filename="../main_window.py" line="14326"/>
         <source>The chart will show that pass of the visit.</source>
         <translation>The chart will show that pass of the visit.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14311"/>
+        <location filename="../main_window.py" line="14339"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed</source>
         <translation>Curve discarded: {0} run(s) undone, {1} points removed</translation>
     </message>
@@ -7875,22 +7880,22 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>The search failed: {0}</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="262"/>
+        <location filename="../phase_dialog.py" line="275"/>
         <source>Search first.</source>
         <translation>Search first.</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="267"/>
+        <location filename="../phase_dialog.py" line="280"/>
         <source>Export the period report</source>
         <translation>Export the period report</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="268"/>
+        <location filename="../phase_dialog.py" line="281"/>
         <source>PNG image (*.png)</source>
         <translation>PNG image (*.png)</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="279"/>
+        <location filename="../phase_dialog.py" line="292"/>
         <source>Written:
 {0}
 {1}</source>
@@ -7899,12 +7904,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
 {1}</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="286"/>
+        <location filename="../phase_dialog.py" line="299"/>
         <source>The figure was no longer on disk: only the CSV was written (search again to draw it and export it).</source>
         <translation>The figure was no longer on disk: only the CSV was written (search again to draw it and export it).</translation>
     </message>
     <message>
-        <location filename="../phase_dialog.py" line="292"/>
+        <location filename="../phase_dialog.py" line="305"/>
         <source>Could not write the report: {0}</source>
         <translation>Could not write the report: {0}</translation>
     </message>
@@ -11085,39 +11090,39 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Save annotated copy…</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="270"/>
+        <location filename="../ufe_annotate_tab.py" line="274"/>
         <source>marker {0:.1f}, {1:.1f}</source>
         <translation>marker {0:.1f}, {1:.1f}</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="318"/>
+        <location filename="../ufe_annotate_tab.py" line="322"/>
         <source>Plates to annotate with the same marker</source>
         <translation>Plates to annotate with the same marker</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="319"/>
+        <location filename="../ufe_annotate_tab.py" line="323"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="392"/>
+        <location filename="../ufe_annotate_tab.py" line="396"/>
         <source>Save annotated FITS as</source>
         <translation>Save annotated FITS as</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="408"/>
+        <location filename="../ufe_annotate_tab.py" line="412"/>
         <source>Save failed</source>
         <translation>Save failed</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="409"/>
+        <location filename="../ufe_annotate_tab.py" line="413"/>
         <source>Could not write the annotated FITS to {0}.
 {1}</source>
         <translation>Could not write the annotated FITS to {0}.
 {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="415"/>
+        <location filename="../ufe_annotate_tab.py" line="419"/>
         <source>Saved {0} annotated copy(ies). Last: {1}</source>
         <translation>Saved {0} annotated copy(ies). Last: {1}</translation>
     </message>
@@ -11245,43 +11250,43 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="214"/>
-        <location filename="../ufe_blink_tab.py" line="264"/>
+        <location filename="../ufe_blink_tab.py" line="218"/>
+        <location filename="../ufe_blink_tab.py" line="268"/>
         <source>Load a FITS plate first.</source>
         <translation>Load a FITS plate first.</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="271"/>
+        <location filename="../ufe_blink_tab.py" line="275"/>
         <source>Manual coordinates invalid</source>
         <translation>Manual coordinates invalid</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="276"/>
+        <location filename="../ufe_blink_tab.py" line="280"/>
         <source>Type the supernova name or tick &apos;Manual coordinates&apos;.</source>
         <translation>Type the supernova name or tick &apos;Manual coordinates&apos;.</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="280"/>
+        <location filename="../ufe_blink_tab.py" line="284"/>
         <source>Preparing the blink pair…</source>
         <translation>Preparing the blink pair…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="527"/>
+        <location filename="../ufe_blink_tab.py" line="531"/>
         <source>Export {0}</source>
         <translation>Export {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="535"/>
+        <location filename="../ufe_blink_tab.py" line="539"/>
         <source>Rendering…</source>
         <translation>Rendering…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="566"/>
+        <location filename="../ufe_blink_tab.py" line="570"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="570"/>
+        <location filename="../ufe_blink_tab.py" line="574"/>
         <source>Export failed: {0}</source>
         <translation>Export failed: {0}</translation>
     </message>
@@ -11289,38 +11294,39 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
 <context>
     <name>UfeCalibrationTab</name>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="352"/>
+        <location filename="../ufe_calibration_tab.py" line="359"/>
+        <location filename="../ufe_calibration_tab.py" line="376"/>
         <location filename="../ui/ufe_calibration_tab.ui" line="28"/>
         <source>Open the editor from a visit to see its recipe.</source>
         <translation>Open the editor from a visit to see its recipe.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="363"/>
+        <location filename="../ufe_calibration_tab.py" line="387"/>
         <source>The first frame could not be read:</source>
         <translation>The first frame could not be read:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="399"/>
+        <location filename="../ufe_calibration_tab.py" line="423"/>
         <source>The visit&apos;s recipe is not known</source>
         <translation>The visit&apos;s recipe is not known</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="402"/>
+        <location filename="../ufe_calibration_tab.py" line="426"/>
         <source>dark</source>
         <translation>dark</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="403"/>
+        <location filename="../ufe_calibration_tab.py" line="427"/>
         <source>bias</source>
         <translation>bias</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="405"/>
+        <location filename="../ufe_calibration_tab.py" line="429"/>
         <source>no dark/bias</source>
         <translation>no dark/bias</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="407"/>
+        <location filename="../ufe_calibration_tab.py" line="431"/>
         <source>flat: %1</source>
         <translation>flat: %1</translation>
     </message>
@@ -11329,24 +11335,24 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">pseudo-flat from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="412"/>
+        <location filename="../ufe_calibration_tab.py" line="436"/>
         <source>no flat: the vignetting stays</source>
         <translation>no flat: the vignetting stays</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="434"/>
+        <location filename="../ufe_calibration_tab.py" line="458"/>
         <source>Camera %1 · gain %2 · %3 °C · exposure %4 s · filter %5</source>
         <translation>Camera %1 · gain %2 · %3 °C · exposure %4 s · filter %5</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="111"/>
-        <location filename="../ufe_calibration_tab.py" line="441"/>
+        <location filename="../ufe_calibration_tab.py" line="112"/>
+        <location filename="../ufe_calibration_tab.py" line="465"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="111"/>
-        <location filename="../ufe_calibration_tab.py" line="442"/>
+        <location filename="../ufe_calibration_tab.py" line="112"/>
+        <location filename="../ufe_calibration_tab.py" line="466"/>
         <source>Bias</source>
         <translation>Bias</translation>
     </message>
@@ -11355,7 +11361,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Dark of the flats</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="112"/>
+        <location filename="../ufe_calibration_tab.py" line="113"/>
         <source>Flat</source>
         <translation>Flat</translation>
     </message>
@@ -11368,17 +11374,17 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The masters could not be indexed:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="446"/>
+        <location filename="../ufe_calibration_tab.py" line="470"/>
         <source>Offset: missing (no dark or bias in the library)</source>
         <translation>Offset: missing (no dark or bias in the library)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="448"/>
+        <location filename="../ufe_calibration_tab.py" line="472"/>
         <source>Flat:</source>
         <translation>Flat:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="450"/>
+        <location filename="../ufe_calibration_tab.py" line="474"/>
         <source>(offset removed: %1)</source>
         <translation>(offset removed: %1)</translation>
     </message>
@@ -11391,7 +11397,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Flat: none in the library; a pseudo-flat will be built from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="463"/>
+        <location filename="../ufe_calibration_tab.py" line="487"/>
         <source>Flat: missing for this filter (the vignetting stays)</source>
         <translation>Flat: missing for this filter (the vignetting stays)</translation>
     </message>
@@ -11400,237 +11406,237 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Flat: missing for this filter</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="137"/>
+        <location filename="../ufe_calibration_tab.py" line="138"/>
         <source>The master library lives in Settings, under Measurement.</source>
         <translation>The master library lives in Settings, under Measurement.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="154"/>
+        <location filename="../ufe_calibration_tab.py" line="155"/>
         <source>Open the editor from a project to build its masters.</source>
         <translation>Open the editor from a project to build its masters.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="160"/>
+        <location filename="../ufe_calibration_tab.py" line="161"/>
         <source>Build masters from a folder of calibration frames</source>
         <translation>Build masters from a folder of calibration frames</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="168"/>
+        <location filename="../ufe_calibration_tab.py" line="169"/>
         <source>No FITS frames in that folder.</source>
         <translation>No FITS frames in that folder.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="172"/>
+        <location filename="../ufe_calibration_tab.py" line="173"/>
         <source>Build the masters from %1 frames?</source>
         <translation>Build the masters from %1 frames?</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="176"/>
+        <location filename="../ufe_calibration_tab.py" line="177"/>
         <source>The original frames will be DELETED once each master is written and indexed.</source>
         <translation>The original frames will be DELETED once each master is written and indexed.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="179"/>
+        <location filename="../ufe_calibration_tab.py" line="180"/>
         <source>The original frames are kept.</source>
         <translation>The original frames are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="180"/>
+        <location filename="../ufe_calibration_tab.py" line="181"/>
         <source>The masters will be shared with every project.</source>
         <translation>The masters will be shared with every project.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="182"/>
+        <location filename="../ufe_calibration_tab.py" line="183"/>
         <source>The masters will belong to this project.</source>
         <translation>The masters will belong to this project.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="184"/>
+        <location filename="../ufe_calibration_tab.py" line="185"/>
         <source>Build masters</source>
         <translation>Build masters</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="194"/>
+        <location filename="../ufe_calibration_tab.py" line="195"/>
         <source>Building masters…</source>
         <translation>Building masters…</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="200"/>
+        <location filename="../ufe_calibration_tab.py" line="201"/>
         <source>Building masters… %1 of %2</source>
         <translation>Building masters… %1 of %2</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="212"/>
+        <location filename="../ufe_calibration_tab.py" line="213"/>
         <source>Built %1 masters.</source>
         <translation>Built %1 masters.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="216"/>
+        <location filename="../ufe_calibration_tab.py" line="217"/>
         <source>A group had a single frame, so its master is a copy of that frame and not an average.</source>
         <translation>A group had a single frame, so its master is a copy of that frame and not an average.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="220"/>
+        <location filename="../ufe_calibration_tab.py" line="221"/>
         <source>%1 frames were left out: they are not calibration frames.</source>
         <translation>%1 frames were left out: they are not calibration frames.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="225"/>
+        <location filename="../ufe_calibration_tab.py" line="226"/>
         <source>Nothing was built.</source>
         <translation>Nothing was built.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="235"/>
+        <location filename="../ufe_calibration_tab.py" line="236"/>
         <source>The build failed:</source>
         <translation>The build failed:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="247"/>
+        <location filename="../ufe_calibration_tab.py" line="248"/>
         <source>Open the editor from a project to use a master.</source>
         <translation>Open the editor from a project to use a master.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="256"/>
+        <location filename="../ufe_calibration_tab.py" line="260"/>
         <source>There is no other project&apos;s master to use.</source>
         <translation>There is no other project&apos;s master to use.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="268"/>
+        <location filename="../ufe_calibration_tab.py" line="272"/>
         <source>Use another project&apos;s master</source>
         <translation>Use another project&apos;s master</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="269"/>
+        <location filename="../ufe_calibration_tab.py" line="273"/>
         <source>The file is not copied: this project gets its own link to it.</source>
         <translation>The file is not copied: this project gets its own link to it.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="275"/>
+        <location filename="../ufe_calibration_tab.py" line="279"/>
         <source>Added %1 to this project.</source>
         <translation>Added %1 to this project.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="410"/>
+        <location filename="../ufe_calibration_tab.py" line="434"/>
         <source>vignetting model from the frames</source>
         <translation>vignetting model from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="430"/>
+        <location filename="../ufe_calibration_tab.py" line="454"/>
         <source>(shared)</source>
         <translation>(shared)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="454"/>
+        <location filename="../ufe_calibration_tab.py" line="478"/>
         <source>(no dark at its exposure or bias: the flat keeps its own pedestal)</source>
         <translation>(no dark at its exposure or bias: the flat keeps its own pedestal)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="459"/>
+        <location filename="../ufe_calibration_tab.py" line="483"/>
         <source>Flat: none in the library; a vignetting model will be built from the frames</source>
         <translation>Flat: none in the library; a vignetting model will be built from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="494"/>
+        <location filename="../ufe_calibration_tab.py" line="546"/>
         <source>No dark at this exposure: the bias was subtracted, so the thermal current stays in the frame</source>
         <translation>No dark at this exposure: the bias was subtracted, so the thermal current stays in the frame</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="498"/>
+        <location filename="../ufe_calibration_tab.py" line="550"/>
         <source>No dark or bias in the library: the pedestal and the thermal current stay in the frame</source>
         <translation>No dark or bias in the library: the pedestal and the thermal current stay in the frame</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="502"/>
+        <location filename="../ufe_calibration_tab.py" line="554"/>
         <source>No flat for this filter: the flat residual is not corrected (it matters for the magnitude, little for the centroid)</source>
         <translation>No flat for this filter: the flat residual is not corrected (it matters for the magnitude, little for the centroid)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="507"/>
+        <location filename="../ufe_calibration_tab.py" line="559"/>
         <source>The frame already carries NightScribe&apos;s calibration, so the recipe was not applied again (a second dark would be subtracted twice)</source>
         <translation>The frame already carries NightScribe&apos;s calibration, so the recipe was not applied again (a second dark would be subtracted twice)</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="524"/>
+        <location filename="../ufe_calibration_tab.py" line="576"/>
         <source>There is a %1 (%2) in the library, but its sensor temperature is out of tolerance: %3 °C against %4 °C (tolerance %5 °C). A dark carries the thermal current, so one from another temperature is not the same dark.</source>
         <translation>There is a %1 (%2) in the library, but its sensor temperature is out of tolerance: %3 °C against %4 °C (tolerance %5 °C). A dark carries the thermal current, so one from another temperature is not the same dark.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="534"/>
+        <location filename="../ufe_calibration_tab.py" line="586"/>
         <source>There is a %1 (%2) in the library, but at %3 s: a dark is only valid at the light&apos;s own exposure (%4 s).</source>
         <translation>There is a %1 (%2) in the library, but at %3 s: a dark is only valid at the light&apos;s own exposure (%4 s).</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="541"/>
+        <location filename="../ufe_calibration_tab.py" line="593"/>
         <source>There is a %1 (%2) in the library, but for filter %3; these lights are in %4. A flat is per filter.</source>
         <translation>There is a %1 (%2) in the library, but for filter %3; these lights are in %4. A flat is per filter.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="548"/>
+        <location filename="../ufe_calibration_tab.py" line="600"/>
         <source>There is a %1 (%2) in the library, but for another camera (%3); these lights are from %4.</source>
         <translation>There is a %1 (%2) in the library, but for another camera (%3); these lights are from %4.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="555"/>
+        <location filename="../ufe_calibration_tab.py" line="607"/>
         <source>There is a %1 (%2) in the library, but at gain %3; these lights were taken at gain %4. A dark carries the level, so the gain is part of its match.</source>
         <translation>There is a %1 (%2) in the library, but at gain %3; these lights were taken at gain %4. A dark carries the level, so the gain is part of its match.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="563"/>
+        <location filename="../ufe_calibration_tab.py" line="615"/>
         <source>The flat (%1) is %2 days older than these lights: the train&apos;s dust moves, so a mote may have appeared or gone. It is used anyway.</source>
         <translation>The flat (%1) is %2 days older than these lights: the train&apos;s dust moves, so a mote may have appeared or gone. It is used anyway.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="580"/>
+        <location filename="../ufe_calibration_tab.py" line="632"/>
         <source>Cancelling: the calibration stops after the frame it is applying; the copies already exported are kept.</source>
         <translation>Cancelling: the calibration stops after the frame it is applying; the copies already exported are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="586"/>
+        <location filename="../ufe_calibration_tab.py" line="638"/>
         <source>No visit with frames: open the editor from a visit.</source>
         <translation>No visit with frames: open the editor from a visit.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="611"/>
+        <location filename="../ufe_calibration_tab.py" line="663"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="642"/>
+        <location filename="../ufe_calibration_tab.py" line="694"/>
         <source>The calibration failed:</source>
         <translation>The calibration failed:</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="652"/>
+        <location filename="../ufe_calibration_tab.py" line="705"/>
         <source>Cancelled after %1 frames.</source>
         <translation>Cancelled after %1 frames.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="683"/>
+        <location filename="../ufe_calibration_tab.py" line="740"/>
         <source>Calibrated %1 frames (%2 exported).</source>
         <translation>Calibrated %1 frames (%2 exported).</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="691"/>
+        <location filename="../ufe_calibration_tab.py" line="748"/>
         <source>%1 already carried NightScribe&apos;s calibration and were left as they were.</source>
         <translation>%1 already carried NightScribe&apos;s calibration and were left as they were.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="700"/>
+        <location filename="../ufe_calibration_tab.py" line="757"/>
         <source>Vignetting model from %1 frames, %2-pixel tiles (%3 of %4 tiles kept).</source>
         <translation>Vignetting model from %1 frames, %2-pixel tiles (%3 of %4 tiles kept).</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="717"/>
+        <location filename="../ufe_calibration_tab.py" line="774"/>
         <source>No dark/bias master: the pedestal stays in the model, so its shape is compressed and only part of the vignetting is corrected. Index a bias for this camera.</source>
         <translation>No dark/bias master: the pedestal stays in the model, so its shape is compressed and only part of the vignetting is corrected. Index a bias for this camera.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="744"/>
+        <location filename="../ufe_calibration_tab.py" line="804"/>
         <source>No vignetting model has been built for this visit yet: run the calibration with the model box checked in Settings.</source>
         <translation>No vignetting model has been built for this visit yet: run the calibration with the model box checked in Settings.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="751"/>
+        <location filename="../ufe_calibration_tab.py" line="811"/>
         <source>The model is at %1</source>
         <translation>The model is at %1</translation>
     </message>
@@ -11655,7 +11661,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">deviation over the masked ones: %1 %</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="713"/>
+        <location filename="../ufe_calibration_tab.py" line="770"/>
         <source>Built with the offset removed (%1).</source>
         <translation>Built with the offset removed (%1).</translation>
     </message>
@@ -11664,7 +11670,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">No dark/bias master: the pedestal stays in the flat, so its shape is compressed and only part of the vignetting is corrected. Index a bias for this camera.</translation>
     </message>
     <message>
-        <location filename="../ufe_calibration_tab.py" line="721"/>
+        <location filename="../ufe_calibration_tab.py" line="778"/>
         <source>Warning:</source>
         <translation>Warning:</translation>
     </message>
@@ -11981,12 +11987,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Manual tweak…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1502"/>
+        <location filename="../ufe_compare_tab.py" line="1505"/>
         <source>Sequence ({0})…</source>
         <translation>Sequence ({0})…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="436"/>
+        <location filename="../ufe_compare_tab.py" line="439"/>
         <source>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</source>
         <translation>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</translation>
     </message>
@@ -11996,258 +12002,258 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>The comparison sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="368"/>
+        <location filename="../ufe_compare_tab.py" line="371"/>
         <source>%1 comparison stars in the sequence, saved in the project</source>
         <translation>%1 comparison stars in the sequence, saved in the project</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="372"/>
+        <location filename="../ufe_compare_tab.py" line="375"/>
         <source>No plate yet: open a frame, or load the field from the survey in the block below.</source>
         <translation>No plate yet: open a frame, or load the field from the survey in the block below.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="379"/>
+        <location filename="../ufe_compare_tab.py" line="382"/>
         <source>%1 around the plate centre · no target magnitude yet: the proposal starts from a declared guess and says so</source>
         <translation>%1 around the plate centre · no target magnitude yet: the proposal starts from a declared guess and says so</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="383"/>
+        <location filename="../ufe_compare_tab.py" line="386"/>
         <source>%1 around the plate centre · comparisons for a mag %2 target</source>
         <translation>%1 around the plate centre · comparisons for a mag %2 target</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="390"/>
+        <location filename="../ufe_compare_tab.py" line="393"/>
         <source>figure {0}</source>
         <translation>figure {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="447"/>
-        <location filename="../ufe_compare_tab.py" line="491"/>
+        <location filename="../ufe_compare_tab.py" line="450"/>
+        <location filename="../ufe_compare_tab.py" line="494"/>
         <source>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</source>
         <translation>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="495"/>
+        <location filename="../ufe_compare_tab.py" line="498"/>
         <source>No plate loaded: load a FITS or fetch the field from the survey.</source>
         <translation>No plate loaded: load a FITS or fetch the field from the survey.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="649"/>
+        <location filename="../ufe_compare_tab.py" line="652"/>
         <source>Survey field</source>
         <translation>Survey field</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="650"/>
+        <location filename="../ufe_compare_tab.py" line="653"/>
         <source>Object or field name (SIMBAD):</source>
         <translation>Object or field name (SIMBAD):</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="665"/>
-        <location filename="../ufe_compare_tab.py" line="666"/>
+        <location filename="../ufe_compare_tab.py" line="668"/>
+        <location filename="../ufe_compare_tab.py" line="669"/>
         <source>Downloading the survey field…</source>
         <translation>Downloading the survey field…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="667"/>
-        <location filename="../ufe_compare_tab.py" line="789"/>
+        <location filename="../ufe_compare_tab.py" line="670"/>
+        <location filename="../ufe_compare_tab.py" line="792"/>
         <source>Comparison field</source>
         <translation>Comparison field</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="694"/>
+        <location filename="../ufe_compare_tab.py" line="697"/>
         <source>The survey download failed (offline?). Try again later.</source>
         <translation>The survey download failed (offline?). Try again later.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="702"/>
+        <location filename="../ufe_compare_tab.py" line="705"/>
         <source>Field loaded: {0}</source>
         <translation>Field loaded: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="748"/>
+        <location filename="../ufe_compare_tab.py" line="751"/>
         <source>The plate has no WCS and it could not be solved: use «Solve astrometry…» or check the solver in Settings.</source>
         <translation>The plate has no WCS and it could not be solved: use «Solve astrometry…» or check the solver in Settings.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="759"/>
+        <location filename="../ufe_compare_tab.py" line="762"/>
         <source>Load a plate first (or fetch the field from the survey with «DSS2…»): the catalogue is queried around its centre.</source>
         <translation>Load a plate first (or fetch the field from the survey with «DSS2…»): the catalogue is queried around its centre.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="766"/>
+        <location filename="../ufe_compare_tab.py" line="769"/>
         <source>The plate has no WCS: solving it to build the comparison field…</source>
         <translation>The plate has no WCS: solving it to build the comparison field…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="782"/>
-        <location filename="../ufe_compare_tab.py" line="788"/>
+        <location filename="../ufe_compare_tab.py" line="785"/>
+        <location filename="../ufe_compare_tab.py" line="791"/>
         <source>Querying the catalog…</source>
         <translation>Querying the catalog…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="822"/>
+        <location filename="../ufe_compare_tab.py" line="825"/>
         <source>The field landed but its handling failed: {0}</source>
         <translation>The field landed but its handling failed: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="866"/>
+        <location filename="../ufe_compare_tab.py" line="869"/>
         <source>The catalog query failed (offline?). Try again later.</source>
         <translation>The catalog query failed (offline?). Try again later.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="889"/>
+        <location filename="../ufe_compare_tab.py" line="892"/>
         <source>VSX check failed</source>
         <translation>VSX check failed</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="891"/>
+        <location filename="../ufe_compare_tab.py" line="894"/>
         <source>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</source>
         <translation>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="815"/>
-        <location filename="../ufe_compare_tab.py" line="907"/>
+        <location filename="../ufe_compare_tab.py" line="818"/>
+        <location filename="../ufe_compare_tab.py" line="910"/>
         <source>Proposing the sequence…</source>
         <translation>Proposing the sequence…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="630"/>
+        <location filename="../ufe_compare_tab.py" line="633"/>
         <source>{0}: {1} in the sequence ({2} placed on this frame)</source>
         <translation>{0}: {1} in the sequence ({2} placed on this frame)</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1119"/>
+        <location filename="../ufe_compare_tab.py" line="1122"/>
         <source>{0} is a known variable: it can never be a comparison.</source>
         <translation>{0} is a known variable: it can never be a comparison.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1146"/>
+        <location filename="../ufe_compare_tab.py" line="1149"/>
         <source>VSX variable</source>
         <translation>VSX variable</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1147"/>
+        <location filename="../ufe_compare_tab.py" line="1150"/>
         <source>variables cannot be comparisons</source>
         <translation>variables cannot be comparisons</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1149"/>
+        <location filename="../ufe_compare_tab.py" line="1152"/>
         <source>click: add/remove from the sequence</source>
         <translation>click: add/remove from the sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1323"/>
+        <location filename="../ufe_compare_tab.py" line="1326"/>
         <source>Proposed {0} comparisons (tweak by clicking stars).</source>
         <translation>Proposed {0} comparisons (tweak by clicking stars).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1340"/>
+        <location filename="../ufe_compare_tab.py" line="1343"/>
         <source>The field has no stars on this plate: rebuild it with «Generate field…».</source>
         <translation>The field has no stars on this plate: rebuild it with «Generate field…».</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1343"/>
+        <location filename="../ufe_compare_tab.py" line="1346"/>
         <source>No catalog star survived the field&apos;s own rules: all of them are known variables or sit too close to a neighbour.</source>
         <translation>No catalog star survived the field&apos;s own rules: all of them are known variables or sit too close to a neighbour.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1358"/>
+        <location filename="../ufe_compare_tab.py" line="1361"/>
         <source>The target&apos;s magnitude is not known, so the proposal started from %1: set it, or let the astrometry measure it.</source>
         <translation>The target&apos;s magnitude is not known, so the proposal started from %1: set it, or let the astrometry measure it.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1425"/>
+        <location filename="../ufe_compare_tab.py" line="1428"/>
         <source>measured by a run</source>
         <translation>measured by a run</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1427"/>
+        <location filename="../ufe_compare_tab.py" line="1430"/>
         <source>the planner&apos;s prediction</source>
         <translation>the planner&apos;s prediction</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1429"/>
+        <location filename="../ufe_compare_tab.py" line="1432"/>
         <source>yours</source>
         <translation>yours</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1437"/>
+        <location filename="../ufe_compare_tab.py" line="1440"/>
         <source>The target&apos;s brightness: the proposal chooses the comparison stars around it. Its origin is not recorded for this project.</source>
         <translation>The target&apos;s brightness: the proposal chooses the comparison stars around it. Its origin is not recorded for this project.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1440"/>
+        <location filename="../ufe_compare_tab.py" line="1443"/>
         <source>The target&apos;s brightness: the proposal chooses the comparison stars around it. This figure is {0}.</source>
         <translation>The target&apos;s brightness: the proposal chooses the comparison stars around it. This figure is {0}.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1641"/>
+        <location filename="../ufe_compare_tab.py" line="1644"/>
         <source>Export sequence CSV</source>
         <translation>Export sequence CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1660"/>
+        <location filename="../ufe_compare_tab.py" line="1663"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1331"/>
+        <location filename="../ufe_compare_tab.py" line="1334"/>
         <source>Left out {0} on your own plate: {1}</source>
         <translation>Left out {0} on your own plate: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1252"/>
+        <location filename="../ufe_compare_tab.py" line="1255"/>
         <source>Could not build the sequence: {0}</source>
         <translation>Could not build the sequence: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1353"/>
+        <location filename="../ufe_compare_tab.py" line="1356"/>
         <source>The sequence is the same as before.</source>
         <translation>The sequence is the same as before.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="884"/>
+        <location filename="../ufe_compare_tab.py" line="887"/>
         <source>The catalogue returned no stars inside this plate (is the pointing right?).</source>
         <translation>The catalogue returned no stars inside this plate (is the pointing right?).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1347"/>
+        <location filename="../ufe_compare_tab.py" line="1350"/>
         <source>The proposal found no usable comparison star.</source>
         <translation>The proposal found no usable comparison star.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="855"/>
+        <location filename="../ufe_compare_tab.py" line="858"/>
         <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
         <translation>{0} Your sequence of {1} stars is kept; nothing was lost.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1226"/>
+        <location filename="../ufe_compare_tab.py" line="1229"/>
         <source>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</source>
         <translation>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1236"/>
-        <location filename="../ufe_compare_tab.py" line="1272"/>
+        <location filename="../ufe_compare_tab.py" line="1239"/>
+        <location filename="../ufe_compare_tab.py" line="1275"/>
         <source>Proposing the sequence: checking the {0} catalog stars on your plate…</source>
         <translation>Proposing the sequence: checking the {0} catalog stars on your plate…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1275"/>
+        <location filename="../ufe_compare_tab.py" line="1278"/>
         <source>Checking the candidates on your plate…</source>
         <translation>Checking the candidates on your plate…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1276"/>
+        <location filename="../ufe_compare_tab.py" line="1279"/>
         <source>Comparisons</source>
         <translation>Comparisons</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1291"/>
+        <location filename="../ufe_compare_tab.py" line="1294"/>
         <source>Could not build the sequence: the plate check failed.</source>
         <translation>Could not build the sequence: the plate check failed.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1300"/>
+        <location filename="../ufe_compare_tab.py" line="1303"/>
         <source>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</source>
         <translation>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</translation>
     </message>
@@ -12384,22 +12390,22 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="591"/>
+        <location filename="../ufe_dialog.py" line="589"/>
         <source>Fit</source>
         <translation>Fit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="592"/>
+        <location filename="../ufe_dialog.py" line="590"/>
         <source>Fit the plate to the window</source>
         <translation>Fit the plate to the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="594"/>
+        <location filename="../ufe_dialog.py" line="592"/>
         <source>Zoom {0} % (1:1 at 100)</source>
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="747"/>
+        <location filename="../ufe_dialog.py" line="745"/>
         <source>Calibration</source>
         <translation>Calibration</translation>
     </message>
@@ -12408,75 +12414,75 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Track &amp;&amp; Stack</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1856"/>
+        <location filename="../ufe_dialog.py" line="1854"/>
         <source>Frame {0}/{1}</source>
         <translation>Frame {0}/{1}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1857"/>
+        <location filename="../ufe_dialog.py" line="1855"/>
         <location filename="../ui/ufe_visit_panel.ui" line="23"/>
         <source>Frame</source>
         <translation>Frame</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1858"/>
+        <location filename="../ufe_dialog.py" line="1856"/>
         <source>No visit frames</source>
         <translation>No visit frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1906"/>
-        <location filename="../ufe_dialog.py" line="2006"/>
+        <location filename="../ufe_dialog.py" line="1904"/>
+        <location filename="../ufe_dialog.py" line="2004"/>
         <source>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</source>
         <translation>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1998"/>
+        <location filename="../ufe_dialog.py" line="1996"/>
         <source>This editor was not opened from a visit: there are no frames to solve.</source>
         <translation>This editor was not opened from a visit: there are no frames to solve.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2013"/>
+        <location filename="../ufe_dialog.py" line="2011"/>
         <source>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</source>
         <translation>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2017"/>
+        <location filename="../ufe_dialog.py" line="2015"/>
         <source>Solving the visit&apos;s {0} frames…</source>
         <translation>Solving the visit&apos;s {0} frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2034"/>
-        <location filename="../ufe_dialog.py" line="2073"/>
+        <location filename="../ufe_dialog.py" line="2032"/>
+        <location filename="../ufe_dialog.py" line="2071"/>
         <source>Solving the visit…</source>
         <translation>Solving the visit…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2070"/>
+        <location filename="../ufe_dialog.py" line="2068"/>
         <source>Solving frame {0} of {1}: {2}</source>
         <translation>Solving frame {0} of {1}: {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2087"/>
+        <location filename="../ufe_dialog.py" line="2085"/>
         <source>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</source>
         <translation>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2092"/>
+        <location filename="../ufe_dialog.py" line="2090"/>
         <source>Visit solved: {0} frames solved, {1} already had a WCS</source>
         <translation>Visit solved: {0} frames solved, {1} already had a WCS</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2096"/>
+        <location filename="../ufe_dialog.py" line="2094"/>
         <source>, {0} failed ({1})</source>
         <translation>, {0} failed ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2099"/>
+        <location filename="../ufe_dialog.py" line="2097"/>
         <source>, {0} could not be written into the file</source>
         <translation>, {0} could not be written into the file</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2113"/>
+        <location filename="../ufe_dialog.py" line="2111"/>
         <source>The visit could not be solved: {0}</source>
         <translation>The visit could not be solved: {0}</translation>
     </message>
@@ -12485,7 +12491,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Uses the open frame and the sequence above.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2214"/>
+        <location filename="../ufe_dialog.py" line="2212"/>
         <source>Build the comparison sequence first (Photometry, «Build the sequence…»).</source>
         <translation>Build the comparison sequence first (Photometry, «Build the sequence…»).</translation>
     </message>
@@ -12496,53 +12502,53 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Solving the plate…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2035"/>
+        <location filename="../ufe_dialog.py" line="2033"/>
         <location filename="../ufe_dialog.py" line="2853"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="730"/>
+        <location filename="../ufe_dialog.py" line="728"/>
         <source>Astrometry</source>
         <translation>Astrometry</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="777"/>
+        <location filename="../ufe_dialog.py" line="775"/>
         <source>Photometric series</source>
         <translation>Photometric series</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1350"/>
+        <location filename="../ufe_dialog.py" line="1348"/>
         <source>The photometric series needs a visit with frames: open the editor from a visit and this measures its frames as one series</source>
         <translation>The photometric series needs a visit with frames: open the editor from a visit and this measures its frames as one series</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1729"/>
+        <location filename="../ufe_dialog.py" line="1727"/>
         <source>No frames</source>
         <translation>No frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1731"/>
+        <location filename="../ufe_dialog.py" line="1729"/>
         <source>%1 frames</source>
         <translation>%1 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1733"/>
+        <location filename="../ufe_dialog.py" line="1731"/>
         <source>%1 with problems</source>
         <translation>%1 with problems</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1749"/>
+        <location filename="../ufe_dialog.py" line="1747"/>
         <source>Taken out of the visit</source>
         <translation>Taken out of the visit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1759"/>
+        <location filename="../ufe_dialog.py" line="1757"/>
         <source>Move the frames aside</source>
         <translation>Move the frames aside</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1760"/>
+        <location filename="../ufe_dialog.py" line="1758"/>
         <source>Move %1 frame(s) into the project&apos;s discarded/ folder?
 
 Nothing is deleted: the files move, the registry follows them, and they can be brought back.</source>
@@ -12551,22 +12557,22 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
 Nothing is deleted: the files move, the registry follows them, and they can be brought back.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1768"/>
+        <location filename="../ufe_dialog.py" line="1766"/>
         <source>Moved aside</source>
         <translation>Moved aside</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1780"/>
+        <location filename="../ufe_dialog.py" line="1778"/>
         <source>This window has no project to change.</source>
         <translation>This window has no project to change.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1965"/>
+        <location filename="../ufe_dialog.py" line="1963"/>
         <source>The AI is off: turn it on in Settings → Integrations.</source>
         <translation>The AI is off: turn it on in Settings → Integrations.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2212"/>
+        <location filename="../ufe_dialog.py" line="2210"/>
         <source>Uses the open frame and the comparison sequence of this series.</source>
         <translation>Uses the open frame and the comparison sequence of this series.</translation>
     </message>
@@ -12641,13 +12647,13 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="744"/>
+        <location filename="../ufe_dialog.py" line="742"/>
         <location filename="../ui/ufe_dialog.ui" line="50"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="751"/>
+        <location filename="../ufe_dialog.py" line="749"/>
         <location filename="../ui/ufe_dialog.ui" line="52"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
@@ -12663,15 +12669,15 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="986"/>
+        <location filename="../ufe_dialog.py" line="984"/>
         <location filename="../ufe_dialog.py" line="2665"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="190"/>
-        <location filename="../ufe_dialog.py" line="985"/>
-        <location filename="../ufe_dialog.py" line="2036"/>
+        <location filename="../ufe_dialog.py" line="186"/>
+        <location filename="../ufe_dialog.py" line="983"/>
+        <location filename="../ufe_dialog.py" line="2034"/>
         <location filename="../ufe_dialog.py" line="2642"/>
         <location filename="../ufe_dialog.py" line="2664"/>
         <location filename="../ufe_dialog.py" line="2831"/>
@@ -12683,7 +12689,7 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="715"/>
+        <location filename="../ufe_dialog.py" line="713"/>
         <source>Photometry</source>
         <translation>Photometry</translation>
     </message>
@@ -12827,7 +12833,7 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="278"/>
+        <location filename="../ufe_dialog.py" line="274"/>
         <source>Histogram</source>
         <translation>Histogram</translation>
     </message>
@@ -13306,22 +13312,22 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="870"/>
+        <location filename="../ufe_measure_tab.py" line="873"/>
         <source>Nothing to save yet: measure a point first.</source>
         <translation>Nothing to save yet: measure a point first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="876"/>
+        <location filename="../ufe_measure_tab.py" line="879"/>
         <source>This plate has no observation date in its header: the point cannot be dated, so it cannot be saved.</source>
         <translation>This plate has no observation date in its header: the point cannot be dated, so it cannot be saved.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="893"/>
+        <location filename="../ufe_measure_tab.py" line="896"/>
         <source>Could not save the point in the project.</source>
         <translation>Could not save the point in the project.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="896"/>
+        <location filename="../ufe_measure_tab.py" line="899"/>
         <source>Point saved in the project: it is on the light curve and counts for the campaign summary.</source>
         <translation>Point saved in the project: it is on the light curve and counts for the campaign summary.</translation>
     </message>
@@ -13340,133 +13346,133 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1030"/>
-        <location filename="../ufe_measure_tab.py" line="1860"/>
+        <location filename="../ufe_measure_tab.py" line="1033"/>
+        <location filename="../ufe_measure_tab.py" line="1868"/>
         <source>No comparison sequence yet: build one above with «Build the sequence…».</source>
         <translation>No comparison sequence yet: build one above with «Build the sequence…».</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1222"/>
+        <location filename="../ufe_measure_tab.py" line="1225"/>
         <source>Measure the target first (a click on it).</source>
         <translation>Measure the target first (a click on it).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3191"/>
+        <location filename="../ufe_measure_tab.py" line="3199"/>
         <source>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</source>
         <translation>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3193"/>
+        <location filename="../ufe_measure_tab.py" line="3201"/>
         <source>Instrumental mag: {0:.3f}</source>
         <translation>Instrumental mag: {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3197"/>
+        <location filename="../ufe_measure_tab.py" line="3205"/>
         <source>No comparison star could be used: no calibration.</source>
         <translation>No comparison star could be used: no calibration.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3200"/>
+        <location filename="../ufe_measure_tab.py" line="3208"/>
         <source>Why: {0} (of {1} sequence stars).</source>
         <translation>Why: {0} (of {1} sequence stars).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3204"/>
+        <location filename="../ufe_measure_tab.py" line="3212"/>
         <source>The proposed comps are too bright for this plate: re-propose with a fainter target magnitude, or check the saturation ceiling.</source>
         <translation>The proposed comps are too bright for this plate: re-propose with a fainter target magnitude, or check the saturation ceiling.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3209"/>
+        <location filename="../ufe_measure_tab.py" line="3217"/>
         <source>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</source>
         <translation>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3214"/>
+        <location filename="../ufe_measure_tab.py" line="3222"/>
         <source>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</source>
         <translation>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3225"/>
+        <location filename="../ufe_measure_tab.py" line="3233"/>
         <source>± {0:.3f}</source>
         <translation>± {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3227"/>
+        <location filename="../ufe_measure_tab.py" line="3235"/>
         <source>Magnitude: {0:.3f} {1} ({2})</source>
         <translation>Magnitude: {0:.3f} {1} ({2})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3246"/>
+        <location filename="../ufe_measure_tab.py" line="3254"/>
         <source>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</source>
         <translation>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3249"/>
+        <location filename="../ufe_measure_tab.py" line="3257"/>
         <source> · Δ {0:+.2f}</source>
         <translation> · Δ {0:+.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3256"/>
+        <location filename="../ufe_measure_tab.py" line="3264"/>
         <source>No catalogued source within 8″ of the target (a new object?)</source>
         <translation>No catalogued source within 8″ of the target (a new object?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3270"/>
+        <location filename="../ufe_measure_tab.py" line="3278"/>
         <source>the centroid landed {0:.1f} px from the click</source>
         <translation>the centroid landed {0:.1f} px from the click</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3274"/>
+        <location filename="../ufe_measure_tab.py" line="3282"/>
         <source>no source could be locked: measured where you clicked</source>
         <translation>no source could be locked: measured where you clicked</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3277"/>
+        <location filename="../ufe_measure_tab.py" line="3285"/>
         <source>The sequence carries no Johnson V: calibrating in catalog {0} (for red stars it can differ from V by more than 1 mag)</source>
         <translation>The sequence carries no Johnson V: calibrating in catalog {0} (for red stars it can differ from V by more than 1 mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3283"/>
+        <location filename="../ufe_measure_tab.py" line="3291"/>
         <source>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</source>
         <translation>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3287"/>
+        <location filename="../ufe_measure_tab.py" line="3295"/>
         <source>apertures set by hand (the seeing auto-scale is paused)</source>
         <translation>apertures set by hand (the seeing auto-scale is paused)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3176"/>
+        <location filename="../ufe_measure_tab.py" line="3184"/>
         <source>{0} saturated/clipped</source>
         <translation>{0} saturated/clipped</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="828"/>
+        <location filename="../ufe_measure_tab.py" line="831"/>
         <source>Load a plate first: there is no state to reset.</source>
         <translation>Load a plate first: there is no state to reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="831"/>
+        <location filename="../ufe_measure_tab.py" line="834"/>
         <source>Plate state reset.</source>
         <translation>Plate state reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="834"/>
+        <location filename="../ufe_measure_tab.py" line="837"/>
         <source>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</source>
         <translation>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="845"/>
+        <location filename="../ufe_measure_tab.py" line="848"/>
         <source>Load a plate first: there are no plate points to reset.</source>
         <translation>Load a plate first: there are no plate points to reset.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="848"/>
+        <location filename="../ufe_measure_tab.py" line="851"/>
         <source>Reset the points of this plate</source>
         <translation>Reset the points of this plate</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="850"/>
+        <location filename="../ufe_measure_tab.py" line="853"/>
         <source>Delete every measurement point saved on this plate?
 They leave the light curve; the CSV files on disk are
 not touched.</source>
@@ -13475,12 +13481,12 @@ They leave the light curve; the CSV files on disk are
 not touched.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="858"/>
+        <location filename="../ufe_measure_tab.py" line="861"/>
         <source>The plate&apos;s measurement points were deleted.</source>
         <translation>The plate&apos;s measurement points were deleted.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="861"/>
+        <location filename="../ufe_measure_tab.py" line="864"/>
         <source>No measurement points saved on this plate.</source>
         <translation>No measurement points saved on this plate.</translation>
     </message>
@@ -13493,42 +13499,42 @@ not touched.</translation>
         <translation type="vanished">This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="989"/>
+        <location filename="../ufe_measure_tab.py" line="992"/>
         <source>The plate has no WCS and it could not be solved: the comparison stars cannot be located.</source>
         <translation>The plate has no WCS and it could not be solved: the comparison stars cannot be located.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="996"/>
+        <location filename="../ufe_measure_tab.py" line="999"/>
         <source>The plate has no WCS and it could not be solved: no aligned reference.</source>
         <translation>The plate has no WCS and it could not be solved: no aligned reference.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1017"/>
+        <location filename="../ufe_measure_tab.py" line="1020"/>
         <source>The plate has no WCS: solving it to locate the comparison stars…</source>
         <translation>The plate has no WCS: solving it to locate the comparison stars…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1379"/>
+        <location filename="../ufe_measure_tab.py" line="1382"/>
         <source>override: {0} ADU</source>
         <translation>override: {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1384"/>
+        <location filename="../ufe_measure_tab.py" line="1387"/>
         <source>SATURATE/ccd_saturate {0} ADU</source>
         <translation>SATURATE/ccd_saturate {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1388"/>
+        <location filename="../ufe_measure_tab.py" line="1391"/>
         <source>camera linearity {0} ADU</source>
         <translation>camera linearity {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1389"/>
+        <location filename="../ufe_measure_tab.py" line="1392"/>
         <source>auto: {0}</source>
         <translation>auto: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1390"/>
+        <location filename="../ufe_measure_tab.py" line="1393"/>
         <source>auto: no ceiling known (plateau only)</source>
         <translation>auto: no ceiling known (plateau only)</translation>
     </message>
@@ -13561,293 +13567,293 @@ not touched.</translation>
         <translation type="vanished">Measured on your own frames: {0}. It is remembered for this camera, so a single image reuses it.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1505"/>
+        <location filename="../ufe_measure_tab.py" line="1508"/>
         <source>The comparison stars are read on the star stack of these same frames: on this plate they are trails.</source>
         <translation>The comparison stars are read on the star stack of these same frames: on this plate they are trails.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1675"/>
+        <location filename="../ufe_measure_tab.py" line="1683"/>
         <source>This project has one visit with frames, so there is nothing to choose yet: measure the next night and this becomes a choice between this visit and every visit of the project.</source>
         <translation>This project has one visit with frames, so there is nothing to choose yet: measure the next night and this becomes a choice between this visit and every visit of the project.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1698"/>
+        <location filename="../ufe_measure_tab.py" line="1706"/>
         <source>All the visits: {0} night(s), {1} frames. One pass, one run per night; the chart shows the project&apos;s curve.</source>
         <translation>All the visits: {0} night(s), {1} frames. One pass, one run per night; the chart shows the project&apos;s curve.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1703"/>
+        <location filename="../ufe_measure_tab.py" line="1711"/>
         <source>This visit: {0} frame(s).</source>
         <translation>This visit: {0} frame(s).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1722"/>
+        <location filename="../ufe_measure_tab.py" line="1730"/>
         <source>Live mode watches the folder of ONE visit (tonight&apos;s). With «all the visits» the frames come from every night, so live mode is off: choose «this visit» to watch tonight.</source>
         <translation>Live mode watches the folder of ONE visit (tonight&apos;s). With «all the visits» the frames come from every night, so live mode is off: choose «this visit» to watch tonight.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1732"/>
+        <location filename="../ufe_measure_tab.py" line="1740"/>
         <source>Discarding is per visit: open the visit whose curve you want to undo. With «all the visits» in scope there is no single night to undo.</source>
         <translation>Discarding is per visit: open the visit whose curve you want to undo. With «all the visits» in scope there is no single night to undo.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1820"/>
+        <location filename="../ufe_measure_tab.py" line="1828"/>
         <source>Frames: {0}</source>
         <translation>Frames: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1822"/>
+        <location filename="../ufe_measure_tab.py" line="1830"/>
         <source>Frames: {0} · points: {1}</source>
         <translation>Frames: {0} · points: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1827"/>
+        <location filename="../ufe_measure_tab.py" line="1835"/>
         <source>group {0} · cadence from the frames</source>
         <translation>group {0} · cadence from the frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1834"/>
+        <location filename="../ufe_measure_tab.py" line="1842"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1848"/>
+        <location filename="../ufe_measure_tab.py" line="1856"/>
         <source>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</source>
         <translation>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1854"/>
+        <location filename="../ufe_measure_tab.py" line="1862"/>
         <source>No visit with frames: open the editor from a visit to measure a series.</source>
         <translation>No visit with frames: open the editor from a visit to measure a series.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1866"/>
+        <location filename="../ufe_measure_tab.py" line="1874"/>
         <source>The plate has no WCS: solving it to place the series…</source>
         <translation>The plate has no WCS: solving it to place the series…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1872"/>
-        <location filename="../ufe_measure_tab.py" line="1876"/>
+        <location filename="../ufe_measure_tab.py" line="1880"/>
+        <location filename="../ufe_measure_tab.py" line="1884"/>
         <source>The plate has no WCS and it could not be solved: the series cannot be placed.</source>
         <translation>The plate has no WCS and it could not be solved: the series cannot be placed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1882"/>
+        <location filename="../ufe_measure_tab.py" line="1890"/>
         <source>Measure the target once (a click on it) so the series knows where to measure.</source>
         <translation>Measure the target once (a click on it) so the series knows where to measure.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1899"/>
+        <location filename="../ufe_measure_tab.py" line="1907"/>
         <source>Measuring the series…</source>
         <translation>Measuring the series…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2070"/>
+        <location filename="../ufe_measure_tab.py" line="2078"/>
         <source>These points carry neither the airmass nor the measured position (they were measured before the app stored them): measure the series again to have the night figures.</source>
         <translation>These points carry neither the airmass nor the measured position (they were measured before the app stored them): measure the series again to have the night figures.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2110"/>
+        <location filename="../ufe_measure_tab.py" line="2118"/>
         <source>The airmass figure is missing: these points do not carry it.</source>
         <translation>The airmass figure is missing: these points do not carry it.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2114"/>
+        <location filename="../ufe_measure_tab.py" line="2122"/>
         <source>The drift figure is missing: these points do not carry the measured position.</source>
         <translation>The drift figure is missing: these points do not carry the measured position.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2335"/>
+        <location filename="../ufe_measure_tab.py" line="2343"/>
         <source>This chart does not belong to a visit: there are no passes to choose from.</source>
         <translation>This chart does not belong to a visit: there are no passes to choose from.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2353"/>
+        <location filename="../ufe_measure_tab.py" line="2361"/>
         <source>Could not show that pass: {0}</source>
         <translation>Could not show that pass: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2368"/>
+        <location filename="../ufe_measure_tab.py" line="2376"/>
         <source>Pass undone: {0} points removed.</source>
         <translation>Pass undone: {0} points removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2411"/>
+        <location filename="../ufe_measure_tab.py" line="2419"/>
         <source>This chart is the WHOLE PROJECT: {0} points of every night (one pass per night). Choose «this visit» above to see the night you have open.</source>
         <translation>This chart is the WHOLE PROJECT: {0} points of every night (one pass per night). Choose «this visit» above to see the night you have open.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2422"/>
+        <location filename="../ufe_measure_tab.py" line="2430"/>
         <source>This visit&apos;s curve: {0} points, the pass the visit shows (nothing was read from the frames). The visit also holds {1} earlier pass(es) ({2} points) that are not drawn: choose another one in Series ▾ → Passes of this visit…</source>
         <translation>This visit&apos;s curve: {0} points, the pass the visit shows (nothing was read from the frames). The visit also holds {1} earlier pass(es) ({2} points) that are not drawn: choose another one in Series ▾ → Passes of this visit…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2608"/>
+        <location filename="../ufe_measure_tab.py" line="2616"/>
         <source>Series cancelled: it stays “incomplete”; the points measured so far are kept.</source>
         <translation>Series cancelled: it stays “incomplete”; the points measured so far are kept.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2670"/>
+        <location filename="../ufe_measure_tab.py" line="2678"/>
         <source>Series: {0} points from {1} frames</source>
         <translation>Series: {0} points from {1} frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2678"/>
+        <location filename="../ufe_measure_tab.py" line="2686"/>
         <source>Flagged points: {0} ({1})</source>
         <translation>Flagged points: {0} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2703"/>
+        <location filename="../ufe_measure_tab.py" line="2711"/>
         <source>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</source>
         <translation>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2709"/>
+        <location filename="../ufe_measure_tab.py" line="2717"/>
         <source>Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</source>
         <translation>Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2737"/>
+        <location filename="../ufe_measure_tab.py" line="2745"/>
         <source>Cadence too short for the transit ingress</source>
         <translation>Cadence too short for the transit ingress</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2912"/>
+        <location filename="../ufe_measure_tab.py" line="2920"/>
         <source>Measure the series first.</source>
         <translation>Measure the series first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2933"/>
+        <location filename="../ufe_measure_tab.py" line="2941"/>
         <source>ExoClock submission</source>
         <translation>ExoClock submission</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2941"/>
+        <location filename="../ufe_measure_tab.py" line="2949"/>
         <source>NightScribe series: {0} points, group {1}, detrend {2}</source>
         <translation>NightScribe series: {0} points, group {1}, detrend {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2970"/>
+        <location filename="../ufe_measure_tab.py" line="2978"/>
         <source>ExoClock files written. Upload them at exoclock.space</source>
         <translation>ExoClock files written. Upload them at exoclock.space</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2995"/>
+        <location filename="../ufe_measure_tab.py" line="3003"/>
         <source>Run undone: {0} points removed.</source>
         <translation>Run undone: {0} points removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3017"/>
+        <location filename="../ufe_measure_tab.py" line="3025"/>
         <source>Live mode off.</source>
         <translation>Live mode off.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3024"/>
+        <location filename="../ufe_measure_tab.py" line="3032"/>
         <source>Live mode needs a visit with frames, a sequence and a measured target.</source>
         <translation>Live mode needs a visit with frames, a sequence and a measured target.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3060"/>
+        <location filename="../ufe_measure_tab.py" line="3068"/>
         <source>Live mode on: watching the visit folder…</source>
         <translation>Live mode on: watching the visit folder…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3158"/>
+        <location filename="../ufe_measure_tab.py" line="3166"/>
         <source>Advanced defaults restored.</source>
         <translation>Advanced defaults restored.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3179"/>
+        <location filename="../ufe_measure_tab.py" line="3187"/>
         <source>{0} above your camera&apos;s linearity limit</source>
         <translation>{0} above your camera&apos;s linearity limit</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3182"/>
+        <location filename="../ufe_measure_tab.py" line="3190"/>
         <source>{0} off the plate</source>
         <translation>{0} off the plate</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3185"/>
+        <location filename="../ufe_measure_tab.py" line="3193"/>
         <source>{0} without the {1} band</source>
         <translation>{0} without the {1} band</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3188"/>
+        <location filename="../ufe_measure_tab.py" line="3196"/>
         <source>{0} not measurable</source>
         <translation>{0} not measurable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3263"/>
+        <location filename="../ufe_measure_tab.py" line="3271"/>
         <source>manual centre: measured exactly where you placed it (no centroid)</source>
         <translation>manual centre: measured exactly where you placed it (no centroid)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3292"/>
+        <location filename="../ufe_measure_tab.py" line="3300"/>
         <source>{0} of {1} sequence stars not usable: {2}</source>
         <translation>{0} of {1} sequence stars not usable: {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3296"/>
+        <location filename="../ufe_measure_tab.py" line="3304"/>
         <source>⚠ comps at the plate&apos;s clipping level: a zero point built on compressed cores lies LOW (faint targets read too bright). Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps at the plate&apos;s clipping level: a zero point built on compressed cores lies LOW (faint targets read too bright). Propose fainter comps or shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3304"/>
+        <location filename="../ufe_measure_tab.py" line="3312"/>
         <source>⚠ comps above your camera&apos;s linearity limit (≈{0:.0f} ADU, per gain): their flux is not proportional, so they calibrate nothing. Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps above your camera&apos;s linearity limit (≈{0:.0f} ADU, per gain): their flux is not proportional, so they calibrate nothing. Propose fainter comps or shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3318"/>
+        <location filename="../ufe_measure_tab.py" line="3326"/>
         <source>Colour term not fitted (too few comps or too little colour spread): plain zero point</source>
         <translation>Colour term not fitted (too few comps or too little colour spread): plain zero point</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3321"/>
+        <location filename="../ufe_measure_tab.py" line="3329"/>
         <source>assumed</source>
         <translation>assumed</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3322"/>
+        <location filename="../ufe_measure_tab.py" line="3330"/>
         <source>from the field star</source>
         <translation>from the field star</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3323"/>
+        <location filename="../ufe_measure_tab.py" line="3331"/>
         <source>from the project</source>
         <translation>from the project</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3324"/>
+        <location filename="../ufe_measure_tab.py" line="3332"/>
         <source>by hand</source>
         <translation>by hand</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3327"/>
+        <location filename="../ufe_measure_tab.py" line="3335"/>
         <source>Colour term applied with target B−V = {0:.2f} ({1})</source>
         <translation>Colour term applied with target B−V = {0:.2f} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3333"/>
+        <location filename="../ufe_measure_tab.py" line="3341"/>
         <source>⚠ B−V assumed: with k = {0:+.2f}, a red star (B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; enter its real B−V</source>
         <translation>⚠ B−V assumed: with k = {0:+.2f}, a red star (B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; enter its real B−V</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3338"/>
+        <location filename="../ufe_measure_tab.py" line="3346"/>
         <source>No gain anywhere (settings, your own frames or the header): the photon noise is not in the error</source>
         <translation>No gain anywhere (settings, your own frames or the header): the photon noise is not in the error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3344"/>
+        <location filename="../ufe_measure_tab.py" line="3352"/>
         <source>Gain {0} e-/ADU ({1})</source>
         <translation>Gain {0} e-/ADU ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3408"/>
+        <location filename="../ufe_measure_tab.py" line="3416"/>
         <source>new</source>
         <translation>new</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3470"/>
+        <location filename="../ufe_measure_tab.py" line="3478"/>
         <source>The plate has no WCS: solving it for the aligned reference…</source>
         <translation>The plate has no WCS: solving it for the aligned reference…</translation>
     </message>
@@ -13856,82 +13862,82 @@ not touched.</translation>
         <translation type="vanished">No gain in the header or settings: the photon noise is not in the error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3354"/>
+        <location filename="../ufe_measure_tab.py" line="3362"/>
         <source>Scintillation included ({0:.3f} mag)</source>
         <translation>Scintillation included ({0:.3f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3358"/>
+        <location filename="../ufe_measure_tab.py" line="3366"/>
         <source>Host galaxy subtracted (PS1 reference aligned on the frame&apos;s stars and scaled by the comps)</source>
         <translation>Host galaxy subtracted (PS1 reference aligned on the frame&apos;s stars and scaled by the comps)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3366"/>
+        <location filename="../ufe_measure_tab.py" line="3374"/>
         <source>⚠ Reference alignment uncertain ({0} stars, {1:.1f} px): the subtraction may leave star residuals</source>
         <translation>⚠ Reference alignment uncertain ({0} stars, {1:.1f} px): the subtraction may leave star residuals</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3371"/>
+        <location filename="../ufe_measure_tab.py" line="3379"/>
         <source>⚠ Reference alignment uncertain: the subtraction may leave star residuals</source>
         <translation>⚠ Reference alignment uncertain: the subtraction may leave star residuals</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3375"/>
+        <location filename="../ufe_measure_tab.py" line="3383"/>
         <source>Error: {0:.3f} internal · {1:.3f} total</source>
         <translation>Error: {0:.3f} internal · {1:.3f} total</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3381"/>
+        <location filename="../ufe_measure_tab.py" line="3389"/>
         <source>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</source>
         <translation>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3387"/>
+        <location filename="../ufe_measure_tab.py" line="3395"/>
         <source>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</source>
         <translation>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3483"/>
+        <location filename="../ufe_measure_tab.py" line="3491"/>
         <source>Fetching the reference and subtracting…</source>
         <translation>Fetching the reference and subtracting…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3510"/>
+        <location filename="../ufe_measure_tab.py" line="3518"/>
         <source>The subtraction found no usable comparison star to scale the reference.</source>
         <translation>The subtraction found no usable comparison star to scale the reference.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3526"/>
+        <location filename="../ufe_measure_tab.py" line="3534"/>
         <source>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</source>
         <translation>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3311"/>
+        <location filename="../ufe_measure_tab.py" line="3319"/>
         <source>Few comparisons: the scatter dominates the error</source>
         <translation>Few comparisons: the scatter dominates the error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3314"/>
+        <location filename="../ufe_measure_tab.py" line="3322"/>
         <source>Band {0} estimated from Gaia (Riello 2021)</source>
         <translation>Band {0} estimated from Gaia (Riello 2021)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3645"/>
+        <location filename="../ufe_measure_tab.py" line="3653"/>
         <source>Export measurement</source>
         <translation>Export measurement</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3655"/>
+        <location filename="../ufe_measure_tab.py" line="3663"/>
         <source>Export measurement (AAVSO EFF)</source>
         <translation>Export measurement (AAVSO EFF)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3679"/>
+        <location filename="../ufe_measure_tab.py" line="3687"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2688"/>
+        <location filename="../ufe_measure_tab.py" line="2696"/>
         <source>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</source>
         <translation>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</translation>
     </message>
@@ -13966,102 +13972,102 @@ not touched.</translation>
         <translation>The ephemeris&apos; predicted magnitude for this instant, labelled (eph). Use it when the measurement is not worth reporting (a zero point resting on too few comparisons, a trailed object): the measurement is kept in the run, only the band changes.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="617"/>
+        <location filename="../ufe_measure_tab.py" line="620"/>
         <source>matched filter</source>
         <translation>matched filter</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="619"/>
+        <location filename="../ufe_measure_tab.py" line="622"/>
         <source>aperture</source>
         <translation>aperture</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="787"/>
+        <location filename="../ufe_measure_tab.py" line="790"/>
         <source>The report will use this measurement: %1 %2</source>
         <translation>The report will use this measurement: %1 %2</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="791"/>
+        <location filename="../ufe_measure_tab.py" line="794"/>
         <source>The measurement could not be written to the observation.</source>
         <translation>The measurement could not be written to the observation.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="963"/>
+        <location filename="../ufe_measure_tab.py" line="966"/>
         <source>This plate is an object&apos;s track &amp; stack: its stars are TRAILS, so the comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux). The brightness is measured in the Astrometry tab, which reads the comps on a second stack aligned on the stars. Here you can still adjust the RECIPE that tab uses: the apertures, the sky and the centroid.</source>
         <translation>This plate is an object&apos;s track &amp; stack: its stars are TRAILS, so the comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux). The brightness is measured in the Astrometry tab, which reads the comps on a second stack aligned on the stars. Here you can still adjust the RECIPE that tab uses: the apertures, the sky and the centroid.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="972"/>
+        <location filename="../ufe_measure_tab.py" line="975"/>
         <source>This plate is the WHOLE-SEQUENCE stack of a track &amp; stack: every frame combined with the object frozen, so the object is as deep as the visit goes and the stars are trails. The comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux): the brightness is measured in the Astrometry tab, on the observations&apos; own stacks.</source>
         <translation>This plate is the WHOLE-SEQUENCE stack of a track &amp; stack: every frame combined with the object frozen, so the object is as deep as the visit goes and the stars are trails. The comparison stars cannot set a zero point here (a streak read with a circular aperture is not a flux): the brightness is measured in the Astrometry tab, on the observations&apos; own stacks.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="980"/>
+        <location filename="../ufe_measure_tab.py" line="983"/>
         <source>This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there. Here you can still adjust the RECIPE the Astrometry tab uses.</source>
         <translation>This plate is the STAR stack of a track &amp; stack: the comps are points here, but the OBJECT is a trail, so it cannot be measured on this plate. Open the object&apos;s stack and measure there. Here you can still adjust the RECIPE the Astrometry tab uses.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2694"/>
+        <location filename="../ufe_measure_tab.py" line="2702"/>
         <source>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</source>
         <translation>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2746"/>
+        <location filename="../ufe_measure_tab.py" line="2754"/>
         <source>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</source>
         <translation>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2751"/>
+        <location filename="../ufe_measure_tab.py" line="2759"/>
         <source>{0} frame(s) could not be read: they are not on the curve</source>
         <translation>{0} frame(s) could not be read: they are not on the curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2755"/>
+        <location filename="../ufe_measure_tab.py" line="2763"/>
         <source>Frame {0} could not be read: {1}</source>
         <translation>Frame {0} could not be read: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2772"/>
+        <location filename="../ufe_measure_tab.py" line="2780"/>
         <source>the file is empty</source>
         <translation>the file is empty</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2774"/>
+        <location filename="../ufe_measure_tab.py" line="2782"/>
         <source>the file is truncated (was it still being written?)</source>
         <translation>the file is truncated (was it still being written?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2777"/>
+        <location filename="../ufe_measure_tab.py" line="2785"/>
         <source>the file has no image</source>
         <translation>the file has no image</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2779"/>
+        <location filename="../ufe_measure_tab.py" line="2787"/>
         <source>the pixel format is not supported</source>
         <translation>the pixel format is not supported</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2781"/>
+        <location filename="../ufe_measure_tab.py" line="2789"/>
         <source>the file could not be read</source>
         <translation>the file could not be read</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2967"/>
+        <location filename="../ufe_measure_tab.py" line="2975"/>
         <source>The ExoClock files could not be written: {0}</source>
         <translation>The ExoClock files could not be written: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3105"/>
+        <location filename="../ufe_measure_tab.py" line="3113"/>
         <source>Live: {0} new frame(s) in the folder</source>
         <translation>Live: {0} new frame(s) in the folder</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3107"/>
+        <location filename="../ufe_measure_tab.py" line="3115"/>
         <source>Live mode stopped.</source>
         <translation>Live mode stopped.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3116"/>
+        <location filename="../ufe_measure_tab.py" line="3124"/>
         <source>Live batch lost: {0} frame(s) were not measured ({1})</source>
         <translation>Live batch lost: {0} frame(s) were not measured ({1})</translation>
     </message>
@@ -14076,7 +14082,7 @@ not touched.</translation>
         <translation>Search the project&apos;s curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2134"/>
+        <location filename="../ufe_measure_tab.py" line="2142"/>
         <source>The period search works on a project&apos;s curve: open the editor from a project to reach it.</source>
         <translation>The period search works on a project&apos;s curve: open the editor from a project to reach it.</translation>
     </message>
@@ -14096,52 +14102,52 @@ not touched.</translation>
         <translation>Every N minutes</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2151"/>
+        <location filename="../ufe_measure_tab.py" line="2159"/>
         <source>The fixed range is empty or inverted: the faintest magnitude must be larger than the brightest.</source>
         <translation>The fixed range is empty or inverted: the faintest magnitude must be larger than the brightest.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2203"/>
+        <location filename="../ufe_measure_tab.py" line="2211"/>
         <source>No outlier is marked: switch the detector on first.</source>
         <translation>No outlier is marked: switch the detector on first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2213"/>
+        <location filename="../ufe_measure_tab.py" line="2221"/>
         <source>No point selected: click one on the chart first.</source>
         <translation>No point selected: click one on the chart first.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2594"/>
+        <location filename="../ufe_measure_tab.py" line="2602"/>
         <source>{0} selected · {1} excluded · {2} marked</source>
         <translation>{0} selected · {1} excluded · {2} marked</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1936"/>
+        <location filename="../ufe_measure_tab.py" line="1944"/>
         <source>PNG image (*.png)</source>
         <translation>PNG image (*.png)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1924"/>
+        <location filename="../ufe_measure_tab.py" line="1932"/>
         <source>Measure the series first: the figure is the curve.</source>
         <translation>Measure the series first: the figure is the curve.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1974"/>
+        <location filename="../ufe_measure_tab.py" line="1982"/>
         <source>{0} frames</source>
         <translation>{0} frames</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1976"/>
+        <location filename="../ufe_measure_tab.py" line="1984"/>
         <source>{0:g} s</source>
         <translation>{0:g} s</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1979"/>
+        <location filename="../ufe_measure_tab.py" line="1987"/>
         <source>band {0}</source>
         <translation>band {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1980"/>
+        <location filename="../ufe_measure_tab.py" line="1988"/>
         <source>NightScribe</source>
         <translation>NightScribe</translation>
     </message>
@@ -14156,22 +14162,22 @@ not touched.</translation>
         <translation>Write the two figures that explain the night: the airmass of every point (a curve that fades and comes back is often the sky) and the position of the target (with the alignment on, this is the guide residual: the frame that jumped shows as a spike). Both are scientific figures, ready for the report</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2055"/>
+        <location filename="../ufe_measure_tab.py" line="2063"/>
         <source>Measure the series first: the figures are its night.</source>
         <translation>Measure the series first: the figures are its night.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2103"/>
+        <location filename="../ufe_measure_tab.py" line="2111"/>
         <source>Could not write the night figures: {0}</source>
         <translation>Could not write the night figures: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2106"/>
+        <location filename="../ufe_measure_tab.py" line="2114"/>
         <source>Night figures written: {0}</source>
         <translation>Night figures written: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2119"/>
+        <location filename="../ufe_measure_tab.py" line="2127"/>
         <source>Night conditions</source>
         <translation>Night conditions</translation>
     </message>
@@ -14186,32 +14192,32 @@ not touched.</translation>
         <translation>Δ magnitude (differential)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2865"/>
+        <location filename="../ufe_measure_tab.py" line="2873"/>
         <source>Fixed magnitude range cleared: the axis changed what it measures.</source>
         <translation>Fixed magnitude range cleared: the axis changed what it measures.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1933"/>
+        <location filename="../ufe_measure_tab.py" line="1941"/>
         <source>Save the chart</source>
         <translation>Save the chart</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1947"/>
+        <location filename="../ufe_measure_tab.py" line="1955"/>
         <source>Chart written as you see it: {0}</source>
         <translation>Chart written as you see it: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1944"/>
+        <location filename="../ufe_measure_tab.py" line="1952"/>
         <source>Could not write the chart: {0}</source>
         <translation>Could not write the chart: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2798"/>
+        <location filename="../ufe_measure_tab.py" line="2806"/>
         <source>The series failed and stopped: {0}</source>
         <translation>The series failed and stopped: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3133"/>
+        <location filename="../ufe_measure_tab.py" line="3141"/>
         <source>Live mode failed and stopped: {0}</source>
         <translation>Live mode failed and stopped: {0}</translation>
     </message>
@@ -14263,37 +14269,37 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>The occasional series actions: undo the last run, ExoClock, the night&apos;s figures, save the chart, period and phase, the guide</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2416"/>
+        <location filename="../ufe_measure_tab.py" line="2424"/>
         <source>This visit&apos;s curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</source>
         <translation>This visit&apos;s curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2302"/>
+        <location filename="../ufe_measure_tab.py" line="2310"/>
         <source>Curve loaded from the visit: {0} points.</source>
         <translation>Curve loaded from the visit: {0} points.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2436"/>
+        <location filename="../ufe_measure_tab.py" line="2444"/>
         <source>This curve does not belong to a visit: there is nothing to discard.</source>
         <translation>This curve does not belong to a visit: there is nothing to discard.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2441"/>
+        <location filename="../ufe_measure_tab.py" line="2449"/>
         <source>Discard the visit&apos;s curve</source>
         <translation>Discard the visit&apos;s curve</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2442"/>
+        <location filename="../ufe_measure_tab.py" line="2450"/>
         <source>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</source>
         <translation>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2452"/>
+        <location filename="../ufe_measure_tab.py" line="2460"/>
         <source>Could not discard the curve: {0}</source>
         <translation>Could not discard the curve: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2465"/>
+        <location filename="../ufe_measure_tab.py" line="2473"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</source>
         <translation>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</translation>
     </message>
@@ -14779,42 +14785,42 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
 <context>
     <name>UfeTrackStackTab</name>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="507"/>
+        <location filename="../ufe_trackstack_tab.py" line="519"/>
         <source>Sum</source>
         <translation>Sum</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="508"/>
+        <location filename="../ufe_trackstack_tab.py" line="520"/>
         <source>Mean</source>
         <translation>Mean</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="509"/>
+        <location filename="../ufe_trackstack_tab.py" line="521"/>
         <source>Median</source>
         <translation>Median</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="510"/>
+        <location filename="../ufe_trackstack_tab.py" line="522"/>
         <source>Sigma-clipped</source>
         <translation>Sigma-clipped</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="527"/>
+        <location filename="../ufe_trackstack_tab.py" line="539"/>
         <source>Whole frame</source>
         <translation>Whole frame</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="528"/>
+        <location filename="../ufe_trackstack_tab.py" line="540"/>
         <source>1024 px</source>
         <translation>1024 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="529"/>
+        <location filename="../ufe_trackstack_tab.py" line="541"/>
         <source>512 px</source>
         <translation>512 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="530"/>
+        <location filename="../ufe_trackstack_tab.py" line="542"/>
         <source>256 px</source>
         <translation>256 px</translation>
     </message>
@@ -14827,17 +14833,17 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">MPC 80 columns</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="875"/>
+        <location filename="../ufe_trackstack_tab.py" line="887"/>
         <source>The brightness is not measured: this run reports positions only.</source>
         <translation>The brightness is not measured: this run reports positions only.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="882"/>
+        <location filename="../ufe_trackstack_tab.py" line="891"/>
         <source>Photometry recipe: the editor&apos;s defaults (open the Photometry tab to see or change them).</source>
         <translation>Photometry recipe: the editor&apos;s defaults (open the Photometry tab to see or change them).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="887"/>
+        <location filename="../ufe_trackstack_tab.py" line="894"/>
         <source>the comps&apos; own band</source>
         <translation>the comps&apos; own band</translation>
     </message>
@@ -14846,7 +14852,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Photometry recipe: %1 · apertures %2 px · sky %3</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="346"/>
+        <location filename="../ufe_trackstack_tab.py" line="354"/>
         <source>Stacking settings</source>
         <translation>Stacking settings</translation>
     </message>
@@ -14859,12 +14865,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Photometry recipe: %1 · apertures %2 · sky %3</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="912"/>
+        <location filename="../ufe_trackstack_tab.py" line="946"/>
         <source>from the seeing</source>
         <translation>from the seeing</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="915"/>
+        <location filename="../ufe_trackstack_tab.py" line="949"/>
         <source>the defaults</source>
         <translation>the defaults</translation>
     </message>
@@ -14877,194 +14883,194 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Which observation</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="167"/>
+        <location filename="../ufe_trackstack_tab.py" line="170"/>
         <source>Middle-of-exposure instant (UT)</source>
         <translation>Middle-of-exposure instant (UT)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="168"/>
+        <location filename="../ufe_trackstack_tab.py" line="171"/>
         <source>Right ascension, from the stack&apos;s own centroid</source>
         <translation>Right ascension, from the stack&apos;s own centroid</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="169"/>
+        <location filename="../ufe_trackstack_tab.py" line="172"/>
         <source>Declination, from the stack&apos;s own centroid</source>
         <translation>Declination, from the stack&apos;s own centroid</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="170"/>
+        <location filename="../ufe_trackstack_tab.py" line="173"/>
         <source>Separation between the two measurements (″)</source>
         <translation>Separation between the two measurements (″)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="171"/>
+        <location filename="../ufe_trackstack_tab.py" line="174"/>
         <source>Signal-to-noise of the measured point</source>
         <translation>Signal-to-noise of the measured point</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="172"/>
+        <location filename="../ufe_trackstack_tab.py" line="175"/>
         <source>Calibrated magnitude</source>
         <translation>Calibrated magnitude</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="173"/>
+        <location filename="../ufe_trackstack_tab.py" line="176"/>
         <source>Photometric error of the magnitude (its ± bar)</source>
         <translation>Photometric error of the magnitude (its ± bar)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="174"/>
+        <location filename="../ufe_trackstack_tab.py" line="177"/>
         <source>Warnings and flags of the point</source>
         <translation>Warnings and flags of the point</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="343"/>
+        <location filename="../ufe_trackstack_tab.py" line="351"/>
         <source>How many observations</source>
         <translation>How many observations</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="361"/>
+        <location filename="../ufe_trackstack_tab.py" line="369"/>
         <source>What the run found</source>
         <translation>What the run found</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="364"/>
+        <location filename="../ufe_trackstack_tab.py" line="372"/>
         <source>The observations</source>
         <translation>The observations</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="370"/>
+        <location filename="../ufe_trackstack_tab.py" line="378"/>
         <source>Manual mark</source>
         <translation>Manual mark</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="516"/>
+        <location filename="../ufe_trackstack_tab.py" line="528"/>
         <source>Weighted (1/σ²)</source>
         <translation>Weighted (1/σ²)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="519"/>
+        <location filename="../ufe_trackstack_tab.py" line="531"/>
         <source>Each frame counts by 1/σ² of its own sky: the same as the sigma clip on a stable night, and what saves a night with thin cloud or moon</source>
         <translation>Each frame counts by 1/σ² of its own sky: the same as the sigma clip on a stable night, and what saves a night with thin cloud or moon</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="540"/>
+        <location filename="../ufe_trackstack_tab.py" line="552"/>
         <source>Bilinear (cleaner)</source>
         <translation>Bilinear (cleaner)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="541"/>
+        <location filename="../ufe_trackstack_tab.py" line="553"/>
         <source>Cubic (sharper)</source>
         <translation>Cubic (sharper)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="542"/>
+        <location filename="../ufe_trackstack_tab.py" line="554"/>
         <source>Quintic (sharpest)</source>
         <translation>Quintic (sharpest)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="799"/>
+        <location filename="../ufe_trackstack_tab.py" line="811"/>
         <source>The calibration is not applied: the train&apos;s dust and the sensor&apos;s vignetting stay in the frames.</source>
         <translation>The calibration is not applied: the train&apos;s dust and the sensor&apos;s vignetting stay in the frames.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="809"/>
+        <location filename="../ufe_trackstack_tab.py" line="821"/>
         <source>Applied to the stack: %1</source>
         <translation>Applied to the stack: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="810"/>
+        <location filename="../ufe_trackstack_tab.py" line="822"/>
         <source>the recipe of the Calibration tab</source>
         <translation>the recipe of the Calibration tab</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="828"/>
+        <location filename="../ufe_trackstack_tab.py" line="840"/>
         <source>%1 frames</source>
         <translation>%1 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="830"/>
+        <location filename="../ufe_trackstack_tab.py" line="842"/>
         <source>%1 observation</source>
         <translation>%1 observation</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="831"/>
+        <location filename="../ufe_trackstack_tab.py" line="843"/>
         <source>%1 observations</source>
         <translation>%1 observations</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="835"/>
+        <location filename="../ufe_trackstack_tab.py" line="847"/>
         <source>positions only</source>
         <translation>positions only</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="840"/>
-        <location filename="../ufe_trackstack_tab.py" line="847"/>
+        <location filename="../ufe_trackstack_tab.py" line="852"/>
+        <location filename="../ufe_trackstack_tab.py" line="859"/>
         <source>brightness with %1</source>
         <translation>brightness with %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="845"/>
+        <location filename="../ufe_trackstack_tab.py" line="857"/>
         <source>brightness from the seeing</source>
         <translation>brightness from the seeing</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="857"/>
+        <location filename="../ufe_trackstack_tab.py" line="869"/>
         <source>calibration: %1</source>
         <translation>calibration: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="858"/>
+        <location filename="../ufe_trackstack_tab.py" line="870"/>
         <source>on</source>
         <translation>on</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="860"/>
+        <location filename="../ufe_trackstack_tab.py" line="872"/>
         <source>no calibration</source>
         <translation>no calibration</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="862"/>
+        <location filename="../ufe_trackstack_tab.py" line="874"/>
         <source>check against other observers</source>
         <translation>check against other observers</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="893"/>
+        <location filename="../ufe_trackstack_tab.py" line="901"/>
         <source>matched filter</source>
         <translation>matched filter</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="896"/>
+        <location filename="../ufe_trackstack_tab.py" line="904"/>
         <source>aperture</source>
         <translation>aperture</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="898"/>
+        <location filename="../ufe_trackstack_tab.py" line="906"/>
         <source>Photometry recipe: %1 · apertures %2 · sky %3 · %4</source>
         <translation>Photometry recipe: %1 · apertures %2 · sky %3 · %4</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1039"/>
+        <location filename="../ufe_trackstack_tab.py" line="1120"/>
         <location filename="../ui/ufe_trackstack_tab.ui" line="23"/>
         <source>Object and frames: open the editor from a visit to arm the sequence.</source>
         <translation>Object and frames: open the editor from a visit to arm the sequence.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1084"/>
+        <location filename="../ufe_trackstack_tab.py" line="1152"/>
         <source>(unnamed)</source>
         <translation>(unnamed)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1085"/>
+        <location filename="../ufe_trackstack_tab.py" line="1153"/>
         <source>Object: %1 · %2 frames</source>
         <translation>Object: %1 · %2 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1092"/>
+        <location filename="../ufe_trackstack_tab.py" line="1160"/>
         <source> · window %1–%2 UT</source>
         <translation> · window %1–%2 UT</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1097"/>
+        <location filename="../ufe_trackstack_tab.py" line="1165"/>
         <source> · %1 could not be read (left out)</source>
         <translation> · %1 could not be read (left out)</translation>
     </message>
@@ -15073,7 +15079,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Below the MPC submission floor of %1: this observation would be left out of the report</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1147"/>
+        <location filename="../ufe_trackstack_tab.py" line="1220"/>
         <source>Expected SNR: %1</source>
         <translation>Expected SNR: %1</translation>
     </message>
@@ -15086,42 +15092,42 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">How many observations the frames are split into (an equal split). A follow run sets this on its own.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1227"/>
+        <location filename="../ufe_trackstack_tab.py" line="1341"/>
         <source>the subfolder of each observation</source>
         <translation>the subfolder of each observation</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1229"/>
+        <location filename="../ufe_trackstack_tab.py" line="1343"/>
         <source>the follow run&apos;s own record</source>
         <translation>the follow run&apos;s own record</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1230"/>
+        <location filename="../ufe_trackstack_tab.py" line="1344"/>
         <source>the gaps between observations</source>
         <translation>the gaps between observations</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1261"/>
+        <location filename="../ufe_trackstack_tab.py" line="1375"/>
         <source>Cancelling: the pipeline stops at the stage boundary it is at; nothing is kept from a cancelled run.</source>
         <translation>Cancelling: the pipeline stops at the stage boundary it is at; nothing is kept from a cancelled run.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1276"/>
+        <location filename="../ufe_trackstack_tab.py" line="1390"/>
         <source>No visit with frames: open the editor from a visit to stack its sequence.</source>
         <translation>No visit with frames: open the editor from a visit to stack its sequence.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1281"/>
+        <location filename="../ufe_trackstack_tab.py" line="1395"/>
         <source>The project has no object name: the ephemeris cannot be fetched, and without it there is no track.</source>
         <translation>The project has no object name: the ephemeris cannot be fetched, and without it there is no track.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1300"/>
+        <location filename="../ufe_trackstack_tab.py" line="1414"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1352"/>
+        <location filename="../ufe_trackstack_tab.py" line="1466"/>
         <source>Calibrating the frames…</source>
         <translation>Calibrating the frames…</translation>
     </message>
@@ -15130,338 +15136,338 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Building a flat from the frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1354"/>
+        <location filename="../ufe_trackstack_tab.py" line="1468"/>
         <source>Solving the reference frame…</source>
         <translation>Solving the reference frame…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1355"/>
+        <location filename="../ufe_trackstack_tab.py" line="1469"/>
         <source>Registering the frames…</source>
         <translation>Registering the frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1356"/>
+        <location filename="../ufe_trackstack_tab.py" line="1470"/>
         <source>Stacking the whole sequence…</source>
         <translation>Stacking the whole sequence…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1357"/>
+        <location filename="../ufe_trackstack_tab.py" line="1471"/>
         <source>Looking for the object…</source>
         <translation>Looking for the object…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1358"/>
+        <location filename="../ufe_trackstack_tab.py" line="1472"/>
         <source>Sweeping the velocity…</source>
         <translation>Sweeping the velocity…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1359"/>
+        <location filename="../ufe_trackstack_tab.py" line="1473"/>
         <source>Stacking each observation…</source>
         <translation>Stacking each observation…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1360"/>
+        <location filename="../ufe_trackstack_tab.py" line="1474"/>
         <source>Measuring the positions…</source>
         <translation>Measuring the positions…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1361"/>
+        <location filename="../ufe_trackstack_tab.py" line="1475"/>
         <source>Stacking the stars…</source>
         <translation>Stacking the stars…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1362"/>
+        <location filename="../ufe_trackstack_tab.py" line="1476"/>
         <source>Measuring the brightness…</source>
         <translation>Measuring the brightness…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1363"/>
-        <location filename="../ufe_trackstack_tab.py" line="4728"/>
+        <location filename="../ufe_trackstack_tab.py" line="1477"/>
+        <location filename="../ufe_trackstack_tab.py" line="4842"/>
         <source>Checking against other observers…</source>
         <translation>Checking against other observers…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1380"/>
+        <location filename="../ufe_trackstack_tab.py" line="1494"/>
         <source>The run failed:</source>
         <translation>The run failed:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1389"/>
+        <location filename="../ufe_trackstack_tab.py" line="1503"/>
         <source>Cancelled: nothing was kept from this run.</source>
         <translation>Cancelled: nothing was kept from this run.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1392"/>
+        <location filename="../ufe_trackstack_tab.py" line="1506"/>
         <source>The run could not finish:</source>
         <translation>The run could not finish:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1440"/>
+        <location filename="../ufe_trackstack_tab.py" line="1554"/>
         <source>Run undone: %1 observations removed.</source>
         <translation>Run undone: %1 observations removed.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1509"/>
+        <location filename="../ufe_trackstack_tab.py" line="1623"/>
         <source>Combined set: %1 observations from several runs, shown as one.</source>
         <translation>Combined set: %1 observations from several runs, shown as one.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2172"/>
+        <location filename="../ufe_trackstack_tab.py" line="2286"/>
         <source>off the plate</source>
         <translation>off the plate</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2173"/>
+        <location filename="../ufe_trackstack_tab.py" line="2287"/>
         <source>saturated</source>
         <translation>saturated</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2174"/>
+        <location filename="../ufe_trackstack_tab.py" line="2288"/>
         <source>non-linear</source>
         <translation>non-linear</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2175"/>
+        <location filename="../ufe_trackstack_tab.py" line="2289"/>
         <source>no catalogue value in the band</source>
         <translation>no catalogue value in the band</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2176"/>
+        <location filename="../ufe_trackstack_tab.py" line="2290"/>
         <source>no positive flux</source>
         <translation>no positive flux</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2182"/>
+        <location filename="../ufe_trackstack_tab.py" line="2296"/>
         <source> · WARNING: the zero point rests on %1 of %2 comps%3, so the error is the honest consequence: check the sequence in the Photometry tab</source>
         <translation> · WARNING: the zero point rests on %1 of %2 comps%3, so the error is the honest consequence: check the sequence in the Photometry tab</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2188"/>
+        <location filename="../ufe_trackstack_tab.py" line="2302"/>
         <source> · comps dropped:%1</source>
         <translation> · comps dropped:%1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2225"/>
+        <location filename="../ufe_trackstack_tab.py" line="2339"/>
         <source>The warp and the combination ran on the GPU (%1): the same result to a fraction of an ADU.</source>
         <translation>The warp and the combination ran on the GPU (%1): the same result to a fraction of an ADU.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2250"/>
+        <location filename="../ufe_trackstack_tab.py" line="2364"/>
         <source>The object&apos;s own trail seeded the velocity sweep: two extra candidate motions (both signs of the measured trail) were scored alongside the ephemeris&apos; grid.</source>
         <translation>The object&apos;s own trail seeded the velocity sweep: two extra candidate motions (both signs of the measured trail) were scored alongside the ephemeris&apos; grid.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2314"/>
+        <location filename="../ufe_trackstack_tab.py" line="2428"/>
         <source>Brightness %1 ± %2 %3 per observation (%4 observations, %5 frames each) from %6 comparison stars · %7%8</source>
         <translation>Brightness %1 ± %2 %3 per observation (%4 observations, %5 frames each) from %6 comparison stars · %7%8</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2522"/>
+        <location filename="../ufe_trackstack_tab.py" line="2636"/>
         <source>Brightness measured with the matched filter</source>
         <translation>Brightness measured with the matched filter</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2524"/>
+        <location filename="../ufe_trackstack_tab.py" line="2638"/>
         <source>Brightness measured with the aperture</source>
         <translation>Brightness measured with the aperture</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2575"/>
+        <location filename="../ufe_trackstack_tab.py" line="2689"/>
         <source>%1 of them already carried NightScribe&apos;s calibration: the recipe was not applied again</source>
         <translation>%1 of them already carried NightScribe&apos;s calibration: the recipe was not applied again</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4089"/>
+        <location filename="../ufe_trackstack_tab.py" line="4203"/>
         <source>Adjust the centroid…</source>
         <translation>Adjust the centroid…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4090"/>
+        <location filename="../ufe_trackstack_tab.py" line="4204"/>
         <source>Auto centroid</source>
         <translation>Auto centroid</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4096"/>
+        <location filename="../ufe_trackstack_tab.py" line="4210"/>
         <source>Include in the report and the check</source>
         <translation>Include in the report and the check</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4097"/>
+        <location filename="../ufe_trackstack_tab.py" line="4211"/>
         <source>Exclude from the report and the check</source>
         <translation>Exclude from the report and the check</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4100"/>
+        <location filename="../ufe_trackstack_tab.py" line="4214"/>
         <source>Hide the photometric error</source>
         <translation>Hide the photometric error</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4101"/>
+        <location filename="../ufe_trackstack_tab.py" line="4215"/>
         <source>Show the photometric error</source>
         <translation>Show the photometric error</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4188"/>
+        <location filename="../ufe_trackstack_tab.py" line="4302"/>
         <source>The observation&apos;s stack is not on disk: re-stack the run to adjust its centroid.</source>
         <translation>The observation&apos;s stack is not on disk: re-stack the run to adjust its centroid.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4229"/>
+        <location filename="../ufe_trackstack_tab.py" line="4343"/>
         <source>Adjust the centroid: zoom and stretch to find the object, then click it. The mark snaps to its local centroid.</source>
         <translation>Adjust the centroid: zoom and stretch to find the object, then click it. The mark snaps to its local centroid.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4271"/>
+        <location filename="../ufe_trackstack_tab.py" line="4385"/>
         <source>This stack carries no WCS: the centroid cannot be turned into a position.</source>
         <translation>This stack carries no WCS: the centroid cannot be turned into a position.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4293"/>
+        <location filename="../ufe_trackstack_tab.py" line="4407"/>
         <source>Centroid picked again by the app; the check runs again.</source>
         <translation>Centroid picked again by the app; the check runs again.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4295"/>
+        <location filename="../ufe_trackstack_tab.py" line="4409"/>
         <source>Centroid re-measured from your mark; the check runs again.</source>
         <translation>Centroid re-measured from your mark; the check runs again.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4398"/>
+        <location filename="../ufe_trackstack_tab.py" line="4512"/>
         <source>Centroid re-selected by hand on the saved stack</source>
         <translation>Centroid re-selected by hand on the saved stack</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4471"/>
+        <location filename="../ufe_trackstack_tab.py" line="4585"/>
         <source>Edited: this exact text will be sent (Regenerate to rebuild it from the measurements).</source>
         <translation>Edited: this exact text will be sent (Regenerate to rebuild it from the measurements).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4625"/>
+        <location filename="../ufe_trackstack_tab.py" line="4739"/>
         <source>Find_Orb was not configured when this stack was made; it is now. Re-run the track &amp; stack to check this visit; meanwhile the centred sequence and the warnings on the report are the safety net.</source>
         <translation>Find_Orb was not configured when this stack was made; it is now. Re-run the track &amp; stack to check this visit; meanwhile the centred sequence and the warnings on the report are the safety net.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4631"/>
+        <location filename="../ufe_trackstack_tab.py" line="4745"/>
         <source>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the warnings on the report are the safety net.</source>
         <translation>Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the warnings on the report are the safety net.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4640"/>
+        <location filename="../ufe_trackstack_tab.py" line="4754"/>
         <source>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and your own review of the report decide.</source>
         <translation>No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and your own review of the report decide.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4718"/>
+        <location filename="../ufe_trackstack_tab.py" line="4832"/>
         <source>There is no observation to check: you have excluded them all. Mark one again to check it.</source>
         <translation>There is no observation to check: you have excluded them all. Mark one again to check it.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4818"/>
+        <location filename="../ufe_trackstack_tab.py" line="4932"/>
         <source>You have excluded every observation: the report has no lines to send. Mark one again to put it back.</source>
         <translation>You have excluded every observation: the report has no lines to send. Mark one again to put it back.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4826"/>
+        <location filename="../ufe_trackstack_tab.py" line="4940"/>
         <source>Observation %1: no SNR was measured, so the app cannot recommend it; sending it is your decision</source>
         <translation>Observation %1: no SNR was measured, so the app cannot recommend it; sending it is your decision</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4831"/>
+        <location filename="../ufe_trackstack_tab.py" line="4945"/>
         <source>Observation %1: SNR %2 is below the recommended floor of %3, so the app does not recommend sending it (a marginal detection risks a false tracklet)</source>
         <translation>Observation %1: SNR %2 is below the recommended floor of %3, so the app does not recommend sending it (a marginal detection risks a false tracklet)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4839"/>
+        <location filename="../ufe_trackstack_tab.py" line="4953"/>
         <source>Observation %1: excluded by you; it is left out of the report and of the check, and you can put it back</source>
         <translation>Observation %1: excluded by you; it is left out of the report and of the check, and you can put it back</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4889"/>
+        <location filename="../ufe_trackstack_tab.py" line="5003"/>
         <source>Report copied to the clipboard.</source>
         <translation>Report copied to the clipboard.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4905"/>
+        <location filename="../ufe_trackstack_tab.py" line="5019"/>
         <source>Save MPC report</source>
         <translation>Save MPC report</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4906"/>
+        <location filename="../ufe_trackstack_tab.py" line="5020"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4912"/>
+        <location filename="../ufe_trackstack_tab.py" line="5026"/>
         <source>The report could not be written:</source>
         <translation>The report could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4914"/>
+        <location filename="../ufe_trackstack_tab.py" line="5028"/>
         <source>Report saved:</source>
         <translation>Report saved:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4920"/>
+        <location filename="../ufe_trackstack_tab.py" line="5034"/>
         <source>There is no report to send.</source>
         <translation>There is no report to send.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4956"/>
+        <location filename="../ufe_trackstack_tab.py" line="5070"/>
         <source>Ready to send: %1 observation(s), format %2, target %3, mode %4. The MPC&apos;s own answer will appear below.</source>
         <translation>Ready to send: %1 observation(s), format %2, target %3, mode %4. The MPC&apos;s own answer will appear below.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4976"/>
+        <location filename="../ufe_trackstack_tab.py" line="5090"/>
         <source>Missing: %1. Set it in Settings → Observer, then send.</source>
         <translation>Missing: %1. Set it in Settings → Observer, then send.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4994"/>
+        <location filename="../ufe_trackstack_tab.py" line="5108"/>
         <source>Sending your edited report as it reads.</source>
         <translation>Sending your edited report as it reads.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5000"/>
+        <location filename="../ufe_trackstack_tab.py" line="5114"/>
         <source>Nothing to send: the report is empty.</source>
         <translation>Nothing to send: the report is empty.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5003"/>
+        <location filename="../ufe_trackstack_tab.py" line="5117"/>
         <source>Test</source>
         <translation>Test</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5003"/>
+        <location filename="../ufe_trackstack_tab.py" line="5117"/>
         <source>Normal</source>
         <translation>Normal</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5004"/>
+        <location filename="../ufe_trackstack_tab.py" line="5118"/>
         <source>Submitting (%1, %2)…</source>
         <translation>Submitting (%1, %2)…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5018"/>
+        <location filename="../ufe_trackstack_tab.py" line="5132"/>
         <source>The MPC accepted the batch:</source>
         <translation>The MPC accepted the batch:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5019"/>
+        <location filename="../ufe_trackstack_tab.py" line="5133"/>
         <source>The MPC did NOT accept the batch:</source>
         <translation>The MPC did NOT accept the batch:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5021"/>
+        <location filename="../ufe_trackstack_tab.py" line="5135"/>
         <source>URL: %1</source>
         <translation>URL: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5023"/>
+        <location filename="../ufe_trackstack_tab.py" line="5137"/>
         <source>Report submitted to the MPC.</source>
         <translation>Report submitted to the MPC.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="5025"/>
+        <location filename="../ufe_trackstack_tab.py" line="5139"/>
         <source>The MPC did not accept the report: see the send window.</source>
         <translation>The MPC did not accept the report: see the send window.</translation>
     </message>
@@ -15478,12 +15484,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The saved run found nothing to mark, and the manual mode needs a fresh run (its base stack is not kept).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1732"/>
+        <location filename="../ufe_trackstack_tab.py" line="1846"/>
         <source>The object was not detected above the %1σ gate: the velocity sweep is not run, because measuring noise is how a false positive is manufactured.</source>
         <translation>The object was not detected above the %1σ gate: the velocity sweep is not run, because measuring noise is how a false positive is manufactured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1737"/>
+        <location filename="../ufe_trackstack_tab.py" line="1851"/>
         <source>The stack&apos;s limit magnitude is %1: the night reached that deep.</source>
         <translation>The stack&apos;s limit magnitude is %1: the night reached that deep.</translation>
     </message>
@@ -15496,52 +15502,52 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The stack could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1893"/>
+        <location filename="../ufe_trackstack_tab.py" line="2007"/>
         <source>The stack could not be shown:</source>
         <translation>The stack could not be shown:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1900"/>
+        <location filename="../ufe_trackstack_tab.py" line="2014"/>
         <source>Mark: click the object.</source>
         <translation>Mark: click the object.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1904"/>
+        <location filename="../ufe_trackstack_tab.py" line="2018"/>
         <source>Click the object on the stack; the click is refined to its centroid.</source>
         <translation>Click the object on the stack; the click is refined to its centroid.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2092"/>
+        <location filename="../ufe_trackstack_tab.py" line="2206"/>
         <source>Mark: (%1, %2) px</source>
         <translation>Mark: (%1, %2) px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2215"/>
+        <location filename="../ufe_trackstack_tab.py" line="2329"/>
         <source>The position came from a LOCAL orbit (%1), not from JPL: two-body and approximate, so the search box is wider. The reported position is measured on the plate, not this prediction.</source>
         <translation>The position came from a LOCAL orbit (%1), not from JPL: two-body and approximate, so the search box is wider. The reported position is measured on the plate, not this prediction.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2219"/>
+        <location filename="../ufe_trackstack_tab.py" line="2333"/>
         <source>local elements</source>
         <translation>local elements</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2220"/>
+        <location filename="../ufe_trackstack_tab.py" line="2334"/>
         <source>a preliminary orbit</source>
         <translation>a preliminary orbit</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2233"/>
+        <location filename="../ufe_trackstack_tab.py" line="2347"/>
         <source>The sequence is not dithered: pattern noise may stack up</source>
         <translation>The sequence is not dithered: pattern noise may stack up</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2237"/>
+        <location filename="../ufe_trackstack_tab.py" line="2351"/>
         <source>The composed WCS is off by up to %1″ against a direct solve: the field&apos;s distortion is biting</source>
         <translation>The composed WCS is off by up to %1″ against a direct solve: the field&apos;s distortion is biting</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2243"/>
+        <location filename="../ufe_trackstack_tab.py" line="2357"/>
         <source>Velocity sweep: %1″/min at PA %2° (%3 velocities scored; the score is SNR × roundness, which penalises a smeared object)</source>
         <translation>Velocity sweep: %1″/min at PA %2° (%3 velocities scored; the score is SNR × roundness, which penalises a smeared object)</translation>
     </message>
@@ -15550,12 +15556,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Detected on the base stack with SNR %1 (the gate is %2σ: below it nothing is measured)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2310"/>
+        <location filename="../ufe_trackstack_tab.py" line="2424"/>
         <source>the project&apos;s sequence</source>
         <translation>the project&apos;s sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2312"/>
+        <location filename="../ufe_trackstack_tab.py" line="2426"/>
         <source>an automatic proposal</source>
         <translation>an automatic proposal</translation>
     </message>
@@ -15564,12 +15570,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Brightness %1 ± %2 %3 per observation (%4 observations, %5 frames each) from %6 comparison stars · %7</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2325"/>
+        <location filename="../ufe_trackstack_tab.py" line="2439"/>
         <source>The brightness was not measured (the box is off): this run reports positions only</source>
         <translation>The brightness was not measured (the box is off): this run reports positions only</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2346"/>
+        <location filename="../ufe_trackstack_tab.py" line="2460"/>
         <source>Saving the stacks in the project…</source>
         <translation>Saving the stacks in the project…</translation>
     </message>
@@ -15578,47 +15584,47 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">%1 stacks saved in the project (one per observation), so reopening the visit shows them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2422"/>
+        <location filename="../ufe_trackstack_tab.py" line="2536"/>
         <source>This visit already held a run: shown again from what was saved (its stacks, its points and its notes). Stack again to redo it.</source>
         <translation>This visit already held a run: shown again from what was saved (its stacks, its points and its notes). Stack again to redo it.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2559"/>
+        <location filename="../ufe_trackstack_tab.py" line="2673"/>
         <source>dark/bias: %1</source>
         <translation>dark/bias: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2562"/>
+        <location filename="../ufe_trackstack_tab.py" line="2676"/>
         <source>flat: %1</source>
         <translation>flat: %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2564"/>
+        <location filename="../ufe_trackstack_tab.py" line="2678"/>
         <source>Calibrated %1 frames</source>
         <translation>Calibrated %1 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2569"/>
+        <location filename="../ufe_trackstack_tab.py" line="2683"/>
         <source>no master matched</source>
         <translation>no master matched</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2580"/>
+        <location filename="../ufe_trackstack_tab.py" line="2694"/>
         <source>Warning:</source>
         <translation>Warning:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2596"/>
+        <location filename="../ufe_trackstack_tab.py" line="2710"/>
         <source>The object is trailed by %1 px</source>
         <translation>The object is trailed by %1 px</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2600"/>
+        <location filename="../ufe_trackstack_tab.py" line="2714"/>
         <source> along PA %1°</source>
         <translation> along PA %1°</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2603"/>
+        <location filename="../ufe_trackstack_tab.py" line="2717"/>
         <source>: shorten the exposure or expect a wider PSF.</source>
         <translation>: shorten the exposure or expect a wider PSF.</translation>
     </message>
@@ -15627,67 +15633,67 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The matched filter would read %1x the aperture&apos;s SNR on this stack.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2645"/>
+        <location filename="../ufe_trackstack_tab.py" line="2759"/>
         <source>Limiting magnitude (5σ): %1</source>
         <translation>Limiting magnitude (5σ): %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2650"/>
+        <location filename="../ufe_trackstack_tab.py" line="2764"/>
         <source> (not sky-limited, do not trust it)</source>
         <translation> (not sky-limited, do not trust it)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2655"/>
+        <location filename="../ufe_trackstack_tab.py" line="2769"/>
         <source>Solution residuals: %1″ median</source>
         <translation>Solution residuals: %1″ median</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2662"/>
+        <location filename="../ufe_trackstack_tab.py" line="2776"/>
         <source>, up to %1″ in the worst cell</source>
         <translation>, up to %1″ in the worst cell</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2682"/>
+        <location filename="../ufe_trackstack_tab.py" line="2796"/>
         <source>%1 frames were saved by fitting the field&apos;s small rotation (they were being thrown away).</source>
         <translation>%1 frames were saved by fitting the field&apos;s small rotation (they were being thrown away).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2691"/>
+        <location filename="../ufe_trackstack_tab.py" line="2805"/>
         <source>%1 frames do not contain the object and were left out.</source>
         <translation>%1 frames do not contain the object and were left out.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2695"/>
+        <location filename="../ufe_trackstack_tab.py" line="2809"/>
         <source>%1 frames could not be aligned</source>
         <translation>%1 frames could not be aligned</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2707"/>
+        <location filename="../ufe_trackstack_tab.py" line="2821"/>
         <source>The visit looks like %1 runs: the second one is %2 px away</source>
         <translation>The visit looks like %1 runs: the second one is %2 px away</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2711"/>
+        <location filename="../ufe_trackstack_tab.py" line="2825"/>
         <source> and starts %1 min later</source>
         <translation> and starts %1 min later</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2722"/>
+        <location filename="../ufe_trackstack_tab.py" line="2836"/>
         <source>their stars did not agree on the fit</source>
         <translation>their stars did not agree on the fit</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2723"/>
+        <location filename="../ufe_trackstack_tab.py" line="2837"/>
         <source>too few stars</source>
         <translation>too few stars</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2724"/>
+        <location filename="../ufe_trackstack_tab.py" line="2838"/>
         <source>no stars detected</source>
         <translation>no stars detected</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2725"/>
+        <location filename="../ufe_trackstack_tab.py" line="2839"/>
         <source>no transform could be fitted</source>
         <translation>no transform could be fitted</translation>
     </message>
@@ -15696,148 +15702,173 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Brightness %1 ± %2 %3 from %4 comparison stars on %5 frames (%6)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2365"/>
+        <location filename="../ufe_trackstack_tab.py" line="2479"/>
         <source>Observation %1 (%2 frames)</source>
         <translation>Observation %1 (%2 frames)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2387"/>
-        <location filename="../ufe_trackstack_tab.py" line="3473"/>
+        <location filename="../ufe_trackstack_tab.py" line="2501"/>
+        <location filename="../ufe_trackstack_tab.py" line="3587"/>
         <source>Obs. %1</source>
         <translation>Obs. %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2415"/>
+        <location filename="../ufe_trackstack_tab.py" line="2529"/>
         <source>Sequence stacked: %1 observations measured.</source>
         <translation>Sequence stacked: %1 observations measured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2860"/>
+        <location filename="../ufe_trackstack_tab.py" line="2974"/>
         <source>The group&apos;s stack could not be written:</source>
         <translation>The group&apos;s stack could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2765"/>
+        <location filename="../ufe_trackstack_tab.py" line="2879"/>
         <source>The group&apos;s stack could not be shown:</source>
         <translation>The group&apos;s stack could not be shown:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="165"/>
+        <location filename="../ufe_trackstack_tab.py" line="168"/>
         <source>Which observation: uncheck it to leave it out of the report and of the check</source>
         <translation>Which observation: uncheck it to leave it out of the report and of the check</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1138"/>
+        <location filename="../ufe_trackstack_tab.py" line="1211"/>
         <source>Below the recommended MPC floor of %1: the app will not recommend sending this observation (you decide)</source>
         <translation>Below the recommended MPC floor of %1: the app will not recommend sending this observation (you decide)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1206"/>
+        <location filename="../ufe_trackstack_tab.py" line="1251"/>
+        <source>Observations</source>
+        <translation>Observations</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="1253"/>
+        <source>The frames show %1 gaps in time.</source>
+        <translation>The frames show %1 gaps in time.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="1255"/>
+        <source>A refocus and a re-point look the same in the clock, so this is a guess: split the visit into %1 observations, or keep it as one?</source>
+        <translation>A refocus and a re-point look the same in the clock, so this is a guess: split the visit into %1 observations, or keep it as one?</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="1259"/>
+        <source>Split into %1</source>
+        <translation>Split into %1</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="1261"/>
+        <source>One observation</source>
+        <translation>One observation</translation>
+    </message>
+    <message>
+        <location filename="../ufe_trackstack_tab.py" line="1320"/>
         <source>The follow run grouped the frames into %1 observations (%2). Type another number to split them yourself.</source>
         <translation>The follow run grouped the frames into %1 observations (%2). Type another number to split them yourself.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1212"/>
+        <location filename="../ufe_trackstack_tab.py" line="1326"/>
         <source>How many observations the frames are split into (an equal split). A follow run suggests a number here; you can change it.</source>
         <translation>How many observations the frames are split into (an equal split). A follow run suggests a number here; you can change it.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1353"/>
+        <location filename="../ufe_trackstack_tab.py" line="1467"/>
         <source>Modelling the vignetting from the frames…</source>
         <translation>Modelling the vignetting from the frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="1885"/>
+        <location filename="../ufe_trackstack_tab.py" line="1999"/>
         <source>There is no whole-sequence stack to mark on: stack the sequence first.</source>
         <translation>There is no whole-sequence stack to mark on: stack the sequence first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2045"/>
+        <location filename="../ufe_trackstack_tab.py" line="2159"/>
         <source>The whole-sequence stack could not be written:</source>
         <translation>The whole-sequence stack could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2204"/>
+        <location filename="../ufe_trackstack_tab.py" line="2318"/>
         <source>The position came from a HUMAN MARK on the whole-sequence stack (manual mode): the detection is yours, the gate was bypassed and the velocity sweep was not run. The reported position is measured on the plate from that mark.</source>
         <translation>The position came from a HUMAN MARK on the whole-sequence stack (manual mode): the detection is yours, the gate was bypassed and the velocity sweep was not run. The reported position is measured on the plate from that mark.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2262"/>
+        <location filename="../ufe_trackstack_tab.py" line="2376"/>
         <source>The object did NOT clear the %1σ gate (SNR %2 on the base stack): the velocity sweep was not run, the position is the ephemeris&apos; prediction and the brightness was measured there and is marked as not to be published without looking at it. The stack&apos;s limit magnitude is %3.</source>
         <translation>The object did NOT clear the %1σ gate (SNR %2 on the base stack): the velocity sweep was not run, the position is the ephemeris&apos; prediction and the brightness was measured there and is marked as not to be published without looking at it. The stack&apos;s limit magnitude is %3.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2275"/>
+        <location filename="../ufe_trackstack_tab.py" line="2389"/>
         <source>Detected on the base stack with SNR %1 (the gate is %2σ)</source>
         <translation>Detected on the base stack with SNR %1 (the gate is %2σ)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2289"/>
+        <location filename="../ufe_trackstack_tab.py" line="2403"/>
         <source>The velocity sweep did not improve on the ephemeris (its best candidate is inside the grid&apos;s own scatter): the reported rate and PA are the ephemeris&apos; prediction, not a measurement.</source>
         <translation>The velocity sweep did not improve on the ephemeris (its best candidate is inside the grid&apos;s own scatter): the reported rate and PA are the ephemeris&apos; prediction, not a measurement.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2297"/>
+        <location filename="../ufe_trackstack_tab.py" line="2411"/>
         <source>The velocity sweep improved on the ephemeris&apos; prediction (score %1 against %2) and its answer was refined: the reported rate and PA are measured on this sequence.</source>
         <translation>The velocity sweep improved on the ephemeris&apos; prediction (score %1 against %2) and its answer was refined: the reported rate and PA are measured on this sequence.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2432"/>
+        <location filename="../ufe_trackstack_tab.py" line="2546"/>
         <source>%1 frames could not be read and were left out.</source>
         <translation>%1 frames could not be read and were left out.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2440"/>
+        <location filename="../ufe_trackstack_tab.py" line="2554"/>
         <source>%1 stacks saved in the project (the whole sequence and one per observation), so reopening the visit shows them again.</source>
         <translation>%1 stacks saved in the project (the whole sequence and one per observation), so reopening the visit shows them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2493"/>
+        <location filename="../ufe_trackstack_tab.py" line="2607"/>
         <source>new</source>
         <translation>new</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2532"/>
+        <location filename="../ufe_trackstack_tab.py" line="2646"/>
         <source> (the aperture, with the same zero point, would give %1)</source>
         <translation> (the aperture, with the same zero point, would give %1)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2543"/>
+        <location filename="../ufe_trackstack_tab.py" line="2657"/>
         <source> The matched filter was asked for but the seeing could not be measured on this stack: the aperture measured.</source>
         <translation> The matched filter was asked for but the seeing could not be measured on this stack: the aperture measured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2616"/>
+        <location filename="../ufe_trackstack_tab.py" line="2730"/>
         <source> (SNR %1 against %2 on the brightness measurement)</source>
         <translation> (SNR %1 against %2 on the brightness measurement)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2621"/>
+        <location filename="../ufe_trackstack_tab.py" line="2735"/>
         <source>The brightness is measured with the matched filter, which reads %1x the aperture&apos;s SNR on this stack%2</source>
         <translation>The brightness is measured with the matched filter, which reads %1x the aperture&apos;s SNR on this stack%2</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2626"/>
+        <location filename="../ufe_trackstack_tab.py" line="2740"/>
         <source>The matched filter would read %1x the aperture&apos;s SNR on this stack%2: its switch is in the Photometry panel, next to the apertures</source>
         <translation>The matched filter would read %1x the aperture&apos;s SNR on this stack%2: its switch is in the Photometry panel, next to the apertures</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3262"/>
+        <location filename="../ufe_trackstack_tab.py" line="3376"/>
         <source>Stack the sequence first.</source>
         <translation>Stack the sequence first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3288"/>
+        <location filename="../ufe_trackstack_tab.py" line="3402"/>
         <source>This run kept no star stack, so the comparison stars are not on a plate to re-measure them: run again with &apos;keep the star stack&apos;.</source>
         <translation>This run kept no star stack, so the comparison stars are not on a plate to re-measure them: run again with &apos;keep the star stack&apos;.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3284"/>
+        <location filename="../ufe_trackstack_tab.py" line="3398"/>
         <source>No measured point to re-measure.</source>
         <translation>No measured point to re-measure.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3295"/>
+        <location filename="../ufe_trackstack_tab.py" line="3409"/>
         <source>Re-measuring the brightness…</source>
         <translation>Re-measuring the brightness…</translation>
     </message>
@@ -15850,172 +15881,172 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Brightness re-measured: %1 ± %2 %3 (%4 comps)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3445"/>
+        <location filename="../ufe_trackstack_tab.py" line="3559"/>
         <source>Blink (animated GIF)</source>
         <translation>Blink (animated GIF)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3446"/>
+        <location filename="../ufe_trackstack_tab.py" line="3560"/>
         <source>Montage (still PNG)</source>
         <translation>Montage (still PNG)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3495"/>
+        <location filename="../ufe_trackstack_tab.py" line="3609"/>
         <source>The blink figure could not be written:</source>
         <translation>The blink figure could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3503"/>
+        <location filename="../ufe_trackstack_tab.py" line="3617"/>
         <source>Blink figure written:</source>
         <translation>Blink figure written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3548"/>
+        <location filename="../ufe_trackstack_tab.py" line="3662"/>
         <source>Nothing to animate: the verification needs at least two observations measured in this visit.</source>
         <translation>Nothing to animate: the verification needs at least two observations measured in this visit.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3561"/>
+        <location filename="../ufe_trackstack_tab.py" line="3675"/>
         <source>Animating %1 observations, centred on the object; the stars crawl and the object must not. Click again to stop.</source>
         <translation>Animating %1 observations, centred on the object; the stars crawl and the object must not. Click again to stop.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3659"/>
+        <location filename="../ufe_trackstack_tab.py" line="3773"/>
         <source>The observation&apos;s stack is not on disk: nothing to animate.</source>
         <translation>The observation&apos;s stack is not on disk: nothing to animate.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3820"/>
+        <location filename="../ufe_trackstack_tab.py" line="3934"/>
         <source>Save animation</source>
         <translation>Save animation</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3859"/>
+        <location filename="../ufe_trackstack_tab.py" line="3973"/>
         <source>Nothing to save: the observations produced no frame to animate.</source>
         <translation>Nothing to save: the observations produced no frame to animate.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3863"/>
+        <location filename="../ufe_trackstack_tab.py" line="3977"/>
         <source>Rendering the animation…</source>
         <translation>Rendering the animation…</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3890"/>
+        <location filename="../ufe_trackstack_tab.py" line="4004"/>
         <source>Animation written:</source>
         <translation>Animation written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3898"/>
+        <location filename="../ufe_trackstack_tab.py" line="4012"/>
         <source>The animation could not be written:</source>
         <translation>The animation could not be written:</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3952"/>
+        <location filename="../ufe_trackstack_tab.py" line="4066"/>
         <source>Uncheck it to leave this observation out of the report and of the check; check it again to put it back. The measurement is never deleted</source>
         <translation>Uncheck it to leave this observation out of the report and of the check; check it again to put it back. The measurement is never deleted</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3959"/>
+        <location filename="../ufe_trackstack_tab.py" line="4073"/>
         <source>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</source>
         <translation>Separation between the stack measurement and the per-frame one (the same centroid recipe on both)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3969"/>
+        <location filename="../ufe_trackstack_tab.py" line="4083"/>
         <source>Signal-to-noise of the detection, measured with the astrometry&apos;s own aperture: it is what the detection gate, the position&apos;s error and the MPC floor use. The matched filter does not change it; the brightness measurement has its own pair, in the notes</source>
         <translation>Signal-to-noise of the detection, measured with the astrometry&apos;s own aperture: it is what the detection gate, the position&apos;s error and the MPC floor use. The matched filter does not change it; the brightness measurement has its own pair, in the notes</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3986"/>
+        <location filename="../ufe_trackstack_tab.py" line="4100"/>
         <source>Green: a clean measurement. Orange: usable, but not clean. Red: not to be published without looking at it (see the notes).</source>
         <translation>Green: a clean measurement. Orange: usable, but not clean. Red: not to be published without looking at it (see the notes).</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3991"/>
+        <location filename="../ufe_trackstack_tab.py" line="4105"/>
         <source>The two measurements disagree: the point is flagged, nothing is chosen in silence</source>
         <translation>The two measurements disagree: the point is flagged, nothing is chosen in silence</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4382"/>
+        <location filename="../ufe_trackstack_tab.py" line="4496"/>
         <source>The two measurements disagree</source>
         <translation>The two measurements disagree</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4384"/>
+        <location filename="../ufe_trackstack_tab.py" line="4498"/>
         <source>No per-frame centroid</source>
         <translation>No per-frame centroid</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4386"/>
+        <location filename="../ufe_trackstack_tab.py" line="4500"/>
         <source>Brightness written by hand in the Photometry tab</source>
         <translation>Brightness written by hand in the Photometry tab</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4389"/>
+        <location filename="../ufe_trackstack_tab.py" line="4503"/>
         <source>Measured from the observer&apos;s mark (manual mode)</source>
         <translation>Measured from the observer&apos;s mark (manual mode)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4392"/>
+        <location filename="../ufe_trackstack_tab.py" line="4506"/>
         <source>The object did not clear the detection gate: it was measured at the ephemeris&apos; position and is not to be published without looking at it</source>
         <translation>The object did not clear the detection gate: it was measured at the ephemeris&apos; position and is not to be published without looking at it</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4396"/>
+        <location filename="../ufe_trackstack_tab.py" line="4510"/>
         <source>Excluded from the report by you</source>
         <translation>Excluded from the report by you</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4483"/>
+        <location filename="../ufe_trackstack_tab.py" line="4597"/>
         <source>#</source>
         <translation>#</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4483"/>
+        <location filename="../ufe_trackstack_tab.py" line="4597"/>
         <source>Date</source>
         <translation>Date</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4483"/>
+        <location filename="../ufe_trackstack_tab.py" line="4597"/>
         <source>Stn</source>
         <translation>Stn</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4484"/>
+        <location filename="../ufe_trackstack_tab.py" line="4598"/>
         <source>dRA (″)</source>
         <translation>dRA (″)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4484"/>
+        <location filename="../ufe_trackstack_tab.py" line="4598"/>
         <source>dDec (″)</source>
         <translation>dDec (″)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4547"/>
+        <location filename="../ufe_trackstack_tab.py" line="4661"/>
         <source>This row is our own observation: its residual is the one the verdict is about</source>
         <translation>This row is our own observation: its residual is the one the verdict is about</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4590"/>
+        <location filename="../ufe_trackstack_tab.py" line="4704"/>
         <source>Confirmed as &lt;b&gt;%1&lt;/b&gt;</source>
         <translation>Confirmed as &lt;b&gt;%1&lt;/b&gt;</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4592"/>
+        <location filename="../ufe_trackstack_tab.py" line="4706"/>
         <source>published in &lt;a href=&quot;%1&quot;&gt;%2&lt;/a&gt;</source>
         <translation>published in &lt;a href=&quot;%1&quot;&gt;%2&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4595"/>
+        <location filename="../ufe_trackstack_tab.py" line="4709"/>
         <source>published in %1</source>
         <translation>published in %1</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4598"/>
+        <location filename="../ufe_trackstack_tab.py" line="4712"/>
         <source>your observations are among them: your data is in that MPEC</source>
         <translation>your observations are among them: your data is in that MPEC</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4601"/>
+        <location filename="../ufe_trackstack_tab.py" line="4715"/>
         <source>&lt;a href=&quot;%1&quot;&gt;see the object at the MPC&lt;/a&gt;</source>
         <translation>&lt;a href=&quot;%1&quot;&gt;see the object at the MPC&lt;/a&gt;</translation>
     </message>
@@ -16028,7 +16059,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Find_Orb is not configured: the check is not available. Set it up in Settings; meanwhile the centred sequence and the submission floor are the safety net.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4636"/>
+        <location filename="../ufe_trackstack_tab.py" line="4750"/>
         <source>The check is not available:</source>
         <translation>The check is not available:</translation>
     </message>
@@ -16037,64 +16068,64 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">No other observations to compare with: nothing is blocked (a real discovery has no reference); the centred sequence and the submission floor decide.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4647"/>
+        <location filename="../ufe_trackstack_tab.py" line="4761"/>
         <source>The published observations are too few or too short an arc for Find_Orb to fit an orbit, so there is nothing to compare our point with yet. Nothing is blocked.</source>
         <translation>The published observations are too few or too short an arc for Find_Orb to fit an orbit, so there is nothing to compare our point with yet. Nothing is blocked.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4652"/>
+        <location filename="../ufe_trackstack_tab.py" line="4766"/>
         <source>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</source>
         <translation>Our point is an outlier against the other observers: the report is blocked by default. Forcing it leaves the decision on record.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4657"/>
+        <location filename="../ufe_trackstack_tab.py" line="4771"/>
         <source>The check passes: our residual fits inside the published observations&apos; dispersion.</source>
         <translation>The check passes: our residual fits inside the published observations&apos; dispersion.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4661"/>
+        <location filename="../ufe_trackstack_tab.py" line="4775"/>
         <source>Our residual: %1″ / %2″ · %3 distinct observatories</source>
         <translation>Our residual: %1″ / %2″ · %3 distinct observatories</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="2272"/>
-        <location filename="../ufe_trackstack_tab.py" line="4673"/>
+        <location filename="../ufe_trackstack_tab.py" line="2386"/>
+        <location filename="../ufe_trackstack_tab.py" line="4787"/>
         <source>not available</source>
         <translation>not available</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3311"/>
-        <location filename="../ufe_trackstack_tab.py" line="3331"/>
+        <location filename="../ufe_trackstack_tab.py" line="3425"/>
+        <location filename="../ufe_trackstack_tab.py" line="3445"/>
         <source>The brightness could not be re-measured.</source>
         <translation>The brightness could not be re-measured.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="3353"/>
+        <location filename="../ufe_trackstack_tab.py" line="3467"/>
         <source>Brightness re-measured on %1 observation(s): %2 ± %3 %4</source>
         <translation>Brightness re-measured on %1 observation(s): %2 ± %3 %4</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4675"/>
+        <location filename="../ufe_trackstack_tab.py" line="4789"/>
         <source>nothing to compare</source>
         <translation>nothing to compare</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4677"/>
+        <location filename="../ufe_trackstack_tab.py" line="4791"/>
         <source>no orbit yet</source>
         <translation>no orbit yet</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4679"/>
+        <location filename="../ufe_trackstack_tab.py" line="4793"/>
         <source>blocked</source>
         <translation>blocked</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4681"/>
+        <location filename="../ufe_trackstack_tab.py" line="4795"/>
         <source>passes</source>
         <translation>passes</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4707"/>
+        <location filename="../ufe_trackstack_tab.py" line="4821"/>
         <source>There is no measured point to check: run the track &amp; stack first.</source>
         <translation>There is no measured point to check: run the track &amp; stack first.</translation>
     </message>
@@ -16103,17 +16134,17 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">No observation clears the submission floor, so there is nothing to check.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4737"/>
+        <location filename="../ufe_trackstack_tab.py" line="4851"/>
         <source>The re-check failed: no answer from Find_Orb.</source>
         <translation>The re-check failed: no answer from Find_Orb.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4788"/>
+        <location filename="../ufe_trackstack_tab.py" line="4902"/>
         <source>Measure the sequence first.</source>
         <translation>Measure the sequence first.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4814"/>
+        <location filename="../ufe_trackstack_tab.py" line="4928"/>
         <source>%1 of %2 observations are in the report.</source>
         <translation>%1 of %2 observations are in the report.</translation>
     </message>
@@ -16130,12 +16161,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Observation %1 left out: SNR %2 is below the MPC submission floor of %3 (a marginal detection risks a false tracklet)</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4861"/>
+        <location filename="../ufe_trackstack_tab.py" line="4975"/>
         <source>⚠</source>
         <translation>⚠</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4871"/>
+        <location filename="../ufe_trackstack_tab.py" line="4985"/>
         <source>Report generated: %1 observations kept.</source>
         <translation>Report generated: %1 observations kept.</translation>
     </message>
@@ -16187,7 +16218,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
     </message>
     <message>
         <location filename="../ui/ufe_trackstack_tab.ui" line="138"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="472"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="478"/>
         <source>Obs.</source>
         <translation>Obs.</translation>
     </message>
@@ -16280,9 +16311,8 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Saves a second stack of the same frames, aligned on the STARS, next to each observation&apos;s stack. It costs one more stacking pass and it is what the Photometry tab needs to measure the brightness by hand (there the object&apos;s stack has its stars as trails). The run measures with it too, so nothing is built twice</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="322"/>
         <source>Photometry settings…</source>
-        <translation>Photometry settings…</translation>
+        <translation type="vanished">Photometry settings…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_trackstack_tab.ui" line="324"/>
@@ -16386,7 +16416,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Opens the Calibration tab: the master library, the resolved recipe and the pseudo-flat policy that this checkbox applies</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="316"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="314"/>
         <source>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</source>
         <translation>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</translation>
     </message>
@@ -16399,38 +16429,38 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="355"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="361"/>
         <source>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness. The box keeps its own height and scrolls, so a long night never pushes the rest out of the panel and nothing is cut</source>
         <translation>What the run found: the dithering, the composed WCS quality, the velocity sweep, the detection and the brightness. The box keeps its own height and scrolls, so a long night never pushes the rest out of the panel and nothing is cut</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="373"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="379"/>
         <source>Observation:</source>
         <translation>Observation:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="380"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="386"/>
         <source>Which observation&apos;s stack is shown below, with the measured position marked</source>
         <translation>Which observation&apos;s stack is shown below, with the measured position marked</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="397"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="403"/>
         <source>Blink / montage…</source>
         <translation>Blink / montage…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="399"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="405"/>
         <source>Writes one figure with every observation&apos;s stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</source>
         <translation>Writes one figure with every observation&apos;s stack centred on the object, all with the SAME stretch: a GIF that blinks, or a still montage. Auto-stretching each panel separately would make a faint one look as bright as a real one</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="434"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="440"/>
         <source>Every observation&apos;s stack, centred on the object. Click one to bring it to the main view</source>
         <translation>Every observation&apos;s stack, centred on the object. Click one to bring it to the main view</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="367"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="456"/>
+        <location filename="../ufe_trackstack_tab.py" line="375"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="462"/>
         <source>Measurement per observation</source>
         <translation>Measurement per observation</translation>
     </message>
@@ -16486,9 +16516,18 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Opens the Calibration tab: the resolved recipe, the reasons a master was left out, and the vignetting model policy that this checkbox applies; the library itself lives in Settings</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="330"/>
         <source>Re-measure the brightness</source>
-        <translation>Re-measure the brightness</translation>
+        <translation type="vanished">Re-measure the brightness</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="322"/>
+        <source>Photometry…</source>
+        <translation>Photometry…</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="330"/>
+        <source>Re-measure</source>
+        <translation>Re-measure</translation>
     </message>
     <message>
         <location filename="../ui/ufe_trackstack_tab.ui" line="332"/>
@@ -16496,47 +16535,47 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Measures the brightness again on the observation&apos;s stacks with the recipe the Photometry tab is holding right now (apertures, sky, comps), without re-stacking the visit. The position and the detection are untouched</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="407"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="413"/>
         <source>Animate / verify</source>
         <translation>Animate / verify</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="409"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="415"/>
         <source>Plays the observation stacks here, in the main view, centred on the object and with ONE shared stretch: the object must stay put in the middle while the stars crawl, which is what says the detection is real. It writes nothing and asks for no viewer. Click again to stop</source>
         <translation>Plays the observation stacks here, in the main view, centred on the object and with ONE shared stretch: the object must stay put in the middle while the stars crawl, which is what says the detection is real. It writes nothing and asks for no viewer. Click again to stop</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="416"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="422"/>
         <source>Save animation…</source>
         <translation>Save animation…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="418"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="424"/>
         <source>Saves the animation as a GIF or an MP4 with the levels you applied and the plate&apos;s heading on every frame: the same thing the loop shows, so it can be shared as the proof of the detection. The format follows the file name you choose</source>
         <translation>Saves the animation as a GIF or an MP4 with the levels you applied and the plate&apos;s heading on every frame: the same thing the loop shows, so it can be shared as the proof of the detection. The format follows the file name you choose</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="458"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="464"/>
         <source>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</source>
         <translation>The position is measured twice with the same centroid recipe: on the stack and per frame. A disagreement beyond 0.5 arcsec or 3 sigma is flagged, never resolved silently</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="473"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="479"/>
         <source>T_mid</source>
         <translation>T_mid</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="479"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="485"/>
         <source>±</source>
         <translation>±</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="585"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="591"/>
         <source>What came out of the report: how many observations it carries, which ones you excluded and which the app does not recommend sending. Open the report window to read it and to send it to the MPC</source>
         <translation>What came out of the report: how many observations it carries, which ones you excluded and which the app does not recommend sending. Open the report window to read it and to send it to the MPC</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="594"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="600"/>
         <source>Manage MPC report</source>
         <translation>Manage MPC report</translation>
     </message>
@@ -16545,7 +16584,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Report…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="596"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="602"/>
         <source>Open the MPC report in its own window: the format (ADES XML, ADES PSV or 80 columns), the full submission header, and the actions to copy, save or send it to the MPC</source>
         <translation>Open the MPC report in its own window: the format (ADES XML, ADES PSV or 80 columns), the full submission header, and the actions to copy, save or send it to the MPC</translation>
     </message>
@@ -16554,34 +16593,34 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">What came out of the report: how many observations it carries, which ones you excluded and which the app does not recommend sending. A report with no observations is not a report: the button that sends it stays disabled</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4483"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="474"/>
+        <location filename="../ufe_trackstack_tab.py" line="4597"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="480"/>
         <source>RA</source>
         <translation>RA</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4484"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="475"/>
+        <location filename="../ufe_trackstack_tab.py" line="4598"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="481"/>
         <source>Dec</source>
         <translation>Dec</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="476"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="482"/>
         <source>Δ″</source>
         <translation>Δ″</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="480"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="486"/>
         <source>!</source>
         <translation>!</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="489"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="495"/>
         <source>Manual mode (faint object)…</source>
         <translation>Manual mode (faint object)…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="491"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="497"/>
         <source>Mark the object by hand on the whole-sequence stack and measure from your mark: the position is yours (snapped to the centroid, nudged in 0.1 px steps), the velocity is the ephemeris&apos; and the sweep is not run. Useful for an object below the detection gate, and to place a detected one&apos;s centroid by eye. Needs a visit with frames</source>
         <translation>Mark the object by hand on the whole-sequence stack and measure from your mark: the position is yours (snapped to the centroid, nudged in 0.1 px steps), the velocity is the ephemeris&apos; and the sweep is not run. Useful for an object below the detection gate, and to place a detected one&apos;s centroid by eye. Needs a visit with frames</translation>
     </message>
@@ -16590,23 +16629,23 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">The published observations Find_Orb used, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination. A residual is how far an observation sits from the orbit fitted to the rest; a fraction of an arcsecond is the normal scale, and a value many times larger than the neighbours marks a problem with that measurement. Our own rows are highlighted.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="532"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="538"/>
         <source>Check against:</source>
         <translation>Check against:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="534"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="541"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="540"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="547"/>
         <source>The designation the check asks the MPC for. It is prefilled with the object&apos;s name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</source>
         <translation>The designation the check asks the MPC for. It is prefilled with the object&apos;s name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="547"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="553"/>
         <source>Re-check</source>
         <translation>Re-check</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="549"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="555"/>
         <source>Run the check again with the designation above, without stacking the frames again: it only asks the MPC for the published observations and compares our measured points with them</source>
         <translation>Run the check again with the designation above, without stacking the frames again: it only asks the MPC for the published observations and compares our measured points with them</translation>
     </message>
@@ -16635,28 +16674,28 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Δ (″)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="507"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="513"/>
         <source>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</source>
         <translation>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="4093"/>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="522"/>
+        <location filename="../ufe_trackstack_tab.py" line="4207"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="528"/>
         <source>Published observations…</source>
         <translation>Published observations…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="524"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="530"/>
         <source>Open the whole list of published observations the check compared us with, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination, with our own rows highlighted</source>
         <translation>Open the whole list of published observations the check compared us with, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination, with our own rows highlighted</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="564"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="570"/>
         <source>Force the report</source>
         <translation>Force the report</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="566"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="572"/>
         <source>An outlier blocks the report by default; forcing it leaves the decision on record (the check&apos;s verdict and the report&apos;s own note say it was forced)</source>
         <translation>An outlier blocks the report by default; forcing it leaves the decision on record (the check&apos;s verdict and the report&apos;s own note say it was forced)</translation>
     </message>
@@ -16677,12 +16716,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Δ ways (″)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="477"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="483"/>
         <source>SNR</source>
         <translation>SNR</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="478"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="484"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
@@ -16691,7 +16730,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Warnings</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="374"/>
+        <location filename="../ufe_trackstack_tab.py" line="382"/>
         <source>Check against other observers</source>
         <translation>Check against other observers</translation>
     </message>
@@ -16700,7 +16739,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Find_Orb fits the published observations without ours and predicts where ours should land; our residual against their dispersion decides.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="557"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="563"/>
         <source>The check filters, it does not prove: fitting a short arc is not proof of a detection.</source>
         <translation>The check filters, it does not prove: fitting a short arc is not proof of a detection.</translation>
     </message>
@@ -16713,7 +16752,7 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">An outlier blocks the report by default; forcing it leaves the decision on record</translation>
     </message>
     <message>
-        <location filename="../ufe_trackstack_tab.py" line="380"/>
+        <location filename="../ufe_trackstack_tab.py" line="388"/>
         <source>Report</source>
         <translation>Report</translation>
     </message>
@@ -16742,12 +16781,12 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Fill the visit&apos;s MPC paste box with the report; the validator there has the last word before saving</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="603"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="609"/>
         <source>Undo this run</source>
         <translation>Undo this run</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_trackstack_tab.ui" line="605"/>
+        <location filename="../ui/ufe_trackstack_tab.ui" line="611"/>
         <source>Remove this execution&apos;s observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</source>
         <translation>Remove this execution&apos;s observations from the project (the run stays, marked undone, for the audit trail); the other runs and the visit are untouched</translation>
     </message>

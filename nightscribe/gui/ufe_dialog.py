@@ -47,10 +47,6 @@ from .widgets.ufe_project_badge import UfeProjectBadge
 
 logger = logging.getLogger("nightscribe.gui.ufe_dialog")
 
-# one glyph per level of the status line (U4), so a warning reads as a
-# warning before it is read
-_STATUS_GLYPH = {"info": "ⓘ", "warn": "⚠", "error": "✕"}
-
 _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
                  (2.0, "200"), (4.0, "400"))
 
@@ -388,7 +384,9 @@ class UfeDialog(QWidget):
         for tab in (getattr(self, "tab_measure", None),
                     getattr(self, "tab_compare", None),
                     getattr(self, "tab_annotate", None),
-                    getattr(self, "tab_blink", None)):
+                    getattr(self, "tab_blink", None),
+                    getattr(self, "tab_calibration", None),
+                    getattr(self, "tab_trackstack", None)):
             clear = getattr(tab, "clear_session", None)
             if callable(clear):
                 try:
@@ -2561,11 +2559,10 @@ class UfeDialog(QWidget):
         # that eats the plate's height costs more than it says).
         # @args: text - the message, level - "info" | "warn" | "error"
         # @return: None
-        from ..viz import palette as viz_palette
         self._status_text = str(text or "")
         self._status_level = level if level in ("info", "warn", "error") \
             else "info"
-        glyph = _STATUS_GLYPH[self._status_level]
+        glyph = theme.level_glyph(self._status_level)
         self._status_glyph = glyph
         bar = self._ui.lbl_status_bar
         bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -2576,9 +2573,12 @@ class UfeDialog(QWidget):
             # status bar measured 25 px and took them from the plate, which
             # is the whole point of U1. 12 px is the same size the chart's
             # ticks use, and it is a footnote, not a headline.
-            colour = {"info": theme.C_TEXT_DIM, "warn": "#e0c060",
-                      "error": viz_palette.DANGER}[self._status_level]
-            bar.setStyleSheet(f"color: {colour}; font-size: 12px;")
+            # The colour comes from the app's single level table
+            # (theme.LEVEL_COLOURS), the same one every tab reads, so the
+            # line and the panel cannot disagree about what a warning is.
+            bar.setStyleSheet(
+                f"color: {theme.level_colour(self._status_level)};"
+                " font-size: 12px;")
             self._status_shown = self._status_level
         self._elide_status()
 

@@ -361,3 +361,30 @@ def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
     assert not theme._is_themed(qapp)
     qapp._nightscribe_themed = True
     assert theme._is_themed(qapp)
+
+
+def test_the_level_table_is_the_single_source(qapp):
+    # One glyph and one colour per level, in ONE place: the window's status
+    # line and every tab read the same table, so the same sentence cannot
+    # come out in two colours. It used to be three private copies, and the
+    # tabs GUESSED the level from a "⚠" glued to the front of the text.
+    from PySide6.QtWidgets import QLabel
+    from nightscribe.gui import theme
+    assert theme.level_colour("warn") == theme.C_WARN
+    assert theme.level_colour("error") == theme.C_EVENT
+    assert theme.level_colour("info") == theme.C_TEXT_DIM
+    assert theme.level_glyph("error") == "✕"
+    # an unknown level reads as a note, never as a crash
+    assert theme.level_colour("nonsense") == theme.C_TEXT_DIM
+    assert theme.level_glyph(None) == "ⓘ"
+    # paint_level writes the stylesheet once per LEVEL, not per message: a
+    # stylesheet forces a full re-layout, and a tab that says twenty things
+    # in a row must not re-lay the panel twenty times
+    label = QLabel("x")
+    theme.paint_level(label, "warn")
+    first = label.styleSheet()
+    assert theme.C_WARN in first
+    theme.paint_level(label, "warn")
+    assert label.styleSheet() == first
+    theme.paint_level(label, "error")
+    assert theme.C_EVENT in label.styleSheet()

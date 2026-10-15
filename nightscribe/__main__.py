@@ -36,6 +36,148 @@ def _db():
     return db
 
 
+# The CLI's own strings, per language. The code's base language is English
+# (AGENTS.md) and Spanish is a translation, so the table carries both and
+# `_cli_lang` picks one. It is a plain dict on purpose: --help must not pay for
+# importing PySide6 (the GUI's catalogue), and the rule is the same one
+# gui/pretty.ui_lang follows: the configured language, or the OS locale when
+# the setting is "system". This is the fix for the CLI answering only in
+# Spanish, which left an English speaker unable to read --help (UX-01).
+_CLI_TEXT = {
+    "en": {
+        "desc": "Plan your night, understand every object, tell your science.",
+        "epilog": "Run 'nightscribe gui' for the desktop app; "
+                  "'nightscribe <command> --help' for each command.",
+        "tonight": "best targets for tonight",
+        "tonight_fecha": "YYYY-MM-DD (night, UTC)",
+        "tonight_top": "how many to show",
+        "explore": "explained object card",
+        "post": "bilingual drafts + tweet",
+        "solar": "Sun state",
+        "solar_png": "also render the panel as PNG",
+        "blink": "supernova blink: your FITS vs PanSTARRS DR1 g",
+        "blink_name": "supernova name (e.g. 2026ziz)",
+        "blink_image": "FITS with astrometry (WCS)",
+        "blink_effect": "blink or fade",
+        "blink_zoom": "crop around the SN (1 = full)",
+        "blink_interval": "duration of each blink frame (ms)",
+        "blink_video": "also export the blink as an MP4 video (H.264)",
+        "blink_post": "also draft the ES/EN post + tweet referencing the blink",
+        "history": "observing history",
+        "sequence": "photometric sequence + finder chart",
+        "sequence_object": "target name (VSX/SIMBAD)",
+        "sequence_catalog": "magnitude catalogue (default Gaia EDR3)",
+        "sequence_fov": "field of view in arcminutes (3-60)",
+        "sequence_comps": "how many comparison stars to propose",
+        "sequence_mag": "target magnitude (default: VSX max or field median)",
+        "sequence_fits": "your FITS as background (own WCS or solved with "
+                         "Astrometry.net)",
+        "sequence_no_image": "no background image (annotations only)",
+        "inject": "injection and recovery: how deep the pipeline really "
+                  "reaches",
+        "inject_folder": "folder with the frames (never touched)",
+        "inject_fluxes": "fluxes to test, in ADU over the sky (comma "
+                         "separated)",
+        "inject_frames": "how many frames to use (the first ones)",
+        "inject_motion": "motion of the injected object, px per frame",
+        "inject_pa": "position angle of the motion, degrees",
+        "inject_tries": "independent injections per flux",
+        "inject_out": "folder for the injected copies",
+        "gui": "desktop application",
+        "project": "minimal project management (CLI)",
+        "project_list": "list projects",
+        "project_status": "filter by status",
+        "project_create": "create a project",
+        "project_kind": "sn|neo|comet|pccp|transit|hads|variable",
+        "project_advance": "advance a step",
+        "project_show": "show a project",
+        "project_close": "close a project",
+        "project_outcome": "final outcome (free text)",
+        "project_reopen": "reopen a project",
+        "project_files": "list the project's files",
+        "project_id": "project id",
+        "object_name": "object name",
+        "out_dir": "output directory",
+        "png_charts": "also render the charts",
+        "ra_manual": "manual RA (degrees)",
+        "dec_manual": "manual Dec (degrees)",
+        "centre_ra": "field centre RA (degrees)",
+        "centre_dec": "field centre Dec (degrees)",
+    },
+    "es": {
+        "desc": "Planifica tu noche, entiende cada objeto, cuenta tu ciencia.",
+        "epilog": "Ejecuta 'nightscribe gui' para la aplicación de escritorio; "
+                  "'nightscribe <comando> --help' para cada comando.",
+        "tonight": "mejores objetivos de esta noche",
+        "tonight_fecha": "YYYY-MM-DD (noche, UTC)",
+        "tonight_top": "cuántos mostrar",
+        "explore": "ficha explicada de un objeto",
+        "post": "borradores ES/EN + tuit",
+        "solar": "estado del Sol",
+        "solar_png": "generar también el panel como PNG",
+        "blink": "blink SN: tu FITS vs PanSTARRS DR1 g",
+        "blink_name": "nombre de la SN (p. ej. 2026ziz)",
+        "blink_image": "FITS con astrometría (WCS)",
+        "blink_effect": "blink o fade",
+        "blink_zoom": "recorte alrededor de la SN (1 = completo)",
+        "blink_interval": "duración de cada frame del blink (ms)",
+        "blink_video": "exportar también el blink como vídeo MP4 (H.264)",
+        "blink_post": "generar también el borrador ES/EN + tuit del blink",
+        "history": "historial de observaciones",
+        "sequence": "secuencia fotométrica + carta de comparación",
+        "sequence_object": "nombre del objetivo (VSX/SIMBAD)",
+        "sequence_catalog": "catálogo de magnitudes (por defecto Gaia EDR3)",
+        "sequence_fov": "campo de visión en minutos de arco (3-60)",
+        "sequence_comps": "número de estrellas de comparación propuestas",
+        "sequence_mag": "magnitud del objetivo (por defecto: máx. VSX o "
+                        "mediana del campo)",
+        "sequence_fits": "tu FITS como fondo (WCS propio o resuelto con "
+                         "Astrometry.net)",
+        "sequence_no_image": "sin imagen de fondo (solo anotaciones)",
+        "inject": "inyección y recuperación: hasta dónde llega el pipeline",
+        "inject_folder": "carpeta con las tomas (no se tocan)",
+        "inject_fluxes": "flujos a probar, en ADU sobre el cielo (separados "
+                         "por comas)",
+        "inject_frames": "cuántas tomas usar (las primeras)",
+        "inject_motion": "movimiento del objeto inyectado, px por toma",
+        "inject_pa": "ángulo de posición del movimiento, grados",
+        "inject_tries": "inyecciones independientes por flujo",
+        "inject_out": "carpeta para las copias inyectadas",
+        "gui": "aplicación de escritorio",
+        "project": "gestión de proyectos (CLI mínimo)",
+        "project_list": "listar proyectos",
+        "project_status": "filtrar por estado",
+        "project_create": "crear un proyecto",
+        "project_kind": "sn|neo|comet|pccp|transit|hads|variable",
+        "project_advance": "avanzar un paso",
+        "project_show": "mostrar un proyecto",
+        "project_close": "cerrar un proyecto",
+        "project_outcome": "resultado final (texto libre)",
+        "project_reopen": "reabrir un proyecto",
+        "project_files": "listar ficheros del proyecto",
+        "project_id": "id del proyecto",
+        "object_name": "nombre del objeto",
+        "out_dir": "directorio de salida",
+        "png_charts": "generar los gráficos",
+        "ra_manual": "RA manual (grados)",
+        "dec_manual": "Dec manual (grados)",
+        "centre_ra": "RA del centro (grados)",
+        "centre_dec": "Dec del centro (grados)",
+    },
+}
+
+
+def _cli_lang():
+    # @return: "es"|"en", the language the CLI speaks
+    import os
+    lang = str(cfg.get("language", "system") or "system").lower()
+    if lang in ("es", "en"):
+        return lang
+    tag = (os.environ.get("LC_ALL") or os.environ.get("LC_MESSAGES")
+           or os.environ.get("LANG") or "")
+    return "es" if tag.lower().startswith("es") else "en"
+
+
 def _setup_logging(verbose):
     # The log goes to the console AND to a rotating file. A GUI launched
     # from a menu has no console at all, so before this a failure like "a
@@ -585,120 +727,103 @@ def main(argv=None):
     # CLI entry point.
     # @args: argv - optional argument list (tests)
     # @return: exit code
+    T = _CLI_TEXT[_cli_lang()]
     parser = argparse.ArgumentParser(
         prog="nightscribe",
-        description="Planifica tu noche, entiende cada objeto, cuenta tu ciencia.",
-        epilog="Run 'nightscribe gui' for the desktop app. / "
-               "Ejecuta 'nightscribe gui' para la aplicación de escritorio.")
+        description=T["desc"],
+        epilog=T["epilog"])
     from .version import full_version
     parser.add_argument("--version", action="version",
                         version=f"{__app_name__} {full_version()}")
     parser.add_argument("--verbose", "-v", action="store_true")
     sub = parser.add_subparsers(dest="cmd")
 
-    p = sub.add_parser("tonight", help="mejores objetivos de esta noche")
-    p.add_argument("--fecha", help="YYYY-MM-DD (noche, UTC)")
-    p.add_argument("--top", type=int, default=3)
+    p = sub.add_parser("tonight", help=T["tonight"])
+    p.add_argument("--fecha", help=T["tonight_fecha"])
+    p.add_argument("--top", type=int, default=3, help=T["tonight_top"])
     p.set_defaults(func=cmd_tonight)
 
-    p = sub.add_parser("explore", help="ficha explicada de un objeto")
-    p.add_argument("objeto")
+    p = sub.add_parser("explore", help=T["explore"])
+    p.add_argument("objeto", help=T["object_name"])
     p.set_defaults(func=cmd_explore)
 
-    p = sub.add_parser("post", help="borradores ES/EN + tuit")
-    p.add_argument("objeto")
-    p.add_argument("--salida", help="directorio de salida")
-    p.add_argument("--png", action="store_true", help="generar gráficos PNG")
+    p = sub.add_parser("post", help=T["post"])
+    p.add_argument("objeto", help=T["object_name"])
+    p.add_argument("--salida", help=T["out_dir"])
+    p.add_argument("--png", action="store_true", help=T["png_charts"])
     p.set_defaults(func=cmd_post)
 
-    p = sub.add_parser("solar", help="estado del Sol")
-    p.add_argument("--png", action="store_true")
+    p = sub.add_parser("solar", help=T["solar"])
+    p.add_argument("--png", action="store_true", help=T["solar_png"])
     p.set_defaults(func=cmd_solar)
 
-    p = sub.add_parser("blink", help="blink SN: tu FITS vs PanSTARRS DR1 g")
-    p.add_argument("nombre", help="nombre de la SN (p. ej. 2026ziz)")
-    p.add_argument("imagen", help="FITS con astrometría (WCS)")
-    p.add_argument("--salida", help="directorio de salida")
-    p.add_argument("--efecto", choices=["blink", "fade"], default="blink")
-    p.add_argument("--ra", type=float, help="RA manual (grados)")
-    p.add_argument("--dec", type=float, help="Dec manual (grados)")
+    p = sub.add_parser("blink", help=T["blink"])
+    p.add_argument("nombre", help=T["blink_name"])
+    p.add_argument("imagen", help=T["blink_image"])
+    p.add_argument("--salida", help=T["out_dir"])
+    p.add_argument("--efecto", choices=["blink", "fade"], default="blink",
+                   help=T["blink_effect"])
+    p.add_argument("--ra", type=float, help=T["ra_manual"])
+    p.add_argument("--dec", type=float, help=T["dec_manual"])
     p.add_argument("--zoom", type=int, default=1, choices=[1, 2, 4],
-                   help="recorte alrededor de la SN (1 = completo)")
+                   help=T["blink_zoom"])
     p.add_argument("--intervalo", type=int, default=500,
-                   help="duración de cada frame del blink (ms)")
-    p.add_argument("--video", action="store_true",
-                   help="exportar también el blink como vídeo MP4 (H.264)")
-    p.add_argument("--post", action="store_true",
-                   help="generar borrador ES/EN + tuit que referencia el blink")
+                   help=T["blink_interval"])
+    p.add_argument("--video", action="store_true", help=T["blink_video"])
+    p.add_argument("--post", action="store_true", help=T["blink_post"])
     p.set_defaults(func=cmd_blink)
 
-    p = sub.add_parser("history", help="historial de observaciones")
+    p = sub.add_parser("history", help=T["history"])
     p.set_defaults(func=cmd_history)
 
-    p = sub.add_parser("sequence",
-                       help="secuencia fotométrica + carta de comparación")
-    p.add_argument("objeto", nargs="?", default=None,
-                   help="nombre del objetivo (VSX/SIMBAD)")
-    p.add_argument("--ra", type=float, help="RA del centro (grados)")
-    p.add_argument("--dec", type=float, help="Dec del centro (grados)")
+    p = sub.add_parser("sequence", help=T["sequence"])
+    p.add_argument("objeto", nargs="?", default=None, help=T["sequence_object"])
+    p.add_argument("--ra", type=float, help=T["centre_ra"])
+    p.add_argument("--dec", type=float, help=T["centre_dec"])
     p.add_argument("--catalog", choices=["gaia", "apass"], default="gaia",
-                   help="catálogo de magnitudes (por defecto Gaia EDR3)")
-    p.add_argument("--fov", type=float, default=18.0,
-                   help="campo de visión en minutos de arco (3-60)")
-    p.add_argument("--comps", type=int, default=8,
-                   help="número de estrellas de comparación propuestas")
-    p.add_argument("--mag", type=float,
-                   help="magnitud del objetivo (por defecto: máx. VSX o "
-                        "mediana del campo)")
-    p.add_argument("--fits", help="tu FITS como fondo (WCS propio o "
-                                  "resuelto con Astrometry.net)")
+                   help=T["sequence_catalog"])
+    p.add_argument("--fov", type=float, default=18.0, help=T["sequence_fov"])
+    p.add_argument("--comps", type=int, default=8, help=T["sequence_comps"])
+    p.add_argument("--mag", type=float, help=T["sequence_mag"])
+    p.add_argument("--fits", help=T["sequence_fits"])
     p.add_argument("--sin-imagen", action="store_true",
-                   help="sin imagen de fondo (solo anotaciones)")
-    p.add_argument("--salida", help="directorio de salida")
+                   help=T["sequence_no_image"])
+    p.add_argument("--salida", help=T["out_dir"])
     p.set_defaults(func=cmd_sequence)
 
-    p = sub.add_parser(
-        "inject",
-        help="inyección y recuperación: hasta dónde llega el pipeline")
-    p.add_argument("carpeta", help="carpeta con las tomas (no se tocan)")
-    p.add_argument("--flujos", default="2000,5000,12000",
-                   help="flujos a probar, en ADU sobre el cielo (coma)")
-    p.add_argument("--tomas", type=int, default=30,
-                   help="cuántas tomas usar (las primeras)")
+    p = sub.add_parser("inject", help=T["inject"])
+    p.add_argument("carpeta", help=T["inject_folder"])
+    p.add_argument("--flujos", default="2000,5000,12000", help=T["inject_fluxes"])
+    p.add_argument("--tomas", type=int, default=30, help=T["inject_frames"])
     p.add_argument("--movimiento", type=float, default=1.5,
-                   help="movimiento del objeto inyectado, px por toma")
-    p.add_argument("--pa", type=float, default=90.0,
-                   help="ángulo de posición del movimiento, grados")
-    p.add_argument("--intentos", type=int, default=1,
-                   help="inyecciones independientes por flujo")
-    p.add_argument("--salida", default=None,
-                   help="carpeta para las copias inyectadas")
+                   help=T["inject_motion"])
+    p.add_argument("--pa", type=float, default=90.0, help=T["inject_pa"])
+    p.add_argument("--intentos", type=int, default=1, help=T["inject_tries"])
+    p.add_argument("--salida", default=None, help=T["inject_out"])
     p.set_defaults(func=cmd_inject)
 
-    p = sub.add_parser("gui", help="aplicación de escritorio")
+    p = sub.add_parser("gui", help=T["gui"])
     p.set_defaults(func=cmd_gui)
 
-    p = sub.add_parser("project", help="gestión de proyectos (CLI mínimo)")
+    p = sub.add_parser("project", help=T["project"])
     p_sub = p.add_subparsers(dest="action", required=True)
-    p_list = p_sub.add_parser("list", help="listar proyectos")
+    p_list = p_sub.add_parser("list", help=T["project_list"])
     p_list.add_argument("--status", choices=["active", "done", "archived"],
-                        default=None)
-    p_create = p_sub.add_parser("create", help="crear un proyecto")
-    p_create.add_argument("--kind", required=True,
-                          help="sn|neo|comet|pccp|transit|hads|variable")
-    p_create.add_argument("--name", required=True, help="object name")
-    p_advance = p_sub.add_parser("advance", help="avanzar un paso")
-    p_advance.add_argument("id", type=int, help="project id")
-    p_show = p_sub.add_parser("show", help="mostrar un proyecto")
-    p_show.add_argument("id", type=int, help="project id")
-    p_close = p_sub.add_parser("close", help="cerrar un proyecto")
-    p_close.add_argument("id", type=int, help="project id")
-    p_close.add_argument("--outcome", default=None,
-                         help="resultado final (texto libre)")
-    p_reopen = p_sub.add_parser("reopen", help="reabrir un proyecto")
-    p_reopen.add_argument("id", type=int, help="project id")
-    p_files = p_sub.add_parser("files", help="listar ficheros del proyecto")
-    p_files.add_argument("id", type=int, help="project id")
+                        default=None, help=T["project_status"])
+    p_create = p_sub.add_parser("create", help=T["project_create"])
+    p_create.add_argument("--kind", required=True, help=T["project_kind"])
+    p_create.add_argument("--name", required=True, help=T["object_name"])
+    p_advance = p_sub.add_parser("advance", help=T["project_advance"])
+    p_advance.add_argument("id", type=int, help=T["project_id"])
+    p_show = p_sub.add_parser("show", help=T["project_show"])
+    p_show.add_argument("id", type=int, help=T["project_id"])
+    p_close = p_sub.add_parser("close", help=T["project_close"])
+    p_close.add_argument("id", type=int, help=T["project_id"])
+    p_close.add_argument("--outcome", default=None, help=T["project_outcome"])
+    p_reopen = p_sub.add_parser("reopen", help=T["project_reopen"])
+    p_reopen.add_argument("id", type=int, help=T["project_id"])
+    p_files = p_sub.add_parser("files", help=T["project_files"])
+    p_files.add_argument("id", type=int, help=T["project_id"])
     p.set_defaults(func=cmd_project)
 
     # With no subcommand the desktop app opens: a user who types the program's

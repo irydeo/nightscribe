@@ -284,7 +284,8 @@ duplican los tokens del tema), **QA-14** (escrituras no atómicas de productos d
 - [x] Suite verde en las dos plataformas; los 33 *skips* explicados o cubiertos (QA-18 aparte)
 - [x] ADR-091 revisada y `gpu.py` coherente (A5); *pendiente: confirmar la cobertura OpenCL en CI*
 - [x] Guía con capítulo de ficha de objeto, troubleshooting y sin la contradicción del flat dark (B9, B10, B11)
-- [ ] Licencia GPL y aviso de Find_Orb presentes en los paquetes
+- [x] Licencia GPL y aviso de Find_Orb presentes en los paquetes (el aviso viaja en el bundle,
+  el `.deb`, el `.rpm` y el PKGBUILD)
 
 ---
 

@@ -78,11 +78,25 @@ def log_path():
 
 
 def docs_dir():
-    # @return: Path to the documentation folder (docs/ bundled by the
-    # PyInstaller spec, or the repository one when running from source)
+    # @return: Path to the documentation folder, or None when there is none.
+    # The three places a running copy looks, in order: the PyInstaller
+    # bundle (Windows installer and portable build), a checkout run from
+    # source, and a system install (the .deb, the .rpm, the PKGBUILD and a
+    # `pip install`, which drop the guide in share/nightscribe/docs). Until
+    # 2026-10-15 the Linux packages and the wheel shipped WITHOUT it, so
+    # Help > Documentation, the UFE's "?" and the offline assistant index
+    # came up empty everywhere except Windows.
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS) / "docs"
-    return Path(__file__).resolve().parent.parent / "docs"
+    candidates = [
+        Path(__file__).resolve().parent.parent / "docs",
+        Path(sys.prefix) / "share" / "nightscribe" / "docs",
+        Path("/usr/share/nightscribe/docs"),
+    ]
+    for cand in candidates:
+        if cand.is_dir():
+            return cand
+    return candidates[0]
 
 
 def findorb_bundle_dir():

@@ -199,63 +199,79 @@ def build(version, findorb_dir, out_dir, arch="amd64"):
     # @return: the path to the .deb
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    stage = Path(tempfile.mkdtemp(prefix="ns-deb-"))
+    stage = _stage(version, findorb_dir, arch)
     try:
-        # The Python package, importable by the system interpreter.
-        dest_pkg = stage / "usr" / "lib" / "python3" / "dist-packages"
-        shutil.copytree(ROOT / "nightscribe", dest_pkg / "nightscribe",
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        # The version, in the two shapes the app understands: the standard
-        # dist-info (importlib.metadata) and a plain file the version module
-        # reads as a last resort. Both carry the SAME --version, so a package
-        # can never report a version other than the one it was built with.
-        _write(dest_pkg / f"nightscribe-{version}.dist-info" / "METADATA",
-               _dist_info(version))
-        _write(stage / "usr" / "share" / "nightscribe" / "version",
-               version + "\n")
-        # The launcher, the desktop entry and the icons.
-        _write(stage / "usr" / "bin" / "nightscribe", _wrapper(),
-               mode=0o755)
-        shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.desktop",
-                     _mk(stage / "usr" / "share" / "applications"
-                         / f"{DESKTOP_ID}.desktop"))
-        # The AppStream metainfo: licence, developer and icon for the
-        # software centre (its id must match the .desktop file's name).
-        shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.metainfo.xml",
-                     _mk(stage / "usr" / "share" / "metainfo"
-                         / f"{DESKTOP_ID}.metainfo.xml"))
-        for size in ICON_SIZES:
-            src = ROOT / "nightscribe" / "assets" / f"appicon-{size}.png"
-            if src.is_file():
-                dst = (stage / "usr" / "share" / "icons" / "hicolor"
-                       / f"{size}x{size}" / "apps" / "nightscribe.png")
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
-        # The Debian documentation: the copyright (the licence Debian policy
-        # asks for) and a one-line changelog.
-        doc = stage / "usr" / "share" / "doc" / "nightscribe"
-        _write(doc / "copyright", _copyright())
-        with gzip.open(_mk(doc / "changelog.gz"), "wt", encoding="utf-8") as fh:
-            fh.write(
-                f"nightscribe ({version}) unstable; urgency=medium\n\n"
-                f"  * Package build {version}.\n\n"
-                f" -- Francisco Jose Calvo Fernandez "
-                f"<irydeo@users.noreply.github.com>  "
-                f"{time.strftime('%a, %d %b %Y %H:%M:%S %z')}\n")
-        # Find_Orb, when the caller prepared one (bin/fo + share/findorb/data).
-        if findorb_dir and Path(findorb_dir).is_dir():
-            shutil.copytree(findorb_dir,
-                            stage / "usr" / "lib" / "nightscribe" / "findorb")
-        # DEBIAN/control (Installed-Size in KiB, as the policy wants).
-        size_kb = sum(f.stat().st_size for f in stage.rglob("*")
-                      if f.is_file()) // 1024
-        _write(stage / "DEBIAN" / "control", _control(version, arch, size_kb))
         deb = out_dir / f"nightscribe_{version}_{arch}.deb"
         subprocess.run(["dpkg-deb", "--build", "--root-owner-group",
                         str(stage), str(deb)], check=True)
         return deb
     finally:
         shutil.rmtree(stage, ignore_errors=True)
+
+
+def _stage(version, findorb_dir, arch):
+    # @args: version, findorb_dir, arch - as in build()
+    # @return: the Path of the staged tree (the caller removes it)
+    # Split out of build() so a test can inspect what the package will
+    # actually carry without a dpkg-deb run: the documentation shipped empty
+    # on every Linux channel until 2026-10-15 and nothing noticed.
+    stage = Path(tempfile.mkdtemp(prefix="ns-deb-"))
+    # The Python package, importable by the system interpreter.
+    dest_pkg = stage / "usr" / "lib" / "python3" / "dist-packages"
+    shutil.copytree(ROOT / "nightscribe", dest_pkg / "nightscribe",
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # The version, in the two shapes the app understands: the standard
+    # dist-info (importlib.metadata) and a plain file the version module
+    # reads as a last resort. Both carry the SAME --version, so a package
+    # can never report a version other than the one it was built with.
+    _write(dest_pkg / f"nightscribe-{version}.dist-info" / "METADATA",
+           _dist_info(version))
+    _write(stage / "usr" / "share" / "nightscribe" / "version",
+           version + "\n")
+    # The documentation, where paths.docs_dir() looks on a system install:
+    # without it Help > Documentation, the UFE's "?" and the offline
+    # assistant index come up empty.
+    shutil.copytree(ROOT / "docs",
+                    _mk(stage / "usr" / "share" / "nightscribe" / "docs"),
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # The launcher, the desktop entry and the icons.
+    _write(stage / "usr" / "bin" / "nightscribe", _wrapper(),
+           mode=0o755)
+    shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.desktop",
+                 _mk(stage / "usr" / "share" / "applications"
+                     / f"{DESKTOP_ID}.desktop"))
+    # The AppStream metainfo: licence, developer and icon for the
+    # software centre (its id must match the .desktop file's name).
+    shutil.copy2(ROOT / "installer" / f"{DESKTOP_ID}.metainfo.xml",
+                 _mk(stage / "usr" / "share" / "metainfo"
+                     / f"{DESKTOP_ID}.metainfo.xml"))
+    for size in ICON_SIZES:
+        src = ROOT / "nightscribe" / "assets" / f"appicon-{size}.png"
+        if src.is_file():
+            dst = (stage / "usr" / "share" / "icons" / "hicolor"
+                   / f"{size}x{size}" / "apps" / "nightscribe.png")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
+    # The Debian documentation: the copyright (the licence Debian policy
+    # asks for) and a one-line changelog.
+    doc = stage / "usr" / "share" / "doc" / "nightscribe"
+    _write(doc / "copyright", _copyright())
+    with gzip.open(_mk(doc / "changelog.gz"), "wt", encoding="utf-8") as fh:
+        fh.write(
+            f"nightscribe ({version}) unstable; urgency=medium\n\n"
+            f"  * Package build {version}.\n\n"
+            f" -- Francisco Jose Calvo Fernandez "
+            f"<irydeo@users.noreply.github.com>  "
+            f"{time.strftime('%a, %d %b %Y %H:%M:%S %z')}\n")
+    # Find_Orb, when the caller prepared one (bin/fo + share/findorb/data).
+    if findorb_dir and Path(findorb_dir).is_dir():
+        shutil.copytree(findorb_dir,
+                        stage / "usr" / "lib" / "nightscribe" / "findorb")
+    # DEBIAN/control (Installed-Size in KiB, as the policy wants).
+    size_kb = sum(f.stat().st_size for f in stage.rglob("*")
+                  if f.is_file()) // 1024
+    _write(stage / "DEBIAN" / "control", _control(version, arch, size_kb))
+    return stage
 
 
 def _mk(path):

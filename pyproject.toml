@@ -53,7 +53,7 @@ nightscribe = "nightscribe.__main__:main"
 
 [project.urls]
 Homepage = "https://www.irydeo.com"
-Repository = "https://github.com/<pending>/nightscribe"
+Repository = "https://github.com/irydeo/nightscribe"
 
 [tool.setuptools_scm]
 version_scheme = "guess-next-dev"
@@ -65,6 +65,30 @@ include = ["nightscribe*"]
 [tool.setuptools.package-data]
 "nightscribe.gui" = ["ui/*.ui", "i18n/*.qm"]
 "nightscribe" = ["assets/*", "assets/hads-coverage/*"]
+
+# The documentation travels with the package, in the layout the in-app
+# browser and the offline assistant index expect (ADR-070). Every directory
+# that holds .md files needs its own entry: setuptools' data-files FLATTENS
+# a globbed tree into one target dir, which would break the manual's
+# relative links. tests/unit/test_packaging.py walks docs/ and fails when a
+# directory is left out, so this list cannot rot silently.
+[tool.setuptools.data-files]
+"share/nightscribe/docs" = [
+    "docs/*.md",
+    "docs/*.hrz",
+    "docs/*.targets",
+    "docs/*.txt",
+]
+"share/nightscribe/docs/adr" = ["docs/adr/*.md"]
+"share/nightscribe/docs/user" = ["docs/user/*.md"]
+"share/nightscribe/docs/video" = ["docs/video/*.md"]
+"share/nightscribe/docs/PLANS" = ["docs/PLANS/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-minor-planets" = ["docs/PLANS/astrometry-minor-planets/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-perf" = ["docs/PLANS/astrometry-perf/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-snr" = ["docs/PLANS/astrometry-snr/*.md"]
+"share/nightscribe/docs/PLANS/hads" = ["docs/PLANS/hads/*.md"]
+"share/nightscribe/docs/PLANS/ux" = ["docs/PLANS/ux/*.md"]
+"share/nightscribe/docs/PLANS/variables" = ["docs/PLANS/variables/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

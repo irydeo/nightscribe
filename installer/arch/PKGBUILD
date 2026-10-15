@@ -46,7 +46,9 @@ build() {
 package() {
     cd "$srcdir/$pkgname"
 
-    # The Python package, into the system site-packages.
+    # The Python package, into the system site-packages. This also drops the
+    # documentation in usr/share/nightscribe/docs (the wheel's data-files),
+    # which is where paths.docs_dir() looks on a system install.
     python -m installer --destdir="$pkgdir" dist/*.whl
 
     # The launcher, the desktop entry and the icons.

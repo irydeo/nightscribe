@@ -82,6 +82,10 @@ printf 'Metadata-Version: 2.1\nName: nightscribe\nVersion: %{version}\n' \
     > %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info/METADATA
 install -d %{buildroot}%{_datadir}/nightscribe
 printf '%s\n' '%{version}' > %{buildroot}%{_datadir}/nightscribe/version
+# The documentation, where paths.docs_dir() looks on a system install:
+# without it Help > Documentation and the offline assistant index are empty.
+install -d %{buildroot}%{_datadir}/nightscribe/docs
+cp -a docs/. %{buildroot}%{_datadir}/nightscribe/docs/
 install -d %{buildroot}%{_bindir}
 cat > %{buildroot}%{_bindir}/nightscribe <<'EOF'
 #!/bin/sh
@@ -118,6 +122,7 @@ fi
 %{_datadir}/metainfo/io.github.irydeo.nightscribe.metainfo.xml
 %license %{_datadir}/licenses/%{name}/LICENSE
 %{_datadir}/nightscribe/version
+%{_datadir}/nightscribe/docs
 %{_datadir}/icons/hicolor/*/apps/nightscribe.png
 %{_prefix}/lib/nightscribe/findorb
 

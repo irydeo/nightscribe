@@ -561,3 +561,40 @@ def test_attach_fits_lists_the_exception(panel, monkeypatch, tmp_path):
     monkeypatch.setattr(vp_mod, "adopt_ui", _spy)
     w._on_attach()
     assert seen["ui"].lst_except.count() == 1
+
+
+def test_free_space_moves_the_run_frames_and_brings_them_back(
+        panel, monkeypatch, tmp_path):
+    # ADR-062 phase 9 wired into the visit (A2): the originals of a run move
+    # to procesados/ and come back. Nothing is deleted.
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core import astrometry_store as store
+    import nightscribe.core.project as proj_mod
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    sid = vp.current_session_id()
+    run = store.create_run(vp._db, pid, sid, cfg={}, object_name="SN2026vp",
+                           status="complete")
+    frames = []
+    for i in range(2):
+        f = tmp_path / f"fr{i}.fits"
+        f.write_bytes(b"x" * 100)
+        frames.append({"path": str(f), "size": 100, "filter": "Clear",
+                       "exptime_s": 3.0, "date_obs": "2026-10-15T21:00:00"})
+    store.add_frames(vp._db, run, frames)
+    # the move lands in the project folder, kept off the real data dir
+    monkeypatch.setattr(proj_mod, "storage_dir",
+                        lambda p: tmp_path / "project")
+    monkeypatch.setattr(
+        QMessageBox, "question",
+        staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes))
+    w = vp._win
+    # the panel fixture does not wire the runs callback: give it the one run
+    w._runs_for_session = lambda sid: [{"id": run, "status": "complete"}]
+    w._populate_runs()
+    w._on_free_space()
+    for i in range(len(frames)):
+        assert not (tmp_path / f"fr{i}.fits").exists()
+    w._on_restore_space()
+    for i in range(len(frames)):
+        assert (tmp_path / f"fr{i}.fits").exists()

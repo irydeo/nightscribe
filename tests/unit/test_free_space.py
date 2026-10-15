@@ -85,6 +85,32 @@ def test_restore_brings_the_frames_back(tmp_db, tmp_path):
     assert free_space.freeable(tmp_db, run)["n"] == 3
 
 
+def test_restore_does_not_overwrite_a_recaptured_frame(tmp_db, tmp_path):
+    # The observer recaptured into the same folder with the same names and
+    # then restores: os.replace used to destroy the new frame in silence
+    # (QA-03). The restored one now lands under a free name and the registry
+    # follows it.
+    _p, _s, run, paths = _setup(tmp_db, tmp_path)
+    free_space.move_to_processed(tmp_db, run, tmp_path / "project")
+    for path in paths:
+        (tmp_path / os.path.basename(path)).write_bytes(b"NEW-CAPTURE")
+    report = free_space.restore(tmp_db, run)
+    assert report.moved == 3 and not report.errors
+    assert len(report.renamed) == 3
+    # the recaptured frames survive
+    for path in paths:
+        assert (tmp_path / os.path.basename(path)).read_bytes() == b"NEW-CAPTURE"
+    # and the restored ones are real, under a different name, with the
+    # manifest pointing at where they actually are
+    for wanted, actual in report.renamed:
+        assert actual != wanted and os.path.exists(actual)
+    rows = tmp_db.execute(
+        "SELECT path, archived, moved_to FROM astrometry_frames"
+        " WHERE run_id=?", (run,)).fetchall()
+    assert all(r[1] == 0 and r[2] is None for r in rows)
+    assert all(os.path.exists(r[0]) for r in rows)
+
+
 def test_a_missing_frame_is_skipped_not_fatal(tmp_db, tmp_path):
     _p, _s, run, paths = _setup(tmp_db, tmp_path)
     import os

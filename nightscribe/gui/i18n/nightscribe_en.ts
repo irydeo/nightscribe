@@ -16671,17 +16671,37 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>State</translation>
     </message>
     <message>
-        <location filename="../ui/visit_window.ui" line="71"/>
+        <location filename="../ui/visit_window.ui" line="72"/>
+        <source>Bring back…</source>
+        <translation>Bring back…</translation>
+    </message>
+    <message>
+        <location filename="../ui/visit_window.ui" line="72"/>
+        <source>Move this visit&apos;s frames back from procesados/ to where they were. A name already taken is not overwritten: the frame lands next to it</source>
+        <translation>Move this visit&apos;s frames back from procesados/ to where they were. A name already taken is not overwritten: the frame lands next to it</translation>
+    </message>
+    <message>
+        <location filename="../ui/visit_window.ui" line="73"/>
+        <source>Free space…</source>
+        <translation>Free space…</translation>
+    </message>
+    <message>
+        <location filename="../ui/visit_window.ui" line="73"/>
+        <source>Move the original frames of the selected run into the project&apos;s procesados/ folder. Nothing is deleted, and Bring back undoes it</source>
+        <translation>Move the original frames of the selected run into the project&apos;s procesados/ folder. Nothing is deleted, and Bring back undoes it</translation>
+    </message>
+    <message>
+        <location filename="../ui/visit_window.ui" line="79"/>
         <source>Night notes (seeing, clouds…)</source>
         <translation>Night notes (seeing, clouds…)</translation>
     </message>
     <message>
-        <location filename="../ui/visit_window.ui" line="75"/>
+        <location filename="../ui/visit_window.ui" line="83"/>
         <source>Save and close</source>
         <translation>Save and close</translation>
     </message>
     <message>
-        <location filename="../ui/visit_window.ui" line="75"/>
+        <location filename="../ui/visit_window.ui" line="83"/>
         <source>Flush the date edit if pending and close the window (everything else already saved itself)</source>
         <translation>Flush the date edit if pending and close the window (everything else already saved itself)</translation>
     </message>
@@ -16730,128 +16750,179 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Measure the series…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="584"/>
+        <location filename="../widgets/visits_panel.py" line="596"/>
         <source>Delete visit</source>
         <translation>Delete visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="585"/>
+        <location filename="../widgets/visits_panel.py" line="597"/>
         <source>Delete this visit? Its measurements and files are kept, unlinked from it.</source>
         <translation>Delete this visit? Its measurements and files are kept, unlinked from it.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="604"/>
+        <location filename="../widgets/visits_panel.py" line="616"/>
         <source>plate</source>
         <translation>plate</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="605"/>
+        <location filename="../widgets/visits_panel.py" line="617"/>
         <source>image</source>
         <translation>image</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="606"/>
+        <location filename="../widgets/visits_panel.py" line="618"/>
         <source>chart</source>
         <translation>chart</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="607"/>
+        <location filename="../widgets/visits_panel.py" line="619"/>
         <source>report</source>
         <translation>report</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="608"/>
+        <location filename="../widgets/visits_panel.py" line="620"/>
         <source>sequence</source>
         <translation>sequence</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="609"/>
+        <location filename="../widgets/visits_panel.py" line="621"/>
         <source>animation</source>
         <translation>animation</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="610"/>
+        <location filename="../widgets/visits_panel.py" line="622"/>
         <source>ephemeris</source>
         <translation>ephemeris</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="611"/>
+        <location filename="../widgets/visits_panel.py" line="623"/>
         <source>stack</source>
         <translation>stack</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="612"/>
+        <location filename="../widgets/visits_panel.py" line="624"/>
         <source>motion (GIF)</source>
         <translation>motion (GIF)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="613"/>
+        <location filename="../widgets/visits_panel.py" line="625"/>
         <source>motion (MP4)</source>
         <translation>motion (MP4)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="614"/>
+        <location filename="../widgets/visits_panel.py" line="626"/>
         <source>evolution (GIF)</source>
         <translation>evolution (GIF)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="615"/>
+        <location filename="../widgets/visits_panel.py" line="627"/>
         <source>evolution (MP4)</source>
         <translation>evolution (MP4)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="616"/>
+        <location filename="../widgets/visits_panel.py" line="628"/>
         <source>EXOTIC handoff</source>
         <translation>EXOTIC handoff</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="617"/>
+        <location filename="../widgets/visits_panel.py" line="629"/>
         <source>EXOTIC figure</source>
         <translation>EXOTIC figure</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="618"/>
+        <location filename="../widgets/visits_panel.py" line="630"/>
         <source>AAVSO report</source>
         <translation>AAVSO report</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="619"/>
+        <location filename="../widgets/visits_panel.py" line="631"/>
         <source>EXOTIC parameters</source>
         <translation>EXOTIC parameters</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="660"/>
+        <location filename="../widgets/visits_panel.py" line="672"/>
         <source>undone</source>
         <translation>undone</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="661"/>
+        <location filename="../widgets/visits_panel.py" line="673"/>
         <source>complete</source>
         <translation>complete</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="670"/>
+        <location filename="../widgets/visits_panel.py" line="682"/>
         <source>This visit&apos;s runs: click one and open it in the editor.</source>
         <translation>This visit&apos;s runs: click one and open it in the editor.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="673"/>
+        <location filename="../widgets/visits_panel.py" line="685"/>
+        <location filename="../widgets/visits_panel.py" line="766"/>
+        <location filename="../widgets/visits_panel.py" line="814"/>
         <source>This visit has no runs yet.</source>
         <translation>This visit has no runs yet.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="724"/>
+        <location filename="../widgets/visits_panel.py" line="757"/>
+        <source>%1 original frames can be moved to procesados/.</source>
+        <translation>%1 original frames can be moved to procesados/.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="779"/>
+        <source>Nothing to free: the frames are already in procesados/.</source>
+        <translation>Nothing to free: the frames are already in procesados/.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="784"/>
+        <source>Free space</source>
+        <translation>Free space</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="785"/>
+        <source>Move %1 original frames (%2 MB) to %3?
+
+Nothing is deleted: Bring back undoes it.</source>
+        <translation>Move %1 original frames (%2 MB) to %3?
+
+Nothing is deleted: Bring back undoes it.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="802"/>
+        <source>%1 frames moved, %2 could not be moved.</source>
+        <translation>%1 frames moved, %2 could not be moved.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="805"/>
+        <source>%1 frames moved to procesados/.</source>
+        <translation>%1 frames moved to procesados/.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="828"/>
+        <source>Nothing to bring back.</source>
+        <translation>Nothing to bring back.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="830"/>
+        <source>%1 frames brought back.</source>
+        <translation>%1 frames brought back.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="833"/>
+        <source>%1 landed next to a file with the same name.</source>
+        <translation>%1 landed next to a file with the same name.</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="858"/>
         <source>Attach files to the visit</source>
         <translation>Attach files to the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="725"/>
+        <location filename="../widgets/visits_panel.py" line="859"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="765"/>
-        <location filename="../widgets/visits_panel.py" line="823"/>
+        <location filename="../widgets/visits_panel.py" line="899"/>
+        <location filename="../widgets/visits_panel.py" line="957"/>
         <source>FITS details</source>
         <translation>FITS details</translation>
     </message>
@@ -16930,45 +17001,45 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Save report…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="767"/>
+        <location filename="../widgets/visits_panel.py" line="901"/>
         <source>FITS files: {0}</source>
         <translation>FITS files: {0}</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="777"/>
-        <location filename="../widgets/visits_panel.py" line="808"/>
+        <location filename="../widgets/visits_panel.py" line="911"/>
+        <location filename="../widgets/visits_panel.py" line="942"/>
         <source>{0}  ·  {1} · {2} · {3}s</source>
         <translation>{0}  ·  {1} · {2} · {3}s</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1004"/>
-        <location filename="../widgets/visits_panel.py" line="1033"/>
+        <location filename="../widgets/visits_panel.py" line="1138"/>
+        <location filename="../widgets/visits_panel.py" line="1167"/>
         <source>Paste your measurements first.</source>
         <translation>Paste your measurements first.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1011"/>
+        <location filename="../widgets/visits_panel.py" line="1145"/>
         <source>Valid: %1 lines, %2</source>
         <translation>Valid: %1 lines, %2</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1019"/>
-        <location filename="../widgets/visits_panel.py" line="1049"/>
+        <location filename="../widgets/visits_panel.py" line="1153"/>
+        <location filename="../widgets/visits_panel.py" line="1183"/>
         <source>Invalid: </source>
         <translation>Invalid: </translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1040"/>
+        <location filename="../widgets/visits_panel.py" line="1174"/>
         <source>Save MPC report</source>
         <translation>Save MPC report</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1059"/>
+        <location filename="../widgets/visits_panel.py" line="1193"/>
         <source>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</source>
         <translation>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1062"/>
+        <location filename="../widgets/visits_panel.py" line="1196"/>
         <source>Saved: %1 (%2 lines)</source>
         <translation>Saved: %1 (%2 lines)</translation>
     </message>

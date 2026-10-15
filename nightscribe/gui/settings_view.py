@@ -15,13 +15,17 @@
 
 The `.ui` carries the structure: a rail (`lst_categories`), a stack of
 scrollable pages (`stk_pages`) and the groups inside their page. This module
-does the three things that are behaviour and not layout:
+does the four things that are behaviour and not layout:
 
 * fills the rail from `settings_spec.CATEGORIES` and ties it to the stack;
-* turns a group into a disclosure (advanced groups open collapsed), so the
-  common path stays short;
+* gives every group its title bar (`title_groups`), so two groups never
+  read as one continuous list;
+* folds each page's expert groups behind ONE "Advanced" door
+  (`make_advanced_doors`, ADR-092): nothing is removed, the common path
+  just stays short;
 * indexes every field row (its label + its help) and filters the pages as
-  the observer types in `edt_search`.
+  the observer types in `edt_search`, opening the door when the match
+  lives behind it.
 
 Everything is offscreen and testable: no network, no MainWindow.
 """
@@ -32,7 +36,7 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QGroupBox, QHBoxLayout, QLabel, QLineEdit,
                                QListView, QListWidgetItem, QPlainTextEdit,
-                               QSpinBox, QTableWidget,
+                               QSpinBox, QTableWidget, QToolButton,
                                QVBoxLayout, QWidget)
 
 from . import theme
@@ -73,38 +77,36 @@ def _rail_icon(theme, stem):
 
 
 def build_rail(dlg, categories, tr):
-    # Fills the left rail with one ICON per category (ADR-071) and ties it
-    # to the stacked pages, so the observer picks a task and the page
-    # follows. The name survives as the tooltip and the accessible name:
-    # an icon-only rail must say what it is on hover. A missing asset falls
-    # back to the text, so the rail never goes mute.
+    # Fills the left rail with one row per category, ICON + NAME (ADR-092),
+    # and ties it to the stacked pages, so the observer picks a task and the
+    # page follows. ADR-071's rail was icon-only: six glyphs you had to
+    # hover to learn. The name is visible now (the app's own FITS editor
+    # bar shows text by default for the same reason); the tooltip and the
+    # accessible name repeat it, and a missing icon still leaves the text,
+    # so the rail never goes mute.
     # @args: dlg - the dialog, categories - [(page, label, svg stem)],
     #        tr - self.tr
     # @return: None
     from . import theme
     rail = dlg.lst_categories
     rail.clear()
-    rail.setViewMode(QListView.IconMode)
-    rail.setFlow(QListView.TopToBottom)
+    rail.setViewMode(QListView.ListMode)
     rail.setMovement(QListView.Static)
     rail.setResizeMode(QListView.Adjust)
     rail.setUniformItemSizes(True)
-    rail.setSpacing(4)
-    rail.setIconSize(QSize(24, 24))
-    rail.setWordWrap(False)
+    rail.setSpacing(2)
+    rail.setIconSize(QSize(20, 20))
     rail.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
     for _page, label, stem in categories:
         name = tr(label)
         item = QListWidgetItem()
         icon = _rail_icon(theme, stem)
-        if icon.isNull():
-            item.setText(name)
-        else:
+        if not icon.isNull():
             item.setIcon(icon)
+        item.setText(name)
         item.setToolTip(name)
         item.setData(Qt.AccessibleTextRole, name)
-        item.setSizeHint(QSize(52, 52))
-        item.setTextAlignment(Qt.AlignCenter)
+        item.setSizeHint(QSize(140, 34))
         rail.addItem(item)
     rail.setCurrentRow(0)
     rail.currentRowChanged.connect(
@@ -173,6 +175,96 @@ def title_groups(dlg):
         if lay is None or lay.count() == 0:
             continue
         make_titled(group)
+
+
+class _AdvancedDoor(QWidget):
+    # The ONE collapsible section at the bottom of a Settings page
+    # (ADR-092): the page's expert groups live inside, closed by default,
+    # so the common path reads short and finished. Not a QGroupBox on
+    # purpose: the search index walks the groups, and a door that were one
+    # would index (and hide) itself. The chevron speaks the app's idiom
+    # (the same ▸/▾ as the Tonight "Filters" toggle).
+    def __init__(self, page, count, tr):
+        # @args: page - the page widget the door belongs to, count - how
+        #        many groups live behind it, tr - self.tr
+        super().__init__(page)
+        self.setObjectName(f"door_{page.objectName()}")
+        # what the observer last chose; the search opens the door on a hit
+        # WITHOUT touching this, so clearing the box hands the door back
+        # to the state its owner left it in
+        self.user_open = False
+        box = QVBoxLayout(self)
+        box.setContentsMargins(0, 0, 0, 10)
+        box.setSpacing(0)
+        self.bar = QToolButton(self)
+        self.bar.setObjectName(self.objectName() + "_bar")
+        self.bar.setCursor(Qt.PointingHandCursor)
+        self.bar.setToolButtonStyle(Qt.ToolButtonTextOnly)
+        # the same filled strip a group title wears, rounded on all four
+        # corners: a door, not just another group start
+        self.bar.setStyleSheet(
+            f"QToolButton {{ {theme.section_bar_style()}"
+            f" border-bottom-left-radius: 6px;"
+            f" border-bottom-right-radius: 6px; border: none;"
+            f" color: {theme.C_ACCENT}; font-weight: bold;"
+            f" text-align: left; padding: 6px 10px; }}")
+        self.bar.clicked.connect(
+            lambda: self.set_open(not self.is_open(), by_user=True))
+        box.addWidget(self.bar)
+        self.content = QWidget(self)
+        self.content.setObjectName(self.objectName() + "_content")
+        cbox = QVBoxLayout(self.content)
+        cbox.setContentsMargins(0, 0, 0, 0)
+        cbox.setSpacing(0)
+        box.addWidget(self.content)
+        self._count = count
+        self._title = tr("Advanced")
+        self.bar.setAccessibleName(self._title)
+        self.set_open(False)
+
+    def is_open(self):
+        # @return: True when the expert groups are on screen
+        return not self.content.isHidden()
+
+    def set_open(self, open_, by_user=False):
+        # @args: open_ - show the groups, by_user - remember it as the
+        #        observer's own choice (the search passes False)
+        # @return: None
+        if by_user:
+            self.user_open = open_
+        self.content.setVisible(open_)
+        chevron = "▾" if open_ else "▸"
+        self.bar.setText(f"{chevron}  {self._title} ({self._count})")
+
+
+def make_advanced_doors(dlg, groups, tr):
+    # Moves each page's ADVANCED groups (settings_spec.ADVANCED_GROUPS)
+    # behind the page's door, keeping their relative order. Run AFTER
+    # title_groups, so a moved group already wears its bar.
+    # @args: dlg - the dialog, groups - set of group objectNames,
+    #        tr - self.tr
+    # @return: {group objectName: door}, for wire_search
+    doors = {}
+    for i in range(dlg.stk_pages.count()):
+        page = dlg.stk_pages.widget(i).widget()
+        lay = page.layout()
+        if lay is None:
+            continue
+        advanced = []
+        for j in range(lay.count()):
+            w = lay.itemAt(j).widget()
+            if isinstance(w, QGroupBox) and w.objectName() in groups:
+                advanced.append(w)
+        if not advanced:
+            continue
+        door = _AdvancedDoor(page, len(advanced), tr)
+        for group in advanced:
+            lay.removeWidget(group)          # keeps the widget alive
+            door.content.layout().addWidget(group)
+        lay.addWidget(door)
+        for group in advanced:
+            doors[group.objectName()] = door
+    return doors
 
 
 def insert_page_intros(dlg, intros, tr):
@@ -269,20 +361,24 @@ def backend_gate(dlg, groups):
     return eligible
 
 
-def wire_search(dlg, no_results, eligible=None):
+def wire_search(dlg, no_results, eligible=None, doors=None):
     # Filters the field rows as the observer types: a row stays when the
     # query appears in its label, its help or its group's title (accent and
     # case insensitive). A group with no match hides; if the shown page has
     # no match but another does, the rail jumps to the first one; if nothing
-    # matches anywhere, a quiet line says so.
+    # matches anywhere, a quiet line says so. A match behind an "Advanced"
+    # door OPENS it (ADR-092): a search hit must be visible, not folded
+    # away; clearing the box hands every door back to its owner.
     # @args: dlg - the dialog, no_results - the quiet line's text (already
     #        translated; it lives in main_window so lupdate sees it in the
     #        MainWindow context), eligible - optional unit -> bool gate (a
     #        row that fails it is hidden whatever the query says; used for
-    #        the observatory backend, ADR-081)
+    #        the observatory backend, ADR-081), doors - {group objectName:
+    #        _AdvancedDoor} from make_advanced_doors
     # @return: the apply() callable, so the caller can re-evaluate it when
     #          something the gate reads changes (the backend combo)
     units = _index_units(dlg)
+    doors = doors or {}
     group_page = {}
     for i in range(dlg.stk_pages.count()):
         page = dlg.stk_pages.widget(i).widget()
@@ -312,6 +408,16 @@ def wire_search(dlg, no_results, eligible=None):
             g = getattr(dlg, name, None)
             if g is not None:
                 g.setVisible(ok)
+        # a door opens for a hit behind it; with no query it goes back to
+        # the state the observer chose (user_open)
+        door_hit = {}
+        for name, ok in group_ok.items():
+            door = doors.get(name)
+            if door is not None:
+                door_hit[door] = door_hit.get(door, False) or ok
+        for door in set(doors.values()):
+            door.set_open(door.user_open
+                          or (bool(query) and door_hit.get(door, False)))
         page_ok = {}
         for name, ok in group_ok.items():
             page = group_page.get(name)

@@ -6,10 +6,10 @@
   <property name="modal"><bool>true</bool></property>
   <property name="minimumSize"><size><width>900</width><height>620</height></size></property>
   <layout class="QVBoxLayout" name="verticalLayout">
-   <item><widget class="QLineEdit" name="edt_search"><property name="placeholderText"><string>Search settings…</string></property></widget></item>
+   <item><widget class="QLineEdit" name="edt_search"><property name="placeholderText"><string>Search: gain, moon, api key…</string></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="hbox_body">
-     <item><widget class="QListWidget" name="lst_categories"><property name="minimumSize"><size><width>64</width><height>0</height></size></property><property name="maximumSize"><size><width>64</width><height>16777215</height></size></property></widget></item>
+     <item><widget class="QListWidget" name="lst_categories"><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="maximumSize"><size><width>150</width><height>16777215</height></size></property></widget></item>
      <item>
       <widget class="QStackedWidget" name="stk_pages">
        <widget class="QScrollArea" name="scr_observatory">
@@ -109,8 +109,13 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_sky"><property name="text"><string>How bright your zenith sky is; it sets the suggested sub-exposure. Look up fills it from the light-pollution atlas (needs the key in Integrations), or read it off the map. ~18 city, ~20 suburban, ~21.5 dark sky.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-             <item><widget class="QCheckBox" name="chk_follow_guide"><property name="text"><string>Put the guider back before each observation of a follow run</string></property><property name="toolTip"><string>A slew stops the guider, so the follow run restarts it before capturing each observation, using the calibration you already have. Turn it off if you guide by hand or do not guide at all.</string></property></widget></item>
-             <item><widget class="QCheckBox" name="chk_follow_calibrate"><property name="text"><string>Calibrate the guider at the start of a follow run</string></property><property name="toolTip"><string>Off by default: the guider starts with the calibration it already has. Turn it on when you know the calibration is stale (a new setup, a new guide scope orientation).</string></property></widget></item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="grp_reports">
+            <property name="title"><string>Observer and reports</string></property>
+            <layout class="QVBoxLayout" name="vbox_reports">
              <item>
               <layout class="QHBoxLayout" name="row_observer">
                <item><widget class="QLabel" name="lbl_observer"><property name="text"><string>Observer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -325,6 +330,15 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_binning"><property name="text"><string>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+            </layout>
+           </widget>
+          </item>
+          <item>
+           <widget class="QGroupBox" name="grp_camera_profile">
+            <property name="title"><string>Camera: measured profile</string></property>
+            <layout class="QVBoxLayout" name="vbox_camera_profile">
+             <item><widget class="QLabel" name="lblH_camprofile"><property name="text"><string>Sensor physics at your gain setting; the preset fills starting values and 0 means unknown. Measure yours before trusting an error bar.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_camprofile">
                <item><widget class="QLabel" name="lbl_camfull"><property name="text"><string>Full well (e-):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -362,7 +376,6 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_cam_readout"><property name="text"><string>Readout plus download of one frame, seconds. It is the app&apos;s one per-frame overhead (the preset fills it from the sensor, by type and size), and it decides how many frames fit before a fast object leaves the field and how long a sequence takes. Raise it if your mount also needs to settle between frames.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-             <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
              <item><widget class="QLabel" name="lbl_cam_gain_note"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_camgain_measure">
@@ -590,6 +603,8 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_follow_guide"><property name="text"><string>Put the guider back before each observation of a follow run</string></property><property name="toolTip"><string>A slew stops the guider, so the follow run restarts it before capturing each observation, using the calibration you already have. Turn it off if you guide by hand or do not guide at all.</string></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_follow_calibrate"><property name="text"><string>Calibrate the guider at the start of a follow run</string></property><property name="toolTip"><string>Off by default: the guider starts with the calibration it already has. Turn it on when you know the calibration is stale (a new setup, a new guide scope orientation).</string></property></widget></item>
             </layout>
            </widget>
           </item>

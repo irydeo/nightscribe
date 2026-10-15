@@ -40,6 +40,15 @@ otra app que lo tenga mapeado.
 El inglés es el idioma base del código; el español es una traducción. Los tests
 fallan si queda alguna cadena `unfinished`.
 
+**Una ayuda no nombra el caso concreto** (AGENTS.md, regla permanente): un tooltip o un
+texto de ayuda explica POR QUÉ y, como mucho, el ORDEN DE MAGNITUD («pierde alrededor de
+un cuarto de magnitud»); nunca cita la visita, la fecha, el objeto ni el número de tomas
+del que salió la medida, ni pone un ejemplo con nombre propio. Las cifras exactas viven
+en el ADR y en los comentarios del código, que es donde se pueden revisar.
+`tests/unit/test_help_texts.py` recorre cada tooltip, etiqueta y cadena `tr()` y falla
+ante un caso concreto; si una cadena va legítimamente de las vigilias (cuya lista ES
+T CrB y R CrB), el test lo dice con sus propias palabras.
+
 ## Empaquetado
 
 ```bash

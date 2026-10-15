@@ -45,10 +45,11 @@ When a step is complete, **✔ Mark done** marks it and the project moves on.
 
 ## The project list
 
-In **My projects** you have search, filters by type/tag/campaign and three
-views: **Active**, **Done** and **Archived**. Two details you will use daily:
+In **My projects** you have search, filters by type/tag/campaign and four
+views: **Active**, **All**, **Done** and **Archived**. Two details you will use
+daily:
 
-- **☆ Favourites first**: pins to the top what you are following closely.
+- **★ Favorites first**: pins to the top what you are following closely.
 - **"Needs you"**: the landing panel summarises which projects need you and
   why ("5 days without measuring this variable and its period is 0.3 days",
   "this SN is fading: last useful shot this week").
@@ -70,9 +71,12 @@ views: **Active**, **Done** and **Archived**. Two details you will use daily:
   confirmation blink against the reference image.
 - **Exoplanet transit**: the transit curve; NightScribe prepares the EXOTIC
   handoff and the ExoClock submission.
-- **Variable** (including **HADS**, high-amplitude δ Scuti stars):
-  photometric series, period search and folded curve.
-- **Alert**: one-off targets (outbursts, AAVSO calls).
+- **HADS**: high-amplitude δ Scuti stars, which pulse so fast and so hard
+  that a single session folds into the classic saw-tooth (chapter 06).
+- **Variable**: your campaign members that are due by cadence, stars with an
+  event in progress and your standing vigils.
+- **Close approaches and alerts**: the week's fast visitor from ESA NEOCC,
+  and the AAVSO editorial channel (outbursts, calls to observe).
 
 ## The observing journal
 

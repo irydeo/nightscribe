@@ -175,7 +175,8 @@ Ninguna clave es obligatoria: cada integración opcional degrada con elegancia.
   Ejecutar de todas formas* (el instalador se construye desde este mismo
   código).
 - **Una fuente falla** (p. ej. NEOfixer caído) → la app sigue funcionando con el
-  resto; revisa *Ayuda → Acerca de NightScribe* para ver la lista de fuentes.
+  resto; revisa *Ayuda → Acerca de NightScribe* para la lista de las principales
+  (la completa está en `docs/DATA_SOURCES.md`).
 - **Acciones CCDciel deshabilitadas** → el control solo está disponible con
   CCDciel en ejecución; revisa host/puerto en *Configuración → Integraciones*.
 - **Faltan traducciones tras editar** → ejecuta

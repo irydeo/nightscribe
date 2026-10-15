@@ -25,7 +25,7 @@ exactamente como corría.
 
 ## Encenderla y apagarla
 
-El interruptor está en **Ajustes → Medición → Astrometría → Trabajo**:
+El interruptor está en **Ajustes → Medición → Trabajo** (tras la puerta **Avanzado**):
 **Deformar y combinar en la GPU**, con un selector de **Backend** al lado. Viene
 **encendido**, y en una máquina sin tarjeta no hace nada: la app se da cuenta y
 corre en el procesador.
@@ -55,7 +55,7 @@ CUDA no se reparte: es una instalación manual para una tarjeta NVIDIA.
    para CUDA 12.x, `cupy-cuda11x` para CUDA 11.x. (El sufijo sigue la versión
    mayor del toolkit de CUDA que te dé el driver.)
 2. Comprueba que importa: `python -c "import cupy; print(cupy.__version__)"`.
-3. En **Ajustes → Medición → Astrometría → Trabajo**, pon el **Backend** en
+3. En **Ajustes → Medición → Trabajo** (tras la puerta **Avanzado**), pon el **Backend** en
    **CUDA** y arranca el run otra vez.
 
 > **Una instalación empaquetada no admite CUDA.** Los builds de Windows y macOS

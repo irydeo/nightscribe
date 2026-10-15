@@ -474,7 +474,8 @@ Cada fuente externa, qué te aporta, con qué frescura, y si necesita clave.
 Toda la red pasa por una **caché SQLite con TTL por fuente** (la columna
 «refresco»): las consultas repetidas son instantáneas y gratuitas para el
 servicio. Si una fuente cae, el resto de la app nunca se rompe; las fuentes
-están listadas en **Ayuda → Acerca de NightScribe**.
+están listadas en **Ayuda → Acerca de NightScribe** (las principales; la lista
+completa está en `docs/DATA_SOURCES.md`).
 
 **Fuentes de planificación (alimentan Esta noche):**
 

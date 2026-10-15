@@ -48,10 +48,10 @@ Cuando un paso está completo, **✔ Marcar hecho** lo marca y el proyecto avanz
 ## La lista de proyectos
 
 En **Mis proyectos** tienes búsqueda, filtros por tipo/etiqueta/campaña y
-tres vistas: **Activos**, **Terminados** y **Archivados**. Dos detalles que
-usarás a diario:
+cuatro vistas: **Activos**, **Todos**, **Terminados** y **Archivados**. Dos
+detalles que usarás a diario:
 
-- **☆ Favoritos**: fija arriba lo que estás siguiendo de cerca.
+- **★ Favoritos**: fija arriba lo que estás siguiendo de cerca.
 - **«Te necesita»**: el panel de entrada resume qué proyectos te necesitan y
   por qué («llevas 5 días sin medir esta variable y su período es de 0,3
   días», «esta SN se está apagando: última foto útil esta semana»).
@@ -73,9 +73,13 @@ usarás a diario:
   confirmación contra la imagen de referencia.
 - **Tránsito de exoplaneta**: curva del tránsito; NightScribe prepara el
   pase a EXOTIC y el envío a ExoClock.
-- **Variable** (incluidas las **HADS**, δ Scuti de alta amplitud): series
-  fotométricas, búsqueda de período y curva plegada.
-- **Alerta**: objetivos de ocasión (outbursts, llamadas de la AAVSO).
+- **HADS**: δ Scuti de alta amplitud, que pulsan tan rápido y tan fuerte que
+  una sola sesión se pliega en el clásico diente de sierra (capítulo 06).
+- **Variable**: tus miembros de campaña que tocan por cadencia, estrellas con
+  un evento en curso y tus vigilias permanentes.
+- **Aproximaciones cercanas y alertas**: el visitante rápido de la semana de
+  la ESA NEOCC, y el canal editorial de AAVSO (outbursts, llamadas a
+  observar).
 
 ## El diario de observación
 

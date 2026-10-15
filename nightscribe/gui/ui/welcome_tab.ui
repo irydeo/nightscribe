@@ -383,7 +383,7 @@
          <item row="4" column="0"><widget class="QLabel" name="lbl_equip_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
          <item row="4" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property></widget></item>
          <item row="5" column="0"><widget class="QLabel" name="lbl_equip_camtype"><property name="text"><string>Camera type:</string></property></widget></item>
-         <item row="5" column="1"><widget class="QComboBox" name="cmb_camera_type"><property name="toolTip"><string>CCD, CMOS or DSLR; it goes into the MPC report's instrument type and into the EXOTIC handoff</string></property></widget></item>
+         <item row="5" column="1"><widget class="QComboBox" name="cmb_camera_type"><property name="toolTip"><string>CCD, CMOS or DSLR; choosing a camera preset fills it. It goes into the MPC report's instrument type and into the EXOTIC handoff</string></property></widget></item>
         </layout>
        </item>
        <item>

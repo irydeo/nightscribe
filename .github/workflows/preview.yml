@@ -84,12 +84,19 @@ jobs:
         id: ver
         run: |
           v=$(python -c "from importlib.metadata import version; print(version('nightscribe'))")
-          v="${v//+/-}"                 # '+' is legal but awkward in file names
           sha7=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          # `version` stays the PEP 440 string setuptools-scm produced, local
+          # segment ('+') included. It is what the Linux packagers record in the
+          # *.dist-info/METADATA, and RPM's dependency generator parses that
+          # field with `packaging`, which rejects anything that is not PEP 440
+          # ("Invalid version") and kills the whole build. Swapping '+' for '-'
+          # (or '.') made the .rpm die on 2026-10-15. Only the file-name label
+          # drops the '+', where it is legal but awkward.
+          label="${v//+/-}-preview.$sha7"
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "suffix=-preview.$sha7" >> "$GITHUB_OUTPUT"
-          echo "label=$v-preview.$sha7" >> "$GITHUB_OUTPUT"
-          echo "version: $v / label: $v-preview.$sha7"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "version: $v / label: $label"
 
   # ------------------------------------------------------------- windows
   windows:
@@ -176,7 +183,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y --no-install-recommends \
-            git ca-certificates curl bzip2 tar dpkg-dev python3
+            git ca-certificates curl bzip2 tar dpkg-dev python3 appstream
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -190,6 +197,12 @@ jobs:
             --version "${{ needs.test.outputs.version }}" \
             --findorb findorb-payload --arch amd64 --out dist
           ls -la dist
+
+      - name: Validate the AppStream metainfo
+        # A package whose software centre shows no licence, no developer and
+        # no icon is what the observer reported on Ubuntu; this gate keeps it
+        # from shipping again (ADR-087 rev).
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
 
       - name: Upload the .deb
         uses: actions/upload-artifact@v4
@@ -207,7 +220,7 @@ jobs:
       - name: Install build tools
         run: |
           dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build \
-            python3-devel
+            python3-devel appstream
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -215,11 +228,16 @@ jobs:
       - name: Prepare the Find_Orb payload (linux-64)
         run: sh tools/fetch_findorb.sh findorb-payload
 
+      - name: Validate the AppStream metainfo
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
+
       - name: Build the .rpm
         run: |
           ver="${{ needs.test.outputs.version }}"
-          # RPM versions cannot contain '-': it separates version and release.
-          ver="${ver//-/.}"
+          # The version feeds BOTH the spec's Version: and the dist-info
+          # METADATA. RPM takes the '+' of a PEP 440 local segment (rpmvercmp
+          # treats it as a separator) and PEP 440 needs it, so it is left as it
+          # is; a '-' would be illegal in RPM, but PEP 440 never emits one.
           top="$PWD/rpmbuild"
           mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \

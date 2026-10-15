@@ -133,13 +133,23 @@ def window(_point_db_at_tmpdir):
     app = QApplication.instance() or QApplication([])
     theme.apply_theme(app)
     from nightscribe.gui.main_window import MainWindow
-    # keep the tests hermetic: no auto-compute network worker on startup
+    # A configured install whose setup was already seen: the window opens on
+    # Home (not Welcome) and navigation is not gated (the setup gate would
+    # otherwise block every view until a site is set). The Tonight compute is
+    # disabled so no test hits the network.
     orig_cfg = config.is_configured
-    config.is_configured = lambda: False
+    orig_ver = config._data.get("app_version")
+    orig_seen = config._data.get("welcome_seen")
+    config.is_configured = lambda: True
+    config._data["app_version"] = ""
+    config._data["welcome_seen"] = True
     w = MainWindow()
     w._now_timer.stop()
+    w._tonight_loaded = True     # never auto-compute (network)
     yield w
     config.is_configured = orig_cfg
+    config._data["app_version"] = orig_ver
+    config._data["welcome_seen"] = orig_seen
     w.close()
 
 
@@ -1404,7 +1414,9 @@ def test_refresh_position_button_forces_a_fresh_fetch(window, panel, monkeypatch
     window._ccd_refresh_position()
     from nightscribe.config import config as _cfg
     assert seen["name"] == "A11HPKO"
-    assert seen["site"] == _cfg.get("mpc_code", "")
+    # a planning/goto lookup falls back to the geocentric site 500 when no MPC
+    # code is set (NEOfixer rejects an empty site; 2026-10-14)
+    assert seen["site"] == (_cfg.get("mpc_code", "") or "500")
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
     p2 = project.get(dbmod.db, p["id"])

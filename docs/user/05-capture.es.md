@@ -163,7 +163,8 @@ proyecto si no) y el run anota cuántas fueron. El editor FITS entonces **las
 agrupa solo**: se acabó adivinar cuántas observaciones hubo. Cuando las
 subcarpetas no son alcanzables, las agrupa el registro del propio run; si tampoco
 encaja, el hueco que deja el re-apuntado las separa; el número a mano es el
-último recurso.
+último recurso. El número es una **sugerencia**: viene precargado y puedes
+escribir otro, y entonces manda el tuyo.
 
 Dos cosas que hay que saber: necesita un **solver de placa** (el centrado es un
 goto astrométrico), y con **NINA/PINS** cada observación es **un fotograma** (su

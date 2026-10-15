@@ -730,6 +730,64 @@ def tr_note(note):
     return QCoreApplication.translate(_MIG, note)
 
 
+class _Rows:
+    # What Database.execute hands back. sqlite3 reuses ONE connection (and its
+    # prepared-statement cache), so a statement run by ANOTHER thread RESETS a
+    # cursor that has not been read yet. The engine's thread pools call
+    # db.execute(...).fetchall() from many threads at once (register_sequence
+    # does, through the calibrating loader), and the fetch happened AFTER
+    # execute had released the lock: the rows came back empty and
+    # calibration._row_to_ref died with "not enough values to unpack
+    # (expected 10, got 0)" (measured on a real 539-frame visit, 2026-10-15).
+    #
+    # The fix is to read the rows WHILE THE LOCK IS STILL HELD (see execute)
+    # and serve them from here, so the cursor never escapes the lock. The
+    # result sets are small (indexes, master lists, project rows), so
+    # materialising them costs nothing and removes the race for good.
+    __slots__ = ("_rows", "_index", "lastrowid", "rowcount")
+
+    def __init__(self, rows, lastrowid, rowcount):
+        self._rows = rows
+        self._index = 0
+        self.lastrowid = lastrowid
+        self.rowcount = rowcount
+
+    def fetchone(self):
+        # @return: the next row, or None when they are exhausted
+        if self._index >= len(self._rows):
+            return None
+        row = self._rows[self._index]
+        self._index += 1
+        return row
+
+    def fetchmany(self, size=1):
+        # @args: size - how many rows at most
+        # @return: up to size rows
+        end = self._index + max(0, int(size))
+        rows = self._rows[self._index:end]
+        self._index += len(rows)
+        return rows
+
+    def fetchall(self):
+        # @return: the rows left
+        rows = self._rows[self._index:]
+        self._index = len(self._rows)
+        return rows
+
+    def __iter__(self):
+        while self._index < len(self._rows):
+            row = self._rows[self._index]
+            self._index += 1
+            yield row
+
+    def close(self):
+        # @return: None. Nothing to release: the rows are plain tuples and
+        #          the lock was already given back by execute. It exists so a
+        #          caller that closes its cursor keeps working.
+        self._rows = ()
+        self._index = 0
+
+
 class Database:
     # Single SQLite access point: HTTP cache plus the observatory's own
     # observation history. Everything persistent lives here (see ADR-002).
@@ -740,6 +798,11 @@ class Database:
     # method serialises through _lock. (Without it, concurrent calls
     # interleave and sqlite3 raises "bad parameter or other API misuse",
     # and an interrupted write can even land a half-bound row.)
+    #
+    # The serialisation has to cover the FETCH and not only the execute:
+    # sqlite3 resets an unread cursor when another statement runs on the
+    # connection, so execute reads the rows under the lock and returns them
+    # materialised (_Rows). See that class for the bug it prevents.
 
     def __init__(self, db_file=None):
         import threading
@@ -757,9 +820,14 @@ class Database:
         # Public SQL helper for domain modules (e.g. core/project.py).
         # Does NOT auto-commit: call commit() when your operation is done.
         # @args: sql - SQL string with placeholders, params - tuple/list
-        # @return: sqlite3 cursor (caller may fetchone/fetchall)
+        # @return: a _Rows result (fetchone/fetchall/iterate, lastrowid,
+        #          rowcount). The rows are read HERE, while the lock is held:
+        #          returning the raw cursor let another thread reset it and
+        #          the fetch came back empty (see _Rows).
         with self._lock:
-            return self._conn.execute(sql, params)
+            cur = self._conn.execute(sql, params)
+            rows = cur.fetchall()
+            return _Rows(rows, cur.lastrowid, cur.rowcount)
 
     def commit(self):
         # Commits the current transaction

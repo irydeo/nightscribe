@@ -37,8 +37,9 @@ dependencies = [
     "photutils>=1.10",
     # The portable GPU backend travels with the app (ADR-091): pyopencl is a
     # normal dependency so OpenCL works out of the box on NVIDIA, AMD and Intel.
-    # The GPU PATH itself stays off by default and the app runs unchanged on a
-    # machine with no OpenCL device or no ICD loader; CuPy (CUDA) stays manual.
+    # The GPU path is ON by default (ADR-089 revision, 2026-10-15) and the app
+    # runs unchanged on a machine with no OpenCL device or no ICD loader;
+    # CuPy (CUDA) stays manual.
     "pyopencl>=2024.1",
 ]
 

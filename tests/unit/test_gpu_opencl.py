@@ -14,8 +14,10 @@
 """The OpenCL backend must be the SAME road to the same answer as the CUDA
 one, and the same as numpy.
 
-pyopencl cannot be a hard dependency, so the whole file SKIPS on a machine
-without it (the normal case, and the CI). When it is there, what is pinned is
+pyopencl is a hard dependency, so the whole file SKIPS only on a machine with
+no OpenCL device (the ICD loader or a card missing). CI installs pocl, a CPU
+OpenCL implementation, so the kernels run there too and are not only exercised
+on the author's card. When there is a device, what is pinned is
 the parity (the warp and the combine agree with the numpy path to within a
 float32 rounding), that the facade can be pointed at it and reaches it, and
 that the registration (`frame_stars`) finds the CPU's own stars. The SCALABLE

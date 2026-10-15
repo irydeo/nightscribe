@@ -13,13 +13,14 @@
 
 """ONE switch, TWO backends, and the CPU always underneath.
 
-The observer's switch is `astrometry_gpu` (off by default): a machine without
-a card, or one whose card nobody asked to use, takes the numpy path and pays
-nothing for this file existing. Which BACKEND serves the calls is a second
-setting, `astrometry_gpu_backend`:
+The observer's switch is `astrometry_gpu` (ON by default): with a card present
+the accelerator runs, and a machine without one (or with no ICD loader) falls
+straight through to the numpy path and pays nothing for this file existing.
+Which BACKEND serves the calls is a second setting, `astrometry_gpu_backend`:
 
-* `auto` (the default) prefers **CUDA** (`core/gpu_cuda.py`, CuPy) and falls
-  back to **OpenCL** (`core/gpu_opencl.py`, pyopencl);
+* `opencl` (the default) is the portable one the app ships, on NVIDIA, AMD and
+  Intel (`core/gpu_opencl.py`, pyopencl);
+* `auto` prefers **CUDA** (`core/gpu_cuda.py`, CuPy) and falls back to OpenCL;
 * `cuda` / `opencl` force one, for the observer who wants to compare them or
   whose machine has both.
 
@@ -44,8 +45,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# The switch that turns the accelerator on (off by default), and the one that
-# picks WHICH backend when both are there.
+# The switch that turns the accelerator on (ON by default since the ADR-089
+# revision of 2026-10-15), and the one that picks WHICH backend when both are
+# there.
 SETTING = "astrometry_gpu"
 BACKEND_SETTING = "astrometry_gpu_backend"
 

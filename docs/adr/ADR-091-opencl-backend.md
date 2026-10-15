@@ -17,6 +17,11 @@ corre en **NVIDIA, AMD e Intel**, mientras que CuPy solo existe en NVIDIA: es el
 
 **Decisión**:
 
+> **Nota de estado (2026-10-15):** el valor por defecto del interruptor cambió a
+> **encendido** y el backend a **`opencl`**. El punto 2 y la alternativa de
+> pyopencl, más abajo, citan el valor ORIGINAL («apagado por defecto», `auto`);
+> la nota al final del ADR mide y justifica el cambio.
+
 1. **`core/gpu.py` pasa a ser una fachada**: elige backend y despacha; el código
    CuPy se mueve a **`core/gpu_cuda.py`** y el nuevo es **`core/gpu_opencl.py`**.
    La superficie pública es la misma en los dos (`available`, `device_name`,
@@ -192,6 +197,11 @@ and a per-pixel selection) beats a general library call. And OpenCL runs on
 backend the app can **ship**.
 
 **Decision**:
+
+> **Status note (2026-10-15):** the switch's default changed to **on** and the
+> backend to **`opencl`**. Point 2 and the pyopencl alternative below quote the
+> ORIGINAL value ("off by default", `auto`); the note at the end of the ADR
+> measures and justifies the change.
 
 1. **`core/gpu.py` becomes a facade**: it picks a backend and dispatches; the
    CuPy code moves to **`core/gpu_cuda.py`** and the new one is

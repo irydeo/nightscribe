@@ -84,12 +84,19 @@ jobs:
         id: ver
         run: |
           v=$(python -c "from importlib.metadata import version; print(version('nightscribe'))")
-          v="${v//+/-}"                 # '+' is legal but awkward in file names
           sha7=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          # `version` stays the PEP 440 string setuptools-scm produced, local
+          # segment ('+') included. It is what the Linux packagers record in the
+          # *.dist-info/METADATA, and RPM's dependency generator parses that
+          # field with `packaging`, which rejects anything that is not PEP 440
+          # ("Invalid version") and kills the whole build. Swapping '+' for '-'
+          # (or '.') made the .rpm die on 2026-10-15. Only the file-name label
+          # drops the '+', where it is legal but awkward.
+          label="${v//+/-}-preview.$sha7"
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "suffix=-preview.$sha7" >> "$GITHUB_OUTPUT"
-          echo "label=$v-preview.$sha7" >> "$GITHUB_OUTPUT"
-          echo "version: $v / label: $v-preview.$sha7"
+          echo "label=$label" >> "$GITHUB_OUTPUT"
+          echo "version: $v / label: $label"
 
   # ------------------------------------------------------------- windows
   windows:
@@ -227,8 +234,10 @@ jobs:
       - name: Build the .rpm
         run: |
           ver="${{ needs.test.outputs.version }}"
-          # RPM versions cannot contain '-': it separates version and release.
-          ver="${ver//-/.}"
+          # The version feeds BOTH the spec's Version: and the dist-info
+          # METADATA. RPM takes the '+' of a PEP 440 local segment (rpmvercmp
+          # treats it as a separator) and PEP 440 needs it, so it is left as it
+          # is; a '-' would be illegal in RPM, but PEP 440 never emits one.
           top="$PWD/rpmbuild"
           mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
           tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \

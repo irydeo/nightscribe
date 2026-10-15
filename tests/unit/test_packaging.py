@@ -74,6 +74,9 @@ def test_the_deb_stages_the_documentation():
         assert (docs / "adr").is_dir()
         assert list((docs / "user").glob("*.md"))
         assert (docs / "PHOTOMETRY.md").is_file()   # a topic doc the app opens
+        # Find_Orb's licence notice travels with the package
+        assert (stage / "usr" / "share" / "doc" / "nightscribe"
+                / "findorb-notice.txt").is_file()
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 

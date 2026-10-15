@@ -234,6 +234,12 @@ def _stage(version, findorb_dir, arch):
     shutil.copytree(ROOT / "docs",
                     _mk(stage / "usr" / "share" / "nightscribe" / "docs"),
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # Find_Orb's own licence notice, next to the copyright: the package ships
+    # Find_Orb (a separate GPLv2 program) and has to say so.
+    notice = ROOT / "installer" / "findorb-notice.txt"
+    if notice.is_file():
+        shutil.copy2(notice, _mk(stage / "usr" / "share" / "doc"
+                                 / "nightscribe" / "findorb-notice.txt"))
     # The launcher, the desktop entry and the icons.
     _write(stage / "usr" / "bin" / "nightscribe", _wrapper(),
            mode=0o755)

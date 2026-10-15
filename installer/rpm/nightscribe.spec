@@ -103,6 +103,10 @@ install -m 0644 installer/io.github.irydeo.nightscribe.metainfo.xml \
 # The licence, where RPM's %license macro expects it.
 install -d %{buildroot}%{_datadir}/licenses/%{name}
 install -m 0644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+# Find_Orb's own licence notice: the package ships Find_Orb (a separate
+# GPLv2 program) and has to say so.
+install -m 0644 installer/findorb-notice.txt \
+    %{buildroot}%{_datadir}/licenses/%{name}/findorb-notice.txt
 for s in 16 32 48 64 128 256; do
     install -d %{buildroot}%{_datadir}/icons/hicolor/${s}x${s}/apps
     install -m 0644 nightscribe/assets/appicon-${s}.png \
@@ -121,6 +125,7 @@ fi
 %{_datadir}/applications/io.github.irydeo.nightscribe.desktop
 %{_datadir}/metainfo/io.github.irydeo.nightscribe.metainfo.xml
 %license %{_datadir}/licenses/%{name}/LICENSE
+%license %{_datadir}/licenses/%{name}/findorb-notice.txt
 %{_datadir}/nightscribe/version
 %{_datadir}/nightscribe/docs
 %{_datadir}/icons/hicolor/*/apps/nightscribe.png

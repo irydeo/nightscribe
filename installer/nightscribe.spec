@@ -59,6 +59,11 @@ for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm",
 for f in glob.glob(os.path.join(ROOT, "docs/**/*.md"), recursive=True):
     sub = os.path.dirname(os.path.relpath(f, ROOT))
     datas.append((f, sub))
+# Find_Orb's licence notice travels with the bundle, next to the app's own
+# licence: the portable zip has no installer to show it (the .iss does).
+_notice = os.path.join(ROOT, "installer", "findorb-notice.txt")
+if os.path.isfile(_notice):
+    datas.append((_notice, "."))
 
 # Find_Orb, when the CI dropped a prepared tree next to the repo
 # (findorb-payload/: bin/fo + share/findorb/data). It travels as a folder in

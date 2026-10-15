@@ -89,6 +89,25 @@ degradación elegante) y regístrala en un ADR. Para las tres recetas que más s
 fuente nueva, un tipo de objetivo nuevo, una pestaña nueva del editor), mira
 `docs/DEVELOPING.md`.
 
+## Release
+
+La versión sale del tag de git: `setuptools-scm` lo lee, así que etiquetar
+`v0.1.0` hace que el paquete construido y el propio `--version` de la app
+digan `0.1.0`. No hay nada que editar a mano.
+
+1. Mueve las entradas de `[Sin publicar]` de `CHANGELOG.es.md` (y su gemelo
+   inglés) bajo la nueva versión, con la fecha de hoy.
+2. Comprueba que el clasificador `Development Status` de `pyproject.toml`
+   sigue cuadrando con el hito (`3 - Alpha`, `4 - Beta`, `5 -
+   Production/Stable`).
+3. Llévalo a `main`: el workflow `preview.yml` construye los artefactos
+   (instalador y zip portable de Windows, `.deb`, `.rpm`) y los publica como la
+   pre-release rodante, después de que pase la suite unitaria.
+4. Etiqueta y sube: `git tag -a v0.1.0 -m "NightScribe 0.1.0"` y luego
+   `git push origin v0.1.0`.
+5. Crea la release de GitHub desde el tag, con los artefactos del paso 3 y las
+   notas del CHANGELOG. Márcala como la última release, no como pre-release.
+
 ## Pull requests
 
 Un asunto por PR, tests en verde, documentación actualizada (ambos idiomas).

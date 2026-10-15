@@ -276,8 +276,9 @@ duplican los tokens del tema), **QA-14** (escrituras no atómicas de productos d
 
 ## 6. Checklist de publicación de la 0.1
 
-- [x] `pyproject.toml`: URL real (B4). Pendiente: clasificador a `4 - Beta` y versión == tag
-- [ ] `CHANGELOG.md` y proceso de release en `CONTRIBUTING` (DEV-06, QA-16)
+- [x] `pyproject.toml`: URL real (B4), clasificador `4 - Beta`, y la versión sale del tag
+  (setuptools-scm: etiquetar `v0.1.0` hace que el paquete y `--version` digan `0.1.0`)
+- [x] `CHANGELOG.md` (y su gemela ES) y proceso de release en `CONTRIBUTING` (DEV-06, QA-16)
 - [x] `.deb`, `.rpm`, PKGBUILD y wheel con `docs/` y ayuda offline verificada por test (B5)
 - [x] README sin promesas incumplidas (CLI, Find_Orb, recuento de claves, asistente) (B7, B8, A13)
 - [x] Suite verde en las dos plataformas; los 33 *skips* explicados o cubiertos (QA-18 aparte)

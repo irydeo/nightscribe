@@ -312,7 +312,7 @@ cual: la receta no se aplica una segunda vez, y el run lo dice.
 12. **Ajustar el brillo sin re-apilar.** La receta de la pestaña Fotometría
     (aperturas, cielo, comparsas y qué reporta la banda) quedaba congelada al
     arrancar el run, así que cambiarla obligaba a re-apilar toda la visita. La
-    pestaña Astrometría tiene ahora **«Re-medir el brillo»**: vuelve a ejecutar
+    pestaña Astrometría tiene ahora **«Re-medir»**: vuelve a ejecutar
     la receta sobre los **apilados guardados** de la observación en escena (el
     del objeto y el de estrellas) y reescribe solo la banda del stack. La
     posición y la detección no se tocan. Necesita que el run haya guardado el

@@ -147,6 +147,11 @@ class UfeManualDialog(QDialog):
         super().resizeEvent(ev)
         lbl = getattr(self, "lbl_hint", None)
         if lbl is not None and lbl.width() >= 50:
+            # the floor is CLEARED first: Qt clamps heightForWidth to the
+            # widget's minimumHeight, so a label measured once at a narrow
+            # width could never come back down when the window grew (the
+            # same defect the Astrometry panel's labels carried)
+            lbl.setMinimumHeight(0)
             need = lbl.heightForWidth(lbl.width())
             if need > 0:
                 lbl.setMinimumHeight(int(need))

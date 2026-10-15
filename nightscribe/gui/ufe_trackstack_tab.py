@@ -323,6 +323,11 @@ class UfeTrackStackTab(QWidget):
         self.lbl_calibration_hint = self._ui.lbl_calibration_hint
         self._sync_calibration_hint()
         self.lbl_recipe = self._ui.lbl_recipe
+        # the line is elided to the column, so the whole text lives in the
+        # tooltip: the Designer file's help is kept and the text goes BEFORE
+        # it (see _elide_recipe)
+        self._recipe_help = self.lbl_recipe.toolTip()
+        self._recipe_text = ""
         self.btn_recipe = self._ui.btn_recipe
         self.btn_recipe.clicked.connect(self._on_edit_recipe)
         self.btn_remeasure = self._ui.btn_remeasure
@@ -878,37 +883,59 @@ class UfeTrackStackTab(QWidget):
         self.lbl_recipe.setEnabled(on)
         self.btn_recipe.setEnabled(on)
         if not on:
-            self.lbl_recipe.setText(self.tr(
+            self._recipe_text = self.tr(
                 "The brightness is not measured: this run reports "
-                "positions only."))
-            self._fit_label(self.lbl_recipe)
-            self._sync_plan_line()
-            return
-        if not recipe:
-            self.lbl_recipe.setText(self.tr(
+                "positions only.")
+        elif not recipe:
+            self._recipe_text = self.tr(
                 "Photometry recipe: the editor's defaults (open the "
-                "Photometry tab to see or change them)."))
-            self._fit_label(self.lbl_recipe)
-            self._sync_plan_line()
-            return
-        band = recipe.get("band") or self.tr("the comps' own band")
-        # The METHOD is said too, and not only the apertures: it decides how
-        # the light is measured, and a run launched from here has to say it
-        # BEFORE it runs (a recipe read silently is a number nobody can
-        # question). A plate saved before the key existed falls back to the
-        # app's own setting, which is the same fallback the run uses.
-        method = (self.tr("matched filter")
-                  if recipe.get("matched",
-                                config.get("phot_matched", True))
-                  else self.tr("aperture"))
-        self.lbl_recipe.setText(self.tr(
-            "Photometry recipe: %1 · apertures %2 · sky %3 · %4").replace(
+                "Photometry tab to see or change them).")
+        else:
+            band = recipe.get("band") or self.tr("the comps' own band")
+            # The METHOD is said too, and not only the apertures: it decides
+            # how the light is measured, and a run launched from here has to
+            # say it BEFORE it runs (a recipe read silently is a number
+            # nobody can question). A plate saved before the key existed
+            # falls back to the app's own setting, which is the same
+            # fallback the run uses.
+            method = (self.tr("matched filter")
+                      if recipe.get("matched",
+                                    config.get("phot_matched", True))
+                      else self.tr("aperture"))
+            template = self.tr(
+                "Photometry recipe: %1 · apertures %2 · sky %3 · %4")
+            self._recipe_text = template.replace(
                 "%1", str(band)).replace(
-                "%2", self._recipe_radii_text(recipe)).replace(
-                "%3", str(recipe.get("sky") or "median")).replace(
-                "%4", method))
-        self._fit_label(self.lbl_recipe)
+                    "%2", self._recipe_radii_text(recipe)).replace(
+                    "%3", str(recipe.get("sky") or "median")).replace(
+                    "%4", method)
+        self._elide_recipe()
         self._sync_plan_line()
+
+    def _elide_recipe(self):
+        # @return: None. The recipe line is ONE line, ELIDED, with the whole
+        #          text in the tooltip: it says WHAT the brightness will be
+        #          measured with, and a wrapped version of it grew to seven
+        #          lines (119 px of a 352 px column) and pushed the two
+        #          buttons under it out of the block. It is the same
+        #          treatment the window's status line carries, for the same
+        #          reason: a message that eats the panel's height costs more
+        #          than it says.
+        from PySide6.QtGui import QFontMetrics
+        label = self.lbl_recipe
+        text = getattr(self, "_recipe_text", "")
+        fm = QFontMetrics(label.font())
+        room = max(80, label.width() - 4)
+        shown = fm.elidedText(text, Qt.ElideRight, room) if text else ""
+        if label.text() != shown:
+            label.setText(shown)
+        label.setToolTip((text + "\n\n" + self._recipe_help) if text
+                         else self._recipe_help)
+
+    def recipe_text(self):
+        # @return: the recipe line's WHOLE text, the one the tooltip carries
+        #          (the label shows it elided to the column)
+        return getattr(self, "_recipe_text", "")
 
     def _recipe_radii_text(self, recipe):
         # @args: recipe - the photometry recipe
@@ -930,8 +957,10 @@ class UfeTrackStackTab(QWidget):
         #          it here and nowhere else.
         self._status_hook = fn if callable(fn) else None
 
-    def _say(self, text):
-        # @args: text - the status line's text ("" hides it)
+    def _say(self, text, level=None):
+        # @args: text - the status line's text ("" hides it), level - "info"
+        #        | "warn" | "error" (None: inferred from the ⚠ the message
+        #        already carries)
         # @return: None. The messages that belong to no group live under the
         #          action they belong to (asked for 2026-10-06) and they are
         #          read in full: the line is a read-only BOX with its own
@@ -943,8 +972,13 @@ class UfeTrackStackTab(QWidget):
         #          the whole text is also in the tooltip and in the window's
         #          own line (U4, via set_status_hook). What the run FOUND is
         #          not here: it lives in its own group, with room and a
-        #          scroll.
-        self._status_text = text or ""
+        #          scroll. The box wears the level's colour, the same one
+        #          the window's line uses (theme.LEVEL_COLOURS is the single
+        #          source), so a warning cannot read as news.
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
+        self._status_text = text
         self.lbl_status.setVisible(bool(text))
         self.lbl_status.setToolTip(self._status_text)
         self.lbl_status.setPlainText(self._status_text)
@@ -953,10 +987,10 @@ class UfeTrackStackTab(QWidget):
         # hides the very sentence that says what happened
         self.lbl_status.moveCursor(QTextCursor.Start)
         self.lbl_status.verticalScrollBar().setValue(0)
+        theme.paint_level(self.lbl_status, level)
         self._fit_status()
         if self._status_hook is not None and text:
-            self._status_hook(str(text),
-                              "warn" if str(text).startswith("⚠") else "info")
+            self._status_hook(text, level)
 
     def _fit_status(self):
         # @return: None. The box's own height, capped at three lines: the
@@ -1002,8 +1036,15 @@ class UfeTrackStackTab(QWidget):
         #          is the fix the measure tab and the manual window already
         #          carry. A few pixels is not a width: at 1 px a wrapped
         #          label would want one line per word.
+        # The floor is CLEARED before measuring: Qt clamps heightForWidth to
+        # the widget's minimumHeight, so a label measured once at a narrow
+        # width (before the layout settled) could never come back down. The
+        # recipe line, measured at its 100 px default in __init__, stayed
+        # 119 px tall (seven lines) with 352 px to wrap in, and pushed the
+        # two buttons under it out of the block (measured 2026-10-15).
         if label is None or label.width() < 50:
             return
+        label.setMinimumHeight(0)
         need = label.heightForWidth(label.width())
         if need and need > 0:
             label.setMinimumHeight(int(need))
@@ -1012,12 +1053,14 @@ class UfeTrackStackTab(QWidget):
         # @args: event - the resize event, passed on
         # @return: None. A wider or narrower column needs another number of
         #          lines, so the wrapped labels are refitted here, where
-        #          the width is known, and the status line is elided again.
+        #          the width is known, the recipe line is elided again and
+        #          the status line is refitted.
         super().resizeEvent(event)
-        for name in ("lbl_object", "lbl_recipe", "lbl_calibration_hint"):
+        for name in ("lbl_object", "lbl_calibration_hint"):
             label = getattr(self._ui, name, None)
             if label is not None and label.isVisible():
                 self._fit_label(label)
+        self._elide_recipe()
         self._fit_status()
 
     # ------------------------------------------------------------- visit

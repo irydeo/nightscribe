@@ -35,6 +35,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QWidget
 
 from ..config import config
+from . import theme
 from .ui_loader import adopt_ui
 from .ufe_host import host_of
 
@@ -169,15 +170,23 @@ class UfeCalibrationTab(QWidget):
         # @return: None
         self._status_hook = fn if callable(fn) else None
 
-    def _say(self, text):
-        # @args: text - the status line's text ("" hides it)
+    def _say(self, text, level=None):
+        # @args: text - the status line's text ("" hides it), level - "info"
+        #        | "warn" | "error" (None: inferred from the ⚠ the message
+        #        already carries)
         # @return: None. The panel keeps its own line as the record and the
-        #          window's line gets it too (U4).
+        #          window's line gets it too (U4), both in the level's
+        #          colour. This tab also reports FAILURES, and "The
+        #          calibration failed:" carries no ⚠, so it used to reach
+        #          the window as plain news: the level is explicit here.
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
         self.lbl_status.setVisible(bool(text))
-        self.lbl_status.setText(text or "")
+        self.lbl_status.setText(text)
+        theme.paint_level(self.lbl_status, level)
         if self._status_hook is not None and text:
-            self._status_hook(str(text),
-                              "warn" if str(text).startswith("⚠") else "info")
+            self._status_hook(text, level)
 
     # ------------------------------------------------------------ recipe
 
@@ -191,7 +200,7 @@ class UfeCalibrationTab(QWidget):
         self._recipe = None
         self.lbl_recipe.setText(self.tr(
             "Open the editor from a visit to see its recipe."))
-        self.lbl_warnings.setText("")
+        self._set_concerns([])
 
     def _sync_context(self):
         # The recipe shown is the FIRST frame's: a visit is one camera,
@@ -208,7 +217,7 @@ class UfeCalibrationTab(QWidget):
             self._recipe = None
             self.lbl_recipe.setText(self.tr(
                 "Open the editor from a visit to see its recipe."))
-            self.lbl_warnings.setText("")
+            self._set_concerns([])
             return
         self._ctx_paths = paths
         from ..core import calibration
@@ -219,14 +228,14 @@ class UfeCalibrationTab(QWidget):
             self._recipe = None
             self.lbl_recipe.setText(
                 self.tr("The first frame could not be read:") + f" {err}")
-            self.lbl_warnings.setText("")
+            self._set_concerns([])
             return
         meta = calibration.meta_from_header(header)
         tol = float(config.get("calib_temp_tol_c", 3.0))
         recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
         self._recipe = recipe
         self.lbl_recipe.setText(self._recipe_text(meta, recipe))
-        self.lbl_warnings.setText("\n".join(self._concern_lines(recipe)))
+        self._set_concerns(self._concern_lines(recipe))
 
     def has_masters(self):
         # Whether the library has anything that MATCHES this visit, asked by
@@ -307,22 +316,50 @@ class UfeCalibrationTab(QWidget):
 
     def _concern_lines(self, recipe):
         # @args: recipe - the resolved Recipe
-        # @return: the warnings and the reasons as bullet lines, translated
-        #          and deduplicated. The warnings are the short, stable
-        #          sentences (a piece is missing); the notes carry WHY a
+        # @return: [(level, "• line")]: the warnings and the reasons, each
+        #          WITH WHAT IT IS, translated and deduplicated. The
+        #          warnings are the short, stable sentences (a piece is
+        #          missing) and they are WARNINGS; the notes carry WHY a
         #          master that IS in the library was left out, with the
-        #          numbers, which is what lets the observer fix it instead
-        #          of reading "no flat" and giving up (ADR-061 rev).
-        lines = []
+        #          numbers, and they are NOTES. The level is what lets the
+        #          block be read by colour instead of sentence by sentence
+        #          (ADR-061 rev).
+        lines, seen = [], set()
         for warning in recipe.warnings:
-            line = "• " + self._warning_text(warning)
-            if line not in lines:
-                lines.append(line)
+            text = "• " + self._warning_text(warning)
+            if text not in seen:
+                seen.add(text)
+                lines.append(("warn", text))
         for note in getattr(recipe, "notes", None) or []:
             text = self._note_text(note)
-            if text and ("• " + text) not in lines:
-                lines.append("• " + text)
+            if text and ("• " + text) not in seen:
+                seen.add("• " + text)
+                lines.append(("info", "• " + text))
         return lines
+
+    def _set_concerns(self, pairs):
+        # @args: pairs - [(level, "• line")] from _concern_lines or the run
+        # @return: None. The block is painted with ONE COLOUR PER LINE, so a
+        #          missing piece reads as a warning and a "why it was left
+        #          out" as a note without reading the sentence (asked for
+        #          2026-10-15: the text is long and hard to read). The plain
+        #          text is kept beside the HTML in warnings_text(), so what
+        #          the observer copies and the tests read is the same text
+        #          it always was.
+        import html as _html
+        self._warnings_text = "\n".join(text for _level, text in pairs)
+        if not pairs:
+            self.lbl_warnings.setText("")
+            return
+        out = ['<span style="color:{0}">{1}</span>'.format(
+            theme.level_colour(level), _html.escape(text))
+            for level, text in pairs]
+        self.lbl_warnings.setText("<br>".join(out))
+
+    def warnings_text(self):
+        # @return: the block's text, plain, with no markup ("" when there is
+        #          nothing to say)
+        return getattr(self, "_warnings_text", "")
 
     def _warning_text(self, warning):
         # @args: warning - a core recipe warning (internal English)
@@ -480,7 +517,8 @@ class UfeCalibrationTab(QWidget):
         #        other workers' failed signal)
         # @return: None
         self._run_ended()
-        self._say(self.tr("The calibration failed:") + f" {message}")
+        self._say(self.tr("The calibration failed:") + f" {message}",
+                  "error")
 
     def _on_finished(self, payload):
         # @args: payload - CalibrationWorker's result dict
@@ -497,18 +535,22 @@ class UfeCalibrationTab(QWidget):
         # recipe, and the same missing master said three hundred times
         # says nothing. The recipe's own notes (WHY a master was left out)
         # go with them, so the reason does not disappear after a run.
-        lines, seen = [], set()
+        pairs, seen = [], set()
         for _path, report in reports:
             for warning in (getattr(report, "warnings", None) or []):
-                if warning not in seen:
-                    seen.add(warning)
-                    lines.append("• " + self._warning_text(warning))
+                text = "• " + self._warning_text(warning)
+                if text not in seen:
+                    seen.add(text)
+                    pairs.append(("warn", text))
+        # the recipe's own NOTES come with them, so the reason a master was
+        # left out does not disappear after a run (the warnings are already
+        # in the reports, one per frame)
         if self._recipe is not None:
-            for note in getattr(self._recipe, "notes", None) or []:
-                text = self._note_text(note)
-                if text and ("• " + text) not in lines:
-                    lines.append("• " + text)
-        self.lbl_warnings.setText("\n".join(lines))
+            for level, text in self._concern_lines(self._recipe):
+                if level == "info" and text not in seen:
+                    seen.add(text)
+                    pairs.append((level, text))
+        self._set_concerns(pairs)
         if written:
             # the copies register to the visit like any other product
             # (the dialog's save hook owns the database)
@@ -560,7 +602,10 @@ class UfeCalibrationTab(QWidget):
                     "vignetting is corrected. Index a bias for this camera.")
             if info.get("note"):
                 note += " " + self.tr("Warning:") + " " + info["note"]
-            self._say(note)
+            # the model is a warning when its pedestal is missing (it then
+            # corrects only part of the vignetting), a note otherwise
+            self._say(note, "warn" if (off.get("n_missing")
+                                       or info.get("note")) else "info")
         # The model is registered to the visit like any other product and the
         # door to look at it is opened.
         model_file = payload.get("model_file")

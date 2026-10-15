@@ -309,7 +309,7 @@
       <item>
        <widget class="QLabel" name="lbl_recipe">
         <property name="text"><string/></property>
-        <property name="wordWrap"><bool>true</bool></property>
+        <property name="wordWrap"><bool>false</bool></property>
         <property name="toolTip">
          <string>The recipe the brightness is measured with, read live from the Photometry tab: the apertures, the sky method, the centroid and the colour term. One editor in the app, so the numbers cannot drift apart</string>
         </property>
@@ -319,7 +319,7 @@
        <layout class="QHBoxLayout" name="row_recipe">
         <item>
          <widget class="QPushButton" name="btn_recipe">
-          <property name="text"><string>Photometry settings…</string></property>
+          <property name="text"><string>Photometry…</string></property>
           <property name="toolTip">
            <string>The apertures, the sky method and the centroid the run will use are edited in the Photometry tab, and nowhere else. The brightness itself is measured here, on the stacks</string>
           </property>
@@ -327,7 +327,7 @@
         </item>
         <item>
          <widget class="QPushButton" name="btn_remeasure">
-          <property name="text"><string>Re-measure the brightness</string></property>
+          <property name="text"><string>Re-measure</string></property>
           <property name="toolTip">
            <string>Measures the brightness again on the observation's stacks with the recipe the Photometry tab is holding right now (apertures, sky, comps), without re-stacking the visit. The position and the detection are untouched</string>
           </property>

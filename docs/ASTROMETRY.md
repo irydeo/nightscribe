@@ -308,7 +308,7 @@ left as it is: the recipe is not applied a second time, and the run says so.
 12. **Tune the brightness without re-stacking.** The Photometry tab's recipe
     (apertures, sky, comps, and what the band reports) used to be frozen when
     the run started, so changing it meant re-stacking the whole visit. The
-    Astrometry tab now has **Re-measure the brightness**: it re-runs the recipe
+    Astrometry tab now has **Re-measure**: it re-runs the recipe
     on the **saved stacks** of the observation on stage (the object's and the
     star's) and rewrites only the stack's band. The position and the detection
     are untouched. It needs the run to have kept the **star stack** (the box in

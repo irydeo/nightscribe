@@ -1,4 +1,4 @@
-# AGENTS.md — NightScribe
+# AGENTS.md: NightScribe
 
 *Guía del proyecto para personas y agentes de IA / Project guide for humans and AI agents.*
 
@@ -112,7 +112,7 @@ nightscribe/
     hads.py          # HADS: catálogo híbrido (snapshot+sheet), merge, mat. de sesión
     variables.py     # variables: extremos VSX, HJD (Sol Schlyter), asesor de eventos
     campaign.py      # campañas 1:N ortogonales (CRUD, protocolo, due_campaigns,
-                     #   project_signal, tonight_listable, signals_report — ADR-037)
+                     #   project_signal, tonight_listable, signals_report: ADR-037)
     vigils.py        # vigilias de variables (ADR-037 SC4a): lista curada editable
                      #   (T CrB/R CrB), chequeo ZTF vs basal (caché propia 12 h)
     photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
@@ -205,12 +205,12 @@ nightscribe/
     enrich.py        # orquesta fuentes -> datos crudos de un objeto
     narrative.py     # prosa divulgativa ES/EN
     post.py          # plantillas -> post_ES / post_EN / tuit
-    fits_io.py       # lector FITS mínimo (numpy, sin astropy — ADR-018)
+    fits_io.py       # lector FITS mínimo (numpy, sin astropy: ADR-018)
     fits_annotate.py # FITS anotado AIJ-compatible: escribe copias y LEE
                      #   tarjetas ANNOTATE (UFE las pinta al cargar, ADR-044)
     chart_annotate.py # cajas de metadatos de las cartas (puro; reglas:
                       #   nombre siempre, posición/escala solo con WCS,
-                      #   brillo solo calibrado — ADR-046)
+                      #   brillo solo calibrado: ADR-046)
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
     stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
                      #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)
@@ -230,7 +230,7 @@ nightscribe/
                       #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
                       # + astap.py: solver local de placa (binario del usuario,
                       #   -wcs en memoria, caché por hash; ADR-051)
-                      # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
+                      # + aavso.py: canal editorial AAVSO: alertas del foro (JSON
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
                      #   + fotometría de la comunidad con token (vigilias brillantes)
                      # + mpc_obs.py: las observaciones publicadas del objeto (MPC
@@ -238,23 +238,23 @@ nightscribe/
                      #   chequeo del run contra otras estaciones (TTL 6 h; ADR-062)
     journal.py       # Diario de observación: vista derivada por noche (ADR-036)
     attention.py     # «Necesita tu atención»: qué proyecto te necesita y por qué
-                     #   (math local pura, sin red — ADR-038)
+                     #   (math local pura, sin red: ADR-038)
     skyevents.py     # calendario del cielo: motor de eventos 60 d, 100 % local
                      #   (fases, conjunciones, oposiciones por Δλ, eclipses
-                     #   probables, lluvias — ADR-040)
+                     #   probables, lluvias: ADR-040)
     satellites.py    # tránsitos de galileanos + sombras sobre Júpiter para el
                      #   sitio del usuario (IAU WGCCRE + calibración Horizons,
-                     #   ±10 min etiquetado — ADR-040)
+                     #   ±10 min etiquetado: ADR-040)
    viz/               # matplotlib: style, orbit_view, sky_view, night_view,
                       # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                       # + lightcurve_view (curva de luz, con las plantillas SN de
                       #   fondo cuando el proyecto es una supernova)
-                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
+                      # + evolution_view (evolución SN) y motion_view (movimiento NEO:
                       #   la "prueba de fuego", Track C)
                       # + finder_view (carta de comparación: secuencia fotométrica
-                      #   sobre DSS2 o el FITS del usuario — ADR-042)
+                      #   sobre DSS2 o el FITS del usuario: ADR-042)
                       # + phase_view (informe período+fase: periodograma con FAP
-                      #   y curva plegada por noche — ADR-054)
+                      #   y curva plegada por noche: ADR-054)
     gui/               # app, main_window, workers (QThread), wizard, ui_loader,
                        #   ui/ (*.ui Designer);
                        # TRES pestañas: Tonight, Projects, Campaigns
@@ -280,7 +280,7 @@ nightscribe/
                        # rev.) vive a la izquierda de la imagen, visible solo con
                        # visita; phase_dialog.py: período y fase del proyecto
                        # (ADR-054)
-                       # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
+                       # ADR-038: la app habla primero: dashboard «Necesita tu atención»,
                        # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
                        # lenguaje llano + ayudas ⓘ, filas ricas
                        # ADR-045: el flujo del proyecto es Ficha → Captura →
@@ -296,12 +296,12 @@ nightscribe/
                        #   la fecha del reporte no cuadra con la de la visita;
                        #   la carta de comparación vive en Análisis
                        #   (seqchart_dialog.py + widgets/finder_widget.py,
-                       #   picker interactivo de comps — ADR-042)
-                       # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
+                       #   picker interactivo de comps: ADR-042)
+                       # + widgets/ (QGraphicsView chart widgets: ADR-029, sin matplotlib;
                        #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
                        #   stack_strip: la tira de apilados de las observaciones, ADR-062;
                        #   las filas ricas project_row / campaign_row + sparkline, U2/U5;
-                       #   y visits_panel: el gestor de visitas — ADR-045)
+                       #   y visits_panel: el gestor de visitas: ADR-045)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

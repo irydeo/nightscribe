@@ -16,7 +16,7 @@
      <item row="0" column="0"><widget class="QLabel" name="lbl_object"><property name="text"><string>Object:</string></property></widget></item>
      <item row="0" column="1"><widget class="QLineEdit" name="edt_name"/></item>
      <item row="1" column="1"><widget class="QPushButton" name="btn_resolve"><property name="text"><string>Resolve (VSX/SIMBAD)</string></property></widget></item>
-     <item row="2" column="0" colspan="2"><widget class="QLabel" name="lbl_resolved"><property name="text"><string>— not resolved yet —</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item row="2" column="0" colspan="2"><widget class="QLabel" name="lbl_resolved"><property name="text"><string>not resolved yet</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
      <item row="3" column="0"><widget class="QLabel" name="lbl_ra"><property name="text"><string>RA (deg):</string></property></widget></item>
      <item row="3" column="1"><widget class="QLineEdit" name="edt_ra"/></item>
      <item row="4" column="0"><widget class="QLabel" name="lbl_dec"><property name="text"><string>Dec (deg):</string></property></widget></item>

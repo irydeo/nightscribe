@@ -518,6 +518,11 @@
         <translation>color: #8a90a6; font-style: italic; font-size: 11px;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="15"/>
+        <source>Outbursts, brightness drops and predicted extrema: across the stars you follow (campaigns and vigils)</source>
+        <translation>Erupciones, caídas de brillo y máximos previstos: en las estrellas que sigues (campañas y vigilias)</translation>
+    </message>
+    <message>
         <location filename="../ui/campaigns_tab.ui" line="58"/>
         <source>Select a campaign to see its detail</source>
         <translation>Selecciona una campaña para ver su detalle</translation>
@@ -538,9 +543,8 @@
         <translation>Está pasando ahora</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="15"/>
         <source>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</source>
-        <translation>Erupciones, caídas de brillo y máximos previstos — en las estrellas que sigues (campañas y vigilias)</translation>
+        <translation type="vanished">Erupciones, caídas de brillo y máximos previstos — en las estrellas que sigues (campañas y vigilias)</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="27"/>
@@ -6808,107 +6812,107 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>NSMigrations</name>
     <message>
-        <location filename="../../core/db.py" line="642"/>
+        <location filename="../../core/db.py" line="650"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
         <translation>Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="645"/>
+        <location filename="../../core/db.py" line="653"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
         <translation>El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="648"/>
+        <location filename="../../core/db.py" line="656"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
         <translation>El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="651"/>
+        <location filename="../../core/db.py" line="659"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
         <translation>Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="654"/>
+        <location filename="../../core/db.py" line="662"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
         <translation>Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="657"/>
+        <location filename="../../core/db.py" line="665"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
         <translation>Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="660"/>
+        <location filename="../../core/db.py" line="668"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
         <translation>Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="663"/>
+        <location filename="../../core/db.py" line="671"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
         <translation>El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="666"/>
+        <location filename="../../core/db.py" line="674"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
         <translation>Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="670"/>
+        <location filename="../../core/db.py" line="678"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
         <translation>Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="673"/>
+        <location filename="../../core/db.py" line="681"/>
         <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
         <translation>Las mediciones recuerdan la placa en la que se tomaron: al reabrir esa placa en el editor unificado se restaura su estiramiento, la receta de medición y la secuencia de comparación.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="677"/>
+        <location filename="../../core/db.py" line="685"/>
         <source>Photometric series: each point keeps its raw magnitude, its quality flags and the run it belongs to, so a bad run can be undone without touching the rest of the visit.</source>
         <translation>Series fotométricas: cada punto conserva su magnitud cruda, sus marcas de calidad y la ejecución a la que pertenece, así una ejecución mala se deshace sin tocar el resto de la visita.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="681"/>
+        <location filename="../../core/db.py" line="689"/>
         <source>Each photometric point now keeps its own photon error apart from the calibration systematic, so a light curve can be drawn (and judged) without the night&apos;s zero point swamping it.</source>
         <translation>Cada punto fotométrico guarda ahora su propio error de fotones, aparte del sistemático de la calibración, de modo que una curva de luz puede dibujarse (y juzgarse) sin que el punto cero de la noche la ahogue.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="685"/>
+        <location filename="../../core/db.py" line="693"/>
         <source>Every point remembers the night it was measured on (its airmass and its position on the plate), so a curve read back from your project can explain that night without measuring again.</source>
         <translation>Cada punto recuerda la noche en que se midió (su masa de aire y su posición en la placa), así una curva releída de tu proyecto puede explicar esa noche sin volver a medir.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="689"/>
+        <location filename="../../core/db.py" line="697"/>
         <source>A visit&apos;s chart is one curve again: if you measured the same night several times, the visit remembers which pass it shows, and you can pick any other from &quot;Series &gt; Passes of this visit&quot;.</source>
         <translation>La gráfica de una visita vuelve a ser una sola curva: si mediste la misma noche varias veces, la visita recuerda qué pasada muestra y puedes elegir otra en «Serie &gt; Pasadas de esta visita».</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="694"/>
+        <location filename="../../core/db.py" line="702"/>
         <source>Image calibration: a library of master frames (bias, dark, flat) that NightScribe uses to clean your lights before stacking them.</source>
         <translation>Calibración de imágenes: una biblioteca de masters (bias, dark, flat) que NightScribe usa para limpiar tus tomas antes de apilarlas.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="698"/>
+        <location filename="../../core/db.py" line="706"/>
         <source>Minor-planet astrometry: the measured positions, the resolved motion and the frames of each run, tied to their visit and undoable as one execution.</source>
         <translation>Astrometría de cuerpos menores: las posiciones medidas, el movimiento resuelto y los frames de cada ejecución, atados a su visita y reversibles como una sola ejecución.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="702"/>
+        <location filename="../../core/db.py" line="710"/>
         <source>Astrometry: the magnitude the run measured is kept beside the one the report uses, so a brightness measured by hand can replace it without losing what the machine said.</source>
         <translation>Astrometría: la magnitud que midió la ejecución se guarda junto a la que usa el reporte, para que un brillo medido a mano pueda sustituirla sin perder lo que dijo la máquina.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="706"/>
+        <location filename="../../core/db.py" line="714"/>
         <source>The gain of your camera, measured on your own frames, is remembered per camera and setting, so a single image can reuse it instead of trusting the FITS header.</source>
         <translation>La ganancia de tu cámara, medida en tus propias tomas, se recuerda por cámara y ajuste, para que una sola imagen pueda reutilizarla en vez de fiarse de la cabecera del FITS.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="710"/>
+        <location filename="../../core/db.py" line="718"/>
         <source>An astrometric point now carries its photometric error and whether its centroid was re-selected by hand, and a project can hold a combined check and report across all its runs.</source>
         <translation>Un punto astrométrico lleva ahora su error fotométrico y si su centroide se re-seleccionó a mano, y un proyecto puede guardar un chequeo y reporte combinados de todos sus runs.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="714"/>
+        <location filename="../../core/db.py" line="722"/>
         <source>The calibration library is simpler: a dark of the flats is a dark, so the two entries became one and your frames are found by their exposure. Your flats are used whatever the sensor temperature they were taken at, because a flat&apos;s shape does not depend on it.</source>
         <translation>La biblioteca de calibración es más sencilla: un dark de los flats es un dark, así que las dos entradas se han unido y tus tomas se buscan por su exposición. Tus flats se usan sea cual sea la temperatura del sensor a la que se tomaron, porque la forma de un flat no depende de ella.</translation>
     </message>
@@ -7241,8 +7245,12 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/new_project_dialog.ui" line="19"/>
+        <source>not resolved yet</source>
+        <translation>sin resolver aún</translation>
+    </message>
+    <message>
         <source>— not resolved yet —</source>
-        <translation>— sin resolver aún —</translation>
+        <translation type="vanished">— sin resolver aún —</translation>
     </message>
     <message>
         <location filename="../ui/new_project_dialog.ui" line="20"/>
@@ -8605,9 +8613,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Altitud (m):</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="89"/>
         <source>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</source>
-        <translation>Altitud del observatorio sobre el nivel del mar (m); entra en los términos de paralaje y atmósfera</translation>
+        <translation type="vanished">Altitud del observatorio sobre el nivel del mar (m); entra en los términos de paralaje y atmósfera</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="92"/>
@@ -8767,6 +8774,11 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Buscar: ganancia, luna, clave api…</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="89"/>
+        <source>Altitude of the observatory above sea level (m): enters the parallax and atmospheric terms</source>
+        <translation>Altitud del observatorio sobre el nivel del mar (m); entra en los términos de paralaje y atmósfera</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="117"/>
         <source>Observer and reports</source>
         <translation>Observador e informes</translation>
@@ -8865,6 +8877,16 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <location filename="../ui/settings_dialog.ui" line="369"/>
         <source>Readout plus download of one frame, seconds. It is the app&apos;s one per-frame overhead: the preset fills it from the sensor (type and size), and it bounds a moving object&apos;s run, so a slow one means fewer frames before the object drifts out of the field. Raise it if your mount also needs to settle between frames. 0 = unknown</source>
         <translation>Lectura más descarga de un fotograma, en segundos. Es el único overhead por toma de la app: el preset lo rellena según el sensor (tipo y tamaño), y acota la serie de un objeto en movimiento, así que una lectura lenta significa menos tomas antes de que el objeto se salga del campo. Súbelo si tu montura también necesita asentarse entre tomas. 0 = desconocido</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="586"/>
+        <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent: it lands in Tonight (window of 0 = today)</source>
+        <translation>Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente: entra en &quot;Esta noche&quot; (ventana de 0 = hoy)</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="593"/>
+        <source>Standing watch list checked against the latest ZTF magnitude: one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
+        <translation>Lista de guardia permanente chequeada contra la última magnitud ZTF: una estrella por línea: nombre | rise/drop | magnitud basal | umbral (opcionalmente | RA° | Dec°; si falta, se resuelve vía VSX). rise = vigilia de erupción (T CrB), drop = vigilia de caída (R CrB)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="686"/>
@@ -9088,9 +9110,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Token de API AAVSO:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="1200"/>
         <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</source>
-        <translation>Opcional; de tu cuenta AAVSO. Las vigilias de estrellas brillantes (basal por debajo de ~11,5 mag, p. ej. T CrB / R CrB) leen la fotometría de la comunidad, que exige este token — sin él permanecen en silencio</translation>
+        <translation type="vanished">Opcional; de tu cuenta AAVSO. Las vigilias de estrellas brillantes (basal por debajo de ~11,5 mag, p. ej. T CrB / R CrB) leen la fotometría de la comunidad, que exige este token — sin él permanecen en silencio</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="237"/>
@@ -9185,6 +9206,11 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <location filename="../ui/settings_dialog.ui" line="378"/>
         <source>Readout plus download of one frame, seconds. It is the app&apos;s one per-frame overhead (the preset fills it from the sensor, by type and size), and it decides how many frames fit before a fast object leaves the field and how long a sequence takes. Raise it if your mount also needs to settle between frames.</source>
         <translation>Lectura más descarga de un fotograma, en segundos. Es el único overhead por toma de la app (el preset lo rellena según el sensor, por tipo y tamaño), y decide cuántas tomas caben antes de que un objeto rápido salga del campo y cuánto dura una secuencia. Súbelo si tu montura también necesita asentarse entre tomas.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="605"/>
+        <source>Show the AAVSO editorial channel: forum alerts and active observing campaigns, as Tonight suggestions when the star is up</source>
+        <translation>Muestra el canal editorial de AAVSO: alertas del foro y campañas de observación activas, como sugerencias en Esta noche cuando la estrella está arriba</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="642"/>
@@ -9392,9 +9418,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Ventana del extremo (días):</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="586"/>
         <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
-        <translation>Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente — entra en &quot;Esta noche&quot; (ventana de 0 = hoy)</translation>
+        <translation type="vanished">Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente — entra en &quot;Esta noche&quot; (ventana de 0 = hoy)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="589"/>
@@ -9402,9 +9427,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Vigilias de variables:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="593"/>
         <source>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
-        <translation>Lista de guardia permanente chequeada contra la última magnitud ZTF — una estrella por línea: nombre | rise/drop | magnitud basal | umbral (opcionalmente | RA° | Dec°; si falta, se resuelve vía VSX). rise = vigilia de erupción (T CrB), drop = vigilia de caída (R CrB)</translation>
+        <translation type="vanished">Lista de guardia permanente chequeada contra la última magnitud ZTF — una estrella por línea: nombre | rise/drop | magnitud basal | umbral (opcionalmente | RA° | Dec°; si falta, se resuelve vía VSX). rise = vigilia de erupción (T CrB), drop = vigilia de caída (R CrB)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="596"/>
@@ -9412,9 +9436,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Canal AAVSO en Esta noche</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="605"/>
         <source>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</source>
-        <translation>Muestra el canal editorial AAVSO — alertas del foro y campañas de observación activas — como sugerencias en Esta noche cuando la estrella está arriba</translation>
+        <translation type="vanished">Muestra el canal editorial AAVSO — alertas del foro y campañas de observación activas — como sugerencias en Esta noche cuando la estrella está arriba</translation>
     </message>
     <message>
         <source>Calibration</source>
@@ -10052,6 +10075,11 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Distancia focal (mm):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="1200"/>
+        <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token: without it they stay silent</source>
+        <translation>Opcional; de tu cuenta AAVSO. Las vigilias de estrellas brillantes (basal por debajo de ~11,5 mag, p. ej. T CrB / R CrB) leen la fotometría de la comunidad, que exige este token: sin él permanecen en silencio</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="1206"/>
         <source>AI writing and assistant (experimental, optional)</source>
         <translation>Escritura con IA y asistente (experimental, opcional)</translation>
@@ -10319,9 +10347,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Próximos 60 días</translation>
     </message>
     <message>
-        <location filename="../ui/sky_calendar.ui" line="65"/>
         <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</source>
-        <translation>Fases lunares, conjunciones, oposiciones, eclipses y lluvias de meteoros — calculado en local, sin red</translation>
+        <translation type="vanished">Fases lunares, conjunciones, oposiciones, eclipses y lluvias de meteoros — calculado en local, sin red</translation>
     </message>
     <message>
         <location filename="../ui/sky_calendar.ui" line="26"/>
@@ -10364,9 +10391,18 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Las lunas de Júpiter esta semana</translation>
     </message>
     <message>
-        <location filename="../ui/sky_calendar.ui" line="95"/>
         <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</source>
-        <translation>Tránsitos de las lunas galileanas y sus sombras sobre el disco de Júpiter — visibles desde tu sitio de noche</translation>
+        <translation type="vanished">Tránsitos de las lunas galileanas y sus sombras sobre el disco de Júpiter — visibles desde tu sitio de noche</translation>
+    </message>
+    <message>
+        <location filename="../ui/sky_calendar.ui" line="65"/>
+        <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers: computed locally, no network</source>
+        <translation>Fases lunares, conjunciones, oposiciones, eclipses y lluvias de meteoros: calculado en local, sin red</translation>
+    </message>
+    <message>
+        <location filename="../ui/sky_calendar.ui" line="95"/>
+        <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc: visible from your site at night</source>
+        <translation>Tránsitos de las lunas galileanas y sus sombras sobre el disco de Júpiter: visibles desde tu sitio de noche</translation>
     </message>
     <message>
         <location filename="../ui/sky_calendar.ui" line="102"/>

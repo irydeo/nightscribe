@@ -490,6 +490,11 @@
         <translation>color: #8a90a6; font-style: italic; font-size: 11px;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="15"/>
+        <source>Outbursts, brightness drops and predicted extrema: across the stars you follow (campaigns and vigils)</source>
+        <translation>Outbursts, brightness drops and predicted extrema: across the stars you follow (campaigns and vigils)</translation>
+    </message>
+    <message>
         <location filename="../ui/campaigns_tab.ui" line="58"/>
         <source>Select a campaign to see its detail</source>
         <translation>Select a campaign to see its detail</translation>
@@ -510,9 +515,8 @@
         <translation>Happening now</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="15"/>
         <source>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</source>
-        <translation>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</translation>
+        <translation type="vanished">Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="27"/>
@@ -6688,107 +6692,107 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>NSMigrations</name>
     <message>
-        <location filename="../../core/db.py" line="642"/>
+        <location filename="../../core/db.py" line="650"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
         <translation>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="645"/>
+        <location filename="../../core/db.py" line="653"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
         <translation>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="648"/>
+        <location filename="../../core/db.py" line="656"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
         <translation>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="651"/>
+        <location filename="../../core/db.py" line="659"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
         <translation>Projects gained their final state: close date, outcome, tags and favourites.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="654"/>
+        <location filename="../../core/db.py" line="662"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
         <translation>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="657"/>
+        <location filename="../../core/db.py" line="665"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
         <translation>Every project keeps its own container folder, in the place it already was.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="660"/>
+        <location filename="../../core/db.py" line="668"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
         <translation>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="663"/>
+        <location filename="../../core/db.py" line="671"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
         <translation>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="666"/>
+        <location filename="../../core/db.py" line="674"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
         <translation>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="670"/>
+        <location filename="../../core/db.py" line="678"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
         <translation>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="673"/>
+        <location filename="../../core/db.py" line="681"/>
         <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
         <translation>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="677"/>
+        <location filename="../../core/db.py" line="685"/>
         <source>Photometric series: each point keeps its raw magnitude, its quality flags and the run it belongs to, so a bad run can be undone without touching the rest of the visit.</source>
         <translation>Photometric series: each point keeps its raw magnitude, its quality flags and the run it belongs to, so a bad run can be undone without touching the rest of the visit.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="681"/>
+        <location filename="../../core/db.py" line="689"/>
         <source>Each photometric point now keeps its own photon error apart from the calibration systematic, so a light curve can be drawn (and judged) without the night&apos;s zero point swamping it.</source>
         <translation>Each photometric point now keeps its own photon error apart from the calibration systematic, so a light curve can be drawn (and judged) without the night&apos;s zero point swamping it.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="685"/>
+        <location filename="../../core/db.py" line="693"/>
         <source>Every point remembers the night it was measured on (its airmass and its position on the plate), so a curve read back from your project can explain that night without measuring again.</source>
         <translation>Every point remembers the night it was measured on (its airmass and its position on the plate), so a curve read back from your project can explain that night without measuring again.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="689"/>
+        <location filename="../../core/db.py" line="697"/>
         <source>A visit&apos;s chart is one curve again: if you measured the same night several times, the visit remembers which pass it shows, and you can pick any other from &quot;Series &gt; Passes of this visit&quot;.</source>
         <translation>A visit&apos;s chart is one curve again: if you measured the same night several times, the visit remembers which pass it shows, and you can pick any other from &quot;Series &gt; Passes of this visit&quot;.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="694"/>
+        <location filename="../../core/db.py" line="702"/>
         <source>Image calibration: a library of master frames (bias, dark, flat) that NightScribe uses to clean your lights before stacking them.</source>
         <translation>Image calibration: a library of master frames (bias, dark, flat) that NightScribe uses to clean your lights before stacking them.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="698"/>
+        <location filename="../../core/db.py" line="706"/>
         <source>Minor-planet astrometry: the measured positions, the resolved motion and the frames of each run, tied to their visit and undoable as one execution.</source>
         <translation>Minor-planet astrometry: the measured positions, the resolved motion and the frames of each run, tied to their visit and undoable as one execution.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="702"/>
+        <location filename="../../core/db.py" line="710"/>
         <source>Astrometry: the magnitude the run measured is kept beside the one the report uses, so a brightness measured by hand can replace it without losing what the machine said.</source>
         <translation>Astrometry: the magnitude the run measured is kept beside the one the report uses, so a brightness measured by hand can replace it without losing what the machine said.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="706"/>
+        <location filename="../../core/db.py" line="714"/>
         <source>The gain of your camera, measured on your own frames, is remembered per camera and setting, so a single image can reuse it instead of trusting the FITS header.</source>
         <translation>The gain of your camera, measured on your own frames, is remembered per camera and setting, so a single image can reuse it instead of trusting the FITS header.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="710"/>
+        <location filename="../../core/db.py" line="718"/>
         <source>An astrometric point now carries its photometric error and whether its centroid was re-selected by hand, and a project can hold a combined check and report across all its runs.</source>
         <translation>An astrometric point now carries its photometric error and whether its centroid was re-selected by hand, and a project can hold a combined check and report across all its runs.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="714"/>
+        <location filename="../../core/db.py" line="722"/>
         <source>The calibration library is simpler: a dark of the flats is a dark, so the two entries became one and your frames are found by their exposure. Your flats are used whatever the sensor temperature they were taken at, because a flat&apos;s shape does not depend on it.</source>
         <translation>The calibration library is simpler: a dark of the flats is a dark, so the two entries became one and your frames are found by their exposure. Your flats are used whatever the sensor temperature they were taken at, because a flat&apos;s shape does not depend on it.</translation>
     </message>
@@ -7121,8 +7125,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/new_project_dialog.ui" line="19"/>
+        <source>not resolved yet</source>
+        <translation>not resolved yet</translation>
+    </message>
+    <message>
         <source>— not resolved yet —</source>
-        <translation>— not resolved yet —</translation>
+        <translation type="vanished">— not resolved yet —</translation>
     </message>
     <message>
         <location filename="../ui/new_project_dialog.ui" line="20"/>
@@ -8509,6 +8517,11 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Tonight: object kinds</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="605"/>
+        <source>Show the AAVSO editorial channel: forum alerts and active observing campaigns, as Tonight suggestions when the star is up</source>
+        <translation>Show the AAVSO editorial channel: forum alerts and active observing campaigns, as Tonight suggestions when the star is up</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="686"/>
         <source>A master is a frame that cancels a pattern the sensor or the optics print on every shot: the bias (the read-out pedestal), the dark (that pedestal plus the thermal current, which grows with the exposure and the temperature) and the flat (the dust shadows and the vignetting). NightScribe picks the right one for each light, and the editor&apos;s Calibration tab says which one it is using and why it is not using one you can see here. Index the masters you have already built: the file is linked, never copied or moved.</source>
         <translation>A master is a frame that cancels a pattern the sensor or the optics print on every shot: the bias (the read-out pedestal), the dark (that pedestal plus the thermal current, which grows with the exposure and the temperature) and the flat (the dust shadows and the vignetting). NightScribe picks the right one for each light, and the editor&apos;s Calibration tab says which one it is using and why it is not using one you can see here. Index the masters you have already built: the file is linked, never copied or moved.</translation>
@@ -8617,9 +8630,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Decimal degrees; east is positive. Your site longitude.</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="89"/>
         <source>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</source>
-        <translation>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</translation>
+        <translation type="vanished">Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="102"/>
@@ -8756,9 +8768,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>AAVSO API token:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="1200"/>
         <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</source>
-        <translation>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</translation>
+        <translation type="vanished">Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="247"/>
@@ -8933,6 +8944,11 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Search: gain, moon, api key…</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="89"/>
+        <source>Altitude of the observatory above sea level (m): enters the parallax and atmospheric terms</source>
+        <translation>Altitude of the observatory above sea level (m): enters the parallax and atmospheric terms</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="117"/>
         <source>Observer and reports</source>
         <translation>Observer and reports</translation>
@@ -9104,6 +9120,11 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Optional; request one from lightpollutionmap.info. With it, Observatory → Sky brightness can look up your site&apos;s zenith brightness; without it you type the value from the map.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="1200"/>
+        <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token: without it they stay silent</source>
+        <translation>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token: without it they stay silent</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="1348"/>
         <source>Object marks:</source>
         <translation>Object marks:</translation>
@@ -9218,6 +9239,16 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <location filename="../ui/settings_dialog.ui" line="504"/>
         <source>ExoClock drops transits too big for your scope when checked</source>
         <translation>ExoClock drops transits too big for your scope when checked</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="586"/>
+        <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent: it lands in Tonight (window of 0 = today)</source>
+        <translation>A campaign variable whose maximum/minimum is this many days or less away counts as imminent: it lands in Tonight (window of 0 = today)</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="593"/>
+        <source>Standing watch list checked against the latest ZTF magnitude: one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
+        <translation>Standing watch list checked against the latest ZTF magnitude: one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="613"/>
@@ -9602,9 +9633,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Extremum window (days):</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="586"/>
         <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
-        <translation>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</translation>
+        <translation type="vanished">A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="589"/>
@@ -9612,9 +9642,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Variable vigils:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="593"/>
         <source>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
-        <translation>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</translation>
+        <translation type="vanished">Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="596"/>
@@ -9622,9 +9651,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>AAVSO channel in Tonight</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="605"/>
         <source>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</source>
-        <translation>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</translation>
+        <translation type="vanished">Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</translation>
     </message>
     <message>
         <source>Calibration</source>
@@ -10175,9 +10203,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Coming up in the next 60 days</translation>
     </message>
     <message>
-        <location filename="../ui/sky_calendar.ui" line="65"/>
         <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</source>
-        <translation>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</translation>
+        <translation type="vanished">Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</translation>
     </message>
     <message>
         <location filename="../ui/sky_calendar.ui" line="26"/>
@@ -10220,9 +10247,18 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Jupiter&apos;s moons this week</translation>
     </message>
     <message>
-        <location filename="../ui/sky_calendar.ui" line="95"/>
         <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</source>
-        <translation>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</translation>
+        <translation type="vanished">Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</translation>
+    </message>
+    <message>
+        <location filename="../ui/sky_calendar.ui" line="65"/>
+        <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers: computed locally, no network</source>
+        <translation>Moon phases, conjunctions, oppositions, eclipses and meteor showers: computed locally, no network</translation>
+    </message>
+    <message>
+        <location filename="../ui/sky_calendar.ui" line="95"/>
+        <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc: visible from your site at night</source>
+        <translation>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc: visible from your site at night</translation>
     </message>
     <message>
         <location filename="../ui/sky_calendar.ui" line="102"/>

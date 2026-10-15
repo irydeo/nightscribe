@@ -629,6 +629,23 @@ def _migrate(conn):
         conn.execute(
             "UPDATE calib_masters SET kind='dark' WHERE kind='dark_flat'")
         conn.execute("PRAGMA user_version = 21")
+    if v < 22:
+        # ADR-061 rev (2026-10-15): the master library gains a PROJECT. A
+        # master built from a project's own calibration frames belongs to
+        # that project (its darks are tied to the night's exposure and
+        # temperature); a master can be SHARED (project_id NULL) and every
+        # project uses it, and a project can ADOPT another project's master
+        # with a LINK (a second row on the same file). The recipe prefers the
+        # project's own masters, then the shared ones.
+        cols = {row[1] for row in conn.execute(
+            "PRAGMA table_info(calib_masters)")}
+        if "project_id" not in cols:
+            conn.execute(
+                "ALTER TABLE calib_masters ADD COLUMN project_id INTEGER")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_calib_project"
+            " ON calib_masters(project_id, kind)")
+        conn.execute("PRAGMA user_version = 22")
     conn.commit()
 
 
@@ -716,6 +733,12 @@ MIGRATION_NOTES = {
         "so the two entries became one and your frames are found by their "
         "exposure. Your flats are used whatever the sensor temperature they "
         "were taken at, because a flat's shape does not depend on it."),
+    22: QT_TRANSLATE_NOOP("NSMigrations",
+        "The calibration library is now by PROJECT: a master built from a "
+        "visit's own frames belongs to its project, you can share the "
+        "reusable ones (bias and flat) with every project, and you can use "
+        "another project's master without copying it. The app can also build "
+        "the masters from your calibration frames."),
 }
 
 

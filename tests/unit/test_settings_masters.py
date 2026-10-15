@@ -127,7 +127,8 @@ def test_the_calibration_library_lives_on_the_measurement_page(qapp):
     assert found is not None, "the master library must live on a page"
     names = _names(dlg, found)
     for w in ("lblH_masters", "btn_master_add", "btn_master_add_dir",
-              "tbl_masters", "btn_master_remove", "lbl_master_status",
+              "btn_master_build", "tbl_masters", "btn_master_remove",
+              "btn_master_share", "lbl_master_status",
               "lblH_master_kind", "chk_calib_vignette_model",
               "spn_calib_temp_tol", "lblH_calib_tol"):
         assert w in names, f"{w} expected on the calibration page"
@@ -212,9 +213,11 @@ def test_adding_indexes_and_links_the_files(qapp, tmp_db, monkeypatch,
            for c in range(dlg.tbl_masters.columnCount())]
     assert row[0] == "dark120.fits"
     assert row[1] == "Dark"
-    assert row[2] == "TestCam"
-    assert row[4] == "-10"
-    assert row[5] == "120"
+    # indexed from the library with no project: it belongs to everyone
+    assert row[2] == "Shared"
+    assert row[3] == "TestCam"
+    assert row[5] == "-10"
+    assert row[6] == "120"
     # the file is where it was, untouched
     assert Path(dark).exists()
     assert calibration.list_masters(tmp_db)[0].path == dark
@@ -279,3 +282,83 @@ def test_a_missing_number_is_blank_not_zero():
     from nightscribe.gui.main_window import _master_num
     assert _master_num(None) == ""
     assert _master_num(-10.0) == "-10"
+
+
+# ------------------------------------------------------------- building
+
+def _patch_build_env(monkeypatch, raw_dir, out_dir):
+    # @args: monkeypatch - pytest's, raw_dir - the folder the picker returns,
+    #        out_dir - where the library folder points
+    # @return: None. The folder picker is a modal window and the library
+    #          folder is the user's real one: both are replaced.
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import calibration as cal_mod
+
+    class _Fake:
+        @staticmethod
+        def getExistingDirectory(*_a, **_k):
+            return str(raw_dir)
+
+    monkeypatch.setattr(mw, "QFileDialog", _Fake)
+    monkeypatch.setattr(cal_mod, "calib_root", lambda cfg=None: out_dir)
+
+
+def test_building_from_settings_writes_and_indexes_shared_masters(
+        qapp, tmp_db, monkeypatch, tmp_path):
+    # The global library BUILDS masters from a folder of calibration frames:
+    # each group becomes one master (the median of its frames), the file is
+    # written in the library folder AND indexed, and it is SHARED, because
+    # this is the common library. The originals are kept: deleting the
+    # observer's data is the observer's call, and a light is refused.
+    from pathlib import Path
+    from nightscribe.core import calibration
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for i in range(3):
+        _write_master(raw / f"d{i}.fits", IMAGETYP="Dark",
+                      INSTRUME="TestCam", EXPTIME=30.0)
+    _write_master(raw / "light.fits", IMAGETYP="Light", INSTRUME="TestCam",
+                  EXPTIME=30.0)
+    out = tmp_path / "calib"
+    dlg = _dlg()
+    win = _prep(qapp, tmp_db, monkeypatch, dlg)
+    _patch_build_env(monkeypatch, raw, out)
+    win._settings_master_build(dlg)
+    win._master_build_worker.wait(30000)
+    qapp.processEvents()
+    rows = calibration.list_masters(tmp_db)
+    assert len(rows) == 1
+    assert rows[0].kind == "dark"
+    assert rows[0].project_id is None                  # shared
+    assert Path(rows[0].path).exists()
+    assert rows[0].path.startswith(str(out))
+    # the originals are kept and the light was left out
+    assert (raw / "d0.fits").exists() and (raw / "light.fits").exists()
+    assert dlg.tbl_masters.rowCount() == 1
+    assert dlg.tbl_masters.item(0, 2).text() == "Shared"
+    assert "1 dark" in dlg.lbl_master_status.text()
+    dlg.deleteLater()
+
+
+def test_sharing_changes_the_owner_and_never_the_file(qapp, tmp_db,
+                                                      monkeypatch, tmp_path):
+    # Ownership is a property of the ROW: sharing puts a master in reach of
+    # every project, and the file never moves or is copied (ADR-061 rev).
+    from pathlib import Path
+    from PySide6.QtWidgets import QInputDialog
+    from nightscribe.core import calibration, project
+    dark = _write_master(tmp_path / "dark.fits", INSTRUME="TestCam")
+    pid = project.create(tmp_db, "neo", "2026 QX")["id"]
+    calibration.add_master(tmp_db, dark, {"kind": "dark"}, project_id=pid)
+    dlg = _dlg()
+    win = _prep(qapp, tmp_db, monkeypatch, dlg)
+    dlg.tbl_masters.selectRow(0)
+    assert dlg.btn_master_share.isEnabled() is True
+    monkeypatch.setattr(
+        QInputDialog, "getItem",
+        staticmethod(lambda *a, **k: ("Shared (every project)", True)))
+    win._settings_master_share(dlg)
+    assert calibration.list_masters(tmp_db)[0].project_id is None
+    assert Path(dark).exists()
+    assert "Shared" in dlg.lbl_master_status.text()
+    dlg.deleteLater()

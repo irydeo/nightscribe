@@ -280,6 +280,69 @@ def test_a_master_out_of_tolerance_is_explained(qapp, tmp_path, tmp_db,
     assert "-16" in warnings and "-10" in warnings
 
 
+# ------------------------------------------------ this project's masters
+
+def test_building_from_the_tab_files_the_masters_under_the_project(
+        qapp, tmp_path, tmp_db, monkeypatch):
+    # The project's Calibration tab BUILDS its masters from a folder of
+    # calibration frames: each group becomes one master, written in the
+    # library folder and filed under THIS project, so the next visit finds
+    # them without a trip to Settings (ADR-061 rev).
+    import nightscribe.core.db as db_mod
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+    from nightscribe.core import calibration
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for i in range(2):
+        _write_fits(raw / f"d{i}.fits", np.full((16, 16), 100.0 + i),
+                    IMAGETYP="Dark", INSTRUME="TestCam", GAIN=2.0,
+                    **{"CCD-TEMP": -10.0}, EXPTIME=30.0)
+    out = tmp_path / "calib"
+    monkeypatch.setattr(calibration, "calib_root", lambda cfg=None: out)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory",
+                        staticmethod(lambda *a, **k: str(raw)))
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.Yes))
+    tab, _host = _tab(qapp, tmp_path)
+    tab._on_build_masters()
+    tab._build_worker.wait(30000)
+    qapp.processEvents()
+    rows = calibration.list_masters(tmp_db, project_id=1)
+    assert len(rows) == 1 and rows[0].kind == "dark"
+    assert rows[0].project_id == 1
+    assert Path(rows[0].path).exists()
+    assert tab.lbl_status.text()
+
+
+def test_adopting_another_projects_master_links_it_into_this_one(
+        qapp, tmp_path, tmp_db, monkeypatch):
+    # "Use another project's master" is a LINK: a second row on the same
+    # file, so this project can use it without copying tens of MB. Before
+    # adopting it, another project's master is not in reach at all.
+    import nightscribe.core.db as db_mod
+    from PySide6.QtWidgets import QInputDialog
+    from nightscribe.core import calibration
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    dark = _write_fits(tmp_path / "dark.fits", np.full((16, 16), 50.0),
+                       IMAGETYP="Dark", INSTRUME="TestCam", GAIN=2.0,
+                       **{"CCD-TEMP": -10.0}, EXPTIME=30.0)
+    calibration.add_master(tmp_db, dark, {"kind": "dark"}, project_id=2)
+    tab, _host = _tab(qapp, tmp_path)          # this visit belongs to pid 1
+    assert calibration.find_master(
+        tmp_db, "dark", "TestCam", 2.0, -10.0, 30.0, None, tol_c=3.0,
+        project_id=1) is None
+    monkeypatch.setattr(QInputDialog, "getItem",
+                        staticmethod(lambda *a, **k: (a[3][0], True)))
+    tab._on_adopt_master()
+    found = calibration.find_master(
+        tmp_db, "dark", "TestCam", 2.0, -10.0, 30.0, None, tol_c=3.0,
+        project_id=1)
+    assert found is not None and found.path == dark
+    assert Path(dark).exists()
+    assert tab.lbl_status.text()
+
+
 # ------------------------------------------------------- colour by level
 
 def test_a_failure_is_reported_as_an_error(qapp, tmp_path, tmp_db,

@@ -87,6 +87,17 @@ class UfeCalibrationTab(QWidget):
         self.btn_model = self._ui.btn_model
         self.btn_model.clicked.connect(self._on_see_model)
         self._model_file = None
+        # ADR-061 rev: this project's OWN masters. Building runs off the GUI
+        # thread (a night of frames is a lot of pixels) and can delete the
+        # originals once the masters exist; adopting links another project's
+        # master into this one without copying the file.
+        self.btn_build_masters = self._ui.btn_build_masters
+        self.btn_build_masters.clicked.connect(self._on_build_masters)
+        self.btn_adopt_master = self._ui.btn_adopt_master
+        self.btn_adopt_master.clicked.connect(self._on_adopt_master)
+        self.chk_build_delete = self._ui.chk_build_delete
+        self.chk_build_share = self._ui.chk_build_share
+        self._build_worker = None
 
     def _vignette_model_on(self):
         # @return: True when Settings asks for a vignetting model when the
@@ -126,6 +137,149 @@ class UfeCalibrationTab(QWidget):
         self._say(self.tr(
             "The master library lives in Settings, under Measurement."))
 
+    # ------------------------------------------------- this project's masters
+
+    def _on_build_masters(self):
+        # @return: None. Builds masters from a folder of calibration frames
+        #          and files them under THIS project (or shared, if the box
+        #          is checked). The build runs off the GUI thread; the
+        #          originals go only when the box is checked and the run is
+        #          confirmed, and only after each master is written AND
+        #          indexed, so a failed build leaves them where they were.
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core import calibration
+        from ..core.db import db
+        from .workers import CalibrationBuildWorker, hold
+        project_id = (self._context() or {}).get("pid")
+        if project_id is None:
+            self._say(self.tr("Open the editor from a project to build its "
+                              "masters."))
+            return
+        if self._build_worker is not None and self._build_worker.isRunning():
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, self.tr("Build masters from a folder of calibration "
+                          "frames"), "")
+        if not folder:
+            return
+        files = sorted(
+            str(p) for p in Path(folder).rglob("*")
+            if p.is_file() and p.suffix.lower() in (".fits", ".fit", ".fts"))
+        if not files:
+            self._say(self.tr("No FITS frames in that folder."))
+            return
+        delete = self.chk_build_delete.isChecked()
+        shared = self.chk_build_share.isChecked()
+        plan = self.tr("Build the masters from %1 frames?").replace(
+            "%1", str(len(files)))
+        if delete:
+            plan += " " + self.tr(
+                "The original frames will be DELETED once each master is "
+                "written and indexed.")
+        else:
+            plan += " " + self.tr("The original frames are kept.")
+        plan += " " + (self.tr("The masters will be shared with every "
+                               "project.") if shared
+                       else self.tr("The masters will belong to this "
+                                    "project."))
+        if QMessageBox.question(self, self.tr("Build masters"), plan) \
+                != QMessageBox.Yes:
+            return
+        self._build_worker = hold(CalibrationBuildWorker(
+            files, str(calibration.calib_root()), db, project_id=project_id,
+            shared=shared, delete_sources=delete))
+        self._build_worker.progress.connect(self._on_build_progress)
+        self._build_worker.finished.connect(self._on_build_finished)
+        self._build_worker.failed.connect(self._on_build_failed)
+        self.btn_build_masters.setEnabled(False)
+        self._say(self.tr("Building masters…"))
+        self._build_worker.start()
+
+    def _on_build_progress(self, done, total, kind):
+        # @args: done/total - groups finished, kind - the one just built
+        # @return: None
+        self._say(self.tr("Building masters… %1 of %2").replace(
+            "%1", str(done)).replace("%2", str(total)))
+
+    def _on_build_finished(self, result):
+        # @args: result - core.calibration.build_masters' dict
+        # @return: None. A group with a SINGLE frame is called out: it is a
+        #          copy of that frame, not an average. The recipe is re-read
+        #          because a master the tab could not find may exist now.
+        self.btn_build_masters.setEnabled(True)
+        self._build_worker = None
+        built = result.get("built", [])
+        if built:
+            bits = [self.tr("Built %1 masters.").replace(
+                "%1", str(len(built)))]
+            if any(item.get("single") for item in built):
+                bits.append(self.tr(
+                    "A group had a single frame, so its master is a copy of "
+                    "that frame and not an average."))
+            skipped = result.get("skipped", [])
+            if skipped:
+                bits.append(self.tr("%1 frames were left out: they are not "
+                                    "calibration frames.").replace(
+                                        "%1", str(len(skipped))))
+            self._say("  ".join(bits))
+        else:
+            self._say(self.tr("Nothing was built."))
+        for kind, why in result.get("errors", [])[:2]:
+            self._say(f"✕ {kind}: {why}")
+        self._sync_context()
+
+    def _on_build_failed(self, message):
+        # @args: message - the worker's error (internal English)
+        # @return: None
+        self.btn_build_masters.setEnabled(True)
+        self._build_worker = None
+        self._say(self.tr("The build failed:") + f" {message}")
+
+    def _on_adopt_master(self):
+        # @return: None. Links a master another project built into THIS
+        #          project: a second row on the same file, never a copy. The
+        #          list leaves out what this project can already use, so
+        #          adopting the same master twice is not offered.
+        from PySide6.QtWidgets import QInputDialog
+        from ..core import calibration, project
+        from ..core.db import db
+        project_id = (self._context() or {}).get("pid")
+        if project_id is None:
+            self._say(self.tr("Open the editor from a project to use a "
+                              "master."))
+            return
+        # What this project can already use, BY FILE: an adopted master is a
+        # new ROW on the same file, so comparing ids would offer the same
+        # master again and again.
+        mine = {m.path for m in calibration.list_masters(
+            db, project_id=project_id)}
+        candidates = [m for m in calibration.list_masters(db)
+                      if m.project_id is not None
+                      and m.project_id != project_id and m.path not in mine]
+        if not candidates:
+            self._say(self.tr("There is no other project's master to use."))
+            return
+        owners, labels = {}, []
+        for m in candidates:
+            if m.project_id not in owners:
+                p = project.get(db, m.project_id) or {}
+                owners[m.project_id] = (p.get("object_name")
+                                        or f"#{m.project_id}")
+            labels.append(f"{Path(m.path).name}  ·  "
+                          f"{self._master_kind_label(m.kind)}  ·  "
+                          f"{owners[m.project_id]}")
+        choice, ok = QInputDialog.getItem(
+            self, self.tr("Use another project's master"),
+            self.tr("The file is not copied: this project gets its own link "
+                    "to it."), labels, 0, False)
+        if not ok:
+            return
+        ref = candidates[labels.index(choice)]
+        if calibration.adopt_master(db, ref.id, project_id) is not None:
+            self._say(self.tr("Added %1 to this project.").replace(
+                "%1", Path(ref.path).name))
+            self._sync_context()
+
     # ------------------------------------------------------- host wiring
 
     def set_active(self, flag):
@@ -144,12 +298,15 @@ class UfeCalibrationTab(QWidget):
     def shutdown(self):
         # The worker must not outlive the workbench: a QThread destroyed
         # while it runs aborts the whole application. Cancel stops it
-        # between frames and wait() gives it a bounded time to land.
+        # between frames (the calibrate worker) or between groups (the
+        # build) and wait() gives it a bounded time to land.
         # @return: None
-        if self._worker is not None and self._worker.isRunning():
-            self._worker.cancel()
-            self._worker.wait(5000)
-        self._worker = None
+        for attr in ("_worker", "_build_worker"):
+            worker = getattr(self, attr, None)
+            if worker is not None and worker.isRunning():
+                worker.cancel()
+                worker.wait(5000)
+            setattr(self, attr, None)
 
     def _context(self):
         # @return: the visit context {"pid", "session_id", "paths",
@@ -232,7 +389,11 @@ class UfeCalibrationTab(QWidget):
             return
         meta = calibration.meta_from_header(header)
         tol = float(config.get("calib_temp_tol_c", 3.0))
-        recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        # The project's OWN masters are preferred and the shared ones are the
+        # fallback; the recipe then SAYS when it used a shared one (ADR-061
+        # rev), so "why is it not using my dark" has an answer.
+        recipe = calibration.resolve_recipe(db, meta, tol_c=tol,
+                                            project_id=ctx.get("pid"))
         self._recipe = recipe
         self.lbl_recipe.setText(self._recipe_text(meta, recipe))
         self._set_concerns(self._concern_lines(recipe))
@@ -281,6 +442,18 @@ class UfeCalibrationTab(QWidget):
         #          uses (by file name) or what is missing
         def _v(value):
             return "–" if value is None else str(value)
+
+        def _mark(ref):
+            # @args: ref - a chosen master
+            # @return: its file name, with "(shared)" when the project that
+            #          ASKED does not own it: those pixels come from the
+            #          common library or from another project's nights, and
+            #          the observer has to know which (ADR-061 rev).
+            name = Path(ref.path).name
+            if recipe.project_id is not None and ref.project_id is None:
+                name += " " + self.tr("(shared)")
+            return name
+
         lines = [self.tr(
             "Camera %1 · gain %2 · %3 °C · exposure %4 s · filter %5"
         ).replace("%1", _v(meta.get("camera"))).replace(
@@ -291,15 +464,15 @@ class UfeCalibrationTab(QWidget):
         if recipe.offset is not None:
             kind = self.tr("Dark") if recipe.offset_kind == "dark" \
                 else self.tr("Bias")
-            lines.append(kind + ": " + Path(recipe.offset.path).name)
+            lines.append(kind + ": " + _mark(recipe.offset))
         else:
             lines.append(self.tr(
                 "Offset: missing (no dark or bias in the library)"))
         if recipe.flat is not None:
-            line = self.tr("Flat:") + " " + Path(recipe.flat.path).name
+            line = self.tr("Flat:") + " " + _mark(recipe.flat)
             if recipe.flat_offset is not None:
                 line += " " + self.tr("(offset removed: %1)").replace(
-                    "%1", Path(recipe.flat_offset.path).name)
+                    "%1", _mark(recipe.flat_offset))
             else:
                 line += " " + self.tr(
                     "(no dark at its exposure or bias: the flat keeps its "
@@ -493,7 +666,8 @@ class UfeCalibrationTab(QWidget):
         self._worker = hold(CalibrationWorker(
             paths, db, export_dir, config,
             vignette_model=want_model,
-            flat_path=flat_path))
+            flat_path=flat_path,
+            project_id=(self._context() or {}).get("pid")))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

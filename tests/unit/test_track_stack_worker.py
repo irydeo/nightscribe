@@ -460,8 +460,9 @@ def test_the_vignette_model_is_skipped_for_already_calibrated_frames(
     worker = _worker()
     worker._cfg = {"calib_vignette_model": True}
     calls = []
-    monkeypatch.setattr(calibration, "resolve_recipe",
-                        lambda db, meta, tol_c=None: calibration.Recipe())
+    monkeypatch.setattr(
+        calibration, "resolve_recipe",
+        lambda db, meta, tol_c=None, project_id=None: calibration.Recipe())
     monkeypatch.setattr(calibration, "vignette_model",
                         lambda *a, **k: (calls.append(1), (None, {}))[1])
 

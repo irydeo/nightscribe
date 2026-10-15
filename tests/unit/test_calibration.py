@@ -503,3 +503,215 @@ def test_frame_calibrator_skips_an_already_calibrated_frame(tmp_db, tmp_path):
     assert summary["already"] == 1
     assert summary["offsets"] == [] and summary["flats"] == []
 
+
+# ------------------------------------------------------ building masters
+
+def _cal_frame(path, value, kind="Dark", **cards):
+    # @args: path - where, value - the constant level, kind - IMAGETYP,
+    #        cards - extra header cards (CCD__TEMP writes CCD-TEMP)
+    # @return: the path (str). A calibration frame with a small pattern, so
+    #          the median of several can be told from a single one.
+    data = np.full((8, 8), float(value), dtype=np.float32)
+    data[2:4, 2:4] += 10.0
+    return _write_fits(path, data, IMAGETYP=kind, INSTRUME="TestCam",
+                       **cards)
+
+
+def _index_dark(db, tmp_path, name, project_id, **meta):
+    # @args: db - Database, tmp_path - the test folder, name - the file,
+    #        project_id - who owns it (None for a SHARED master)
+    # @return: the master's path
+    path = _write_fits(tmp_path / name, np.full((6, 6), 50.0),
+                       IMAGETYP="Dark", INSTRUME="TestCam", GAIN=1.0,
+                       CCD__TEMP=-10.0, EXPTIME=30.0)
+    cal.add_master(db, path, {"kind": "dark"}, project_id=project_id)
+    return path
+
+
+def test_build_masters_combines_with_the_median(tmp_db, tmp_path):
+    # The master of a group is the MEDIAN of its frames (outliers.
+    # nanmedian_axis0, the app's own combine), it carries the cards the
+    # recipe keys on, and the row it is indexed under says WHO owns it.
+    from nightscribe.core import outliers
+    frames = [_cal_frame(tmp_path / f"d{i}.fits", 100 + i, "Dark",
+                         GAIN=2.0, CCD__TEMP=-10.0, EXPTIME=30.0)
+              for i in range(3)]
+    out = tmp_path / "calib"
+    result = cal.build_masters(tmp_db, frames, out, project_id=7)
+    assert len(result["built"]) == 1
+    master = result["built"][0]
+    assert master["kind"] == "dark" and master["n"] == 3
+    assert master["single"] is False
+    # the pixels are the median of the three frames, not the first one
+    want = outliers.nanmedian_axis0(np.stack(
+        [cal.read_image(p)[0] for p in frames], axis=0))
+    got, header = cal.read_image(master["path"])
+    assert np.allclose(got, want)
+    assert header["IMAGETYP"] == "Dark"
+    assert float(header["GAIN"]) == 2.0
+    assert float(header["EXPTIME"]) == 30.0
+    assert float(header["CCD-TEMP"]) == -10.0
+    ref = cal.list_masters(tmp_db)[0]
+    assert ref.project_id == 7 and ref.kind == "dark"
+
+
+def test_build_refuses_a_light_and_an_ambiguous_frame(tmp_db, tmp_path):
+    # A light is never a master, and a frame whose header does not say what
+    # it is (no IMAGETYP, a nonzero exposure) is refused too: a dark is
+    # recognised by its exposure, not guessed.
+    from pathlib import Path
+    light = _cal_frame(tmp_path / "light.fits", 500, "Light", EXPTIME=30.0)
+    ambiguous = _write_fits(tmp_path / "odd.fits",
+                            np.full((8, 8), 5.0, dtype=np.float32),
+                            INSTRUME="TestCam", EXPTIME=2.0)
+    dark = _cal_frame(tmp_path / "d.fits", 100, "Dark", EXPTIME=30.0)
+    result = cal.build_masters(tmp_db, [light, ambiguous, dark],
+                               tmp_path / "calib")
+    assert [b["kind"] for b in result["built"]] == ["dark"]
+    reasons = {Path(p).name: why for p, why in result["skipped"]}
+    assert "light.fits" in reasons and "odd.fits" in reasons
+
+
+def test_a_single_frame_group_is_marked_single(tmp_db, tmp_path):
+    # One frame is a COPY, not a master: it carries that frame's own noise,
+    # so the build says so instead of pretending it averaged anything.
+    frame = _cal_frame(tmp_path / "d.fits", 100, "Dark", EXPTIME=30.0)
+    result = cal.build_masters(tmp_db, [frame], tmp_path / "calib")
+    assert result["built"][0]["single"] is True
+    assert result["built"][0]["n"] == 1
+
+
+def test_darks_a_few_tenths_apart_are_one_master(tmp_db, tmp_path):
+    # The sensor's reading drifts a few tenths over a night, and grouping by
+    # the raw value turned one night of darks into a handful of one-frame
+    # copies. They are grouped to the nearest degree, and the master carries
+    # the MEDIAN temperature of its frames.
+    frames = [_cal_frame(tmp_path / f"d{i}.fits", 100 + i, "Dark",
+                         EXPTIME=30.0, CCD__TEMP=-20.0 + delta)
+              for i, delta in enumerate((0.3, 0.0, -0.3))]
+    result = cal.build_masters(tmp_db, frames, tmp_path / "calib")
+    assert len(result["built"]) == 1
+    assert result["built"][0]["n"] == 3
+    assert result["built"][0]["single"] is False
+    _data, header = cal.read_image(result["built"][0]["path"])
+    assert float(header["CCD-TEMP"]) == -20.0
+
+
+def test_darks_at_different_setpoints_stay_apart(tmp_db, tmp_path):
+    # Two setpoints are two different darks: the thermal current is not the
+    # same, and the recipe would not accept one for the other.
+    warm = [_cal_frame(tmp_path / f"w{i}.fits", 100, "Dark", EXPTIME=30.0,
+                       CCD__TEMP=-10.0) for i in range(2)]
+    cold = [_cal_frame(tmp_path / f"c{i}.fits", 100, "Dark", EXPTIME=30.0,
+                       CCD__TEMP=-20.0) for i in range(2)]
+    result = cal.build_masters(tmp_db, warm + cold, tmp_path / "calib")
+    assert len(result["built"]) == 2
+    assert sorted(b["n"] for b in result["built"]) == [2, 2]
+
+
+def test_the_originals_go_only_when_asked(tmp_db, tmp_path):
+    # The frames are the observer's data: they are removed only when the
+    # caller asked, and the master is indexed first, so a build that died
+    # before the row existed cannot leave the observer with no frames AND no
+    # master.
+    from pathlib import Path
+    frames = [_cal_frame(tmp_path / f"d{i}.fits", 100 + i, "Dark",
+                         EXPTIME=30.0) for i in range(2)]
+    out = tmp_path / "calib"
+    result = cal.build_masters(tmp_db, frames, out, delete_sources=True)
+    assert all(not Path(p).exists() for p in frames)
+    assert len(cal.list_masters(tmp_db)) == 1
+    assert Path(result["built"][0]["path"]).exists()
+    # without the flag the originals stay
+    frames2 = [_cal_frame(tmp_path / f"e{i}.fits", 100 + i, "Dark",
+                          EXPTIME=60.0) for i in range(2)]
+    cal.build_masters(tmp_db, frames2, out, delete_sources=False)
+    assert all(Path(p).exists() for p in frames2)
+
+
+def test_the_projects_own_dark_wins_over_a_shared_one(tmp_db, tmp_path):
+    # A project's own master is tied to ITS nights: at the same key it beats
+    # the shared one, because the shared one may be another train.
+    shared = _index_dark(tmp_db, tmp_path, "shared.fits", None)
+    mine = _index_dark(tmp_db, tmp_path, "mine.fits", 3)
+    found = cal.find_master(tmp_db, "dark", "TestCam", 1.0, -10.0, 30.0,
+                            None, tol_c=3.0, project_id=3)
+    assert found is not None and found.path == mine
+    assert found.path != shared
+
+
+def test_a_project_without_its_own_master_uses_a_shared_one(tmp_db,
+                                                            tmp_path):
+    shared = _index_dark(tmp_db, tmp_path, "shared.fits", None)
+    found = cal.find_master(tmp_db, "dark", "TestCam", 1.0, -10.0, 30.0,
+                            None, tol_c=3.0, project_id=9)
+    assert found is not None and found.path == shared
+
+
+def test_another_projects_master_is_invisible_until_adopted(tmp_db,
+                                                            tmp_path):
+    # Ownership is a WALL: a project does not silently use another project's
+    # dark. Adopting it (a LINK, the same file) is what puts it in reach.
+    other = _index_dark(tmp_db, tmp_path, "other.fits", 2)
+    assert cal.find_master(tmp_db, "dark", "TestCam", 1.0, -10.0, 30.0, None,
+                           tol_c=3.0, project_id=5) is None
+    row = cal.list_masters(tmp_db, project_id=2)[0]
+    assert cal.adopt_master(tmp_db, row.id, 5) is not None
+    found = cal.find_master(tmp_db, "dark", "TestCam", 1.0, -10.0, 30.0, None,
+                            tol_c=3.0, project_id=5)
+    assert found is not None and found.path == other
+    # the link did not copy the file: both rows point at the same path
+    rows = [m for m in cal.list_masters(tmp_db) if m.path == other]
+    assert sorted(m.project_id for m in rows) == [2, 5]
+
+
+def test_the_recipe_marks_a_master_the_project_does_not_own(tmp_db,
+                                                            tmp_path):
+    # Falling back to a shared master is allowed and normal, and the recipe
+    # CARRIES who asked and which master it was: that is what the tab marks
+    # "(shared)" from, so the observer knows the pixels are not from this
+    # project's own nights (ADR-061 rev).
+    shared = _index_dark(tmp_db, tmp_path, "shared.fits", None)
+    meta = {"camera": "TestCam", "gain": 1.0, "temp_c": -10.0,
+            "exptime_s": 30.0, "filter": None}
+    recipe = cal.resolve_recipe(tmp_db, meta, tol_c=3.0, project_id=4)
+    assert recipe.project_id == 4
+    assert recipe.offset is not None
+    assert recipe.offset.project_id is None          # the project's? no
+    # the project's OWN dark is not shared, and it wins
+    mine = _index_dark(tmp_db, tmp_path, "mine.fits", 4)
+    recipe2 = cal.resolve_recipe(tmp_db, meta, tol_c=3.0, project_id=4)
+    assert recipe2.offset.path == mine
+    assert recipe2.offset.project_id == 4
+    assert shared != mine
+
+
+def test_delete_master_never_removes_a_file_another_row_uses(tmp_db,
+                                                             tmp_path):
+    from pathlib import Path
+    other = _index_dark(tmp_db, tmp_path, "other.fits", 2)
+    row = cal.list_masters(tmp_db, project_id=2)[0]
+    cal.adopt_master(tmp_db, row.id, 5)
+    # deleting the owner's row leaves the file: project 5 still points at it
+    cal.delete_master(tmp_db, row.id, delete_file=True)
+    assert Path(other).exists()
+    assert cal.master_in_use(tmp_db, other) is True
+    # the last row is what takes the file
+    last = cal.list_masters(tmp_db)[0]
+    cal.delete_master(tmp_db, last.id, delete_file=True)
+    assert not Path(other).exists()
+
+
+def test_calib_root_falls_back_to_the_data_dir():
+    # The key existed since ADR-061 and nothing read it: the build needs a
+    # folder, and an empty setting means <data dir>/calib.
+    class _Cfg:
+        def __init__(self, value):
+            self._v = value
+
+        def get(self, key, default=None):
+            return self._v if key == "calib_root" else default
+
+    assert cal.calib_root(_Cfg("")).name == "calib"
+    assert cal.calib_root(_Cfg("/tmp/nsroot")).name == "nsroot"
+

@@ -19,7 +19,7 @@
     <widget class="QLabel" name="lbl_recipe_title">
      <property name="text"><string>Calibration recipe for this visit</string></property>
      <property name="toolTip">
-      <string>Which master of the library each piece uses (a dark already includes the bias; the flat is per filter and normalised), resolved against the first frame's header</string>
+      <string>Which master of the library each piece uses (a dark already includes the bias; the flat is per filter and normalised), resolved against the first frame's header. A master this project does not own is marked "(shared)": it comes from the common library or from another project's nights, and it is used because this project has none of its own for that key</string>
      </property>
     </widget>
    </item>
@@ -46,6 +46,55 @@
       </spacer>
      </item>
     </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_build">
+     <property name="title"><string>This project's masters</string></property>
+     <layout class="QVBoxLayout" name="vbox_build">
+      <item>
+       <layout class="QHBoxLayout" name="row_build">
+        <item>
+         <widget class="QPushButton" name="btn_build_masters">
+          <property name="text"><string>Build masters…</string></property>
+          <property name="toolTip">
+           <string>Build the masters from a folder of calibration frames: each frame is classified by its own header, the frames of one key are grouped, combined with the median and written in the library folder. The masters belong to this project unless you share them. The app never guesses: a light, or a frame whose header does not say what it is, is left out and said so</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_adopt_master">
+          <property name="text"><string>Use another project's master…</string></property>
+          <property name="toolTip">
+           <string>Lets THIS project use a master built by another project, without copying it: the file stays where it is and this project gets its own link to it. The owner can take the link away later, and the file is deleted only when no project is using it any more</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="hsp_build">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chk_build_delete">
+        <property name="text"><string>Delete the original frames once the masters exist</string></property>
+        <property name="toolTip">
+         <string>The frames are the raw material of the masters and take far more room than they do. They are removed only after each master is written AND indexed, so a build that fails leaves them where they were. Off by default: the frames are your data</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="chk_build_share">
+        <property name="text"><string>Share the built masters with every project</string></property>
+        <property name="toolTip">
+         <string>A bias and a flat are reusable (the sensor's pedestal and the optical train's shape do not change from one project to the next), while a dark is tied to a night's exposure and temperature. Sharing is a property of the library entry, not a copy: the same file serves every project that uses it</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
    </item>
    <item>
     <widget class="QLabel" name="lbl_warnings_title">

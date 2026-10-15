@@ -125,6 +125,74 @@ def test_a_new_session_clears_the_previous_run(qapp, tmp_path):
     assert tab._restore_asked is False
 
 
+def test_the_panel_fits_the_column(qapp, tmp_path):
+    # Reported 2026-10-15: the Astrometry panel's right edge was cut. The
+    # content's own minimum has to fit the column the UFE OPENS (the tab
+    # column's default), or the form is clipped; the scroll area no longer
+    # hides the horizontal bar, so a narrower column scrolls instead.
+    from PySide6.QtWidgets import QScrollArea
+    from nightscribe.gui import ufe_dialog
+    tab, _host = _tab(qapp, tmp_path)
+    inner = tab.findChild(QScrollArea).widget()
+    assert inner.minimumSizeHint().width() <= ufe_dialog._TABS_W
+
+
+class _FakeBox:
+    # A QMessageBox stand-in for the gap question: records the buttons and
+    # answers with the one whose label contains `pick`.
+    pick = "One"
+    Question = 0
+    AcceptRole = 0
+    RejectRole = 0
+
+    def __init__(self, _parent=None):
+        self.buttons = {}
+
+    def setIcon(self, *_a): pass
+    def setWindowTitle(self, *_a): pass
+    def setText(self, *_a): pass
+    def setInformativeText(self, *_a): pass
+    def setDefaultButton(self, _b): pass
+    def exec(self): pass
+
+    def addButton(self, label, _role):
+        self.buttons[label] = label
+        return label
+
+    def clickedButton(self):
+        return next(label for label in self.buttons if self.pick in label)
+
+
+def test_the_gap_rule_asks_before_it_decides(qapp, tmp_path, monkeypatch):
+    # A refocus and a re-point look the same in the clock, so the gap rule is
+    # a guess: when it would decide, the observer is asked (reported
+    # 2026-10-15: the refocuses of a visit came out as seven "observations").
+    from nightscribe.core import follow
+    from nightscribe.gui import ufe_trackstack_tab as mod
+    tab, _host = _tab(qapp, tmp_path)
+    monkeypatch.setattr(follow, "resolve_groups",
+                        lambda *a, **k: ([(0, 2), (2, 4)], "gaps"))
+    monkeypatch.setattr(mod, "QMessageBox", _FakeBox)
+    # "One observation": the guess is dropped and the count is 1
+    _FakeBox.pick = "One"
+    tab._gaps_asked = False
+    tab._groups_overridden = False
+    tab._ask_about_gaps()
+    assert tab._gaps_asked is True
+    assert tab._groups_overridden is True
+    assert tab.spn_nobs.value() == 1
+    # asked ONCE per visit: a second call does nothing
+    tab._ask_about_gaps()
+    assert tab.spn_nobs.value() == 1
+    # "Split into N" keeps the gap rule's number
+    _FakeBox.pick = "Split"
+    tab._gaps_asked = False
+    tab._groups_overridden = False
+    tab._ask_about_gaps()
+    assert tab._gaps_asked is True
+    assert tab._groups_overridden is False
+
+
 def test_the_tab_finds_an_embedded_host(qapp, tmp_path):
     # ADR-053: the editor is a PAGE of the shell, so window() from a tab is
     # the MAIN window and the hooks live in an ancestor. The helper above

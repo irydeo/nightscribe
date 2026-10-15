@@ -32,8 +32,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QColor, QIcon, QTextCursor
-from PySide6.QtWidgets import (QFrame, QScrollArea, QTableWidgetItem,
-                               QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QFrame, QMessageBox, QScrollArea,
+                               QTableWidgetItem, QVBoxLayout, QWidget)
 
 from ..config import config
 from . import theme
@@ -148,6 +148,9 @@ class UfeTrackStackTab(QWidget):
         self._auto_groups = None
         self._auto_source = ""
         self._groups_overridden = False
+        # whether the observer has been ASKED about the gap rule for THIS
+        # visit (a refocus and a re-point look the same in the clock)
+        self._gaps_asked = False
         self.lbl_snr_line = self._ui.lbl_snr_line
         self.lbl_plan_line = self._ui.lbl_plan_line
         self.tbl_snr = self._ui.tbl_snr
@@ -1036,6 +1039,7 @@ class UfeTrackStackTab(QWidget):
         self._result = None
         self._run_id = None
         self._restore_asked = False   # a new visit may hold its own run
+        self._gaps_asked = False      # ...and gets its own gap question
         self._thumbs.clear()
         self.tbl_points.setRowCount(0)
         self.tbl_snr.setRowCount(0)
@@ -1120,6 +1124,11 @@ class UfeTrackStackTab(QWidget):
         self.lbl_object.setText(line)
         self._fit_label(self.lbl_object)
         self._sync_calibration_hint()
+        # A refocus and a re-point look the SAME in the clock, so the gap
+        # rule is a guess: when it is the one that would decide, the
+        # observer is asked (reported 2026-10-15: the refocuses of a visit
+        # came out as seven "observations").
+        self._ask_about_gaps()
         self._refresh_preview()
         # The visit may ALREADY hold a run (asked for): show it instead of
         # an empty column, from what was saved. The ask is retried until it
@@ -1176,6 +1185,47 @@ class UfeTrackStackTab(QWidget):
         ctx = self._context() or {}
         runs = ctx.get("follow_runs") or []
         return runs[-1] if runs else None
+
+    def _ask_about_gaps(self):
+        # @return: None. The gap rule (`follow.group_by_gaps`) reads the
+        #          clock, and a REFOCUS leaves the same gap a re-point does:
+        #          so when it is the rule that would decide, the observer is
+        #          asked instead of being handed a number (reported
+        #          2026-10-15: the refocuses of a visit came out as seven
+        #          "observations"). Asked ONCE per visit; the answer stands
+        #          until the visit changes.
+        from ..core import follow
+        frames = self._frames or []
+        if self._gaps_asked or len(frames) < 2:
+            return
+        groups, source = follow.resolve_groups(frames)
+        if source != "gaps" or len(groups) < 2:
+            return
+        self._gaps_asked = True
+        n = len(groups)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Question)
+        box.setWindowTitle(self.tr("Observations"))
+        box.setText(self.tr(
+            "The frames show %1 gaps in time.").replace("%1", str(n)))
+        box.setInformativeText(self.tr(
+            "A refocus and a re-point look the same in the clock, so this is "
+            "a guess: split the visit into %1 observations, or keep it as "
+            "one?").replace("%1", str(n)))
+        split = box.addButton(
+            self.tr("Split into %1").replace("%1", str(n)),
+            QMessageBox.AcceptRole)
+        one = box.addButton(self.tr("One observation"), QMessageBox.RejectRole)
+        box.setDefaultButton(one)      # never invent observations
+        box.exec()
+        if box.clickedButton() is split:
+            return                     # the count follows the gap rule
+        # the observer's word wins over the guess: one observation
+        self._groups_overridden = True
+        spn = self.spn_nobs
+        spn.blockSignals(True)
+        spn.setValue(1)
+        spn.blockSignals(False)
 
     def _resolved_groups(self):
         # @return: (groups, source): the per-observation groups the reduction

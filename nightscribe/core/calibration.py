@@ -578,6 +578,11 @@ class CalibrationReport:
     pedestal_adu: float | None = None     # median of the offset removed
     warnings: list[str] = field(default_factory=list)
     ok: bool = True
+    # The frame already carried NightScribe's calibration (NSCALIB) and was
+    # left as it was: the recipe was NOT applied. It is a fact the run's note
+    # and the Calibration tab have to say, because "calibrated" and "already
+    # calibrated" are not the same thing to the observer.
+    already: bool = False
 
 
 def _note(recipe, what, reason, master=None, value=None, wanted=None,
@@ -1067,6 +1072,31 @@ def vignette_model(paths, tile=None, frames=None, order=None, loader=None,
     return model, info
 
 
+# The card a calibrated copy carries so it is never calibrated twice, and
+# the note both calibrators add when they honour it (one string, so the
+# Calibration tab and the run say the same thing).
+CALIBRATED_CARD = "NSCALIB"
+_ALREADY_NOTE = ("already calibrated by NightScribe: "
+                 "the recipe was not applied again")
+
+
+def is_calibrated(header):
+    # @args: header - a FITS header dict
+    # @return: True when NightScribe already calibrated this frame
+    # The exported calibrated copies KEEP the cards the recipe keys on
+    # (camera, gain, exposure, temperature, filter): only the structural ones
+    # are dropped (see export_calibrated). So feeding one of them back into
+    # the library would subtract the dark and divide the flat a SECOND time,
+    # and a double-calibrated frame has no tell in the image. The card is the
+    # frame saying "I am already clean", and both calibrators read it.
+    value = header.get(CALIBRATED_CARD)
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return value.strip().upper() in ("T", "TRUE", "YES", "1")
+    return bool(value)
+
+
 class FrameCalibrator:
     # A LOADER that calibrates on the way in. The stacking engine reads each
     # frame many times and in pieces (the registration wants the whole frame,
@@ -1103,6 +1133,13 @@ class FrameCalibrator:
         #          need it read it themselves, and calibrating does not
         #          change it.
         data, header = read_image(path, box)
+        if is_calibrated(header):
+            # The frame already carries NightScribe's calibration: applying
+            # the recipe again would subtract the dark twice. It is said in
+            # the report, never done in silence.
+            self.reports.append((path, CalibrationReport(
+                already=True, ok=True, warnings=[_ALREADY_NOTE])))
+            return _as_float32(data)
         meta = meta_from_header(header)
         temp = meta.get("temp_c")
         key = (meta.get("camera"), meta.get("gain"), meta.get("exptime_s"),
@@ -1123,7 +1160,10 @@ class FrameCalibrator:
         #          and the warnings, deduplicated. The observer has to know
         #          what the magnitude was measured with.
         offsets, flats, warnings = set(), set(), []
+        already = 0
         for _path, report in self.reports:
+            if getattr(report, "already", False):
+                already += 1
             if report.offset_path:
                 offsets.add(Path(report.offset_path).name
                             if report.offset_path != "vignette-model"
@@ -1135,7 +1175,7 @@ class FrameCalibrator:
             for note in report.warnings:
                 if note not in warnings:
                     warnings.append(note)
-        return {"n": len(self.reports),
+        return {"n": len(self.reports), "already": already,
                 "offsets": sorted(offsets), "flats": sorted(flats),
                 "warnings": warnings[:4]}
 
@@ -1216,6 +1256,16 @@ def calibrate_paths(paths, db, cfg=None, master_loader=None, box=None,
         if cancel is not None and cancel():
             break
         data, header = read_image(path, box)
+        if is_calibrated(header):
+            # Already calibrated by NightScribe (see is_calibrated): the
+            # recipe is skipped and the report says so. The Calibration tab
+            # renders that warning instead of a second subtraction nobody
+            # would see in the image.
+            out.append((path, _as_float32(data), header, CalibrationReport(
+                already=True, ok=True, warnings=[_ALREADY_NOTE])))
+            if progress is not None:
+                progress(index, total, path)
+            continue
         meta = meta_from_header(header)
         recipe = resolve_recipe(db, meta, tol_c=tol)
         data_cal, report = calibrate(data, recipe, loader=master_loader,
@@ -1245,6 +1295,11 @@ def export_calibrated(data, header, out_path, report=None):
         except (ValueError, TypeError):
             continue
     hdu.header["HISTORY"] = "NightScribe calibration (ADR-061)"
+    # The marker that keeps the copy from being calibrated twice: the
+    # camera/gain/exposure/filter cards are still there (they are what makes
+    # a master valid), so without this card a run over the copies would
+    # subtract the dark and divide the flat again (see is_calibrated).
+    hdu.header[CALIBRATED_CARD] = True
     if report is not None:
         if report.offset_path:
             hdu.header["HISTORY"] = f"offset ({report.offset_kind}): " \

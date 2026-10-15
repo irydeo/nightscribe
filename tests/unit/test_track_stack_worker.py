@@ -446,3 +446,31 @@ def test_the_whole_frame_cache_reads_once_and_matches(tmp_path):
         calibration.read_image(str(path), (10, 20, 90, 100))[0],
         tiny(str(path), (10, 20, 90, 100)))
     assert len(tiny._cache) == 0
+
+
+# --------------------------------------------------- the calibration loader
+
+def test_the_vignette_model_is_skipped_for_already_calibrated_frames(
+        monkeypatch):
+    # A run over already-calibrated copies skips every frame inside the
+    # calibrator, so building the vignetting model would be work thrown away,
+    # and it would be sampled from pixels that no longer carry the pedestal
+    # the model expects. The frame's own NSCALIB card decides.
+    from nightscribe.core import calibration
+    worker = _worker()
+    worker._cfg = {"calib_vignette_model": True}
+    calls = []
+    monkeypatch.setattr(calibration, "resolve_recipe",
+                        lambda db, meta, tol_c=None: calibration.Recipe())
+    monkeypatch.setattr(calibration, "vignette_model",
+                        lambda *a, **k: (calls.append(1), (None, {}))[1])
+
+    monkeypatch.setattr(calibration, "read_header",
+                        lambda path: {"NSCALIB": True, "FILTER": "R"})
+    assert worker._build_calibrator() is not None
+    assert calls == []                    # already calibrated: no model
+
+    monkeypatch.setattr(calibration, "read_header",
+                        lambda path: {"FILTER": "R"})
+    assert worker._build_calibrator() is not None
+    assert calls == [1]                   # raw frames: the model is built

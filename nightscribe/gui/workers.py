@@ -2390,7 +2390,12 @@ class TrackStackWorker(QThread):
         recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
         model = None
         want_model = bool(self._cfg_get("calib_vignette_model", False))
-        if recipe.flat is None and want_model:
+        # The frames may already carry NightScribe's calibration (an exported
+        # copy fed back). Then FrameCalibrator skips them all, so building the
+        # model would be work thrown away AND built from pixels that no longer
+        # carry the pedestal the model expects (see calibration.is_calibrated).
+        already = calibration.is_calibrated(header)
+        if recipe.flat is None and want_model and not already:
             self.progress.emit("vignette", 0, len(self._paths))
             # The pedestal goes with it: the model is built from the frames
             # with the SAME offset removed as the light, or the division

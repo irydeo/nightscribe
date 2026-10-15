@@ -410,7 +410,9 @@ aparece.
   instrumento de tu cámara. Por debajo de la puerta de detección hay **modo
   manual** (marcar el objeto a ojo sobre el apilado de toda la secuencia) y la
   **animación** reproduce las observaciones en el editor para ver el asteroide
-  quieto mientras las estrellas se arrastran.
+  quieto mientras las estrellas se arrastran. Las dos etapas más pesadas, el
+  **registro** y el **apilado**, pueden correr en una **tarjeta gráfica** cuando
+  hay una (apagado por defecto, por CUDA u OpenCL, y el resultado es el mismo).
 - **Blink y anotación.** Tu FITS parpadeado contra una referencia PanSTARRS
   DR1 g pedida con la geometría exacta de tu imagen (GIF animado, MP4 H.264,
   PNG antes/después) y una copia anotada compatible con AIJ con la posición
@@ -524,7 +526,8 @@ cuerpos menores (Kepler desde los elementos SBDB), instantes de tránsito,
 fechas julianas heliocéntricas, todo el calendario del cielo de 60 días y los
 fenómenos de las lunas de Júpiter. Y la **reducción misma**: el registro, el
 apilado, la medida astrométrica y fotométrica, la serie, la búsqueda de
-período y la curva de luz son aritmética sobre tus propios píxeles, sin ningún
+período y la curva de luz son aritmética sobre tus propios píxeles (en el
+procesador, o en tu tarjeta gráfica si lo pides), sin ningún
 servicio de por medio. Las imágenes van acreditadas (NASA/SDO, PanSTARRS,
 DSS); las webs externas (SolarMonitor, ETD, NEOfixer, TNS…) se abren en tu
 navegador, nunca incrustadas.

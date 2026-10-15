@@ -35,12 +35,16 @@ corre en **NVIDIA, AMD e Intel**, mientras que CuPy solo existe en NVIDIA: es el
    `iterations` pasadas, el veto **acumulativo** y el centro moviéndose a la
    media de los supervivientes. Un NaN es el «no hay dato aquí» de la app, así
    que cada método lo salta igual que la ruta numpy.
-4. **El registro (`frame_stars`) NO se porta**: la mediana por bloques y la
-   búsqueda de estrellas son otra bestia, y un medio-puerto que moviera un
-   centroide en silencio sería **peor que no portarlo**. En una máquina
-   solo-OpenCL el registro se queda en la CPU (la app lo dice en la nota del
-   run, que nombra el dispositivo) y las dos etapas caras siguen en el
-   dispositivo.
+4. **El registro (`frame_stars`) también se porta**: la imagen fuente (la
+   mediana por bloques y el fondo) y la detección de estrellas (decimación, la
+   MAD global del ruido y los máximos locales), espejo línea a línea de
+   `register.source_image` y `register.detect_stars`. El coste de la estimación
+   en la CPU son **dos medianas** (medido en un frame de 2048²: 101 ms de 170),
+   y OpenCL no tiene mediana, así que las dos son un **radix select** sobre el
+   patrón de bits ordenable del float (8 pasadas de 8 bits, un histograma por
+   pasada). El voto, el emparejamiento y el ajuste **siguen en la CPU** (igual
+   que en el backend CUDA): las listas de estrellas son cortas y un viaje al
+   dispositivo por cada una no paga.
 5. **La paridad se fija con un test** (`tests/unit/test_gpu_opencl.py`) que se
    salta sin pyopencl (el caso normal y el CI): el warp y el combine coinciden
    con la ruta numpy dentro del redondeo de float32, el mask del warp es
@@ -53,32 +57,45 @@ corre en **NVIDIA, AMD e Intel**, mientras que CuPy solo existe en NVIDIA: es el
    un requisito (apagada por defecto y, sin dispositivo OpenCL o sin el ICD
    loader, `available()` es False y el camino numpy corre exactamente igual),
    pero el **binding** que hace posible el backend portable se reparte.
+7. **El registro corre en `float` por defecto**, con el camino `double` a una
+   línea (`gpu_opencl._FORCE_WIDE`, y un test lo ejercita para que no sea código
+   muerto): medido, la lista de estrellas del `float` es la **misma** que la de
+   la CPU (posiciones a 1,35e-7 px, picos a 2,4e-4 ADU) y el `double` es **bit a
+   bit**, pero el `double` es **2,6× más lento** en una tarjeta de consumo (la
+   3090 hace fp64 a 1/64 de fp32 y además duplica cada transferencia). La
+   paridad que se fija es la del `float`, y con la cifra delante.
 
-**Lo medido** (RTX 3090, 60 tomas de 2048², `tools/bench/bench_opencl.py`; el
-`stack_group` sigma de la app, frame completo):
+**Lo medido** (RTX 3090, `tools/bench/bench_opencl.py`; el `stack_group` sigma
+de la app, 60 tomas de 2048², frame completo):
 
 | Etapa | CuPy (CUDA) | OpenCL | OpenCL / CuPy |
 | --- | --- | --- | --- |
-| Warp bilineal por toma | 12,4 ms | **4,2 ms** | **0,34×** |
-| Combine `mean` | 1,7 ms | 1,4 ms | 0,79× |
-| Combine `median` | 203,2 ms | **64,3 ms** | **0,32×** |
+| Warp bilineal por toma | 10,7 ms | **4,0 ms** | **0,37×** |
+| Combine `mean` | 1,5 ms | 1,3 ms | 0,86× |
+| Combine `median` | 202,4 ms | **64,7 ms** | **0,32×** |
 
 | `stack_group` sigma, 60 × 2048² | Tiempo |
 | --- | --- |
-| CPU (16 hilos) | 8462 ms |
-| CUDA (CuPy) | 2168 ms |
-| **OpenCL** | **1400 ms** |
+| CPU (16 hilos) | 8811 ms |
+| CUDA (CuPy) | 2075 ms |
+| **OpenCL** | **1446 ms** |
+
+Y el **registro** (la imagen fuente y las estrellas de una toma de 2048², la
+etapa que este ADR añade):
+
+| Registro (imagen fuente + estrellas, 2048²) | Tiempo | vs CPU |
+| --- | --- | --- |
+| CPU (16 hilos) | 168,1 ms | x1,0 |
+| **OpenCL** | **12,5 ms** | **x13,4** |
+| CUDA (CuPy) | 21,2 ms | x7,9 |
 
 Es decir: OpenCL no es el premio de consolación, es **más rápido que el camino
-CuPy actual** de punta a punta (1400 ms contra 2168 ms), porque sus kernels
-están escritos para el trabajo que hacen. La lección del ADR-089 se repite: lo
-que decide es el **ancho de banda**, y ahí un kernel a propósito le gana a una
-biblioteca general.
-
-Y lo que **falta**, medido para no engañarse: la estimación del registro por
-toma de 2048² cuesta 170,4 ms en CPU y 21,3 ms en CUDA (0,12×). En una máquina
-solo-OpenCL esa etapa **sigue en CPU**: es el hueco honesto de este backend, y
-está escrito en el módulo en vez de tapado.
+CuPy actual** en las dos etapas (1446 ms contra 2075 ms el apilado, y 12,5 ms
+contra 21,2 ms el registro), porque sus kernels están escritos para el trabajo
+que hacen: un warp a propósito, una selección por píxel para la mediana del
+combine, un quickselect para la mediana del bloque y un radix select para la
+MAD global. La lección del ADR-089 se repite: lo que decide es el **ancho de
+banda** (y en la mediana global, no ordenar lo que solo hay que seleccionar).
 
 **Alternativas**:
 
@@ -106,12 +123,26 @@ los dos backends contra los mismos datos. ADR-089 **no se revoca**: su punto 2
 (una ruta GPU opcional, apagada por defecto) sigue vigente, y su alternativa
 «OpenCL por ahora» es justo la que este ADR convierte en decisión.
 
-**Nota (2026-10-14): el registro en una máquina solo-OpenCL, medido.** El punto
-4 deja la estimación por toma en CPU. Medido en un frame real de 2048², esa
-etapa es 170,4 ms en CPU; en una visita de decenas de tomas eso domina el tiempo
-del registro, y es el motivo por el que el backend CUDA sigue existiendo y por
-el que `auto` lo prefiere cuando está. El día que la mediana por bloques y la
-búsqueda de estrellas se porten a OpenCL, este ADR se actualiza con la cifra.
+**Nota (2026-10-14): las dos medianas, que son el registro entero.** El punto 4
+se apoya en una medida: de los 170 ms de la estimación por toma, **101 son dos
+medianas** (la del bloque de 32×32, 56 ms, y la MAD global sobre ~2,1 M valores,
+45 ms) y el resto es paralelo y barato. Por eso el port no es «mover píxeles»:
+es implementar dos selecciones EXACTAS. La del bloque es un quickselect por
+bloque en memoria local, con un work-group de UN work-item (`__local` es por
+work-group, y un grupo mayor compartiría el buffer y se pisaría); la global es
+un radix select sobre el patrón de bits ordenable del float. Medido en la 3090:
+la del bloque **4,4 ms contra 56 (x12,6)** y las dos globales **3,6 ms contra
+45 (x12,5)**.
+
+**Nota (2026-10-14): dos detalles que costaron un ulp cada uno, medidos.** La
+paridad bit a bit del `double` no salió sola. (a) El compilador contraía
+`a*b + c` en un `fma`, que se salta el redondeo del producto y movía el fondo
+1,1e-13 en un cielo de mil; se apaga con `#pragma OPENCL FP_CONTRACT OFF`, que
+es lo que la CPU hace sin querer. (b) La media 2×2 de la decimación de numpy
+suma `(a+b)+(c+d)` y no de izquierda a derecha, y eso movía el pico 9,1e-13; el
+kernel suma fila a fila y luego las filas. Con las dos, el `frame_stars` del
+`double` es **bit a bit** en los cuatro tamaños probados (2048², el 2008² que no
+divide por el bloque, 512² y 128²).
 
 ## English
 
@@ -147,11 +178,15 @@ backend the app can **ship**.
    `iterations` passes, the **cumulative** rejection and the centre moving to
    the mean of the survivors. A NaN is the app's "no data here", so every method
    skips it exactly as the numpy path does.
-4. **The registration (`frame_stars`) is NOT ported**: the block median and the
-   star search are a different beast, and a half-port that quietly moved a
-   centroid would be **worse than no port**. On an OpenCL-only machine the
-   registration stays on the CPU (the app says so in the run's note, which names
-   the device) and the two expensive stages stay on the device.
+4. **The registration (`frame_stars`) is ported too**: the source image (the
+   block median and the background) and the star detection (decimation, the
+   noise's global MAD and the local maxima), a line-by-line mirror of
+   `register.source_image` and `register.detect_stars`. The estimate's cost on
+   the CPU is **two medians** (measured on a 2048² frame: 101 ms of 170), and
+   OpenCL has no median, so both are a **radix select** on the sortable bit
+   pattern of the float (8 passes of 8 bits, one histogram per pass). The vote,
+   the pairing and the fit **stay on the CPU** (as in the CUDA backend): the
+   star lists are short and a trip to the device per one does not pay.
 5. **The parity is pinned by a test** (`tests/unit/test_gpu_opencl.py`) that
    skips without pyopencl (the normal case and the CI): the warp and the combine
    agree with the numpy path to within float32 rounding, the warp's mask is
@@ -164,31 +199,45 @@ backend the app can **ship**.
    (off by default and, with no OpenCL device or no ICD loader, `available()` is
    False and the numpy path runs exactly the same), but the **binding** that
    makes the portable backend possible is shipped.
+7. **The registration runs in `float` by default**, with the `double` path one
+   line away (`gpu_opencl._FORCE_WIDE`, and a test exercises it so it is not
+   dead code): measured, the float star list is the **same** as the CPU's
+   (positions to 1.35e-7 px, peaks to 2.4e-4 ADU) and the double one is **bit
+   for bit**, but the double is **2.6x slower** on a consumer card (an RTX 3090
+   does fp64 at 1/64 of fp32 AND doubles every transfer). The parity that is
+   pinned is the float one, with the figure in front of it.
 
-**What was measured** (RTX 3090, 60 frames of 2048²,
-`tools/bench/bench_opencl.py`; the app's `stack_group` sigma, whole frame):
+**What was measured** (RTX 3090, `tools/bench/bench_opencl.py`; the app's
+`stack_group` sigma, 60 frames of 2048², whole frame):
 
 | Stage | CuPy (CUDA) | OpenCL | OpenCL / CuPy |
 | --- | --- | --- | --- |
-| Per-frame bilinear warp | 12.4 ms | **4.2 ms** | **0.34x** |
-| `mean` combine | 1.7 ms | 1.4 ms | 0.79x |
-| `median` combine | 203.2 ms | **64.3 ms** | **0.32x** |
+| Per-frame bilinear warp | 10.7 ms | **4.0 ms** | **0.37x** |
+| `mean` combine | 1.5 ms | 1.3 ms | 0.86x |
+| `median` combine | 202.4 ms | **64.7 ms** | **0.32x** |
 
 | `stack_group` sigma, 60 x 2048² | Time |
 | --- | --- |
-| CPU (16 threads) | 8462 ms |
-| CUDA (CuPy) | 2168 ms |
-| **OpenCL** | **1400 ms** |
+| CPU (16 threads) | 8811 ms |
+| CUDA (CuPy) | 2075 ms |
+| **OpenCL** | **1446 ms** |
+
+And the **registration** (the source image and the stars of a 2048² frame, the
+stage this ADR adds):
+
+| Registration (source image + stars, 2048²) | Time | vs CPU |
+| --- | --- | --- |
+| CPU (16 threads) | 168.1 ms | x1.0 |
+| **OpenCL** | **12.5 ms** | **x13.4** |
+| CUDA (CuPy) | 21.2 ms | x7.9 |
 
 That is: OpenCL is not the consolation prize, it is **faster than the current
-CuPy path** end to end (1400 ms against 2168 ms), because its kernels are
-written for the work they do. ADR-089's lesson repeats: what decides is
-**bandwidth**, and there a purpose-built kernel beats a general library.
-
-And what is **missing**, measured so as not to fool ourselves: the per-frame
-registration estimate of a 2048² frame costs 170.4 ms on the CPU and 21.3 ms on
-CUDA (0.12x). On an OpenCL-only machine that stage **stays on the CPU**: it is
-this backend's honest gap, and it is written in the module instead of hidden.
+CuPy path** on both stages (1446 ms against 2075 ms for the stacking, and
+12.5 ms against 21.2 ms for the registration), because its kernels are written
+for the work they do: a purpose-built warp, a per-pixel selection for the
+combine's median, a quickselect for the block median and a radix select for the
+global MAD. ADR-089's lesson repeats: what decides is **bandwidth** (and, for
+the global median, not sorting what only needs selecting).
 
 **Alternatives**:
 
@@ -216,9 +265,23 @@ measures both backends against the same data. ADR-089 is **not revoked**: its
 point 2 (an optional GPU path, off by default) still stands, and its
 "OpenCL for now" alternative is exactly what this ADR turns into a decision.
 
-**Note (2026-10-14): the registration on an OpenCL-only machine, measured.**
-Point 4 leaves the per-frame estimate on the CPU. Measured on a real 2048²
-frame, that stage is 170.4 ms on the CPU; in a visit of dozens of frames it
-dominates the registration's time, and that is why the CUDA backend still
-exists and why `auto` prefers it when present. The day the block median and the
-star search are ported to OpenCL, this ADR is updated with the figure.
+**Note (2026-10-14): the two medians, which are the whole registration.**
+Point 4 rests on a measurement: of the estimate's 170 ms per frame, **101 are
+two medians** (the 32x32 block one, 56 ms, and the global MAD over ~2.1M values,
+45 ms) and the rest is parallel and cheap. That is why the port is not "moving
+pixels": it is implementing two EXACT selections. The block one is a per-block
+quickselect in local memory, with a work-group of ONE work-item (`__local` is
+per work-group, and a bigger group would share the buffer and race); the global
+one is a radix select on the sortable bit pattern of the float. Measured on the
+RTX 3090: the block one **4.4 ms against 56 (x12.6)** and the two global ones
+**3.6 ms against 45 (x12.5)**.
+
+**Note (2026-10-14): two details that each cost one ulp, measured.** The double
+build's bit-for-bit parity did not come for free. (a) The compiler contracted
+`a*b + c` into one `fma`, which skips the product's rounding and moved the
+background by 1.1e-13 on a sky of a thousand; it is turned off with
+`#pragma OPENCL FP_CONTRACT OFF`, which is what the CPU does without meaning to.
+(b) numpy's 2x2 decimation mean sums `(a+b)+(c+d)` and not left to right, which
+moved the peak by 9.1e-13; the kernel sums row by row and then the rows. With
+both, the double `frame_stars` is **bit for bit** at the four sizes tested
+(2048², the 2008² that does not divide by the block, 512² and 128²).

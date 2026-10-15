@@ -132,9 +132,65 @@ def test_the_engine_takes_the_opencl_path_when_it_is_on(tmp_path, forced_opencl)
     assert np.nanmax(np.abs(cpu - on_gpu)) < 0.5
 
 
-def test_the_registration_is_not_ported_and_says_so():
-    # The block median and the star search are a different beast, and a
-    # half-port that quietly moved a centroid would be worse than no port. The
-    # contract is the same as any other unserved call: None, and the CPU does
-    # the work.
-    assert gpu_opencl.frame_stars(np.zeros((64, 64), dtype=np.float32)) is None
+def _field(size, seed=1, nstars=200):
+    # A synthetic star field, the same shape the register bench uses.
+    rng = np.random.default_rng(seed)
+    img = rng.normal(1000.0, 4.0, (size, size))
+    yy, xx = np.mgrid[0:size, 0:size]
+    for _ in range(nstars):
+        x, y = rng.uniform(8, size - 8), rng.uniform(8, size - 8)
+        img += rng.uniform(1200, 5000) * np.exp(
+            -((xx - x) ** 2 + (yy - y) ** 2) / (2 * 1.6 ** 2))
+    return img.astype(np.float32)
+
+
+def test_the_registration_stars_match_the_cpu():
+    # The whole point of porting the estimate: the stars it finds must be the
+    # CPU's. The default build is float, so the positions are compared with a
+    # tight tolerance (measured 1.3e-7 px) and not bit for bit.
+    from nightscribe.core import register
+    img = _field(512, seed=11)
+    ref_src = register.source_image(img)
+    ref = register.detect_stars(ref_src)
+    src, got = gpu_opencl.frame_stars(img)
+    assert got.shape == ref.shape
+    assert np.max(np.abs(ref[:, :2] - got[:, :2])) < 1e-3     # px
+    assert np.max(np.abs(ref[:, 2] - got[:, 2])) < 1e-2       # ADU
+    # and the source image itself, which the estimate also keeps
+    assert np.max(np.abs(ref_src - src)) < 1e-2               # ADU
+
+
+def test_the_registration_stars_are_identical_in_the_double_build():
+    # The exact-parity build (one line away, see gpu_opencl._FORCE_WIDE): bit
+    # for bit with the CPU, which is what the ADR-089 path promises.
+    from nightscribe.core import register
+    saved = gpu_opencl._FORCE_WIDE
+    gpu_opencl._FORCE_WIDE = True
+    gpu_opencl._reg.update(checked=False, ok=False, program=None)
+    try:
+        img = _field(512, seed=12)
+        ref_src = register.source_image(img)
+        ref = register.detect_stars(ref_src)
+        src, got = gpu_opencl.frame_stars(img)
+        assert np.array_equal(ref_src, src)
+        assert np.array_equal(ref, got)
+    finally:
+        gpu_opencl._FORCE_WIDE = saved
+        gpu_opencl._reg.update(checked=False, ok=False, program=None)
+
+
+def test_the_registration_feeds_the_estimate():
+    # The integration point: the transform the estimate reads from the OpenCL
+    # source image and stars must be the CPU's.
+    from nightscribe.core import register
+    a = _field(256, seed=13)
+    b = np.roll(a, (2, -3), axis=(0, 1))
+    src_a, stars_a = gpu_opencl.frame_stars(a)
+    src_b, stars_b = gpu_opencl.frame_stars(b)
+    got = register.estimate_transform(a, b, ref_src=src_a, src_src=src_b,
+                                      ref_stars=stars_a, src_stars=stars_b)
+    want = register.estimate_transform(a, b)
+    assert got["n"] == want["n"] and got["n"] >= register.MIN_MATCH
+    assert abs(got["dx"] - want["dx"]) < 0.05
+    assert abs(got["dy"] - want["dy"]) < 0.05
+    assert abs(got["angle"] - want["angle"]) < 1e-4

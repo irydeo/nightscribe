@@ -7782,7 +7782,14 @@ class MainWindow(QMainWindow):
             fh.write(data)
         except OSError as err:
             fh.close()
-            QMessageBox.warning(self, self._ccd_backend_label(), str(err))
+            # The raw OSError said nothing the observer could act on; the
+            # reason (disk full, permissions) goes to the log and a plain
+            # sentence to the dialog (UX-19).
+            logger.warning("could not write the captured FITS: %s", err)
+            QMessageBox.warning(
+                self, self._ccd_backend_label(),
+                self.tr("Could not save the captured frame to disk: %1")
+                .replace("%1", getattr(err, "strerror", None) or str(err)))
             return
         fh.close()
         self._open_frame_path_in_editor(fh.name)

@@ -1459,8 +1459,8 @@ class UfeCompareTab(QWidget):
         for i, e in enumerate(self._entries):
             self.table.setItem(i, 0, QTableWidgetItem(e["name"]))
             combo = QComboBox()
-            combo.addItem("Comp", "comp")
-            combo.addItem("Check", "check")
+            combo.addItem(self.tr("Comp"), "comp")
+            combo.addItem(self.tr("Check"), "check")
             combo.setCurrentIndex(1 if e["kind"] == "check" else 0)
             combo.currentIndexChanged.connect(
                 lambda _ix, row=i: self._type_changed(row))

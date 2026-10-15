@@ -193,7 +193,7 @@
              <item>
               <widget class="QToolButton" name="btn_home">
                <property name="text"><string>⌂</string></property>
-               <property name="toolTip"><string>Back to the dashboard</string></property>
+               <property name="toolTip"><string>Back to the project list</string></property>
                <property name="maximumWidth"><number>36</number></property>
               </widget>
              </item>

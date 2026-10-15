@@ -102,6 +102,14 @@ idioma de la app). La puerta general a la documentación dentro de la app
 desaparece con él: el visor interno solo sobrevive donde abre un documento
 concreto (el «?» de la serie en el UFE).
 
+**Revisión (2026-10-15, la puerta offline vuelve).** El visor interno recupera una
+puerta en la ventana principal: **Ayuda → Guía (offline)**, que abre la guía que
+viaja dentro de la instalación, sin red. No es la puerta general que se retiró:
+abre la guía, no cualquier documento, y su razón es el observatorio sin conexión,
+que no tenía forma de llegar al manual desde la app aunque los `.md` viajen
+empaquetados (el hueco que dejó la revisión de 2026-10-08). La guía web sigue
+siendo la puerta principal y la que abre la Bienvenida.
+
 ## English
 
 **Context**: the user guide lives in `docs/user/` (an index and twelve chapters,
@@ -198,3 +206,11 @@ guide" button opened the in-app markdown viewer; it now opens the published
 language). The general in-app door to the documentation goes away with it: the
 in-app viewer only survives where it opens one concrete document (the UFE
 series "?").
+
+**Revision (2026-10-15, the offline door returns).** The in-app viewer gets a
+door back in the main window: **Help > User guide (offline)**, which opens the
+guide the install carries, with no network. It is not the general door that was
+removed: it opens the guide, not any document, and its reason is the observatory
+with no connection, which had no way to reach the manual from the app even though
+the `.md` files travel inside the packages (the gap the 2026-10-08 revision left).
+The web guide is still the main door and the one Welcome opens.

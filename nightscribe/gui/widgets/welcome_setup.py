@@ -471,7 +471,7 @@ class WelcomeSetup(QWidget):
         u.lbl_data_rule.setText(
             self.tr("Shown once per version; after this the app opens "
                     "straight on your projects.") if update else
-            self.tr("Required once per version."))
+            self.tr("A report, not a step: nothing to do here."))
         # One action, and on an update it lives with the report it closes:
         # two buttons doing the same thing read as a mistake.
         u.btn_data_ack.setText(
@@ -590,9 +590,20 @@ class WelcomeSetup(QWidget):
                         "your location."))
             return
         wz._apply_site(self.ui)
+        if self._needs_resolve():
+            # The code did not resolve (the status line says why) and there
+            # are no coordinates: do not advance to a site that is not one.
+            return
         self._refresh_create()
         self._fill_night()
         self.show_step("equip")
+
+    def _needs_resolve(self):
+        # @return: True when there is an MPC code but still no coordinates
+        u = self.ui
+        return (u.spn_site_lat.value() == 0.0
+                and u.spn_site_lon.value() == 0.0
+                and bool(u.edt_site_mpc.text().strip()))
 
     def _equip_next(self):
         # The equipment step never blocks: its fields come pre-filled with

@@ -162,6 +162,7 @@
      <addaction name="separator"/>
      <addaction name="action_welcome"/>
      <addaction name="action_guide_web"/>
+     <addaction name="action_docs_offline"/>
      <addaction name="separator"/>
      <addaction name="action_log"/>
      <addaction name="separator"/>
@@ -202,6 +203,10 @@
   <action name="action_guide_web">
     <property name="text"><string>User guide (web)</string></property>
     <property name="toolTip"><string>The same guide as a web page, in your browser: handy to read on a phone or to send to somebody</string></property>
+  </action>
+  <action name="action_docs_offline">
+    <property name="text"><string>User guide (offline)</string></property>
+    <property name="toolTip"><string>The guide that travels inside the install, opened without a network: for an observatory with no connection</string></property>
   </action>
   <action name="action_log">
     <property name="text"><string>Open the log…</string></property>

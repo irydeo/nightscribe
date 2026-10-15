@@ -144,23 +144,67 @@ def test_run_points_the_json_output_at_the_workdir(tmp_path, monkeypatch):
     inp.write_text("LINE\n")
     seen = {}
 
-    class _Proc:
+    class _FakeProc:
         returncode = 0
-        stdout = "ok"
-        stderr = ""
 
-    def fake_run(args, **kwargs):
-        seen["args"] = args
-        env_path = args[args.index("-D") + 1]
-        seen["env"] = open(env_path).read()
-        return _Proc()
+        def __init__(self, args, **kwargs):
+            seen["args"] = args
+            env_path = args[args.index("-D") + 1]
+            seen["env"] = open(env_path).read()
 
-    monkeypatch.setattr(findorb.subprocess, "run", fake_run)
+        def communicate(self, timeout=None):
+            return "ok", ""
+
+        def terminate(self):
+            pass
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    # run() polls a Popen so the observer's Cancel can stop it (QA-07), so the
+    # test fakes Popen, not subprocess.run.
+    monkeypatch.setattr(findorb.subprocess, "Popen", _FakeProc)
     ok, workdir, _log = findorb.run(str(inp), "/usr/bin/fo", timeout=5)
     assert ok
     assert "JSON_COMBINED_NAME=" in seen["env"]
     assert "total.json" in seen["env"]
     assert f"OUTPUT_DIR={workdir}" in seen["env"]
+
+
+def test_run_honours_the_observers_cancel(tmp_path, monkeypatch):
+    # The button used to do nothing: subprocess.run(timeout=...) cannot be
+    # interrupted, so a run lasted up to the CPU limit or the wall timeout.
+    inp = tmp_path / "obs.txt"
+    inp.write_text("LINE\n")
+    seen = {}
+
+    class _FakeProc:
+        returncode = None
+
+        def __init__(self, args, **kwargs):
+            pass
+
+        def communicate(self, timeout=None):
+            raise findorb.subprocess.TimeoutExpired("fo", timeout)
+
+        def terminate(self):
+            seen["terminated"] = True
+
+        def wait(self, timeout=None):
+            return 0
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(findorb.subprocess, "Popen", _FakeProc)
+    ok, _workdir, log = findorb.run(str(inp), "/usr/bin/fo",
+                                    cancel=lambda: True, timeout=5)
+    assert ok is False
+    assert "cancel" in log.lower()
+    assert seen.get("terminated")
 
 
 def test_as_residual_reads_findorbs_obscode_key():

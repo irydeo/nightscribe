@@ -103,13 +103,17 @@ def test_the_welcome_guide_button_opens_the_web_guide(window, monkeypatch):
 
 
 def test_the_help_menu_keeps_only_its_doors(window):
-    # The general in-app doc door and the Data sources entry are gone
+    # The GENERAL in-app doc door and the Data sources entry are gone
     # (ADR-053 revisions): the guide is the published website and the sources
-    # live in About. Each entry went with the method that served it.
+    # live in About. The offline guide door is NOT the general one: it opens
+    # the guide the install carries, for an observatory with no network
+    # (ADR-070 revision, 2026-10-15).
     for name in ("action_docs", "action_sources"):
         assert not hasattr(window._menus, name), name
     for name in ("on_docs", "on_sources"):
         assert not hasattr(window, name), name
+    assert hasattr(window._menus, "action_docs_offline")
+    assert hasattr(window, "on_docs_offline")
     # About is the LAST entry of the menu
     assert window._menus.menu_help.actions()[-1] is window._menus.action_about
 

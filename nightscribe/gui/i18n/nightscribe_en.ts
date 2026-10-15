@@ -1399,8 +1399,8 @@
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="126"/>
-        <source>PROYECTOS</source>
-        <translation>PROYECTOS</translation>
+        <source>PROJECTS</source>
+        <translation>PROJECTS</translation>
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="127"/>
@@ -10821,8 +10821,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_advanced_dialog.ui" line="52"/>
-        <source>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Ajustes value (the line at the right shows what 0 resolves to)</source>
-        <translation>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Ajustes value (the line at the right shows what 0 resolves to)</translation>
+        <source>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Settings value (the line at the right shows what 0 resolves to)</source>
+        <translation>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Settings value (the line at the right shows what 0 resolves to)</translation>
     </message>
     <message>
         <location filename="../ui/ufe_advanced_dialog.ui" line="56"/>

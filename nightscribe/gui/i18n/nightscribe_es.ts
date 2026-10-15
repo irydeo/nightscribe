@@ -1427,7 +1427,7 @@
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="126"/>
-        <source>PROYECTOS</source>
+        <source>PROJECTS</source>
         <translation>PROYECTOS</translation>
     </message>
     <message>
@@ -10965,8 +10965,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_advanced_dialog.ui" line="52"/>
-        <source>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Ajustes value (the line at the right shows what 0 resolves to)</source>
-        <translation>El techo del detector como valor absoluto en ADU, para una medida suelta y para una serie; 0 = usa la tarjeta SATURATE de la cabecera o el valor de Ajustes (la línea de la derecha dice a qué resuelve el 0)</translation>
+        <source>The detector ceiling as an absolute ADU value, for both a single measurement and a series; 0 = use the header&apos;s SATURATE card or the Settings value (the line at the right shows what 0 resolves to)</source>
+        <translation>El techo del detector como valor absoluto en ADU, para una medida suelta y para una serie; 0 = usa la tarjeta SATURATE de la cabecera o el valor de Configuración (la línea de la derecha dice a qué resuelve el 0)</translation>
     </message>
     <message>
         <location filename="../ui/ufe_advanced_dialog.ui" line="56"/>

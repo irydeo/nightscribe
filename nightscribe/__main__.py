@@ -87,7 +87,7 @@ def _no_site():
     if cfg.is_configured():
         return False
     print("No site configured / No hay observatorio configurado.")
-    print("Run the GUI once: a short wizard sets up your observatory.")
+    print("Run the GUI once: the Welcome screen sets up your observatory.")
     print(f"You can also edit {paths.config_dir() / 'nightscribe.json'} "
           "with your coordinates and MPC code (optional).")
     return True
@@ -587,12 +587,14 @@ def main(argv=None):
     # @return: exit code
     parser = argparse.ArgumentParser(
         prog="nightscribe",
-        description="Planifica tu noche, entiende cada objeto, cuenta tu ciencia.")
+        description="Planifica tu noche, entiende cada objeto, cuenta tu ciencia.",
+        epilog="Run 'nightscribe gui' for the desktop app. / "
+               "Ejecuta 'nightscribe gui' para la aplicación de escritorio.")
     from .version import full_version
     parser.add_argument("--version", action="version",
                         version=f"{__app_name__} {full_version()}")
     parser.add_argument("--verbose", "-v", action="store_true")
-    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub = parser.add_subparsers(dest="cmd")
 
     p = sub.add_parser("tonight", help="mejores objetivos de esta noche")
     p.add_argument("--fecha", help="YYYY-MM-DD (noche, UTC)")
@@ -698,6 +700,11 @@ def main(argv=None):
     p_files = p_sub.add_parser("files", help="listar ficheros del proyecto")
     p_files.add_argument("id", type=int, help="project id")
     p.set_defaults(func=cmd_project)
+
+    # With no subcommand the desktop app opens: a user who types the program's
+    # name wants the program, not a usage error. Every CLI command stays one
+    # word away, and a subparser's own default overrides this one.
+    parser.set_defaults(func=cmd_gui)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

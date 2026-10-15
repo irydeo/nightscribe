@@ -627,6 +627,14 @@ class MainWindow(QMainWindow):
         # its plate and stretch survive); its workers are only shut down
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
         self._shell_stack().setCurrentIndex(index)
+        # The workbench is a PAGE now, and its menu entry OPENS it: while it
+        # IS the view there is nothing to open, and pressing it reset the
+        # session (the plate went black, reported 2026-10-15). Disabled, not
+        # removed: the entry still says where the workbench lives.
+        menus = getattr(self, "_menus", None)
+        action = getattr(menus, "action_ufe", None)
+        if action is not None:
+            action.setEnabled(index != VIEW_UFE)
         self._sync_sky_bar(index)
         if index != VIEW_UFE:
             # the workbench's tool windows (Blink, Calibrate, Annotate, the
@@ -12723,7 +12731,12 @@ class MainWindow(QMainWindow):
         if getattr(self, "_ufe", None) is not None:
             return self._ufe
         from .ufe_dialog import UfeDialog
-        self._ufe = UfeDialog(lang=self._lang(), parent=self)
+        # The FIRST build loads every tab's Designer file and takes a visible
+        # moment: the same "Please wait" the run opens use, so the window does
+        # not read as frozen while it happens (reported 2026-10-15).
+        self._ufe = self._with_busy(
+            self.tr("Opening the image workbench…"),
+            lambda: UfeDialog(lang=self._lang(), parent=self))
         return self._ufe
 
     def _ufe_page(self):
@@ -12768,6 +12781,11 @@ class MainWindow(QMainWindow):
 
     def _tools_ufe(self):
         # Menu Tools → FITS editor… (ADR-044)
+        # Already there: the entry is disabled while the workbench is the
+        # view, and this is the guard for a programmatic call. Re-opening it
+        # reset the session and the plate went black (reported 2026-10-15).
+        if self._shell_stack().currentIndex() == VIEW_UFE:
+            return
         dlg = self._ufe_build()
         begin = getattr(dlg, "begin_session", None)
         if callable(begin):

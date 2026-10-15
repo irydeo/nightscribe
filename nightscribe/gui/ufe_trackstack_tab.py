@@ -2564,8 +2564,16 @@ class UfeTrackStackTab(QWidget):
             "%1", str(cal.get("n") or 0))
         if bits:
             text += " (" + " · ".join(bits) + ")"
-        else:
+        elif not cal.get("already"):
             text += " (" + self.tr("no master matched") + ")"
+        if cal.get("already"):
+            # The frame carried NightScribe's own calibration and was left
+            # alone: "calibrated" and "already calibrated" are not the same
+            # thing, and the observer has to know the recipe did not run.
+            text += ". " + self.tr(
+                "%1 of them already carried NightScribe's calibration: the "
+                "recipe was not applied again").replace(
+                    "%1", str(cal["already"]))
         info = cal.get("vignette_model") or {}
         if info.get("note"):
             text += ". " + self.tr("Warning:") + " " + info["note"]

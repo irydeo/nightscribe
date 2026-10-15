@@ -384,3 +384,26 @@ of 2048², QHY42PRO, gain 3, −20 °C, Clear filter):
    read. Masters are indexed by **IMAGETYP** (with an exposure fallback
    when the header is silent), so the observer classifies nothing by hand
    and a light frame refuses itself.
+
+**Revisión (2026-10-15): una copia ya calibrada no se calibra dos veces.** El
+run aplica la receta **en memoria, al leer** cada toma, y las copias que exporta
+la pestaña Calibración conservan las tarjetas de las que depende la receta
+(cámara, ganancia, exposición, filtro): devolver una copia a un run la
+calibraba **otra vez**, restando el dark y dividiendo el flat dos veces, sin
+ninguna señal visible en la imagen. `export_calibrated` escribe ahora la tarjeta
+`NSCALIB`, y `FrameCalibrator` y `calibrate_paths` la respetan
+(`calibration.is_calibrated`): la toma se deja tal cual y el informe lo dice
+(`CalibrationReport.already`), tanto en la línea del run como en los avisos de
+la pestaña. «Calibrada» y «ya calibrada» no son lo mismo, y el observador tiene
+que poder distinguirlas.
+
+**Revision (2026-10-15): an already calibrated copy is not calibrated twice.**
+The run applies the recipe **in memory, as each frame is read**, and the copies
+the Calibration tab exports keep the cards the recipe keys on (camera, gain,
+exposure, filter): feeding a copy back into a run calibrated it **again**,
+subtracting the dark and dividing the flat twice, with no visible tell in the
+image. `export_calibrated` now writes the `NSCALIB` card, and `FrameCalibrator`
+and `calibrate_paths` honour it (`calibration.is_calibrated`): the frame is left
+as it is and the report says so (`CalibrationReport.already`), both in the run's
+line and in the tab's warnings. "Calibrated" and "already calibrated" are not
+the same thing, and the observer has to be able to tell them apart.

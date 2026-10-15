@@ -332,6 +332,11 @@ class UfeCalibrationTab(QWidget):
                 "No flat for this filter: the flat residual is not "
                 "corrected (it matters for the magnitude, little for the "
                 "centroid)")
+        if text.startswith("already calibrated"):
+            return self.tr(
+                "The frame already carries NightScribe's calibration, so "
+                "the recipe was not applied again (a second dark would be "
+                "subtracted twice)")
         return text
 
     def _note_text(self, note):
@@ -502,8 +507,19 @@ class UfeCalibrationTab(QWidget):
                 except Exception as err:
                     logger.warning(
                         "calibrated export register failed: %s", err)
-        self._say(self.tr("Calibrated %1 frames (%2 exported).").replace(
-            "%1", str(len(reports))).replace("%2", str(len(written))))
+        skipped = sum(1 for _p, r in reports
+                      if getattr(r, "already", False))
+        text = self.tr("Calibrated %1 frames (%2 exported).").replace(
+            "%1", str(len(reports) - skipped)).replace(
+            "%2", str(len(written)))
+        if skipped:
+            # A frame that already carried the marker was left alone: saying
+            # "calibrated" for it would be a small lie the observer can act
+            # on (the export was run twice over the same folder).
+            text += " " + self.tr(
+                "%1 already carried NightScribe's calibration and were "
+                "left as they were.").replace("%1", str(skipped))
+        self._say(text)
         # What the vignetting model was made of, so the observer can judge it
         # instead of trusting it: how many frames the sky was sampled from,
         # on what grid, and how many tiles the robust fit kept.

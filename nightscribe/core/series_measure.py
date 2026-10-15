@@ -1121,12 +1121,33 @@ _MIN_AIRMASS_RANGE = 0.05   # below this there is no trend to fit (D34)
 
 
 def _night_of(mjd):
-    # Observing night: the day boundary sits at local noon, so a run that
-    # crosses midnight stays one night.
+    # Observing night: the day boundary sits at LOCAL noon, so a run that
+    # crosses midnight stays one night. It used to be `floor(mjd - 0.5)`,
+    # which is noon UTC: east of about UTC+6 the local evening crosses
+    # 12:00 UT, so one night split in two and the per-night aperture (T3),
+    # the multi-night detrend (T5) and the per-night QC ran on half nights.
+    # The offset moves the boundary to the observer's own noon, and the key
+    # stays the MJD of the local civil date's midnight, which is what
+    # _night_label renders as the evening's date.
     # @return: an integer night key, or None
     if mjd is None:
         return None
-    return int(math.floor(mjd - 0.5))
+    return int(math.floor(mjd - 0.5 + _local_offset_days(mjd)))
+
+
+def _local_offset_days(mjd):
+    # @args: mjd - the instant (UTC)
+    # @return: the local UTC offset in days, east positive (0 on failure)
+    # The MJD is UTC; astimezone() turns it into the machine's local time,
+    # the same clock the observing journal groups by (ADR-036), so a series
+    # and its journal entry agree on which night it was.
+    try:
+        from . import coords, variables
+        dt = coords.datetime_from_jd(float(mjd) + variables.MJD0)
+        off = dt.astimezone().utcoffset()
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+    return off.total_seconds() / 86400.0 if off else 0.0
 
 
 def _night_label(night):

@@ -102,7 +102,10 @@ calibración y astrometría juntas, para que quien mide no salte de página.
   vuelta a esta página.
 - **Astrometría**: la compuerta de detección, el listón de envío al MPC, el
   barrido de velocidades, el chequeo contra otras estaciones (con
-  **Find_Orb**) y los hilos de trabajo.
+  **Find_Orb**) y los hilos de trabajo. Su grupo **Trabajo** lleva además el
+  interruptor de la **tarjeta gráfica** y su **backend** (apagado por
+  defecto; el capítulo 07 cuenta qué acelera y por qué no cambia el
+  resultado).
 - **Solver de placa**: *Auto* prueba ASTAP local y cae a
   nova.astrometry.net; también puedes forzar uno. **Binario ASTAP**: ruta
   al ejecutable (vacío = buscar `astap` en el PATH), con **Test** para

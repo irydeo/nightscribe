@@ -183,6 +183,14 @@ cual: la receta no se aplica una segunda vez, y el run lo dice.
    **298 ms** (×3,2). Si quieres capar los hilos (por ejemplo, porque estés
    usando el equipo para otra cosa), el ajuste **`astrometry_threads`** lo
    permite: 0 es automático.
+   Y si el equipo tiene una **tarjeta gráfica**, el **registro** y el
+   **apilado** pueden correr en ella en vez de en el procesador. Está
+   **apagado por defecto** (Ajustes → Medición → Astrometría → Trabajo), no
+   cambia el resultado, y es el mismo camino por **CUDA** (NVIDIA) u
+   **OpenCL** (NVIDIA, AMD, Intel; la app lo reparte, así que la tarjeta que
+   no sea NVIDIA no se queda fuera). La nota del run dice entonces **qué
+   dispositivo** hizo el trabajo. Las cifras, el método y los dos backends
+   están en las notas de decisión ADR-089 y ADR-091.
    Además de las pilas de cada observación, la app guarda en el proyecto la
    pila de **toda la secuencia** (`<objeto>_base.fits`): todas las tomas
    combinadas con el objeto congelado, la imagen más profunda de la visita. Es

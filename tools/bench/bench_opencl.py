@@ -321,6 +321,32 @@ def _bench_run(n, size):
         print(f"  {label:8s}: {1000 * t:8.1f} ms")
 
 
+def _bench_registration(size):
+    # The per-frame estimate (the source image and the stars) through the
+    # APP's own entry points: the stage ADR-091 added to the OpenCL backend.
+    # On the CPU its cost is TWO medians (the per-block one and the global MAD
+    # over ~2.1M values), which is why the backend carries a radix select.
+    from nightscribe.core import gpu_cuda, gpu_opencl, register
+    rng = np.random.default_rng(5)
+    img = rng.normal(1000.0, 4.0, (size, size))
+    yy, xx = np.mgrid[0:size, 0:size]
+    for _ in range(400):
+        x, y = rng.uniform(8, size - 8), rng.uniform(8, size - 8)
+        img += rng.uniform(1500, 4000) * np.exp(
+            -((xx - x) ** 2 + (yy - y) ** 2) / (2 * 1.5 ** 2))
+    img = img.astype(np.float32)
+    print(f"\n=== REGISTRATION (source image + stars, {size}^2) ===")
+    cpu = _time(lambda: register.detect_stars(register.source_image(img)),
+                repeats=2)
+    print(f"  CPU    : {1000 * cpu:8.1f} ms")
+    if gpu_opencl.available():
+        ocl = _time(lambda: gpu_opencl.frame_stars(img), repeats=2)
+        print(f"  OpenCL : {1000 * ocl:8.1f} ms   ({cpu / ocl:.1f}x)")
+    if gpu_cuda.available():
+        cuda = _time(lambda: gpu_cuda.frame_stars(img), repeats=2)
+        print(f"  CUDA   : {1000 * cuda:8.1f} ms   ({cpu / cuda:.1f}x)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--frames", type=int, default=60)
@@ -341,6 +367,7 @@ def main():
     _bench_warp(cp, cnd, cl, ctx, queue, program, n, h, w)
     _bench_combine(cp, cl, ctx, queue, program, n, h, w)
     _bench_run(n, h)
+    _bench_registration(h)
 
 
 if __name__ == "__main__":

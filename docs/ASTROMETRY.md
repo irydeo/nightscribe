@@ -181,6 +181,14 @@ left as it is: the recipe is not applied a second time, and the run says so.
    (x3.2). If you want to cap the threads (because the machine is busy with
    something else), the **`astrometry_threads`** setting allows it: 0 is
    automatic.
+   And if the machine has a **graphics card**, the **registration** and the
+   **stacking** can run on it instead of on the processor. It is **off by
+   default** (Settings → Measurement → Astrometry → Work), it changes nothing
+   about the result, and it is the same road through **CUDA** (NVIDIA) or
+   **OpenCL** (NVIDIA, AMD, Intel; the app ships it, so the card that is not
+   NVIDIA is not left out). The run's note then says **which device** computed
+   the work. The figures, the method and the two backends are in the decision
+   notes ADR-089 and ADR-091.
    Besides each observation's stack, the app saves the **whole sequence's**
    stack into the project (`<object>_base.fits`): every frame combined with
    the object frozen, the deepest image of the visit. It is the one the manual

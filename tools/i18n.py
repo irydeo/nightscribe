@@ -73,6 +73,10 @@ def _tool(name):
 def lupdate():
     # @return: None. Refreshes the .ts from the sources, keeping the existing
     #          translations; new strings arrive marked unfinished.
+    # NOTE: `-no-obsolete` is deliberately NOT passed. Some strings are built
+    # at runtime (the sky-quality scale, the planet names), so lupdate cannot
+    # see them in the sources and would drop their translations as obsolete,
+    # which the coverage test catches. The dead entries it keeps are the price.
     sources = []
     for pattern in SOURCES:
         sources.extend(sorted(str(p) for p in ROOT.glob(pattern)))

@@ -120,8 +120,9 @@ no de ingeniería, y es la que más caro se paga en una primera versión públic
   (el test que cae cambia entre ejecuciones; con `-n 4` la suite queda verde, y el árbol base
   sin cambios también falla, así que es **preexistente**). El CI no lo ve porque sus runners
   tienen 2–4 núcleos. Mismo dominio que QA-10: fiabilidad de la suite en máquinas grandes.
-  **Resuelto en P3**: el conftest acota el pool de hilos del combine por proceso, y `-n auto`
-  vuelve a pasar.
+  **Mitigado en P3**: el conftest acota el pool de hilos del combine por proceso (el crash pasó
+  de casi todas las ejecuciones a raro), pero queda un crash nativo residual que no hemos
+  localizado; el remedio documentado es `-n 4` o `PYTEST_XDIST_AUTO_NUM_WORKERS=4`.
 - **Extensibilidad y proceso**: `db._migrate` de 586 líneas (DEV-12), red fuera del caché sin
   lista de exenciones (DEV-10), sin `docs/DEVELOPING.md` (DEV-11), sin guardianes de índice ADR
   ni de `requests` (DEV-13, DEV-14), `imageio-ffmpeg` dura frente a opcional (DEV-16), ficheros
@@ -241,8 +242,9 @@ para todo el worker de xdist.
   (incluido el caso «la tabla no está y aun así llega arriba»).
 - **DEV-11** (hecho) `docs/DEVELOPING.md` y su gemela ES, con las tres recetas, enlazado desde
   CONTRIBUTING.
-- **QA-18** (hecho) el conftest acota el pool de hilos del combine por proceso: con `-n auto` en
-  la máquina de 12 núcleos la suite vuelve a pasar, dos veces seguidas.
+- **QA-18** (mitigado) el conftest acota el pool de hilos del combine por proceso, lo que reduce
+  mucho la frecuencia del crash (de casi todas las ejecuciones a raro); queda un crash nativo
+  residual en máquinas de muchos núcleos, sin localizar, con `-n 4` como remedio documentado.
 
 *Agendado, fuera de la 0.1:* refactor de `main_window.py` (A12), `db._migrate` (DEV-12) y los
 módulos grandes secundarios.

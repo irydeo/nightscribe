@@ -31,6 +31,11 @@ dependencies = [
     "numpy>=1.26",
     "platformdirs>=4.0",
     "Pillow>=10.0",
+    # The MP4 export needs an ffmpeg binary; imageio-ffmpeg brings one. It is
+    # a hard dependency for pip (the export works out of the box) and only
+    # Recommends in the .deb, where Debian policy treats a video encoder as
+    # optional (see tools/build_deb.py). The divergence is deliberate: the app
+    # degrades gracefully without it (the MP4 button says so).
     "imageio-ffmpeg>=0.5",
     "astropy>=6.0",
     "scipy>=1.11",

@@ -18,8 +18,11 @@ python3 -m venv --system-site-packages .venv
 ```
 
 The unit suite is offline by design: a `requests` call raises and the source's
-own fallback must handle it. It also caps its own thread pools (the combine), so
-`-n auto` is safe even on a machine with many cores.
+own fallback must handle it. It also caps its own thread pools (the combine).
+On a machine with many cores, `-n auto` can still make a worker die now and
+then (a native crash we have not pinned down); `-n 4`, or
+`PYTEST_XDIST_AUTO_NUM_WORKERS=4`, is steadier. The CI, with 2-4 cores, is
+unaffected.
 
 ## The rules that are tests
 

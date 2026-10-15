@@ -20,8 +20,10 @@ python3 -m venv --system-site-packages .venv
 
 La suite unitaria es offline a propósito: una llamada a `requests` lanza, y el
 fallback propio de la fuente tiene que gestionarlo. Además acota sus propios
-pools de hilos (el combine), así que `-n auto` es seguro incluso en una máquina
-con muchos núcleos.
+pools de hilos (el combine). En una máquina con muchos núcleos, `-n auto` puede
+hacer que un worker muera de vez en cuando (un crash nativo que no hemos
+localizado); `-n 4`, o `PYTEST_XDIST_AUTO_NUM_WORKERS=4`, es más estable. El
+CI, con 2-4 núcleos, no se ve afectado.
 
 ## Las reglas que son tests
 

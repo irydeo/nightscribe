@@ -318,7 +318,7 @@ tools/fetch_findorb.sh # prepara el Find_Orb que se empaqueta (micromamba,
 tools/build_deb.py   # construye el .deb (Python del sistema, ADR-087)
 website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
                      #   README y el manual es docs/user, los mismos ficheros
-                     #   que pinta la app; tools/build_site.py los convierte y
+                     #   que pinta la app; website/tools/build_site.py los convierte y
                      #   inyecta la paleta y los chips del tema; el HTML se
                      #   commitea y un test lo regenera y lo compara
 installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
@@ -348,7 +348,8 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-069, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (bilingües; el índice vive en
+`docs/adr/README.md`).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Flujos y planes**: el flujo centrado en proyectos (UX v3, ADR-019 a ADR-022) está
@@ -411,7 +412,7 @@ drafts + tweet + ready-to-attach PNG charts). And between planning and reporting
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-069, bilingual). Read the ADR before
+decisions live in `docs/adr/` (bilingual; the index lives in `docs/adr/README.md`). Read the ADR before
 changing a decision; update it if you do.
 
 **Flows and plans**: the project-centric flow (UX v3, ADR-019 to ADR-022) is

@@ -196,8 +196,9 @@ exposición, filtro). Al indexar declaras qué *es* cada fichero:
 
 - **Bias**: el offset electrónico de lectura (exposición cero).
 - **Dark**: corriente térmica, a la misma exposición que las luces. *Un dark
-  ya incluye el bias*, así que con dark no hace falta bias aparte.
-- **Dark de flats**: a la exposición de los flats.
+  ya incluye el bias*, así que con dark no hace falta bias aparte. Un «dark
+  de flats» (a la exposición de los flats) es un dark: se indexa como
+  **Dark** con su exposición, no como un cuarto tipo.
 - **Flat**: por filtro, normalizado.
 
 > **¿Por qué calibrar?** Porque tu sensor miente de tres maneras conocidas y

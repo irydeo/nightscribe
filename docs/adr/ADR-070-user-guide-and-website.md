@@ -7,7 +7,7 @@ sin explicación)
 
 ## Español
 
-**Contexto**: la guía de usuario vive en `docs/user/` (índice y diez capítulos,
+**Contexto**: la guía de usuario vive en `docs/user/` (índice y doce capítulos,
 cada uno en español e inglés) y la aplicación la muestra en **Ayuda →
 Documentación técnica** con su propio conversor de markdown (`gui/markdown.py`),
 sin dependencias. La carpeta `website/` era otra cosa: una landing escrita a
@@ -104,7 +104,7 @@ concreto (el «?» de la serie en el UFE).
 
 ## English
 
-**Context**: the user guide lives in `docs/user/` (an index and ten chapters,
+**Context**: the user guide lives in `docs/user/` (an index and twelve chapters,
 each in Spanish and English) and the application shows it in **Help →
 Technical Documentation** with its own markdown converter
 (`gui/markdown.py`), dependency-free. The `website/` folder was something

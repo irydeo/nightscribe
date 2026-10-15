@@ -2,6 +2,14 @@
 
 *[English version](DESIGN.md)*
 
+> **Nota (2026-10-15): documento histórico de diseño.** Describe el diseño de la
+> primera etapa; el producto ha cambiado desde entonces. La pestaña Observatorio
+> se plegó en el paso Captura, el Sol y el cielo pasaron al menú Herramientas, el
+> control de telescopio ya no está fuera de alcance (ADR-030/081), las pestañas
+> son Esta noche · Proyectos · Campañas, y la configuración por defecto no trae
+> **ningún** código MPC. La descripción viva está en `docs/user/` y en los ADR
+> (`docs/adr/`).
+
 ## Visión
 
 **Planifica tu noche, entiende cada objeto, cuenta tu ciencia.**

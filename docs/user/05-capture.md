@@ -196,8 +196,8 @@ temperature, exposure, filter). When indexing you declare what each file
 - **Bias**: the electronic read offset (zero exposure).
 - **Dark**: thermal current, at the same exposure as the lights. *A dark
   already includes the bias*, so with a dark you do not need a separate
-  bias.
-- **Flat dark**: at the flats' exposure.
+  bias. A "dark of the flats" (at the flats' exposure) is just a dark: index
+  it as **Dark** with its own exposure, not as a fourth kind.
 - **Flat**: per filter, normalised.
 
 > **Why calibrate?** Because your sensor lies in three known, repeatable

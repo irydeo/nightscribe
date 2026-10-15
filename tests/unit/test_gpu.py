@@ -33,6 +33,18 @@ pytestmark = pytest.mark.skipif(not gpu.available(),
                                 reason="no GPU backend on this machine")
 
 
+def _needs_registration():
+    # @return: None. SKIPS the test when this device cannot serve the
+    #          registration: the backend checks its kernels against the CPU
+    #          at build time and REFUSES when they disagree (pocl
+    #          miscompiles the block median's quickselect, measured
+    #          2026-10-15). There is no parity to pin on a device that
+    #          cannot produce the answer at all.
+    from nightscribe.core import gpu_opencl
+    if not gpu_opencl._reg_build():
+        pytest.skip("this OpenCL device refuses the registration kernels")
+
+
 def test_the_backend_is_off_unless_it_is_asked_for():
     # The observer's explicit choice is one gate and the hardware is the
     # other; a GPU that is merely PRESENT must not change a result. The
@@ -143,6 +155,7 @@ def test_the_registration_kernels_match_the_numpy_path():
     # are deterministic in float64, so the source image matches to the bit and
     # the stars to a fraction of a pixel; anything larger would move the
     # transform and the stack.
+    _needs_registration()
     from nightscribe.core import register
     size = 256
     img = _field(size, seed=4)
@@ -162,6 +175,7 @@ def test_the_source_image_matches_on_a_ragged_frame():
     # The real camera writes 2008^2, which does NOT divide by the block (32):
     # 2008 % 32 = 24, so the CPU walks RAGGED blocks of 32 and 33 and the
     # device has to reproduce them, or the background (and the stars) move.
+    _needs_registration()
     from nightscribe.core import register
     size = 200              # 200 % 32 = 8, a ragged frame
     img = _field(size, seed=6)

@@ -99,8 +99,9 @@ between pages.
 - **Astrometry**: the detection gate, the MPC submission floor, the
   velocity sweep, the check against other stations (with **Find_Orb**) and
   the worker threads. Its **Work** group also carries the **graphics card**
-  switch and its **backend** (off by default; chapter 07 says what it
-  accelerates and why it changes nothing about the result).
+  switch and its **backend** (on by default, with **OpenCL**; chapter 12 says
+  what it accelerates, how to install CUDA and why it changes nothing about
+  the result).
 - **Plate solver**: *Auto* tries local ASTAP and falls back to
   nova.astrometry.net; you can also force one. **ASTAP binary**: path to
   the executable (empty = look for `astap` on the PATH), with **Test** to

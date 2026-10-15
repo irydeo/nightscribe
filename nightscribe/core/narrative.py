@@ -618,6 +618,7 @@ def hashtags(kind):
         "neo": "#asteroide #asteroid #NEO",
         "comet": "#cometa #comet",
         "pccp": "#cometa #comet",
+        "alert": "#asteroide #asteroid #NEO #AAVSO",
         "transient": "#supernova",
         "sn": "#supernova",
         "exoplanet": "#exoplanet #exoplaneta",

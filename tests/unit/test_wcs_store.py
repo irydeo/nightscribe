@@ -98,9 +98,15 @@ def test_write_solved_wcs_empty_cards_is_a_noop(tmp_path):
 
 def test_write_solved_wcs_keeps_the_file_mode(tmp_path):
     # The atomic replace went through a 0600 temp file, so a solved FITS
-    # quietly became owner-only (QA-13).
+    # quietly became owner-only (QA-13). The mode is compared with the one
+    # the file HAD, not with a literal 0644: Windows has no Unix modes,
+    # os.chmod cannot set them and os.stat reports a synthesised 0666 for a
+    # writable file, so the literal could never hold there (the Windows CI
+    # of 2026-10-15). What the test says is "the write does not CHANGE the
+    # mode", which is what the bug was about, and that holds anywhere.
     import os
     src = _make_fits(tmp_path / "plate.fits")
     os.chmod(src, 0o644)
+    before = os.stat(src).st_mode & 0o777
     assert wcs_store.write_solved_wcs(src, _CARDS)
-    assert (os.stat(src).st_mode & 0o777) == 0o644
+    assert (os.stat(src).st_mode & 0o777) == before

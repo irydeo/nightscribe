@@ -145,7 +145,7 @@ observation is measured **twice** with the same centroid recipe: on the
 stack and frame by frame. A disagreement beyond 0.5″ or 3σ is flagged;
 it is never resolved silently.
 
-The **Re-measure the brightness** button re-runs the recipe on the **saved
+The **Re-measure** button re-runs the recipe on the **saved
 stacks of the run's observations** (each object's and its star's) without
 re-stacking the visit, and rewrites only the stacks' bands: the positions and
 the detection are untouched. It needs the run to have kept the **star stack**.

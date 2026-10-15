@@ -1579,10 +1579,14 @@ class CalibrationWorker(QThread):
     failed = Signal(str)             # an unexpected error, in English
 
     def __init__(self, paths, db, export_dir=None, cfg=None,
-                 vignette_model=False, flat_path=None):
+                 vignette_model=False, flat_path=None, project_id=None):
         super().__init__()
         self._paths = list(paths)
         self._db = db
+        # ADR-061 rev: the project the visit belongs to. Its OWN masters are
+        # preferred and the shared ones are the fallback, so a dark built for
+        # this project is the one applied here.
+        self._project_id = project_id
         # ADR-061 rev: build the VIGNETTING MODEL from the frames themselves
         # for the filters the library has no flat for. It is built ONCE for
         # the whole visit (it samples a spread of the frames) and then
@@ -1620,6 +1624,7 @@ class CalibrationWorker(QThread):
                 model, model_info = calibration.vignette_model(
                     self._paths, db=self._db, cfg=self._cfg,
                     cancel=lambda: self._cancel,
+                    project_id=self._project_id,
                     progress=lambda d, t: self.progress.emit(0, total))
                 # The model itself is written as a product of the visit, so
                 # the observer can open it and see that it is smooth and
@@ -1640,7 +1645,8 @@ class CalibrationWorker(QThread):
                 # batch entry point resolves, per frame, from its header
                 out = calibration.calibrate_paths(
                     [path], self._db, self._cfg,
-                    cancel=lambda: self._cancel, vignette_model=model)
+                    cancel=lambda: self._cancel, vignette_model=model,
+                    project_id=self._project_id)
                 if not out:
                     break
                 src, data, header, report = out[0]
@@ -1712,6 +1718,50 @@ class _WholeFrameCache:
         return data[y0:y1, x0:x1]
 
 
+class CalibrationBuildWorker(QThread):
+    # Builds master frames from a list of calibration frames, off the GUI
+    # thread (ADR-061 rev). The engine (core/calibration.build_masters) reads
+    # each frame, groups them by the recipe's OWN key, combines each group
+    # with the median and writes + indexes the master; the worker only wraps
+    # it with progress and cancellation, and it can DELETE the originals once
+    # each master exists (the caller confirms that first).
+
+    progress = Signal(int, int, str)   # (done, total, kind)
+    finished = Signal(object)          # build_masters' result dict
+    failed = Signal(str)               # an unexpected error, in English
+
+    def __init__(self, paths, out_dir, db, project_id=None, shared=False,
+                 delete_sources=False):
+        super().__init__()
+        self._paths = list(paths)
+        self._out_dir = str(out_dir)
+        self._db = db
+        self._project_id = project_id
+        self._shared = bool(shared)
+        self._delete_sources = bool(delete_sources)
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the dialog (Cancel or a shutdown): the engine stops
+        # between GROUPS, so a master already written and indexed is kept.
+        self._cancel = True
+
+    def run(self):
+        from ..core import calibration
+        try:
+            result = calibration.build_masters(
+                self._db, self._paths, self._out_dir,
+                project_id=self._project_id, shared=self._shared,
+                progress=lambda d, t, k: self.progress.emit(d, t, k),
+                cancel=lambda: self._cancel,
+                delete_sources=self._delete_sources)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("calibration build worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(result)
+
+
 class TrackStackWorker(QThread):
     # The whole track & stack pipeline off the GUI thread (astrometry plan,
     # phases 2-6 wired by phase 7): solve the reference, register, stack the
@@ -1734,9 +1784,13 @@ class TrackStackWorker(QThread):
                  obs_code="", site="", final_size=0, margin=64,
                  comps=None, band=None, target_mag=None, recipe=None,
                  phot_enabled=True, save_star_stack=False, calibrate=False,
-                 manual_ref=None, packed=None, groups=None):
+                 manual_ref=None, packed=None, groups=None, project_id=None):
         super().__init__()
         self._paths = list(paths)
+        # ADR-061 rev: the project the visit belongs to. Its OWN masters are
+        # preferred over the shared ones, so a dark built for this project is
+        # the one applied to the stack.
+        self._project_id = project_id
         # ADR-061 applied where the faint object is: calibrate the frames AS
         # THEY ARE READ (dark/bias and flat), because a stack of uncalibrated
         # frames keeps the train's dust and the sensor's vignetting, and the
@@ -2396,7 +2450,8 @@ class TrackStackWorker(QThread):
         tol = None
         if self._cfg is not None:
             tol = self._cfg.get("calib_temp_tol_c", None)
-        recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        recipe = calibration.resolve_recipe(db, meta, tol_c=tol,
+                                            project_id=self._project_id)
         model = None
         want_model = bool(self._cfg_get("calib_vignette_model", False))
         # The frames may already carry NightScribe's calibration (an exported
@@ -2414,10 +2469,12 @@ class TrackStackWorker(QThread):
             model, info = calibration.vignette_model(
                 self._paths, db=db, cfg=self._cfg,
                 cancel=lambda: self._cancel,
+                project_id=self._project_id,
                 progress=lambda d, t: self.progress.emit("vignette", d, t))
             self._vignette_info = info
         return calibration.FrameCalibrator(db, self._cfg,
-                                           vignette_model=model)
+                                           vignette_model=model,
+                                           project_id=self._project_id)
 
     def run(self):
         import math

@@ -106,6 +106,93 @@ def test_visit_arms_the_tab(qapp, tmp_path):
     assert "2026 QX" in tab.lbl_object.text()
 
 
+def test_a_new_session_clears_the_previous_run(qapp, tmp_path):
+    # Reported 2026-10-15: opening another visit kept the previous RUN's
+    # face (its strip, its tables, its Undo). clear_session() leaves the
+    # run behind; the run lives in its project, never in the tab.
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"status": "ok", "points": [1, 2]}
+    tab._run_id = 77
+    tab.tbl_points.setRowCount(3)
+    tab.tbl_snr.setRowCount(2)
+    tab._show_result_area(True)
+    tab.clear_session()
+    assert tab._result is None
+    assert tab._run_id is None
+    assert tab._ctx_paths is None
+    assert tab.tbl_points.rowCount() == 0
+    assert tab.tbl_snr.rowCount() == 0
+    assert tab._restore_asked is False
+
+
+def test_the_panel_fits_the_column(qapp, tmp_path):
+    # Reported 2026-10-15: the Astrometry panel's right edge was cut. The
+    # content's own minimum has to fit the column the UFE OPENS (the tab
+    # column's default), or the form is clipped; the scroll area no longer
+    # hides the horizontal bar, so a narrower column scrolls instead.
+    from PySide6.QtWidgets import QScrollArea
+    from nightscribe.gui import ufe_dialog
+    tab, _host = _tab(qapp, tmp_path)
+    inner = tab.findChild(QScrollArea).widget()
+    assert inner.minimumSizeHint().width() <= ufe_dialog._TABS_W
+
+
+class _FakeBox:
+    # A QMessageBox stand-in for the gap question: records the buttons and
+    # answers with the one whose label contains `pick`.
+    pick = "One"
+    Question = 0
+    AcceptRole = 0
+    RejectRole = 0
+
+    def __init__(self, _parent=None):
+        self.buttons = {}
+
+    def setIcon(self, *_a): pass
+    def setWindowTitle(self, *_a): pass
+    def setText(self, *_a): pass
+    def setInformativeText(self, *_a): pass
+    def setDefaultButton(self, _b): pass
+    def exec(self): pass
+
+    def addButton(self, label, _role):
+        self.buttons[label] = label
+        return label
+
+    def clickedButton(self):
+        return next(label for label in self.buttons if self.pick in label)
+
+
+def test_the_gap_rule_asks_before_it_decides(qapp, tmp_path, monkeypatch):
+    # A refocus and a re-point look the same in the clock, so the gap rule is
+    # a guess: when it would decide, the observer is asked (reported
+    # 2026-10-15: the refocuses of a visit came out as seven "observations").
+    from nightscribe.core import follow
+    from nightscribe.gui import ufe_trackstack_tab as mod
+    tab, _host = _tab(qapp, tmp_path)
+    monkeypatch.setattr(follow, "resolve_groups",
+                        lambda *a, **k: ([(0, 2), (2, 4)], "gaps"))
+    monkeypatch.setattr(mod, "QMessageBox", _FakeBox)
+    # "One observation": the guess is dropped and the count is 1
+    _FakeBox.pick = "One"
+    tab._gaps_asked = False
+    tab._groups_overridden = False
+    tab._ask_about_gaps()
+    assert tab._gaps_asked is True
+    assert tab._groups_overridden is True
+    assert tab.spn_nobs.value() == 1
+    # asked ONCE per visit: a second call does nothing
+    tab._ask_about_gaps()
+    assert tab.spn_nobs.value() == 1
+    # "Split into N" keeps the gap rule's number
+    _FakeBox.pick = "Split"
+    tab._gaps_asked = False
+    tab._groups_overridden = False
+    tab._ask_about_gaps()
+    assert tab._gaps_asked is True
+    assert tab._groups_overridden is False
+
+
 def test_the_tab_finds_an_embedded_host(qapp, tmp_path):
     # ADR-053: the editor is a PAGE of the shell, so window() from a tab is
     # the MAIN window and the hooks live in an ancestor. The helper above
@@ -716,14 +803,14 @@ def test_the_brightness_row_says_what_the_run_will_measure_with(qapp,
     state = UfeImageState(host)
     tab = UfeTrackStackTab(state, "en", parent=host)
     tab._sync_recipe_row()
-    text = tab.lbl_recipe.text()
+    text = tab.recipe_text()
     assert "G" in text and "5.0/9.0/14.0" in text and "median" in text
     tab.btn_recipe.click()
     assert shown == ["measure"]
     # with the box off the row says what the run will NOT do, and it is
     # disarmed: there is nothing to edit for a measurement that is not run
     tab.chk_brightness.setChecked(False)
-    assert "positions only" in tab.lbl_recipe.text()
+    assert "positions only" in tab.recipe_text()
     assert not tab.btn_recipe.isEnabled()
 
 
@@ -741,11 +828,11 @@ def test_the_brightness_row_handles_a_recipe_that_sizes_from_the_seeing(
     state = UfeImageState(host)
     tab = UfeTrackStackTab(state, "en", parent=host)
     tab._sync_recipe_row()
-    assert "from the seeing" in tab.lbl_recipe.text()
+    assert "from the seeing" in tab.recipe_text()
     # and with no host answering, the row says so instead of inventing one
     host.photometry_recipe = None
     tab._sync_recipe_row()
-    assert "defaults" in tab.lbl_recipe.text()
+    assert "defaults" in tab.recipe_text()
 
 
 def test_the_brightness_row_says_which_method_will_measure(qapp, tmp_path):
@@ -763,12 +850,63 @@ def test_the_brightness_row_says_which_method_will_measure(qapp, tmp_path):
     state = UfeImageState(host)
     tab = UfeTrackStackTab(state, "en", parent=host)
     tab._sync_recipe_row()
-    assert "matched filter" in tab.lbl_recipe.text()
+    assert "matched filter" in tab.recipe_text()
     # with the aperture pinned, the row says the aperture and nothing else
     base["matched"] = False
     tab._sync_recipe_row()
-    assert "aperture" in tab.lbl_recipe.text()
-    assert "matched filter" not in tab.lbl_recipe.text()
+    assert "aperture" in tab.recipe_text()
+    assert "matched filter" not in tab.recipe_text()
+
+
+def test_the_recipe_line_is_one_elided_line(qapp, tmp_path):
+    # Reported 2026-10-15: the "Photometry recipe…" message is long and
+    # pushed the two buttons under it out of the block. It is ONE line now,
+    # elided, with the whole text in the tooltip (the same treatment the
+    # window's status line carries), so it can never grow.
+    tab, _host = _tab(qapp, tmp_path)
+    tab.chk_brightness.setChecked(True)
+    tab._sync_recipe_row()
+    assert tab.lbl_recipe.wordWrap() is False
+    assert tab.lbl_recipe.minimumHeight() == 0
+    # one line, in the label's OWN font (the Windows one is taller)
+    from PySide6.QtGui import QFontMetrics
+    one_line = QFontMetrics(tab.lbl_recipe.font()).lineSpacing()
+    assert tab.lbl_recipe.sizeHint().height() <= one_line + 10
+    assert tab.recipe_text() in tab.lbl_recipe.toolTip()
+    # and the Designer file's own help is still there, after the text
+    assert tab.lbl_recipe.toolTip() != tab.recipe_text()
+    # the two buttons are SHORT now: the row demanded 374 px with the long
+    # labels ("Photometry settings…" 169 + "Re-measure the brightness" 199)
+    # while the viewport at the default column is 352. The names are pinned
+    # so a long one cannot creep back in, and the row is measured against
+    # the panel's own font-driven ceiling (the Windows font asks for more
+    # than the Linux one, which is what the panel test already allows for).
+    assert tab.btn_recipe.text() == "Photometry…"
+    assert tab.btn_remeasure.text() == "Re-measure"
+    box = tab.btn_recipe.parentWidget().layout()
+    row = next(box.itemAt(i).layout() for i in range(box.count())
+               if box.itemAt(i).layout() is not None
+               and box.itemAt(i).layout().objectName() == "row_recipe")
+    assert row.minimumSize().width() <= _PANEL_MAX_MIN_W
+
+
+def test_a_wrapped_label_can_come_back_down(qapp, tmp_path):
+    # _fit_label sets a floor from heightForWidth, and Qt CLAMPS
+    # heightForWidth to that floor: a label measured once at a narrow width
+    # (before the layout settled) used to stay tall for good. The recipe
+    # line was measured at its 100 px default and stayed 119 px (seven
+    # lines) with 352 px to wrap in.
+    from PySide6.QtWidgets import QLabel
+    tab, _host = _tab(qapp, tmp_path)
+    label = QLabel("palabra " * 40)
+    label.setWordWrap(True)
+    label.resize(120, 20)
+    tab._fit_label(label)
+    narrow = label.minimumHeight()
+    label.resize(900, 20)
+    tab._fit_label(label)
+    assert narrow > 0
+    assert label.minimumHeight() < narrow
 
 
 def test_the_stack_is_written_with_its_own_wcs(qapp, tmp_path):

@@ -407,3 +407,91 @@ and `calibrate_paths` honour it (`calibration.is_calibrated`): the frame is left
 as it is and the report says so (`CalibrationReport.already`), both in the run's
 line and in the tab's warnings. "Calibrated" and "already calibrated" are not
 the same thing, and the observer has to be able to tell them apart.
+
+**Revisión (2026-10-15): la biblioteca es por PROYECTO, y la app construye los
+masters.** La biblioteca era una sola bolsa global: cualquier master valía para
+cualquier visita, y un dark tomado para una noche podía acabar aplicándose a
+otra sin que nadie lo supiera. Y llenarla obligaba a construir los masters
+fuera, con la app mirando. Lo que cambia:
+
+1. **Cada master tiene dueño.** `calib_masters` gana una columna
+   `project_id` (migración aditiva v22; NULL = **compartido**, que es lo que
+   son las filas que ya existían, así que ninguna biblioteca se rompe). Un
+   master construido con las tomas de un proyecto es **de ese proyecto**; el
+   bias y el flat, que son reutilizables (el pedestal del sensor y la forma
+   del tren óptico no cambian de un proyecto a otro), se pueden **compartir**.
+   Compartir es una propiedad de la **fila**, no una copia: el mismo fichero
+   puede sostener la fila del dueño y la de cada proyecto que lo adopte.
+2. **La búsqueda respeta la propiedad.** `find_master` prueba primero los
+   masters del proyecto que pregunta y solo después los compartidos; con
+   `project_id=None` (nadie pregunta) solo alcanza los **compartidos**: la
+   propiedad es un muro, y el master de otro proyecto no se usa por
+   accidente. La receta **marca** un master que el proyecto no posee
+   («(shared)») para que el observador sepa que esos píxeles no son de sus
+   noches.
+3. **Adoptar es enlazar.** Un proyecto puede usar el master de otro con un
+   **enlace** (una segunda fila sobre el mismo fichero), nunca una copia. Y
+   borrar una fila **no borra el fichero** si otra fila lo sigue usando:
+   `delete_master` lo comprueba (`master_in_use`).
+4. **La app construye los masters.** Desde la pestaña Calibración del
+   proyecto (o desde la biblioteca de Ajustes, que construye para todos):
+   cada toma se clasifica por su propia **IMAGETYP** (una luz se rechaza
+   sola), las tomas de una misma clave (la clave del propio `resolve_recipe`,
+   con la temperatura del dark redondeada al grado: su lectura deriva unas
+   décimas a lo largo de una noche, y agrupar por el valor crudo partía una
+   noche de darks en varios maestros de una sola toma) se agrupan, se
+   combinan con la **mediana** (`outliers.nanmedian_axis0`, el mismo
+   combinador del apilado) y el master se escribe con las tarjetas que la
+   receta necesita para volver a encontrarlo (`INSTRUME`, `GAIN`, `CCD-TEMP`,
+   `EXPTIME`, `FILTER`, `IMAGETYP`), dentro de `calib_root` (que hasta ahora
+   se escribía y **no leía nadie**). Un grupo de **una sola toma** se dice:
+   es una copia de esa toma, no una media, y lleva su propio ruido.
+5. **Los originales se borran solo si se pide, y solo después.** Las tomas de
+   calibración son dato del observador: se borran únicamente si la casilla lo
+   dice, y solo **después** de que cada master esté escrito E indexado, así
+   que una construcción que falla a medias no deja al observador sin tomas y
+   sin master. La construcción corre en un hilo aparte, con progreso y
+   cancelación.
+
+**Revision (2026-10-15): the library is per PROJECT, and the app builds the
+masters.** The library was one global bag: any master was valid for any visit,
+and a dark taken for one night could end up applied to another without anyone
+knowing. And filling it meant building the masters outside, with the app just
+watching. What changes:
+
+1. **Every master has an owner.** `calib_masters` gains a `project_id` column
+   (additive migration v22; NULL = **shared**, which is what the rows that
+   already existed are, so no library breaks). A master built from a project's
+   frames is **that project's**; the bias and the flat, which are reusable (the
+   sensor's pedestal and the optical train's shape do not change from one
+   project to the next), can be **shared**. Sharing is a property of the
+   **row**, not a copy: the same file can back the owner's row and the row of
+   every project that adopts it.
+2. **The lookup respects ownership.** `find_master` tries the asking project's
+   masters first and only then the shared ones; with `project_id=None` (nobody
+   asking) it reaches only the **shared** ones: ownership is a wall, and
+   another project's master is never used by accident. The recipe **marks** a
+   master the project does not own ("(shared)") so the observer knows those
+   pixels are not from their nights.
+3. **Adopting is linking.** A project can use another project's master with a
+   **link** (a second row on the same file), never a copy. And deleting a row
+   **does not delete the file** if another row still uses it: `delete_master`
+   checks (`master_in_use`).
+4. **The app builds the masters.** From the project's Calibration tab (or from
+   the Settings library, which builds for everyone): each frame is classified
+   by its own **IMAGETYP** (a light refuses itself), the frames of one key
+   (the key of `resolve_recipe` itself, with the dark's temperature taken to
+   the nearest degree: its reading drifts a few tenths over a night, and
+   grouping by the raw value turned one night of darks into a handful of
+   one-frame masters) are grouped, combined with the **median**
+   (`outliers.nanmedian_axis0`, the same combiner the stacking uses) and the
+   master is written with the cards the recipe needs to find it again
+   (`INSTRUME`, `GAIN`, `CCD-TEMP`, `EXPTIME`, `FILTER`, `IMAGETYP`), inside
+   `calib_root` (which until now was written and **read by nobody**). A group
+   of a **single frame** is said: it is a copy of that frame, not an average,
+   and it carries that frame's own noise.
+5. **The originals go only when asked, and only after.** The calibration
+   frames are the observer's data: they are removed only if the checkbox says
+   so, and only **after** each master is written AND indexed, so a build that
+   fails halfway does not leave the observer with no frames and no master. The
+   build runs off the GUI thread, with progress and cancellation.

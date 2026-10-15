@@ -578,6 +578,7 @@ def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
             confirmed_at=(ref.confirmed_at if ref else ""),
             ours_published=(ref.ours_present if ref else False))
     workdir = None
+    run_dir = None
     try:
         workdir = tempfile.mkdtemp(prefix="nightscribe-fo-in-")
         input_path = write_input(ours_lines, others_lines,
@@ -606,7 +607,10 @@ def check(ours_lines, desig, cfg=None, others_lines=None, findorb_path=None,
         _attach_reference(report, ref)
         return report
     finally:
-        for path in (workdir,):
+        # BOTH the input folder and the one `run` made for itself: the
+        # latter was left behind, one `nightscribe-fo-*` per check
+        # (reported 2026-10-15).
+        for path in (workdir, run_dir):
             if path:
                 shutil.rmtree(path, ignore_errors=True)
 

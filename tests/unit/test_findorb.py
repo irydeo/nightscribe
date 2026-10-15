@@ -205,6 +205,34 @@ def test_run_honours_the_observers_cancel(tmp_path, monkeypatch):
     assert ok is False
     assert "cancel" in log.lower()
     assert seen.get("terminated")
+def test_check_removes_both_of_its_temp_folders(tmp_path, monkeypatch):
+    # Reported 2026-10-15: `check` removed the input folder but not the one
+    # `run` made for itself, so every check left a `nightscribe-fo-*`
+    # behind. Both go now.
+    import os
+    made = []
+    real = findorb.tempfile.mkdtemp
+
+    def spy(*a, **k):
+        d = real(*a, **k)
+        made.append(d)
+        return d
+
+    monkeypatch.setattr(findorb.tempfile, "mkdtemp", spy)
+    monkeypatch.setattr(findorb, "probe",
+                        lambda *a, **k: ("/usr/bin/fo", "ok"))
+
+    class _Proc:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(findorb.subprocess, "run", lambda *a, **k: _Proc())
+    findorb.check(["OUR LINE"], "2025 UR", cfg=None,
+                  others_lines=["OTHER LINE"])
+    assert made, "the flow created its temp folders"
+    for d in made:
+        assert not os.path.exists(d), f"left behind: {d}"
 
 
 def test_as_residual_reads_findorbs_obscode_key():

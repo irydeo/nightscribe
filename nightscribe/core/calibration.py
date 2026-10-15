@@ -270,30 +270,36 @@ class MasterRef:
     filter: str | None = None
     created: str | None = None
     meta: dict = field(default_factory=dict)
+    # The PROJECT a master belongs to, or None when it is SHARED (every
+    # project may use it). A master built from a project's own frames is the
+    # project's; a project can also ADOPT another project's master with a
+    # LINK (a second row on the same file). See ADR-061 rev.
+    project_id: int | None = None
 
 
 def _row_to_ref(row):
     # @args: row - sqlite row (id, kind, path, camera, gain, temp_c,
-    #        exptime_s, filter, created, meta)
+    #        exptime_s, filter, created, meta, project_id)
     # @return: MasterRef
     (mid, kind, path, camera, gain, temp_c, exptime_s, filt,
-     created, meta) = row
+     created, meta, project_id) = row
     try:
         meta = json.loads(meta) if meta else {}
     except (TypeError, ValueError):
         meta = {}
     return MasterRef(id=mid, kind=kind, path=path, camera=camera, gain=gain,
                      temp_c=temp_c, exptime_s=exptime_s, filter=filt,
-                     created=created, meta=meta)
+                     created=created, meta=meta, project_id=project_id)
 
 
-def add_master(db, path, meta):
+def add_master(db, path, meta, project_id=None):
     # Indexes a master the user already built. Any field missing from meta
     # is read from the file's own header, so a well-headed master can be
     # indexed with just its kind.
     # @args: db - Database, path - master FITS, meta - dict with at least
     #        {"kind": bias|dark|dark_flat|flat} and any of camera/gain/
-    #        temp_c/exptime_s/filter
+    #        temp_c/exptime_s/filter, project_id - the project it belongs to,
+    #        or None for a SHARED master (ADR-061 rev)
     # @return: the new row id
     meta = dict(meta or {})
     kind = meta.get("kind")
@@ -310,25 +316,37 @@ def add_master(db, path, meta):
                           "filter")}
     cur = db.execute(
         "INSERT INTO calib_masters (kind, path, camera, gain, temp_c,"
-        " exptime_s, filter, created, meta) VALUES (?,?,?,?,?,?,?,?,?)",
+        " exptime_s, filter, created, meta, project_id)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
         (kind, str(path), meta.get("camera"), meta.get("gain"),
          meta.get("temp_c"), meta.get("exptime_s"), meta.get("filter"),
-         created, json.dumps(extra)))
+         created, json.dumps(extra),
+         None if project_id is None else int(project_id)))
     db.commit()
     return cur.lastrowid
 
 
-def list_masters(db, camera=None, kind=None):
-    # @args: db - Database, camera - optional filter, kind - optional filter
+def list_masters(db, camera=None, kind=None, project_id=None,
+                 include_shared=False):
+    # @args: db - Database, camera - optional filter, kind - optional filter,
+    #        project_id - when given, only that project's masters (plus the
+    #        SHARED ones when include_shared); when None, every master (the
+    #        Settings library), include_shared - as above (ADR-061 rev)
     # @return: list[MasterRef], newest first
     sql = ("SELECT id, kind, path, camera, gain, temp_c, exptime_s, filter,"
-           " created, meta FROM calib_masters")
+           " created, meta, project_id FROM calib_masters")
     rows = db.execute(sql).fetchall()
     out = [_row_to_ref(r) for r in rows]
     if camera is not None:
         out = [m for m in out if _same_text(m.camera, camera)]
     if kind is not None:
         out = [m for m in out if m.kind == kind]
+    if project_id is not None:
+        if include_shared:
+            out = [m for m in out
+                   if m.project_id == project_id or m.project_id is None]
+        else:
+            out = [m for m in out if m.project_id == project_id]
     # Newest first, and the id breaks a tie: masters indexed in the same
     # second (a whole folder at once, the usual way) would otherwise come
     # back in insertion order and the "newest wins" rule would pick the
@@ -341,6 +359,9 @@ def delete_master(db, master_id, delete_file=False):
     # @args: db - Database, master_id - row id, delete_file - also remove
     #        the file from disk (off by default: the user's data)
     # @return: the path that was removed from the index, or None
+    # An ADOPTED master is a LINK: the same file can back several rows (one
+    # per project), so the file is removed only when NO row is left using it
+    # (ADR-061 rev).
     row = db.execute("SELECT path FROM calib_masters WHERE id=?",
                      (master_id,)).fetchone()
     if not row:
@@ -348,13 +369,276 @@ def delete_master(db, master_id, delete_file=False):
     path = row[0]
     db.execute("DELETE FROM calib_masters WHERE id=?", (master_id,))
     db.commit()
-    if delete_file:
+    if delete_file and not master_in_use(db, path):
         import os
         try:
             os.remove(path)
         except OSError as err:
             logger.warning("could not remove master %s: %s", path, err)
     return path
+
+
+def master_in_use(db, path):
+    # @args: db - Database, path - a master file
+    # @return: True when another row still points at it (an adopted link)
+    row = db.execute("SELECT COUNT(*) FROM calib_masters WHERE path=?",
+                     (str(path),)).fetchone()
+    return bool(row and row[0])
+
+
+# -------------------------------------------- building masters (ADR-061 rev)
+#
+# The library indexes masters the observer already built (add_master). Since
+# ADR-061 rev the app can also BUILD them from a list of calibration frames:
+# it classifies each frame by its own header, groups them by the SAME key the
+# recipe matches on, combines each group with the median and writes a master
+# with the cards the recipe keys on, so the file it writes is found again.
+# The frames are the observer's, and the caller decides whether to delete
+# them once the masters exist.
+
+
+def calib_root(cfg=None):
+    # @args: cfg - the Config (or None for the live one)
+    # @return: the folder the built masters live in: the configured
+    #          calib_root, or <data dir>/calib when it is empty (the
+    #          default). The key existed since ADR-061 but nothing read it;
+    #          wiring it here is what makes it real (ADR-061 rev).
+    from ..config import config as _live
+    from ..paths import data_dir
+    cfg = cfg or _live
+    root = str(cfg.get("calib_root") or "").strip()
+    return Path(root) if root else Path(data_dir()) / "calib"
+
+
+# The IMAGETYP written into a built master: the frame says what it is, so
+# classify_master reads the kind back and nothing is guessed later.
+_MASTER_IMAGETYP = {"bias": "Bias", "dark": "Dark", "flat": "Flat"}
+
+
+def _group_key(kind, meta):
+    # @args: kind - one of KINDS, meta - the frame's metadata
+    # @return: the tuple that makes several frames ONE master. It follows the
+    #          recipe's own match key (resolve_recipe), so two frames end up
+    #          in the same master only when the recipe would treat them the
+    #          same: a bias on camera+gain, a dark on camera+gain+temp+
+    #          exposure, a flat on camera+filter+exposure (its SHAPE is the
+    #          optical train's and does not depend on the temperature).
+    # The dark's temperature is taken to the NEAREST DEGREE, not exactly:
+    # the sensor's reading drifts a few tenths over a night, and grouping by
+    # the raw value turned one night of darks into a handful of one-frame
+    # groups, each a copy of a single frame. The recipe still matches the
+    # master with its own +/-3 C tolerance, so the degree is enough.
+    if kind == "bias":
+        return (kind, meta.get("camera"), meta.get("gain"))
+    if kind == "dark":
+        temp = meta.get("temp_c")
+        return (kind, meta.get("camera"), meta.get("gain"),
+                None if temp is None else round(float(temp)),
+                meta.get("exptime_s"))
+    return (kind, meta.get("camera"), meta.get("filter"),
+            meta.get("exptime_s"))
+
+
+def group_calibration_frames(paths, reader=None):
+    # @args: paths - the calibration frames, reader - optional header reader
+    # @return: (groups, skipped): groups = list of {"kind", "meta", "paths"}
+    #          (one master per entry), skipped = list of (path, why) for the
+    #          frames that cannot be a master (a light, an unknown type, an
+    #          unreadable header). The group's meta carries the MEDIAN
+    #          temperature of its frames, which is what the master's header
+    #          is written with.
+    read = reader or read_header
+    groups = {}
+    skipped = []
+    for path in paths or []:
+        kind, why = classify_master(path)
+        if kind is None:
+            skipped.append((str(path), why))
+            continue
+        try:
+            meta = meta_from_header(read(path))
+        except Exception as err:                               # noqa: BLE001
+            skipped.append((str(path),
+                            f"the header could not be read ({err})"))
+            continue
+        key = _group_key(kind, meta)
+        entry = groups.get(key)
+        if entry is None:
+            entry = {"kind": kind, "meta": dict(meta), "paths": [],
+                     "temps": []}
+            groups[key] = entry
+        entry["paths"].append(str(path))
+        if meta.get("temp_c") is not None:
+            entry["temps"].append(float(meta["temp_c"]))
+    out = []
+    for entry in groups.values():
+        temps = sorted(entry.pop("temps"))
+        if temps:
+            entry["meta"]["temp_c"] = temps[len(temps) // 2]
+        out.append(entry)
+    return out, skipped
+
+
+def _safe_token(value):
+    # @args: value - anything a header carries
+    # @return: a file-name-safe token ("" when there is nothing)
+    if value is None:
+        return ""
+    return re.sub(r"[^A-Za-z0-9._-]+", "", str(value))
+
+
+def master_filename(kind, meta):
+    # @args: kind - one of KINDS, meta - the group's key
+    # @return: the master's file name, with the key in it so two masters for
+    #          the same camera do not collide (the exposure for a dark, the
+    #          filter for a flat)
+    bits = ["master", kind]
+    camera = _safe_token(meta.get("camera"))
+    if camera:
+        bits.append(camera)
+    if meta.get("gain") is not None:
+        bits.append(f"{float(meta['gain']):g}g")
+    if kind == "dark" and meta.get("temp_c") is not None:
+        bits.append(f"{float(meta['temp_c']):g}C")
+    if meta.get("exptime_s") is not None:
+        bits.append(f"{float(meta['exptime_s']):g}s")
+    if kind == "flat":
+        filt = _safe_token(meta.get("filter"))
+        if filt:
+            bits.append(filt)
+    return "_".join(bits) + ".fits"
+
+
+def _master_cards(kind, meta, n_frames):
+    # @args: kind - one of KINDS, meta - the group's key, n_frames - how many
+    # @return: the header cards a built master carries: the ones the recipe
+    #          keys on (so it is found again) plus where it came from. The
+    #          DATE-OBS is the FRAMES' own instant, not the build date: the
+    #          flat's age is measured against it.
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat(
+        timespec="seconds")
+    cards = {
+        "IMAGETYP": _MASTER_IMAGETYP.get(kind, kind),
+        "DATE-OBS": str(meta.get("date_obs") or now),
+        "NS_NFRM": int(n_frames),
+        "NS_COMB": "median",
+    }
+    if meta.get("camera") is not None:
+        cards["INSTRUME"] = str(meta["camera"])
+    if meta.get("gain") is not None:
+        cards["GAIN"] = float(meta["gain"])
+    if meta.get("temp_c") is not None:
+        cards["CCD-TEMP"] = float(meta["temp_c"])
+    if meta.get("exptime_s") is not None:
+        cards["EXPTIME"] = float(meta["exptime_s"])
+    if meta.get("filter") is not None:
+        cards["FILTER"] = str(meta["filter"])
+    return cards
+
+
+def build_master(group, out_dir):
+    # @args: group - {"kind", "meta", "paths"}, out_dir - the library folder
+    # @return: the master path written (inside out_dir/<kind>/)
+    # The combine is the app's own MEDIAN (outliers.nanmedian_axis0, the one
+    # the stacking uses): robust, no parameters, and NaN-aware, so a frame
+    # that came out empty does not poison a pixel.
+    cube = []
+    for path in group["paths"]:
+        data, _header = read_image(path)
+        cube.append(np.asarray(data, dtype=np.float32))
+    if not cube:
+        raise ValueError("the group has no frames")
+    master = outliers.nanmedian_axis0(np.stack(cube, axis=0))
+    folder = Path(out_dir) / group["kind"]
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / master_filename(group["kind"], group["meta"])
+    from astropy.io import fits
+    hdu = fits.PrimaryHDU(np.asarray(master, dtype=np.float32))
+    for key, value in _master_cards(group["kind"], group["meta"],
+                                    len(group["paths"])).items():
+        try:
+            hdu.header[key] = value
+        except (ValueError, TypeError):
+            continue
+    hdu.writeto(str(path), overwrite=True)
+    return str(path)
+
+
+def build_masters(db, paths, out_dir, project_id=None, shared=False,
+                  progress=None, cancel=None, delete_sources=False):
+    # @args: db - Database, paths - the calibration frames, out_dir - the
+    #        library folder, project_id - the project the masters belong to
+    #        (None + shared=True makes them SHARED), progress - callable(done,
+    #        total, kind), cancel - callable() -> bool, delete_sources - also
+    #        remove the original frames once each master is written AND
+    #        indexed (the caller confirms this first)
+    # @return: {"built": [{"kind", "path", "n", "single"}], "skipped":
+    #          [(path, why)], "errors": [(kind, why)], "cancelled": bool}
+    groups, skipped = group_calibration_frames(paths)
+    built, errors = [], []
+    cancelled = False
+    total = len(groups)
+    for index, group in enumerate(groups):
+        if cancel is not None and cancel():
+            cancelled = True
+            break
+        try:
+            master = build_master(group, out_dir)
+            # The row is what makes the master USABLE, so the originals are
+            # only removed after it exists: a build that wrote the file but
+            # not the row would delete the frames for a master nobody can
+            # find. Both live in the same try: an indexing failure must not
+            # abort the rest of the batch.
+            add_master(db, master, {"kind": group["kind"]},
+                       project_id=None if shared else project_id)
+        except Exception as err:                               # noqa: BLE001
+            logger.warning("building a %s master failed: %s",
+                           group["kind"], err)
+            errors.append((group["kind"], str(err)))
+            continue
+        if delete_sources:
+            for path in group["paths"]:
+                try:
+                    Path(path).unlink()
+                except OSError as err:
+                    logger.warning("could not remove %s: %s", path, err)
+        built.append({"kind": group["kind"], "path": master,
+                      "n": len(group["paths"]),
+                      "single": len(group["paths"]) < 2})
+        if progress is not None:
+            progress(index + 1, total, group["kind"])
+    return {"built": built, "skipped": skipped, "errors": errors,
+            "cancelled": cancelled}
+
+
+def adopt_master(db, master_id, project_id):
+    # @args: db - Database, master_id - the row to adopt, project_id - who
+    #        adopts it
+    # @return: the new row id, or None when the source row is gone
+    # A LINK, not a copy: a second row on the SAME file, so a project uses
+    # another project's master without duplicating tens of MB (ADR-061 rev).
+    # The file goes only when NO row is left using it (delete_master).
+    ref = next((m for m in list_masters(db) if m.id == int(master_id)), None)
+    if ref is None:
+        return None
+    cur = db.execute(
+        "INSERT INTO calib_masters (kind, path, camera, gain, temp_c,"
+        " exptime_s, filter, created, meta, project_id)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (ref.kind, ref.path, ref.camera, ref.gain, ref.temp_c, ref.exptime_s,
+         ref.filter, ref.created, json.dumps(ref.meta), int(project_id)))
+    db.commit()
+    return cur.lastrowid
+
+
+def set_master_project(db, master_id, project_id):
+    # @args: db - Database, master_id - the row, project_id - the project it
+    #        belongs to, or None to SHARE it with every project
+    # @return: None
+    db.execute("UPDATE calib_masters SET project_id=? WHERE id=?",
+               (None if project_id is None else int(project_id),
+                int(master_id)))
+    db.commit()
 
 
 # ------------------------------------------------ what a frame IS (ADR-061 rev)
@@ -488,7 +772,7 @@ def _rejections(ref, camera=None, gain=None, temp_c=None, exptime_s=None,
 
 
 def find_master(db, kind, camera=None, gain=None, temp_c=None,
-                exptime_s=None, filter=None, tol_c=None):
+                exptime_s=None, filter=None, tol_c=None, project_id=None):
     # The best master for a light. A criterion left as None is IGNORED
     # (the caller may not know it), which is why resolve_recipe warns when
     # it has to fall back to a loose match.
@@ -498,33 +782,56 @@ def find_master(db, kind, camera=None, gain=None, temp_c=None,
     # almost always empty.
     # @args: db - Database, kind - one of KINDS, camera/gain/temp_c/
     #        exptime_s/filter - what the light asks for, tol_c - temperature
-    #        tolerance (config default when None)
+    #        tolerance (config default when None), project_id - the project
+    #        asking: its OWN masters are tried FIRST and the SHARED ones are
+    #        the fallback. None means NO project is asking, so only the
+    #        SHARED masters are in reach: ownership is a wall, and another
+    #        project's master is never used by accident (ADR-061 rev)
     # @return: MasterRef or None
-    best = None
-    best_delta = None
-    for ref in list_masters(db, kind=kind):
-        if _rejections(ref, camera, gain, temp_c, exptime_s, filter, tol_c):
-            continue
-        delta = None
-        if ref.temp_c is not None and temp_c is not None:
-            delta = abs(ref.temp_c - float(temp_c))
-        if best is None or _prefer(delta, ref, best_delta, best):
-            best, best_delta = ref, delta
-    return best
+
+    def best_of(refs):
+        best = None
+        best_delta = None
+        for ref in refs:
+            if _rejections(ref, camera, gain, temp_c, exptime_s, filter,
+                           tol_c):
+                continue
+            delta = None
+            if ref.temp_c is not None and temp_c is not None:
+                delta = abs(ref.temp_c - float(temp_c))
+            if best is None or _prefer(delta, ref, best_delta, best):
+                best, best_delta = ref, delta
+        return best
+
+    refs = list_masters(db, kind=kind)
+    if project_id is None:
+        return best_of([r for r in refs if r.project_id is None])
+    mine = best_of([r for r in refs if r.project_id == project_id])
+    if mine is not None:
+        return mine
+    return best_of([r for r in refs if r.project_id is None])
 
 
 def closest_rejected(db, kind, camera=None, gain=None, temp_c=None,
-                     exptime_s=None, filter=None, tol_c=None):
+                     exptime_s=None, filter=None, tol_c=None, project_id=None):
     # @args: db - Database, kind - one of KINDS, the rest - what the light
-    #        asks for
+    #        asks for, project_id - when given, only what the project can
+    #        SEE (its own masters and the shared ones); when None, only the
+    #        shared ones (nobody else's master is in reach, ADR-061 rev)
     # @return: (ref, bad) the master of this kind that came CLOSEST to
     #          matching, with the criteria it failed, or (None, []) when
     #          the library holds none of this kind at all
     # The observer who reads "no flat" while KNOWING there is one needs the
     # reason, not a shrug: a master of the right camera with one criterion
     # off beats a stranger that fails everything.
+    refs = list_masters(db, kind=kind)
+    if project_id is None:
+        refs = [r for r in refs if r.project_id is None]
+    else:
+        refs = [r for r in refs
+                if r.project_id == project_id or r.project_id is None]
     best, best_bad, best_rank = None, [], None
-    for ref in list_masters(db, kind=kind):
+    for ref in refs:
         bad = _rejections(ref, camera, gain, temp_c, exptime_s, filter, tol_c)
         if not bad:
             continue
@@ -559,6 +866,9 @@ def _prefer(delta, ref, best_delta, best):
 class Recipe:
     # What the engine will do to a light, resolved against the library.
     meta: dict = field(default_factory=dict)
+    # The project that asked (None when nobody did): the tab marks a master
+    # the project does NOT own, so "shared" is said where it is read.
+    project_id: int | None = None
     offset: MasterRef | None = None       # the dark or bias to subtract
     offset_kind: str | None = None        # "dark" | "bias" | None
     flat: MasterRef | None = None
@@ -606,15 +916,16 @@ def _note(recipe, what, reason, master=None, value=None, wanted=None,
 
 
 def _note_missing(recipe, db, kind, what, camera=None, gain=None, temp_c=None,
-                  exptime_s=None, filter=None, tol_c=None):
+                  exptime_s=None, filter=None, tol_c=None, project_id=None):
     # @args: recipe - the Recipe being built, db - Database, kind - the kind
     #        looked for, what - "dark"|"bias"|"flat", the rest - what the
-    #        light asks for
+    #        light asks for, project_id - when given, only what the project
+    #        can SEE (its own masters and the shared ones)
     # @return: None. Adds ONE note naming the closest master that was left
     #          out and the criterion it failed, or nothing when the library
     #          holds none of this kind (the warning already says that).
     ref, bad = closest_rejected(db, kind, camera, gain, temp_c, exptime_s,
-                                filter, tol_c)
+                                filter, tol_c, project_id=project_id)
     if ref is None or not bad:
         return
     # The FIRST failed criterion is the one to name: camera, gain, exposure,
@@ -638,9 +949,11 @@ def _flat_age_note(recipe, flat, meta):
         _note(recipe, "flat", "age", master=flat.path, days=int(round(days)))
 
 
-def resolve_recipe(db, meta, tol_c=None):
+def resolve_recipe(db, meta, tol_c=None, project_id=None):
     # @args: db - Database, meta - a light's metadata (from a header),
-    #        tol_c - temperature tolerance
+    #        tol_c - temperature tolerance, project_id - the project the
+    #        light belongs to: its OWN masters are preferred and the SHARED
+    #        ones are the fallback (ADR-061 rev)
     # @return: Recipe (with warnings in plain language, never an exception)
     #
     # WHAT EACH PIECE IS MATCHED ON, and why it is not more:
@@ -661,36 +974,36 @@ def resolve_recipe(db, meta, tol_c=None):
     temp = meta.get("temp_c")
     exptime = meta.get("exptime_s")
     filt = meta.get("filter")
-    recipe = Recipe(meta=dict(meta))
+    recipe = Recipe(meta=dict(meta), project_id=project_id)
 
     # Offset: a dark at the light's exposure if there is one, else the bias.
     # Darks and biases do not depend on the filter, so the filter is not
     # part of their match (a dark through a different filter is the same
     # dark); the flat does.
     dark = find_master(db, "dark", camera, gain, temp, exptime,
-                       filter=None, tol_c=tol_c)
+                       filter=None, tol_c=tol_c, project_id=project_id)
     if dark is not None:
         recipe.offset, recipe.offset_kind = dark, "dark"
     else:
         # A bias has no exposure of its own: matching it against the
         # light's exposure would find nothing. It is the fallback offset.
         bias = find_master(db, "bias", camera, gain, None, exptime_s=None,
-                           filter=None, tol_c=tol_c)
+                           filter=None, tol_c=tol_c, project_id=project_id)
         if bias is not None:
             recipe.offset, recipe.offset_kind = bias, "bias"
             recipe.warnings.append(
                 "no dark at this exposure: the bias was subtracted, so the "
                 "thermal current stays in the frame")
             _note_missing(recipe, db, "dark", "dark", camera, gain, temp,
-                          exptime, None, tol_c)
+                          exptime, None, tol_c, project_id=project_id)
         else:
             recipe.warnings.append(
                 "no dark or bias in the library: the pedestal and the "
                 "thermal current stay in the frame")
             _note_missing(recipe, db, "dark", "dark", camera, gain, temp,
-                          exptime, None, tol_c)
+                          exptime, None, tol_c, project_id=project_id)
             _note_missing(recipe, db, "bias", "bias", camera, gain, None,
-                          None, None, tol_c)
+                          None, None, tol_c, project_id=project_id)
 
     # Flat: same filter (that is its whole point). Its exposure is not the
     # light's, so exposure is not part of the match, and NEITHER IS THE GAIN
@@ -699,7 +1012,7 @@ def resolve_recipe(db, meta, tol_c=None):
     # flats) NOR THE TEMPERATURE (its shape is the train's). The dark DOES
     # need the gain and the temperature: there the level IS the signal.
     flat = find_master(db, "flat", camera, None, None, exptime_s=None,
-                       filter=filt, tol_c=tol_c)
+                       filter=filt, tol_c=tol_c, project_id=project_id)
     if flat is not None:
         recipe.flat = flat
         # The flat needs its own offset: a dark at the FLAT's own exposure
@@ -710,15 +1023,16 @@ def resolve_recipe(db, meta, tol_c=None):
         # flat's own dark current, and that one does depend on it.
         recipe.flat_offset = find_master(
             db, "dark", camera, gain, temp, flat.exptime_s,
-            filter=None, tol_c=tol_c) or find_master(
-            db, "bias", camera, gain, None, None, filter=None, tol_c=tol_c)
+            filter=None, tol_c=tol_c, project_id=project_id) or find_master(
+            db, "bias", camera, gain, None, None, filter=None, tol_c=tol_c,
+            project_id=project_id)
         _flat_age_note(recipe, flat, meta)
     else:
         recipe.warnings.append(
             "no flat for this filter: the flat residual is not corrected "
             "(it matters for the magnitude, little for the centroid)")
         _note_missing(recipe, db, "flat", "flat", camera, None, None, None,
-                      filt, tol_c)
+                      filt, tol_c, project_id=project_id)
     return recipe
 
 
@@ -991,8 +1305,9 @@ class _OffsetSubtractor:
     # The recipe is resolved from EACH frame's own header and cached by the
     # key the recipe itself uses, so a visit is one query and not two hundred.
 
-    def __init__(self, db, cfg=None):
+    def __init__(self, db, cfg=None, project_id=None):
         self._db = db
+        self._project_id = project_id
         self._tol = (cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
                      if cfg is not None else _DEFAULT_TEMP_TOL_C)
         self._cache = {}
@@ -1014,7 +1329,8 @@ class _OffsetSubtractor:
                     else int(round(float(temp) / max(self._tol, 1e-6)))))
             recipe = self._cache.get(key)
             if recipe is None:
-                recipe = resolve_recipe(self._db, meta, tol_c=self._tol)
+                recipe = resolve_recipe(self._db, meta, tol_c=self._tol,
+                                        project_id=self._project_id)
                 self._cache[key] = recipe
         except Exception as err:                  # never break the flat
             logger.warning("vignette model: the offset could not be resolved "
@@ -1047,7 +1363,8 @@ class _OffsetSubtractor:
 
 
 def vignette_model(paths, tile=None, frames=None, order=None, loader=None,
-                   progress=None, cancel=None, db=None, cfg=None):
+                   progress=None, cancel=None, db=None, cfg=None,
+                   project_id=None):
     # @args: paths - the light frames of the visit, tile - the tile side in
     #        pixels (None: a fraction of the frame), frames - how many frames
     #        the sky is sampled from (None: VIGNETTE_FRAMES, spread over the
@@ -1099,7 +1416,8 @@ def vignette_model(paths, tile=None, frames=None, order=None, loader=None,
     count = VIGNETTE_FRAMES if frames is None else int(frames)
     count = max(1, min(count, len(paths)))
     idx = np.unique(np.linspace(0, len(paths) - 1, count).astype(int))
-    subtractor = _OffsetSubtractor(db, cfg) if db is not None else None
+    subtractor = (_OffsetSubtractor(db, cfg, project_id=project_id)
+                  if db is not None else None)
     load = subtractor if subtractor is not None else (loader or read_image)
     levels = []
     for n, i in enumerate(idx, 1):
@@ -1190,10 +1508,13 @@ class FrameCalibrator:
     #        vignette_model), used when the library has no flat for the
     #        filter
 
-    def __init__(self, db, cfg=None, vignette_model=None):
+    def __init__(self, db, cfg=None, vignette_model=None, project_id=None):
         self._db = db
         self._cfg = cfg
         self._vignette_model = vignette_model
+        # the project the frames belong to: its own masters are preferred and
+        # the shared ones are the fallback (ADR-061 rev)
+        self._project_id = project_id
         self._tol = (cfg.get("calib_temp_tol_c", _DEFAULT_TEMP_TOL_C)
                      if cfg is not None else _DEFAULT_TEMP_TOL_C)
         self._cache = {}
@@ -1225,7 +1546,8 @@ class FrameCalibrator:
                 else int(round(float(temp) / max(self._tol, 1e-6)))))
         recipe = self._cache.get(key)
         if recipe is None:
-            recipe = resolve_recipe(self._db, meta, tol_c=self._tol)
+            recipe = resolve_recipe(self._db, meta, tol_c=self._tol,
+                                    project_id=self._project_id)
             self._cache[key] = recipe
         out, report = calibrate(data, recipe, box=box,
                                 vignette_model=self._vignette_model,
@@ -1315,7 +1637,8 @@ def calibrate(data, recipe, loader=None, box=None, vignette_model=None,
 
 
 def calibrate_paths(paths, db, cfg=None, master_loader=None, box=None,
-                    progress=None, cancel=None, vignette_model=None):
+                    progress=None, cancel=None, vignette_model=None,
+                    project_id=None):
     # @args: paths - light FITS paths, db - Database, cfg - Config (for the
     #        temperature tolerance), master_loader - callable(path, box) ->
     #        array for the MASTERS (the light is always read from disk with
@@ -1350,7 +1673,7 @@ def calibrate_paths(paths, db, cfg=None, master_loader=None, box=None,
                 progress(index, total, path)
             continue
         meta = meta_from_header(header)
-        recipe = resolve_recipe(db, meta, tol_c=tol)
+        recipe = resolve_recipe(db, meta, tol_c=tol, project_id=project_id)
         data_cal, report = calibrate(data, recipe, loader=master_loader,
                                      box=box, vignette_model=vignette_model,
                                      master_cache=master_cache)

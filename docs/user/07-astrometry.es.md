@@ -147,7 +147,7 @@ brillo. Cada observación se mide **dos veces** con la misma receta de
 centroide: sobre el stack y frame a frame. Un desacuerdo mayor de 0,5″ o 3σ
 se marca; nunca se resuelve en silencio.
 
-El botón **Re-medir el brillo** vuelve a ejecutar la receta sobre los
+El botón **Re-medir** vuelve a ejecutar la receta sobre los
 **apilados guardados de las observaciones del run** (los del objeto y sus
 estrellas) sin re-apilar la visita, y reescribe solo las bandas de los stacks:
 la posición y la detección no se tocan. Necesita que el run haya guardado el

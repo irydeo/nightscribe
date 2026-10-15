@@ -112,6 +112,14 @@ def run():
             "and the defaults are in use.\n\n"
             "No se pudo leer tu fichero de ajustes; se guardó una copia al "
             "lado y se usan los valores por defecto.")
+    # The app's OWN leftovers in the system temp (a run's folders, the phase
+    # chart's scratch, a captured frame): each is removed when its work is
+    # done, but a crash or a kill leaves it, so the ones OLDER than a day go
+    # at startup. A second instance working right now is never touched.
+    from ..paths import sweep_temp
+    removed = sweep_temp()
+    if removed:
+        logger.info("swept %d stale temp entries", removed)
 
     # First the backup snapshot (ADR-042): core/backup.py copies the
     # current database before anything imports core.db, because that

@@ -283,6 +283,9 @@ class UfeCompareTab(QWidget):
         if level is None:
             level = "warn" if text.startswith("⚠") else "info"
         self.lbl_status.setText(text)      # the tab's own record (hidden)
+        # the record wears the level's colour too: the tab and the window's
+        # line say the same sentence in the same colour (one source)
+        theme.paint_level(self.lbl_status, level)
         if self._status_hook is not None:
             self._status_hook(text, level)
 

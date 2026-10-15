@@ -35,6 +35,7 @@ from pathlib import Path
 from PySide6.QtWidgets import QWidget
 
 from ..config import config
+from . import theme
 from .ui_loader import adopt_ui
 from .ufe_host import host_of
 
@@ -86,6 +87,17 @@ class UfeCalibrationTab(QWidget):
         self.btn_model = self._ui.btn_model
         self.btn_model.clicked.connect(self._on_see_model)
         self._model_file = None
+        # ADR-061 rev: this project's OWN masters. Building runs off the GUI
+        # thread (a night of frames is a lot of pixels) and can delete the
+        # originals once the masters exist; adopting links another project's
+        # master into this one without copying the file.
+        self.btn_build_masters = self._ui.btn_build_masters
+        self.btn_build_masters.clicked.connect(self._on_build_masters)
+        self.btn_adopt_master = self._ui.btn_adopt_master
+        self.btn_adopt_master.clicked.connect(self._on_adopt_master)
+        self.chk_build_delete = self._ui.chk_build_delete
+        self.chk_build_share = self._ui.chk_build_share
+        self._build_worker = None
 
     def _vignette_model_on(self):
         # @return: True when Settings asks for a vignetting model when the
@@ -125,6 +137,149 @@ class UfeCalibrationTab(QWidget):
         self._say(self.tr(
             "The master library lives in Settings, under Measurement."))
 
+    # ------------------------------------------------- this project's masters
+
+    def _on_build_masters(self):
+        # @return: None. Builds masters from a folder of calibration frames
+        #          and files them under THIS project (or shared, if the box
+        #          is checked). The build runs off the GUI thread; the
+        #          originals go only when the box is checked and the run is
+        #          confirmed, and only after each master is written AND
+        #          indexed, so a failed build leaves them where they were.
+        from PySide6.QtWidgets import QFileDialog, QMessageBox
+        from ..core import calibration
+        from ..core.db import db
+        from .workers import CalibrationBuildWorker, hold
+        project_id = (self._context() or {}).get("pid")
+        if project_id is None:
+            self._say(self.tr("Open the editor from a project to build its "
+                              "masters."))
+            return
+        if self._build_worker is not None and self._build_worker.isRunning():
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, self.tr("Build masters from a folder of calibration "
+                          "frames"), "")
+        if not folder:
+            return
+        files = sorted(
+            str(p) for p in Path(folder).rglob("*")
+            if p.is_file() and p.suffix.lower() in (".fits", ".fit", ".fts"))
+        if not files:
+            self._say(self.tr("No FITS frames in that folder."))
+            return
+        delete = self.chk_build_delete.isChecked()
+        shared = self.chk_build_share.isChecked()
+        plan = self.tr("Build the masters from %1 frames?").replace(
+            "%1", str(len(files)))
+        if delete:
+            plan += " " + self.tr(
+                "The original frames will be DELETED once each master is "
+                "written and indexed.")
+        else:
+            plan += " " + self.tr("The original frames are kept.")
+        plan += " " + (self.tr("The masters will be shared with every "
+                               "project.") if shared
+                       else self.tr("The masters will belong to this "
+                                    "project."))
+        if QMessageBox.question(self, self.tr("Build masters"), plan) \
+                != QMessageBox.Yes:
+            return
+        self._build_worker = hold(CalibrationBuildWorker(
+            files, str(calibration.calib_root()), db, project_id=project_id,
+            shared=shared, delete_sources=delete))
+        self._build_worker.progress.connect(self._on_build_progress)
+        self._build_worker.finished.connect(self._on_build_finished)
+        self._build_worker.failed.connect(self._on_build_failed)
+        self.btn_build_masters.setEnabled(False)
+        self._say(self.tr("Building masters…"))
+        self._build_worker.start()
+
+    def _on_build_progress(self, done, total, kind):
+        # @args: done/total - groups finished, kind - the one just built
+        # @return: None
+        self._say(self.tr("Building masters… %1 of %2").replace(
+            "%1", str(done)).replace("%2", str(total)))
+
+    def _on_build_finished(self, result):
+        # @args: result - core.calibration.build_masters' dict
+        # @return: None. A group with a SINGLE frame is called out: it is a
+        #          copy of that frame, not an average. The recipe is re-read
+        #          because a master the tab could not find may exist now.
+        self.btn_build_masters.setEnabled(True)
+        self._build_worker = None
+        built = result.get("built", [])
+        if built:
+            bits = [self.tr("Built %1 masters.").replace(
+                "%1", str(len(built)))]
+            if any(item.get("single") for item in built):
+                bits.append(self.tr(
+                    "A group had a single frame, so its master is a copy of "
+                    "that frame and not an average."))
+            skipped = result.get("skipped", [])
+            if skipped:
+                bits.append(self.tr("%1 frames were left out: they are not "
+                                    "calibration frames.").replace(
+                                        "%1", str(len(skipped))))
+            self._say("  ".join(bits))
+        else:
+            self._say(self.tr("Nothing was built."))
+        for kind, why in result.get("errors", [])[:2]:
+            self._say(f"✕ {kind}: {why}")
+        self._sync_context()
+
+    def _on_build_failed(self, message):
+        # @args: message - the worker's error (internal English)
+        # @return: None
+        self.btn_build_masters.setEnabled(True)
+        self._build_worker = None
+        self._say(self.tr("The build failed:") + f" {message}")
+
+    def _on_adopt_master(self):
+        # @return: None. Links a master another project built into THIS
+        #          project: a second row on the same file, never a copy. The
+        #          list leaves out what this project can already use, so
+        #          adopting the same master twice is not offered.
+        from PySide6.QtWidgets import QInputDialog
+        from ..core import calibration, project
+        from ..core.db import db
+        project_id = (self._context() or {}).get("pid")
+        if project_id is None:
+            self._say(self.tr("Open the editor from a project to use a "
+                              "master."))
+            return
+        # What this project can already use, BY FILE: an adopted master is a
+        # new ROW on the same file, so comparing ids would offer the same
+        # master again and again.
+        mine = {m.path for m in calibration.list_masters(
+            db, project_id=project_id)}
+        candidates = [m for m in calibration.list_masters(db)
+                      if m.project_id is not None
+                      and m.project_id != project_id and m.path not in mine]
+        if not candidates:
+            self._say(self.tr("There is no other project's master to use."))
+            return
+        owners, labels = {}, []
+        for m in candidates:
+            if m.project_id not in owners:
+                p = project.get(db, m.project_id) or {}
+                owners[m.project_id] = (p.get("object_name")
+                                        or f"#{m.project_id}")
+            labels.append(f"{Path(m.path).name}  ·  "
+                          f"{self._master_kind_label(m.kind)}  ·  "
+                          f"{owners[m.project_id]}")
+        choice, ok = QInputDialog.getItem(
+            self, self.tr("Use another project's master"),
+            self.tr("The file is not copied: this project gets its own link "
+                    "to it."), labels, 0, False)
+        if not ok:
+            return
+        ref = candidates[labels.index(choice)]
+        if calibration.adopt_master(db, ref.id, project_id) is not None:
+            self._say(self.tr("Added %1 to this project.").replace(
+                "%1", Path(ref.path).name))
+            self._sync_context()
+
     # ------------------------------------------------------- host wiring
 
     def set_active(self, flag):
@@ -143,12 +298,15 @@ class UfeCalibrationTab(QWidget):
     def shutdown(self):
         # The worker must not outlive the workbench: a QThread destroyed
         # while it runs aborts the whole application. Cancel stops it
-        # between frames and wait() gives it a bounded time to land.
+        # between frames (the calibrate worker) or between groups (the
+        # build) and wait() gives it a bounded time to land.
         # @return: None
-        if self._worker is not None and self._worker.isRunning():
-            self._worker.cancel()
-            self._worker.wait(5000)
-        self._worker = None
+        for attr in ("_worker", "_build_worker"):
+            worker = getattr(self, attr, None)
+            if worker is not None and worker.isRunning():
+                worker.cancel()
+                worker.wait(5000)
+            setattr(self, attr, None)
 
     def _context(self):
         # @return: the visit context {"pid", "session_id", "paths",
@@ -169,17 +327,37 @@ class UfeCalibrationTab(QWidget):
         # @return: None
         self._status_hook = fn if callable(fn) else None
 
-    def _say(self, text):
-        # @args: text - the status line's text ("" hides it)
+    def _say(self, text, level=None):
+        # @args: text - the status line's text ("" hides it), level - "info"
+        #        | "warn" | "error" (None: inferred from the ⚠ the message
+        #        already carries)
         # @return: None. The panel keeps its own line as the record and the
-        #          window's line gets it too (U4).
+        #          window's line gets it too (U4), both in the level's
+        #          colour. This tab also reports FAILURES, and "The
+        #          calibration failed:" carries no ⚠, so it used to reach
+        #          the window as plain news: the level is explicit here.
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
         self.lbl_status.setVisible(bool(text))
-        self.lbl_status.setText(text or "")
+        self.lbl_status.setText(text)
+        theme.paint_level(self.lbl_status, level)
         if self._status_hook is not None and text:
-            self._status_hook(str(text),
-                              "warn" if str(text).startswith("⚠") else "info")
+            self._status_hook(text, level)
 
     # ------------------------------------------------------------ recipe
+
+    def clear_session(self):
+        # A different project or visit is a different session (reported
+        # 2026-10-15): the previous visit's recipe line must not travel to
+        # the next one. The library is consulted live, so there is nothing
+        # else to drop.
+        # @return: None
+        self._ctx_paths = None
+        self._recipe = None
+        self.lbl_recipe.setText(self.tr(
+            "Open the editor from a visit to see its recipe."))
+        self._set_concerns([])
 
     def _sync_context(self):
         # The recipe shown is the FIRST frame's: a visit is one camera,
@@ -196,7 +374,7 @@ class UfeCalibrationTab(QWidget):
             self._recipe = None
             self.lbl_recipe.setText(self.tr(
                 "Open the editor from a visit to see its recipe."))
-            self.lbl_warnings.setText("")
+            self._set_concerns([])
             return
         self._ctx_paths = paths
         from ..core import calibration
@@ -207,14 +385,18 @@ class UfeCalibrationTab(QWidget):
             self._recipe = None
             self.lbl_recipe.setText(
                 self.tr("The first frame could not be read:") + f" {err}")
-            self.lbl_warnings.setText("")
+            self._set_concerns([])
             return
         meta = calibration.meta_from_header(header)
         tol = float(config.get("calib_temp_tol_c", 3.0))
-        recipe = calibration.resolve_recipe(db, meta, tol_c=tol)
+        # The project's OWN masters are preferred and the shared ones are the
+        # fallback; the recipe then SAYS when it used a shared one (ADR-061
+        # rev), so "why is it not using my dark" has an answer.
+        recipe = calibration.resolve_recipe(db, meta, tol_c=tol,
+                                            project_id=ctx.get("pid"))
         self._recipe = recipe
         self.lbl_recipe.setText(self._recipe_text(meta, recipe))
-        self.lbl_warnings.setText("\n".join(self._concern_lines(recipe)))
+        self._set_concerns(self._concern_lines(recipe))
 
     def has_masters(self):
         # Whether the library has anything that MATCHES this visit, asked by
@@ -260,6 +442,18 @@ class UfeCalibrationTab(QWidget):
         #          uses (by file name) or what is missing
         def _v(value):
             return "–" if value is None else str(value)
+
+        def _mark(ref):
+            # @args: ref - a chosen master
+            # @return: its file name, with "(shared)" when the project that
+            #          ASKED does not own it: those pixels come from the
+            #          common library or from another project's nights, and
+            #          the observer has to know which (ADR-061 rev).
+            name = Path(ref.path).name
+            if recipe.project_id is not None and ref.project_id is None:
+                name += " " + self.tr("(shared)")
+            return name
+
         lines = [self.tr(
             "Camera %1 · gain %2 · %3 °C · exposure %4 s · filter %5"
         ).replace("%1", _v(meta.get("camera"))).replace(
@@ -270,15 +464,15 @@ class UfeCalibrationTab(QWidget):
         if recipe.offset is not None:
             kind = self.tr("Dark") if recipe.offset_kind == "dark" \
                 else self.tr("Bias")
-            lines.append(kind + ": " + Path(recipe.offset.path).name)
+            lines.append(kind + ": " + _mark(recipe.offset))
         else:
             lines.append(self.tr(
                 "Offset: missing (no dark or bias in the library)"))
         if recipe.flat is not None:
-            line = self.tr("Flat:") + " " + Path(recipe.flat.path).name
+            line = self.tr("Flat:") + " " + _mark(recipe.flat)
             if recipe.flat_offset is not None:
                 line += " " + self.tr("(offset removed: %1)").replace(
-                    "%1", Path(recipe.flat_offset.path).name)
+                    "%1", _mark(recipe.flat_offset))
             else:
                 line += " " + self.tr(
                     "(no dark at its exposure or bias: the flat keeps its "
@@ -295,22 +489,50 @@ class UfeCalibrationTab(QWidget):
 
     def _concern_lines(self, recipe):
         # @args: recipe - the resolved Recipe
-        # @return: the warnings and the reasons as bullet lines, translated
-        #          and deduplicated. The warnings are the short, stable
-        #          sentences (a piece is missing); the notes carry WHY a
+        # @return: [(level, "• line")]: the warnings and the reasons, each
+        #          WITH WHAT IT IS, translated and deduplicated. The
+        #          warnings are the short, stable sentences (a piece is
+        #          missing) and they are WARNINGS; the notes carry WHY a
         #          master that IS in the library was left out, with the
-        #          numbers, which is what lets the observer fix it instead
-        #          of reading "no flat" and giving up (ADR-061 rev).
-        lines = []
+        #          numbers, and they are NOTES. The level is what lets the
+        #          block be read by colour instead of sentence by sentence
+        #          (ADR-061 rev).
+        lines, seen = [], set()
         for warning in recipe.warnings:
-            line = "• " + self._warning_text(warning)
-            if line not in lines:
-                lines.append(line)
+            text = "• " + self._warning_text(warning)
+            if text not in seen:
+                seen.add(text)
+                lines.append(("warn", text))
         for note in getattr(recipe, "notes", None) or []:
             text = self._note_text(note)
-            if text and ("• " + text) not in lines:
-                lines.append("• " + text)
+            if text and ("• " + text) not in seen:
+                seen.add("• " + text)
+                lines.append(("info", "• " + text))
         return lines
+
+    def _set_concerns(self, pairs):
+        # @args: pairs - [(level, "• line")] from _concern_lines or the run
+        # @return: None. The block is painted with ONE COLOUR PER LINE, so a
+        #          missing piece reads as a warning and a "why it was left
+        #          out" as a note without reading the sentence (asked for
+        #          2026-10-15: the text is long and hard to read). The plain
+        #          text is kept beside the HTML in warnings_text(), so what
+        #          the observer copies and the tests read is the same text
+        #          it always was.
+        import html as _html
+        self._warnings_text = "\n".join(text for _level, text in pairs)
+        if not pairs:
+            self.lbl_warnings.setText("")
+            return
+        out = ['<span style="color:{0}">{1}</span>'.format(
+            theme.level_colour(level), _html.escape(text))
+            for level, text in pairs]
+        self.lbl_warnings.setText("<br>".join(out))
+
+    def warnings_text(self):
+        # @return: the block's text, plain, with no markup ("" when there is
+        #          nothing to say)
+        return getattr(self, "_warnings_text", "")
 
     def _warning_text(self, warning):
         # @args: warning - a core recipe warning (internal English)
@@ -444,7 +666,8 @@ class UfeCalibrationTab(QWidget):
         self._worker = hold(CalibrationWorker(
             paths, db, export_dir, config,
             vignette_model=want_model,
-            flat_path=flat_path))
+            flat_path=flat_path,
+            project_id=(self._context() or {}).get("pid")))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)
@@ -468,7 +691,8 @@ class UfeCalibrationTab(QWidget):
         #        other workers' failed signal)
         # @return: None
         self._run_ended()
-        self._say(self.tr("The calibration failed:") + f" {message}")
+        self._say(self.tr("The calibration failed:") + f" {message}",
+                  "error")
 
     def _on_finished(self, payload):
         # @args: payload - CalibrationWorker's result dict
@@ -485,18 +709,22 @@ class UfeCalibrationTab(QWidget):
         # recipe, and the same missing master said three hundred times
         # says nothing. The recipe's own notes (WHY a master was left out)
         # go with them, so the reason does not disappear after a run.
-        lines, seen = [], set()
+        pairs, seen = [], set()
         for _path, report in reports:
             for warning in (getattr(report, "warnings", None) or []):
-                if warning not in seen:
-                    seen.add(warning)
-                    lines.append("• " + self._warning_text(warning))
+                text = "• " + self._warning_text(warning)
+                if text not in seen:
+                    seen.add(text)
+                    pairs.append(("warn", text))
+        # the recipe's own NOTES come with them, so the reason a master was
+        # left out does not disappear after a run (the warnings are already
+        # in the reports, one per frame)
         if self._recipe is not None:
-            for note in getattr(self._recipe, "notes", None) or []:
-                text = self._note_text(note)
-                if text and ("• " + text) not in lines:
-                    lines.append("• " + text)
-        self.lbl_warnings.setText("\n".join(lines))
+            for level, text in self._concern_lines(self._recipe):
+                if level == "info" and text not in seen:
+                    seen.add(text)
+                    pairs.append((level, text))
+        self._set_concerns(pairs)
         if written:
             # the copies register to the visit like any other product
             # (the dialog's save hook owns the database)
@@ -548,7 +776,10 @@ class UfeCalibrationTab(QWidget):
                     "vignetting is corrected. Index a bias for this camera.")
             if info.get("note"):
                 note += " " + self.tr("Warning:") + " " + info["note"]
-            self._say(note)
+            # the model is a warning when its pedestal is missing (it then
+            # corrects only part of the vignetting), a note otherwise
+            self._say(note, "warn" if (off.get("n_missing")
+                                       or info.get("note")) else "info")
         # The model is registered to the visit like any other product and the
         # door to look at it is opened.
         model_file = payload.get("model_file")

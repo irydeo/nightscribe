@@ -91,7 +91,7 @@ def test_button_disabled_without_visit(qapp, tmp_path):
     tab, _host = _tab(qapp, tmp_path, visit=False)
     assert tab.btn_calibrate.isEnabled() is False
     assert tab.lbl_recipe.text()          # says why, never empty
-    assert tab.lbl_warnings.text() == ""
+    assert tab.warnings_text() == ""
 
 
 def test_export_checkbox_defaults_to_the_setting(qapp, tmp_path):
@@ -160,7 +160,7 @@ def test_recipe_shows_the_masters_it_uses(qapp, tmp_path, tmp_db,
     recipe = tab.lbl_recipe.text()
     assert "dark.fits" in recipe
     assert "flat.fits" in recipe
-    assert tab.lbl_warnings.text() == ""
+    assert tab.warnings_text() == ""
     assert tab.btn_calibrate.isEnabled() is True
 
 
@@ -172,7 +172,7 @@ def test_missing_masters_warn_in_plain_language(qapp, tmp_path, tmp_db,
     import nightscribe.core.db as db_mod
     monkeypatch.setattr(db_mod, "db", tmp_db)
     tab, _host = _tab(qapp, tmp_path)
-    warnings = tab.lbl_warnings.text()
+    warnings = tab.warnings_text()
     assert "No dark or bias in the library" in warnings
     assert "No flat for this filter" in warnings
     assert "missing" in tab.lbl_recipe.text()
@@ -274,7 +274,115 @@ def test_a_master_out_of_tolerance_is_explained(qapp, tmp_path, tmp_db,
                                   "gain": 2.0, "temp_c": -16.0,
                                   "exptime_s": 30.0})
     tab, _host = _tab(qapp, tmp_path)     # the lights sit at -10 C
-    warnings = tab.lbl_warnings.text()
+    warnings = tab.warnings_text()
     assert "dark_cold.fits" in warnings
     assert "out of tolerance" in warnings
     assert "-16" in warnings and "-10" in warnings
+
+
+# ------------------------------------------------ this project's masters
+
+def test_building_from_the_tab_files_the_masters_under_the_project(
+        qapp, tmp_path, tmp_db, monkeypatch):
+    # The project's Calibration tab BUILDS its masters from a folder of
+    # calibration frames: each group becomes one master, written in the
+    # library folder and filed under THIS project, so the next visit finds
+    # them without a trip to Settings (ADR-061 rev).
+    import nightscribe.core.db as db_mod
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+    from nightscribe.core import calibration
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    for i in range(2):
+        _write_fits(raw / f"d{i}.fits", np.full((16, 16), 100.0 + i),
+                    IMAGETYP="Dark", INSTRUME="TestCam", GAIN=2.0,
+                    **{"CCD-TEMP": -10.0}, EXPTIME=30.0)
+    out = tmp_path / "calib"
+    monkeypatch.setattr(calibration, "calib_root", lambda cfg=None: out)
+    monkeypatch.setattr(QFileDialog, "getExistingDirectory",
+                        staticmethod(lambda *a, **k: str(raw)))
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.Yes))
+    tab, _host = _tab(qapp, tmp_path)
+    tab._on_build_masters()
+    tab._build_worker.wait(30000)
+    qapp.processEvents()
+    rows = calibration.list_masters(tmp_db, project_id=1)
+    assert len(rows) == 1 and rows[0].kind == "dark"
+    assert rows[0].project_id == 1
+    assert Path(rows[0].path).exists()
+    assert tab.lbl_status.text()
+
+
+def test_adopting_another_projects_master_links_it_into_this_one(
+        qapp, tmp_path, tmp_db, monkeypatch):
+    # "Use another project's master" is a LINK: a second row on the same
+    # file, so this project can use it without copying tens of MB. Before
+    # adopting it, another project's master is not in reach at all.
+    import nightscribe.core.db as db_mod
+    from PySide6.QtWidgets import QInputDialog
+    from nightscribe.core import calibration
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    dark = _write_fits(tmp_path / "dark.fits", np.full((16, 16), 50.0),
+                       IMAGETYP="Dark", INSTRUME="TestCam", GAIN=2.0,
+                       **{"CCD-TEMP": -10.0}, EXPTIME=30.0)
+    calibration.add_master(tmp_db, dark, {"kind": "dark"}, project_id=2)
+    tab, _host = _tab(qapp, tmp_path)          # this visit belongs to pid 1
+    assert calibration.find_master(
+        tmp_db, "dark", "TestCam", 2.0, -10.0, 30.0, None, tol_c=3.0,
+        project_id=1) is None
+    monkeypatch.setattr(QInputDialog, "getItem",
+                        staticmethod(lambda *a, **k: (a[3][0], True)))
+    tab._on_adopt_master()
+    found = calibration.find_master(
+        tmp_db, "dark", "TestCam", 2.0, -10.0, 30.0, None, tol_c=3.0,
+        project_id=1)
+    assert found is not None and found.path == dark
+    assert Path(dark).exists()
+    assert tab.lbl_status.text()
+
+
+# ------------------------------------------------------- colour by level
+
+def test_a_failure_is_reported_as_an_error(qapp, tmp_path, tmp_db,
+                                           monkeypatch):
+    # "The calibration failed:" carries no ⚠, so it used to reach the
+    # window's line as plain news. The level is explicit now (asked for
+    # 2026-10-15: the text is long and hard to read, use colours for an
+    # error and for a warning).
+    import nightscribe.core.db as db_mod
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    tab, _host = _tab(qapp, tmp_path)
+    seen = []
+    tab.set_status_hook(lambda text, level: seen.append((text, level)))
+    tab._on_failed("boom")
+    assert seen and seen[-1][1] == "error"
+
+
+def test_the_warnings_block_wears_one_colour_per_line(qapp, tmp_path, tmp_db,
+                                                      monkeypatch):
+    # A missing piece is a WARNING and a "why a master was left out" is a
+    # NOTE: the block says which is which with the app's own level colours
+    # (theme.LEVEL_COLOURS, the single source), so it can be read by colour
+    # instead of sentence by sentence. The plain text is kept beside the
+    # HTML, so what the observer copies is what it always was.
+    import nightscribe.core.db as db_mod
+    from nightscribe.core import calibration as cal
+    from nightscribe.gui import theme
+    monkeypatch.setattr(db_mod, "db", tmp_db)
+    dark = _write_fits(tmp_path / "dark_cold.fits", np.full((64, 64), 900.0))
+    cal.add_master(tmp_db, dark, {"kind": "dark", "camera": "TestCam",
+                                  "gain": 2.0, "temp_c": -16.0,
+                                  "exptime_s": 30.0})
+    tab, _host = _tab(qapp, tmp_path)      # the lights sit at -10 C
+    html = tab.lbl_warnings.text()
+    assert theme.level_colour("warn") in html    # the piece that is missing
+    assert theme.level_colour("info") in html    # why the master was left out
+    text = tab.warnings_text()
+    assert "No dark or bias" in text
+    assert "out of tolerance" in text
+    # nothing to say: the block is empty and so is the plain text
+    tab._set_concerns([])
+    assert tab.lbl_warnings.text() == ""
+    assert tab.warnings_text() == ""

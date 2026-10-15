@@ -117,9 +117,15 @@ resto está a un clic tras la puerta **Advanced**.
   copian ni se mueven, y se añaden **por ficheros o por carpeta**: cada toma
   se clasifica por su propia cabecera (`IMAGETYP`), así que tú no dices cuál
   es dark y cuál flat. Son **tres tipos, no cuatro**: un «dark de los flats»
-  es un dark, y lo que lo hace válido es su exposición. La biblioteca está
-  solo aquí; la pestaña Calibración del editor la **lee** y te enlaza de
-  vuelta a esta página.
+  es un dark, y lo que lo hace válido es su exposición. La app también puede
+  **construir los masters** desde una carpeta de tomas: las agrupa por su
+  clave, las combina con la mediana y escribe el master en la carpeta de la
+  biblioteca. Cada master tiene **dueño**: los que construye un proyecto son
+  suyos, un bias o un flat se pueden **compartir** con todos, y un proyecto
+  puede **usar** el de otro sin copiarlo. La tabla dice de quién es cada fila
+  («Compartido» cuando es de todos) y desde aquí cambias de quién es. La
+  biblioteca está solo aquí; la pestaña Calibración del editor la **lee** y
+  te enlaza de vuelta a esta página.
 - **Solver de placa**: *Auto* prueba ASTAP local y cae a
   nova.astrometry.net; también puedes forzar uno. **Binario ASTAP**: ruta
   al ejecutable (vacío = buscar `astap` en el PATH), con **Test** para

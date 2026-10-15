@@ -1026,3 +1026,81 @@ between them and the editor.
 **Entry point**: `gui/main_window.py` (the classic paths and `_use_ufe` gone),
 `gui/workers.py` (`SequenceWorker` gone), `gui/ui/settings_dialog.ui` (the
 switch's row gone).
+
+**Revisión (2026-10-15): el nivel de un mensaje tiene un solo color, y la
+receta es una línea.** Dos cosas pedidas por el observador, las dos sobre el
+mismo problema: el editor pone mucho texto y cuesta leerlo.
+
+1. **Un solo código de nivel.** El glifo y el color de un mensaje (`info` /
+   `warn` / `error`) viven ahora en **un sitio** (`theme.LEVEL_GLYPHS`,
+   `theme.LEVEL_COLOURS`, `theme.paint_level`). Antes eran tres copias
+   privadas: la línea de estado de la ventana tenía su propia tabla de glifos
+   y sus propios colores (un amarillo a mano para el aviso y el `DANGER` de
+   las gráficas para el error), y **cada pestaña adivinaba el nivel** por el
+   `⚠` pegado al principio del texto. La pestaña Calibración era la única sin
+   parámetro de nivel, así que **un fallo se contaba como noticia**:
+   `_on_failed` decía "The calibration failed:" sin `⚠` y la línea de la
+   ventana lo pintaba de `info`. Ahora todas las pestañas dicen el nivel, y el
+   aviso de la línea de estado pasa del amarillo suelto (`#e0c060`) al naranja
+   de aviso de la app (`C_WARN`).
+2. **El bloque de avisos de Calibración, con un color por línea.** La pieza
+   que falta es un **aviso** y el "por qué se descartó un maestro" es una
+   **nota**: cada línea lleva su nivel y se pinta con el color que le toca
+   (HTML escapado, el patrón que la pestaña Medir ya usaba), así que el bloque
+   se lee por color y no frase a frase. El texto plano se guarda al lado del
+   HTML (`warnings_text()`), para que lo que el observador copia sea
+   exactamente lo que era.
+3. **La línea de la receta es UNA línea elidida.** En Stacking settings, el
+   mensaje "Photometry recipe: …" era una etiqueta con `wordWrap` y empujaba
+   los dos botones de debajo fuera del bloque. Medido: la etiqueta medía
+   **119 px de alto** (siete líneas) con 352 px de ancho para envolver, y la
+   fila de botones pedía **374 px** ("Photometry settings…" 169 +
+   "Re-measure the brightness" 199) frente a un viewport de **352**. Ahora la
+   línea se **elide** a una sola (el texto completo va en el tooltip, con la
+   ayuda del fichero de Designer detrás) y los dos botones se acortan
+   ("Photometry…" y "Re-measure"): la fila pide 270 px y cabe.
+4. **Por qué la etiqueta medía 119 px: un mínimo que no bajaba.**
+   `_fit_label` fijaba `setMinimumHeight(heightForWidth(ancho))`, y **Qt
+   recorta `heightForWidth` al `minimumHeight`**: medida una vez a 100 px (en
+   `__init__`, antes de que el layout se asentara) la etiqueta ya no podía
+   volver a bajar, aunque luego tuviera 352 px para envolver. El suelo se
+   limpia antes de medir, y el mismo defecto se corrige en
+   `ufe_measure_tab._fit_series_hint` y en `ufe_manual_dialog`.
+
+**Revision (2026-10-15): a message's level has ONE colour, and the recipe is
+one line.** Two things the observer asked for, both about the same problem:
+the editor puts a lot of text on screen and it is hard to read.
+
+1. **A single level code.** The glyph and the colour of a message (`info` /
+   `warn` / `error`) now live in **one place** (`theme.LEVEL_GLYPHS`,
+   `theme.LEVEL_COLOURS`, `theme.paint_level`). It used to be three private
+   copies: the window's status line kept its own glyph table and its own
+   colours (a hand-picked yellow for a warning and the charts' `DANGER` for an
+   error), and **every tab GUESSED the level** from a `⚠` glued to the front
+   of the text. The Calibration tab was the only one without a level
+   parameter, so **a failure was counted as news**: `_on_failed` said "The
+   calibration failed:" with no `⚠` and the window's line painted it `info`.
+   Every tab says the level now, and the status line's warning goes from the
+   loose yellow (`#e0c060`) to the app's warning orange (`C_WARN`).
+2. **The Calibration warnings block, one colour per line.** A missing piece is
+   a **warning** and a "why a master was left out" is a **note**: each line
+   carries its level and is painted in its colour (escaped HTML, the pattern
+   the Measure tab already used), so the block reads by colour and not
+   sentence by sentence. The plain text is kept beside the HTML
+   (`warnings_text()`), so what the observer copies is exactly what it was.
+3. **The recipe line is ONE elided line.** In Stacking settings, the
+   "Photometry recipe: …" message was a `wordWrap` label and pushed the two
+   buttons under it out of the block. Measured: the label was **119 px tall**
+   (seven lines) with 352 px to wrap in, and the row of buttons demanded
+   **374 px** ("Photometry settings…" 169 + "Re-measure the brightness" 199)
+   against a **352 px** viewport. The line is **elided** to one now (the whole
+   text is in the tooltip, with the Designer file's help behind it) and the
+   two buttons are shortened ("Photometry…" and "Re-measure"): the row demands
+   270 px and fits.
+4. **Why the label measured 119 px: a floor that never came down.**
+   `_fit_label` set `setMinimumHeight(heightForWidth(width))`, and **Qt clamps
+   `heightForWidth` to `minimumHeight`**: measured once at 100 px (in
+   `__init__`, before the layout settled) the label could never come back
+   down, even with 352 px to wrap in. The floor is cleared before measuring,
+   and the same defect is fixed in `ufe_measure_tab._fit_series_hint` and
+   `ufe_manual_dialog`.

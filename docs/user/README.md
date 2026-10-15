@@ -41,6 +41,8 @@ them start to finish or jump to the one you need:
 | [10. Settings](10-settings.md) | Reference appendix: every Settings section, what it decides and when to touch it |
 | [11. The assistant](11-assistant.md) | Ask about the object, the app or the editor |
 | [12. The graphics card](12-gpu.md) | What it accelerates, how to turn it on, OpenCL against CUDA |
+| [13. Understanding an object](13-object-card.md) | The object card: parameters explained, charts, capture chips |
+| [14. When something goes wrong](14-troubleshooting.md) | No network, the solver, the MPC report, where the log is |
 
 Conventions:
 

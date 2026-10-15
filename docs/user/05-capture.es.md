@@ -238,4 +238,14 @@ para eso está un master real. Se llama modelo y no flat por eso mismo.
 > Lo puedes abrir con **Ver el modelo** y juzgarlo: tiene que ser una
 > superficie lisa, sin ninguna estrella ni mota.
 
+## Para saber más
+
+Este capítulo es el recorrido; la profundidad vive en el repositorio, en los
+documentos de tema que la propia app abre desde su **?**:
+
+- [`docs/SEQUENCES.es.md`](../SEQUENCES.es.md): la exportación de secuencias,
+  la receta de captura y su sección de resolución de problemas;
+- [`docs/UFE.es.md`](../UFE.es.md): el editor FITS completo, calibración
+  incluida.
+
 Siguiente: [06. Fotometría](06-photometry.es.md).

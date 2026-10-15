@@ -238,4 +238,13 @@ called a model and not a flat for exactly that reason.
 > it with **See the model** and judge it: it has to be a smooth surface, with
 > no star and no mote.
 
+## Further reading
+
+This chapter is the tour; the depth lives in the repository, in the topic
+documents the app itself opens from its **?**:
+
+- [`docs/SEQUENCES.md`](../SEQUENCES.md): the sequence export, the capture
+  recipe and its troubleshooting section;
+- [`docs/UFE.md`](../UFE.md): the FITS editor in full, calibration included.
+
 Next: [06. Photometry](06-photometry.md).

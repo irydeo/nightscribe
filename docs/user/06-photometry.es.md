@@ -176,4 +176,15 @@ sus parámetros, y exporta el archivo de 3 columnas para **ExoClock** con el
 > derivan. Tu curva, aunque sea de un telescopio de 20 cm, actualiza la
 > efeméride de un planeta que un telescopio espacial observará.
 
+## Para saber más
+
+La profundidad vive en el repositorio, en los documentos de tema que la app
+abre desde su **?**:
+
+- [`docs/PHOTOMETRY.es.md`](../PHOTOMETRY.es.md): el tratamiento completo del
+  punto cero, las comparadas y los errores, con glosario;
+- [`docs/SNR.es.md`](../SNR.es.md): el balance de señal/ruido y los límites;
+- [`docs/PRECISION.es.md`](../PRECISION.es.md): qué significan las cifras,
+  medido.
+
 Siguiente: [07. Astrometría](07-astrometry.es.md).

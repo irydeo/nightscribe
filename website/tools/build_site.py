@@ -961,8 +961,16 @@ def _chapters():
 def _guide_link(href, lang):
     # @args: href - a link found in a chapter, lang - the page's language
     # @return: the site's target: a chapter's .md becomes its .html twin in
-    #          this language (the guide's own index included); anything else
+    #          this language (the guide's own index included); a topic doc
+    #          next to the guide in the repository (docs/PHOTOMETRY.md and
+    #          friends, which the site does NOT publish) points at the
+    #          repository, where it is readable as it is; anything else
     #          (http, anchors) is left alone
+    if href.startswith("../") and href.endswith(".md"):
+        twin = href.endswith(".es.md")
+        base = href[:-len(".es.md")] if twin else href[:-len(".md")]
+        name = base[3:] + (".es" if twin else "")
+        return f"{REPO_URL}/blob/main/docs/{name}.md"
     if href.endswith(".md"):
         stem = href[:-len(".md")]
         if stem.endswith(".es"):

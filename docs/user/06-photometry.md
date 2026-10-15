@@ -175,4 +175,14 @@ with the `ExoClock_info.txt` filled in.
 > a 20 cm telescope, updates the ephemeris of a planet a space telescope
 > will observe.
 
+## Further reading
+
+The depth lives in the repository, in the topic documents the app opens from
+its **?**:
+
+- [`docs/PHOTOMETRY.md`](../PHOTOMETRY.md): the full treatment of the zero
+  point, the comparison stars and the errors, with a glossary;
+- [`docs/SNR.md`](../SNR.md): the signal-to-noise budget and the limits;
+- [`docs/PRECISION.md`](../PRECISION.md): what the numbers mean, measured.
+
 Next: [07. Astrometry](07-astrometry.md).

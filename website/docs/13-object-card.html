@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Understanding an object · NightScribe</title>
+<meta name="description" content="Understanding an object">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="13-object-card.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Contents</summary><nav class="toc"><a class="toc-link" href="index.html">User guide</a><a class="toc-link" href="01-getting-started.html"><span>01</span>First steps</a><a class="toc-link" href="02-tonight.html"><span>02</span>Planning the night</a><a class="toc-link" href="03-projects.html"><span>03</span>Projects</a><a class="toc-link" href="04-campaigns.html"><span>04</span>Campaigns and vigils</a><a class="toc-link" href="05-capture.html"><span>05</span>Capture</a><a class="toc-link" href="06-photometry.html"><span>06</span>Photometry</a><a class="toc-link" href="07-astrometry.html"><span>07</span>Astrometry</a><a class="toc-link" href="08-posts.html"><span>08</span>Reporting it</a><a class="toc-link" href="09-cli.html"><span>09</span>The command line</a><a class="toc-link" href="10-settings.html"><span>10</span>Settings</a><a class="toc-link" href="11-assistant.html"><span>11</span>The assistant</a><a class="toc-link" href="12-gpu.html"><span>12</span>The graphics card</a><a class="toc-link on" href="13-object-card.html"><span>13</span>Understanding an object</a><a class="toc-link" href="14-troubleshooting.html"><span>14</span>When something goes wrong</a></nav></details>
+    <p class="side-back"><a href="../index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>Understanding an object</h1><p>Planning tells you <em>what</em> to observe. This chapter is the other half: <em>what you are looking at</em>. NightScribe has one door for every object it knows, and the card behind it is the same wherever you open it from.</p><h2 id="three-ways-to-open-it">Three ways to open it</h2><ul><li><p>the box in the top bar: <strong>Explore an object…</strong> (type a name and press Enter);</p></li><li><p><strong>Tools → Explore object…</strong>;</p></li><li><p>double-click any row of the <strong>Tonight</strong> list, or the button on the row.</p></li></ul><p>The name is looked up in VSX, SIMBAD, JPL SBDB, Horizons, CAD, TNS and the NASA Exoplanet Archive, so it works for an asteroid, a comet, a supernova, a variable star or an exoplanet host. If the object is in no catalogue, the <strong>Tonight</strong> view still lets you create it by hand.</p><h2 id="the-card">The card</h2><p>The card is a calling card, not a data dump:</p><ul><li><p>a <strong>hook line</strong> and a few outreach bullets, in Spanish and English: the sentence you would say out loud to explain why this object is interesting;</p></li><li><p>a <strong>parameter table where every row is explained</strong>: the orbital family, the MOID (the minimum distance the orbit ever gets to the Earth's, in lunar distances), the size estimated from the absolute magnitude, the next close approach, the discovery date. It is multiline and nothing is truncated;</p></li><li><p>the <strong>charts</strong>: the orbit (animated by date, with hover readouts), the night sky with <em>your</em> horizon silhouette and the safe window shaded, the survey field and the light curve when there is one. In the app they are live vector graphics (zoom, pan, hover); the same engines render the PNGs;</p></li><li><p>the <strong>capture chips</strong>: current magnitude, apparent rate, the maximum trail-free exposure with your camera, the window and the hours above the horizon, plus copyable coordinates in decimal and sexagesimal with their epoch.</p></li></ul><blockquote class="why"><strong>Why does every row come explained?</strong> Because "MOID 0.03 AU" means nothing to most people, and "it can come within twelve lunar distances" means everything. The figures are the same; only the reader changes. The explanations live in one place (<code>core/explain.py</code>), so a type, a spectral class or a discovery method is described the same way wherever it appears.</blockquote><h2 id="from-the-card-to-a-project">From the card to a project</h2><p>The card is a starting point, not a dead end: <strong>Create project</strong> turns the object into a project and drops you on its card, with the coordinates, window and magnitude already filled in (chapter 03). From there the flow is the usual one: capture, analyse, publish.</p><p>Next: <a href="14-troubleshooting.html">14. When something goes wrong</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="12-gpu.html"><span>Previous</span>The graphics card</a><a class="pn-next" href="14-troubleshooting.html"><span>Next</span>When something goes wrong</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

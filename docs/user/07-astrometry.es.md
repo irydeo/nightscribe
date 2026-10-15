@@ -358,4 +358,15 @@ en los demás casos.
   comprobaciones** de formato y validez pero **no procesa** el lote. Es el
   ensayo: úsalo para comprobar que el reporte está bien sin comprometerlo.
 
+## Para saber más
+
+La profundidad vive en el repositorio, en los documentos de tema que la app
+abre desde su **?**:
+
+- [`docs/ASTROMETRY.es.md`](../ASTROMETRY.es.md): el centroide, la
+  combinación por 1/sigma^2, el presupuesto de error y el handoff a Find_Orb,
+  con glosario;
+- [`docs/MPC_SUBMISSION.es.md`](../MPC_SUBMISSION.es.md): los formatos ADES y
+  de 80 columnas y el listón de envío.
+
 Siguiente: [08. Contarlo](08-posts.es.md).

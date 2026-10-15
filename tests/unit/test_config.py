@@ -63,3 +63,23 @@ def test_migration_is_not_written_back_until_a_save(tmp_path):
 
 def test_event_mag_threshold_default():
     assert cfgmod.DEFAULTS["event_mag_threshold"] == 0.5
+
+
+def test_save_is_atomic_and_a_corrupt_file_is_kept(tmp_path):
+    # save() used to open the real file for writing and truncate it first, so
+    # a cut during a set() left a torn JSON and the next load fell back to the
+    # defaults in silence (QA-05). Now it is a temp file plus os.replace, and
+    # an unreadable file is kept next to it and reported.
+    cfg = cfgmod.Config()
+    cfg._file = tmp_path / "nightscribe.json"
+    cfg._data = dict(cfgmod.DEFAULTS)
+    cfg._data["lat"] = 40.5
+    cfg.save()
+    assert json.loads(cfg._file.read_text(encoding="utf-8"))["lat"] == 40.5
+
+    cfg._file.write_text("{not json", encoding="utf-8")
+    cfg2 = cfgmod.Config()
+    cfg2._file = cfg._file
+    cfg2.load()
+    assert cfg2.load_error
+    assert (tmp_path / "nightscribe.json.corrupt").exists()

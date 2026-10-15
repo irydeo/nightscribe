@@ -94,3 +94,13 @@ def test_persist_solution_reports_a_write_problem(tmp_path, monkeypatch):
 def test_write_solved_wcs_empty_cards_is_a_noop(tmp_path):
     src = _make_fits(tmp_path / "plate.fits")
     assert wcs_store.write_solved_wcs(src, {}) is False
+
+
+def test_write_solved_wcs_keeps_the_file_mode(tmp_path):
+    # The atomic replace went through a 0600 temp file, so a solved FITS
+    # quietly became owner-only (QA-13).
+    import os
+    src = _make_fits(tmp_path / "plate.fits")
+    os.chmod(src, 0o644)
+    assert wcs_store.write_solved_wcs(src, _CARDS)
+    assert (os.stat(src).st_mode & 0o777) == 0o644

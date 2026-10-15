@@ -13,6 +13,9 @@
 
 import json
 import logging
+import os
+import shutil
+import tempfile
 
 from . import paths
 
@@ -310,13 +313,26 @@ class Config:
 
     def load(self):
         # Reads the config file if it exists, keeping defaults for missing keys
+        self.load_error = None
         try:
             with open(self._file, encoding="utf-8") as f:
                 self._data.update(json.load(f))
         except FileNotFoundError:
             pass
         except (json.JSONDecodeError, OSError) as err:
-            logger.warning("Could not read config %s: %s", self._file, err)
+            # A torn or hand-edited file must not vanish into the defaults in
+            # silence: the observer would lose their coordinates, MPC code,
+            # API keys and camera profile without a word. Keep a copy next to
+            # it, remember why, and let the app say so.
+            self.load_error = str(err)
+            logger.error("Could not read config %s: %s", self._file, err)
+            try:
+                shutil.copy2(self._file, self._file.with_name(
+                    self._file.name + ".corrupt"))
+                logger.error("kept the unreadable config at %s.corrupt",
+                             self._file)
+            except OSError:
+                pass
         # HADS/Track V rollout: a stored whitelist equal to any previous
         # default gets the new kind(s) for free; a customised list is
         # never touched
@@ -335,12 +351,25 @@ class Config:
                 "calib_pseudo_flat")
 
     def save(self):
-        # Writes the current configuration to disk
+        # Writes the current configuration to disk, ATOMICALLY: a power cut
+        # during a set() (called on every Settings change) used to leave a
+        # half-written JSON, and the next load fell back to the defaults in
+        # silence. A temporary file plus os.replace means a reader sees either
+        # the old file or the new one, never a torn one.
+        tmp = None
         try:
-            with open(self._file, "w", encoding="utf-8") as f:
+            fd, tmp = tempfile.mkstemp(dir=str(self._file.parent),
+                                       prefix=".nightscribe-", suffix=".tmp")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, self._file)
         except OSError as err:
             logger.error("Could not save config %s: %s", self._file, err)
+            if tmp is not None:
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
 
     def get(self, key, default=None):
         # @args: key - setting name, default - value if missing

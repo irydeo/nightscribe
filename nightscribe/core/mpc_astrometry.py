@@ -452,12 +452,9 @@ def pack_designation(name, kind=None):
                     f"designation field keeps '{packed[:5]}'. Confirm the "
                     "full packed form before submitting.")
             return packed, note
-    # mpc_report's own packer first: reusing it keeps one source of truth
-    # for the cases it does handle.
-    packed = mpc_report._pack_desig(raw)
-    if packed:
-        return packed, ""
-    packed = _pack_provisional(raw)
+    # The full packer. mpc_report._pack_desig delegates to it, and the
+    # explicit fallback keeps the source of truth visible here.
+    packed = mpc_report._pack_desig(raw) or _pack_provisional(raw)
     if packed:
         if len(packed) > 5:
             return packed[:5], (
@@ -495,7 +492,7 @@ def instrument_mode(cfg):
 
 def _iso_time(mjd):
     # @args: mjd - UTC Modified Julian Date (T_mid)
-    # @return: "YYYY-MM-DDTHH:MM:SS.ssssss" ISO 8601, UTC, no trailing Z
+    # @return: "YYYY-MM-DDTHH:MM:SS.ssssssZ" ISO 8601, UTC (ADES obsTime)
     year, month, day_f = _jd_to_ymdf(float(mjd) + _MJD_JD_OFFSET)
     day = int(math.floor(day_f))
     frac = day_f - day
@@ -507,8 +504,11 @@ def _iso_time(mjd):
     if hh >= 24:                       # rounding at the day boundary
         day += 1
         hh -= 24
+    # The trailing Z says the instant is UTC, which is what ADES expects of
+    # obsTime (the value is T_mid in UTC; without the Z a reader has to assume
+    # the zone, and the standard asks it to be explicit).
     return (f"{year:04d}-{month:02d}-{day:02d}T"
-            f"{hh:02d}:{mm:02d}:{ss_us / 1_000_000:09.6f}")
+            f"{hh:02d}:{mm:02d}:{ss_us / 1_000_000:09.6f}Z")
 
 
 def _mpc80_designation(name, kind=None):

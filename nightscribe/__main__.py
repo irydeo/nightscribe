@@ -178,6 +178,35 @@ def _cli_lang():
     return "es" if tag.lower().startswith("es") else "en"
 
 
+def _install_excepthook():
+    # A Qt slot that raises (outside the workers, which catch their own) was
+    # printed to stderr, and a GUI launched from a menu has no stderr: the
+    # observer saw nothing and the log held nothing either. This sends the
+    # traceback to the log and shows a plain warning pointing at it.
+    # @return: None
+    def _hook(exc_type, exc, tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, tb)
+            return
+        logger.critical("uncaught exception", exc_info=(exc_type, exc, tb))
+        if getattr(_hook, "busy", False):     # never re-enter on its own error
+            return
+        _hook.busy = True
+        try:
+            from PySide6.QtWidgets import QApplication, QMessageBox
+            if QApplication.instance() is not None:
+                QMessageBox.warning(
+                    None, __app_name__,
+                    f"Something went wrong: {exc}\n\nThe details are in the "
+                    "log (Help > Open the log).")
+        except Exception:
+            pass
+        finally:
+            _hook.busy = False
+
+    sys.excepthook = _hook
+
+
 def _setup_logging(verbose):
     # The log goes to the console AND to a rotating file. A GUI launched
     # from a menu has no console at all, so before this a failure like "a
@@ -219,6 +248,7 @@ def _setup_logging(verbose):
                                       buffering=1))
     except OSError as err:           # diagnostics never stop the app
         logger.warning("cannot enable faulthandler: %s", err)
+    _install_excepthook()
 
 
 def _no_site():

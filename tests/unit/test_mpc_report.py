@@ -134,3 +134,11 @@ def test_first_obs_date_ades():
 def test_first_obs_date_none_on_garbage():
     assert mpc_report.first_obs_date("# nothing\n") is None
     assert mpc_report.first_obs_date("not a report line") is None
+
+
+def test_pack_desig_uses_the_right_century_and_keeps_the_year():
+    # The old mapping counted letters from 1800 and dropped the year, so a
+    # 2026 object packed as "mAB12" instead of "K26A12B" and the validator's
+    # warning showed a designation that does not exist (QA-11).
+    assert mpc_report._pack_desig("2026 AB12") == "K26A12B"
+    assert mpc_report._pack_desig("2021 EQ3") == "K21E03Q"

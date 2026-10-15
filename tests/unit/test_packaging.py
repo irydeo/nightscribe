@@ -58,3 +58,60 @@ def test_the_deb_filename_carries_the_arch(tmp_path, monkeypatch):
     monkeypatch.setattr(build_deb.subprocess, "run", lambda *a, **k: None)
     deb = build_deb.build("9.9.9", None, tmp_path, arch="amd64")
     assert deb.name == "nightscribe_9.9.9_amd64.deb"
+
+
+def test_the_deb_stages_the_documentation():
+    # Until 2026-10-15 the .deb, the .rpm, the PKGBUILD and the wheel shipped
+    # WITHOUT docs/, so Help > Documentation, the UFE's "?" and the offline
+    # assistant index came up empty on every Linux channel (they only worked
+    # on Windows, where the PyInstaller spec did bundle them).
+    import shutil
+    build_deb = _load("build_deb")
+    stage = build_deb._stage("1.2.3", None, "amd64")
+    try:
+        docs = stage / "usr" / "share" / "nightscribe" / "docs"
+        assert (docs / "user").is_dir()
+        assert (docs / "adr").is_dir()
+        assert list((docs / "user").glob("*.md"))
+        assert (docs / "PHOTOMETRY.md").is_file()   # a topic doc the app opens
+        # Find_Orb's licence notice travels with the package
+        assert (stage / "usr" / "share" / "doc" / "nightscribe"
+                / "findorb-notice.txt").is_file()
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def test_the_wheel_data_files_cover_every_docs_directory():
+    # setuptools' data-files FLATTEN a globbed tree into one target dir, so
+    # every docs/ directory needs its own entry (a bare docs/**/*.md would
+    # drop adr/ and user/ into docs/ and break the manual's relative links).
+    # This walks the tree and fails when a directory is left out, so the
+    # pyproject list cannot rot silently.
+    import tomllib
+    cfg = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    data_files = cfg["tool"]["setuptools"]["data-files"]
+    covered = {Path(p).parent.as_posix() for pats in data_files.values()
+               for p in pats}
+    missing = []
+    for d in [ROOT / "docs", *(p for p in (ROOT / "docs").rglob("*")
+                               if p.is_dir())]:
+        if any(d.glob("*.md")):
+            rel = d.relative_to(ROOT).as_posix()
+            if rel not in covered:
+                missing.append(rel)
+    assert not missing, missing
+
+
+def test_docs_dir_finds_a_system_install(monkeypatch, tmp_path):
+    # paths.docs_dir() must fall back to share/nightscribe/docs when there is
+    # no checkout next to the module (a wheel or a distro package). Simulate
+    # a site-packages install by moving __file__ off the repository.
+    from nightscribe import paths
+    monkeypatch.setattr(paths, "__file__",
+                        str(tmp_path / "site-packages" / "nightscribe"
+                            / "paths.py"))
+    prefix = tmp_path / "prefix"
+    docs = prefix / "share" / "nightscribe" / "docs"
+    docs.mkdir(parents=True)
+    monkeypatch.setattr(paths.sys, "prefix", str(prefix))
+    assert paths.docs_dir() == docs

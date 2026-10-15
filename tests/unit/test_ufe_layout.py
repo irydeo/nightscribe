@@ -460,11 +460,13 @@ def test_the_bar_keeps_the_daily_actions_and_opens_two_doors():
     visible = [bar.itemAt(i).widget() for i in range(bar.count())
                if bar.itemAt(i).widget() is not None]
     names = [w.objectName() for w in visible]
-    assert len(names) <= 14, names
+    # 15 since 2026-10-15: the editor's guide got its own button next to the
+    # assistant (UX-20), so the help no longer depends on the optional model.
+    assert len(names) <= 15, names
     for must in ("btn_load", "btn_export", "btn_solve", "btn_solve_visit",
                  "btn_zoom_fit",
                  "btn_zoom_100", "btn_view", "btn_zoom_more", "lbl_zoom",
-                 "btn_page_image", "btn_page_curve"):
+                 "btn_docs", "btn_page_image", "btn_page_curve"):
         assert must in names, must
     # the four tools are their OWN buttons, in their own ROW under the bar
     # (asked for 2026-10-06: independent buttons, not a door). Measured with

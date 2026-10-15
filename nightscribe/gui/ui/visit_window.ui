@@ -65,6 +65,14 @@
         <column><property name="text"><string>Observations</string></property></column>
         <column><property name="text"><string>State</string></property></column>
       </widget></item>
+      <item>
+       <layout class="QHBoxLayout" name="row_free">
+        <item><widget class="QLabel" name="vp_lbl_free"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><spacer name="hsp_free"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+        <item><widget class="QPushButton" name="vp_btn_restore"><property name="text"><string>Bring back…</string></property><property name="toolTip"><string>Move this visit's frames back from procesados/ to where they were. A name already taken is not overwritten: the frame lands next to it</string></property></widget></item>
+        <item><widget class="QPushButton" name="vp_btn_free"><property name="text"><string>Free space…</string></property><property name="toolTip"><string>Move the original frames of the selected run into the project's procesados/ folder. Nothing is deleted, and Bring back undoes it</string></property></widget></item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

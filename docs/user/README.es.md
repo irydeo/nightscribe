@@ -40,6 +40,8 @@ puedes leerlos de principio a fin o saltar al que necesites:
 | [10. Configuración](10-settings.es.md) | Apéndice de referencia: cada sección de Configuración, qué decide y cuándo tocarla |
 | [11. El asistente](11-assistant.es.md) | Preguntar por el objeto, por la app o por el editor |
 | [12. La tarjeta gráfica](12-gpu.es.md) | Qué acelera, cómo encenderla, OpenCL contra CUDA |
+| [13. Entender un objeto](13-object-card.es.md) | La ficha del objeto: parámetros explicados, gráficos, chips de captura |
+| [14. Cuando algo va mal](14-troubleshooting.es.md) | Sin red, el solver, el informe MPC, dónde está el registro |
 
 Convenciones:
 

@@ -40,6 +40,15 @@ otra app que lo tenga mapeado.
 El inglés es el idioma base del código; el español es una traducción. Los tests
 fallan si queda alguna cadena `unfinished`.
 
+**Una ayuda no nombra el caso concreto** (AGENTS.md, regla permanente): un tooltip o un
+texto de ayuda explica POR QUÉ y, como mucho, el ORDEN DE MAGNITUD («pierde alrededor de
+un cuarto de magnitud»); nunca cita la visita, la fecha, el objeto ni el número de tomas
+del que salió la medida, ni pone un ejemplo con nombre propio. Las cifras exactas viven
+en el ADR y en los comentarios del código, que es donde se pueden revisar.
+`tests/unit/test_help_texts.py` recorre cada tooltip, etiqueta y cadena `tr()` y falla
+ante un caso concreto; si una cadena va legítimamente de las vigilias (cuya lista ES
+T CrB y R CrB), el test lo dice con sus propias palabras.
+
 ## Empaquetado
 
 ```bash
@@ -76,7 +85,28 @@ test funcional.
 
 Lee primero `docs/adr/`. Para cambiar una decisión, actualiza o reemplaza el ADR. Para
 añadir una fuente de datos, sigue `docs/DATA_SOURCES.md` (un módulo por fuente, TTL,
-degradación elegante) y regístrala en un ADR.
+degradación elegante) y regístrala en un ADR. Para las tres recetas que más salen (una
+fuente nueva, un tipo de objetivo nuevo, una pestaña nueva del editor), mira
+`docs/DEVELOPING.md`.
+
+## Release
+
+La versión sale del tag de git: `setuptools-scm` lo lee, así que etiquetar
+`v0.1.0` hace que el paquete construido y el propio `--version` de la app
+digan `0.1.0`. No hay nada que editar a mano.
+
+1. Mueve las entradas de `[Sin publicar]` de `CHANGELOG.es.md` (y su gemelo
+   inglés) bajo la nueva versión, con la fecha de hoy.
+2. Comprueba que el clasificador `Development Status` de `pyproject.toml`
+   sigue cuadrando con el hito (`3 - Alpha`, `4 - Beta`, `5 -
+   Production/Stable`).
+3. Llévalo a `main`: el workflow `preview.yml` construye los artefactos
+   (instalador y zip portable de Windows, `.deb`, `.rpm`) y los publica como la
+   pre-release rodante, después de que pase la suite unitaria.
+4. Etiqueta y sube: `git tag -a v0.1.0 -m "NightScribe 0.1.0"` y luego
+   `git push origin v0.1.0`.
+5. Crea la release de GitHub desde el tag, con los artefactos del paso 3 y las
+   notas del CHANGELOG. Márcala como la última release, no como pre-release.
 
 ## Pull requests
 

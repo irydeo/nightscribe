@@ -101,6 +101,17 @@ def run():
     # the wizard so its tr() strings resolve.
     load_translator(app)
 
+    # A settings file that could not be read is said out loud: the defaults
+    # are in use and a copy of the broken file sits next to it (QA-05).
+    from ..config import config
+    if getattr(config, "load_error", None):
+        from PySide6.QtWidgets import QMessageBox
+        QMessageBox.warning(
+            None, "NightScribe",
+            "Your settings file could not be read; a copy was kept next to it "
+            "and the defaults are in use.\n\n"
+            "No se pudo leer tu fichero de ajustes; se guardó una copia al "
+            "lado y se usan los valores por defecto.")
     # The app's OWN leftovers in the system temp (a run's folders, the phase
     # chart's scratch, a captured frame): each is removed when its work is
     # done, but a crash or a kill leaves it, so the ones OLDER than a day go

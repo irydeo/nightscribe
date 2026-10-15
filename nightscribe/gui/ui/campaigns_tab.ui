@@ -12,7 +12,7 @@
        <layout class="QHBoxLayout" name="signalsScopeRow">
         <item>
          <widget class="QLabel" name="lbl_signals_scope">
-          <property name="text"><string>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</string></property>
+          <property name="text"><string>Outbursts, brightness drops and predicted extrema: across the stars you follow (campaigns and vigils)</string></property>
           <property name="wordWrap"><bool>true</bool></property>
           <property name="styleSheet"><string>color: #8a90a6; font-style: italic; font-size: 11px;</string></property>
          </widget>

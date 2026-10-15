@@ -24,7 +24,7 @@ card runs on the processor exactly as it always did.
 
 ## Turning it on and off
 
-The switch is in **Settings → Measurement → Astrometry → Work**: **Warp and
+The switch is in **Settings → Measurement → Work** (behind the **Advanced** door): **Warp and
 combine on the GPU**, with a **Backend** selector beside it. It comes **on**,
 and it does nothing on a machine with no card: the app notices and runs on the
 processor.
@@ -52,7 +52,7 @@ CUDA is not shipped: it is a manual install for an NVIDIA card.
    for CUDA 12.x, `cupy-cuda11x` for CUDA 11.x. (The suffix follows the major
    version of the CUDA toolkit your driver provides.)
 2. Check that it imports: `python -c "import cupy; print(cupy.__version__)"`.
-3. In **Settings → Measurement → Astrometry → Work**, set **Backend** to
+3. In **Settings → Measurement → Work** (behind the **Advanced** door), set **Backend** to
    **CUDA** and start the run again.
 
 > **A packaged install cannot take CUDA.** The Windows and macOS builds carry

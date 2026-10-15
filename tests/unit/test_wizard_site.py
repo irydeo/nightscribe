@@ -138,6 +138,53 @@ def test_resolve_site_refuses_a_short_code(qapp, monkeypatch):
     assert "three characters" in h.lbl_site_status.text().lower()
 
 
+def _pin_site_keys(monkeypatch):
+    from nightscribe.config import config
+    for k in ("height", "observatory_name", "welcome_seen"):
+        monkeypatch.setitem(config._data, k, config.get(k))
+    # Force the "no site yet" state: the test must not depend on the
+    # developer's own coordinates being in the real config.
+    monkeypatch.setitem(config._data, "lat", 0.0)
+    monkeypatch.setitem(config._data, "lon", 0.0)
+    monkeypatch.setitem(config._data, "mpc_code", "")
+
+
+def test_apply_site_resolves_a_code_with_no_coordinates(qapp, monkeypatch):
+    # An MPC code alone is not a place: the planner would run around (0, 0).
+    # _apply_site resolves it once, so the observer gets real coordinates.
+    from nightscribe.config import config
+    from nightscribe.gui import wizard
+    from nightscribe.core.sources import obscodes
+    monkeypatch.setattr(obscodes, "lookup",
+                        lambda code: {"lat": 40.55, "lon": -3.37,
+                                      "name": "Irydeo Observatory"})
+    _pin_site_keys(monkeypatch)
+    h = _Husk()
+    h.edt_site_mpc.setText("Z41")
+    wizard._apply_site(h)
+    assert config.get("lat") == 40.55
+    assert config.get("lon") == -3.37
+    assert config.get("mpc_code") == "Z41"
+
+
+def test_apply_site_drops_a_code_that_does_not_resolve(qapp, monkeypatch):
+    # If the code cannot be resolved and there are no coordinates, the code is
+    # NOT stored either: the app keeps asking for a site instead of computing
+    # a false night.
+    from nightscribe.config import config
+    from nightscribe.gui import wizard
+    from nightscribe.core.sources import obscodes
+    monkeypatch.setattr(obscodes, "lookup", lambda code: None)
+    _pin_site_keys(monkeypatch)
+    monkeypatch.setitem(config._data, "mpc_code", "")
+    h = _Husk()
+    h.edt_site_mpc.setText("ZZZ")
+    wizard._apply_site(h)
+    assert config.get("lat") == 0.0
+    assert not (config.get("mpc_code") or "").strip()
+    assert config.is_configured() is False
+
+
 class _EquipHusk:
     """Only the widgets _setup_equipment / _apply_equipment reach for."""
 

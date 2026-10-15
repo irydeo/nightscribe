@@ -82,6 +82,10 @@ printf 'Metadata-Version: 2.1\nName: nightscribe\nVersion: %{version}\n' \
     > %{buildroot}%{python3_sitelib}/nightscribe-%{version}.dist-info/METADATA
 install -d %{buildroot}%{_datadir}/nightscribe
 printf '%s\n' '%{version}' > %{buildroot}%{_datadir}/nightscribe/version
+# The documentation, where paths.docs_dir() looks on a system install:
+# without it Help > Documentation and the offline assistant index are empty.
+install -d %{buildroot}%{_datadir}/nightscribe/docs
+cp -a docs/. %{buildroot}%{_datadir}/nightscribe/docs/
 install -d %{buildroot}%{_bindir}
 cat > %{buildroot}%{_bindir}/nightscribe <<'EOF'
 #!/bin/sh
@@ -99,6 +103,10 @@ install -m 0644 installer/io.github.irydeo.nightscribe.metainfo.xml \
 # The licence, where RPM's %license macro expects it.
 install -d %{buildroot}%{_datadir}/licenses/%{name}
 install -m 0644 LICENSE %{buildroot}%{_datadir}/licenses/%{name}/LICENSE
+# Find_Orb's own licence notice: the package ships Find_Orb (a separate
+# GPLv2 program) and has to say so.
+install -m 0644 installer/findorb-notice.txt \
+    %{buildroot}%{_datadir}/licenses/%{name}/findorb-notice.txt
 for s in 16 32 48 64 128 256; do
     install -d %{buildroot}%{_datadir}/icons/hicolor/${s}x${s}/apps
     install -m 0644 nightscribe/assets/appicon-${s}.png \
@@ -117,7 +125,9 @@ fi
 %{_datadir}/applications/io.github.irydeo.nightscribe.desktop
 %{_datadir}/metainfo/io.github.irydeo.nightscribe.metainfo.xml
 %license %{_datadir}/licenses/%{name}/LICENSE
+%license %{_datadir}/licenses/%{name}/findorb-notice.txt
 %{_datadir}/nightscribe/version
+%{_datadir}/nightscribe/docs
 %{_datadir}/icons/hicolor/*/apps/nightscribe.png
 %{_prefix}/lib/nightscribe/findorb
 

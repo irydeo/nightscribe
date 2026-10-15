@@ -411,6 +411,7 @@ class MainWindow(QMainWindow):
         # view is first opened (never at start).
         self._tonight_loaded = False
         self._tonight_running = False
+        self._tonight_worker = None
         # Interfaz 1.1: navigation history (back/forward) over locations
         # (view, project, tab, campaign). _navigating guards against
         # recording the history replay itself.
@@ -1569,6 +1570,7 @@ class MainWindow(QMainWindow):
         self._menus.action_settings.triggered.connect(self.on_open_settings)
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_guide_web.triggered.connect(self.on_guide_web)
+        self._menus.action_docs_offline.triggered.connect(self.on_docs_offline)
         self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_assistant.triggered.connect(
             lambda: self._open_assistant())
@@ -3254,13 +3256,27 @@ class MainWindow(QMainWindow):
 
     def on_guide_web(self):
         # Opens the published user guide in the OS browser (ADR-070): it is
-        # now the app's only general door to the guide (Help > User guide
-        # (web)), and the one the Welcome screen opens too. The site's own
-        # pages pick the language from the suffix.
+        # the online door to the guide (Help > User guide (web)), and the one
+        # the Welcome screen opens too. The site's own pages pick the language
+        # from the suffix.
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
         suffix = ".es" if self._lang() == "es" else ""
         QDesktopServices.openUrl(QUrl(f"{GUIDE_WEB_URL}{suffix}.html"))
+
+    def on_docs_offline(self):
+        # The offline twin (ADR-070 revision, 2026-10-15): the guide the
+        # install carries, opened in the in-app browser with no network. An
+        # observatory with no connection had no way to reach the manual from
+        # the main window, even though the .md files travel inside the
+        # installers and the Linux packages.
+        from .. import paths as paths_mod
+        from .doc_viewer import open_browser
+        root = paths_mod.docs_dir()
+        name = ("user/README.es.md" if self._lang() == "es"
+                else "user/README.md")
+        start = root / name if (root / name).exists() else None
+        open_browser(root, self, start=start)
 
     def _open_assistant(self, scope="app"):
         # The grounded assistant (ADR-075), non-modal and opt-in. The object
@@ -3316,15 +3332,41 @@ class MainWindow(QMainWindow):
         return kind_glyph_pixmap(kind, size)
 
     def on_compute_tonight(self):
+        if self._tonight_running:
+            # While a run is in flight the button IS the Cancel: a network
+            # phase can take a while and there was no way out but killing the
+            # app (2026-10-15). The worker looks at the flag at every phase
+            # boundary; a fetch already in flight still has to return.
+            if self._tonight_worker is not None:
+                self._tonight_worker.cancel()
+                self.statusBar().showMessage(self.tr("Cancelling…"))
+            return
         self._tonight_running = True
-        self.tonight.btn_compute.setEnabled(False)
+        b = self.tonight.btn_compute
+        b.setText(self.tr("Cancel"))
+        b.setToolTip(self.tr("Stop computing tonight"))
+        b.setMaximumWidth(90)
+        b.setEnabled(True)
         self._show_loading_state()
         self.statusBar().showMessage(self.tr("Computing tonight…"))
         w = TonightWorker(config, db)
+        self._tonight_worker = w
         w.progress.connect(self._tonight_progress)
         w.finished.connect(self._tonight_done)
+        w.cancelled.connect(self._tonight_cancelled)
+        w.cancelled.connect(self._drop_sender)
         self._keep(w)
         w.start()
+
+    def _reset_compute_button(self):
+        # Back to the plain ↻: the run ended, cancelled or not.
+        self._tonight_running = False
+        self._tonight_worker = None
+        b = self.tonight.btn_compute
+        b.setText("↻")
+        b.setToolTip(self.tr("Recompute tonight's targets"))
+        b.setMaximumWidth(32)
+        b.setEnabled(True)
 
     def _maybe_compute_tonight(self):
         # Interfaz 1.0: the new-project view triggers the first compute on
@@ -3404,17 +3446,26 @@ class MainWindow(QMainWindow):
         self.tonight.lbl_moon.setToolTip(self.tr("Computing…"))
 
     def _tonight_done(self, top, all_scored, error=""):
-        self._tonight_running = False
+        self._reset_compute_button()
         self._tonight_loaded = True
-        self.tonight.btn_compute.setEnabled(True)
         self._stop_skeleton()
         self._bar_anim.stop()
         self._status_progress.setVisible(False)
-        if error or not all_scored:
-            msg = error or self.tr("no sources answered")
-            self._show_empty_state(msg)
+        if error:
+            self._show_empty_state(
+                error, self.tr("Check your network and try again."))
             self.statusBar().showMessage(
-                self.tr("Error: %1").replace("%1", msg), 15000)
+                self.tr("Error: %1").replace("%1", error), 15000)
+            return
+        if not all_scored:
+            # No error and nothing scored: the sources answered, but nothing
+            # is up tonight for the kinds the observer enabled. Sending them
+            # to check the network was the old, wrong advice (2026-10-15).
+            self._show_empty_state(
+                self.tr("Nothing of your enabled kinds is up tonight."),
+                self.tr("Try enabling more kinds in the filter above."))
+            self.statusBar().showMessage(
+                self.tr("No targets for the enabled kinds"), 15000)
             return
         self._tonight_top = top
         self._tonight_all = all_scored
@@ -3426,19 +3477,32 @@ class MainWindow(QMainWindow):
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
 
+    def _tonight_cancelled(self):
+        # The worker stopped on request: put the button back and say it, so
+        # the observer is not left looking at a frozen "Cancel".
+        self._reset_compute_button()
+        self._stop_skeleton()
+        self._bar_anim.stop()
+        self._status_progress.setVisible(False)
+        self.statusBar().showMessage(self.tr("Cancelled"), 5000)
+
     def _stop_skeleton(self):
         # Stops the shared shimmer timer (idempotent) once loading ends
         if self._skeleton_timer.isActive():
             self._skeleton_timer.stop()
 
-    def _show_empty_state(self, msg):
-        # Single helpful message when no targets are available
+    def _show_empty_state(self, msg, hint=""):
+        # Single helpful message when no targets are available. `hint` is the
+        # actionable line: it depends on WHY the list is empty (a dead network
+        # is not an empty night), so it is passed in and never assumed.
         container = self._clear_suggestions()
         layout = container.layout()
         self._stop_skeleton()
         self._status_progress.setVisible(False)
-        lbl = QLabel(self.tr("No targets found") + "\n\n" + msg + "\n\n"
-                        + self.tr("Check your network and try again."))
+        text = self.tr("No targets found") + "\n\n" + msg
+        if hint:
+            text += "\n\n" + hint
+        lbl = QLabel(text)
         lbl.setAlignment(Qt.AlignCenter)
         lbl.setWordWrap(True)
         lbl.setMinimumHeight(120)
@@ -3980,10 +4044,14 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(
                 lambda _=False, t=t: self._start_or_continue(t))
         else:
-            btn = QPushButton(f"🔭 {self.tr('Explore')}")
+            # The Welcome CTA promises "Create my first project", so the row
+            # it lands on says the same: "Explore" made the new observer hunt
+            # for the button that creates (2026-10-15). It still opens the
+            # object card, which is where the project is created.
+            btn = QPushButton(f"🔭 {self.tr('Create project')}")
             btn.setToolTip(self.tr(
-                "Open the object in the Explore dialog (you can also "
-                "create a project from there)"))
+                "Open the object and create its project (the same door the "
+                "card's own button uses)"))
             btn.setStyleSheet(
                 "QPushButton { background: #c46922; color: #e8eaf2;"
                 " border: none; border-radius: 4px; padding: 5px;"
@@ -7896,7 +7964,14 @@ class MainWindow(QMainWindow):
             fh.write(data)
         except OSError as err:
             fh.close()
-            QMessageBox.warning(self, self._ccd_backend_label(), str(err))
+            # The raw OSError said nothing the observer could act on; the
+            # reason (disk full, permissions) goes to the log and a plain
+            # sentence to the dialog (UX-19).
+            logger.warning("could not write the captured FITS: %s", err)
+            QMessageBox.warning(
+                self, self._ccd_backend_label(),
+                self.tr("Could not save the captured frame to disk: %1")
+                .replace("%1", getattr(err, "strerror", None) or str(err)))
             return
         fh.close()
         # The editor reads it by PATH, so it has to outlive the call: it is
@@ -11835,7 +11910,8 @@ class MainWindow(QMainWindow):
         pid = self._current_project["id"]
         if QMessageBox.question(
                 self, self.tr("Delete project"),
-                self.tr("Delete this project permanently?"),
+                self.tr("Delete this project and its links? The frames on "
+                        "disk are kept; this cannot be undone."),
                 QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
             return
         project.delete(db, pid)

@@ -473,10 +473,23 @@ def _apply_site(wizard):
     # Writes the site fields to the settings: lat/lon and height always,
     # the MPC code and the name only when filled in.
     # @args: wizard - the loaded wizard
-    config.set("lat", wizard.spn_site_lat.value())
-    config.set("lon", wizard.spn_site_lon.value())
-    config.set("height", int(wizard.spn_site_height.value()))
+    #
+    # An MPC code with no coordinates is NOT a place: the planner and the
+    # twilights would run around (0, 0), the Gulf of Guinea, while the
+    # observer believed the observatory was set (2026-10-15). Resolve it once
+    # here, so no caller can persist a code that never became a place; if it
+    # does not resolve, the code is not stored either and the app keeps
+    # asking for a site instead of computing a false night.
     code = wizard.edt_site_mpc.text().strip().upper()
+    lat, lon = wizard.spn_site_lat.value(), wizard.spn_site_lon.value()
+    if code and lat == 0.0 and lon == 0.0:
+        _resolve_site(wizard)
+        lat, lon = wizard.spn_site_lat.value(), wizard.spn_site_lon.value()
+        if lat == 0.0 and lon == 0.0:
+            code = ""               # unresolved: it is not a site
+    config.set("lat", lat)
+    config.set("lon", lon)
+    config.set("height", int(wizard.spn_site_height.value()))
     if code:
         config.set("mpc_code", code)
     name = wizard.edt_site_name.text().strip()

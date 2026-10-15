@@ -34,7 +34,7 @@ el mismo núcleo; todo el trabajo costoso (red, efemérides) se cachea en SQLite
 
 | Módulo | Responsabilidad |
 |---|---|
-| `nightscribe/__main__.py` | Entrada CLI: `tonight`, `explore`, `post`, `solar`, `blink`, `history`, `gui` |
+| `nightscribe/__main__.py` | Entrada CLI: `tonight`, `explore`, `post`, `solar`, `blink`, `history`, `sequence`, `inject`, `project`, `gui` |
 | `nightscribe/config.py` | Ajustes persistentes (observatorio, apertura, idioma, claves); código MPC → coordenadas |
 | `nightscribe/paths.py` | Directorios de config/datos por SO (platformdirs) |
 | `core/db.py` | SQLite: `http_cache` (TTL por fuente), `targets`, `observations`, `settings`. Punto único de acceso |
@@ -82,7 +82,9 @@ señales Qt de vuelta a la interfaz. El CLI es síncrono.
 ## Internacionalización
 
 Qt Linguist: toda cadena visible pasa por `self.tr()`; fuentes en
-`gui/i18n/nightscribe_{es,en}.ts`, compiladas a `.qm` con `pyside6-lrelease`.
+`gui/i18n/nightscribe_{es,en}.ts`, compiladas a `.qm` a través de `tools/i18n.py`
+(lupdate + lrelease, renombrado atómico: un lrelease crudo con la app abierta la
+tira, ADR-079).
 Idioma de interfaz seleccionable en Configuración (por defecto, el del SO). El contenido
 generado (posts, frases) se produce siempre en ambos idiomas, al margen del idioma de la
 interfaz.
@@ -91,8 +93,8 @@ interfaz.
 
 Fichero SQLite en el directorio de datos del usuario (ver `paths.py`). Esquema
 versionado con una escalera de migraciones sobre `PRAGMA user_version`. Los TTL por
-fuente se definen en `core/db.py` (NOAA 1 h, NEOfixer/efemérides 12 h,
-Rochester/COBS/ESA/PCCP 6 h, SBDB/SIMBAD/CAD/ExoClock 7 d).
+fuente se definen en `core/db.py` (NOAA 1 h, NEOfixer/Horizons 12 h,
+Rochester/COBS/ESA/PCCP 6 h, ExoClock 24 h, SBDB/SIMBAD/CAD 7 d).
 
 ## Errores
 

@@ -62,7 +62,7 @@
              <layout class="QVBoxLayout">
               <item>
                <widget class="QListWidget" name="lst_events">
-                <property name="toolTip"><string>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</string></property>
+                <property name="toolTip"><string>Moon phases, conjunctions, oppositions, eclipses and meteor showers: computed locally, no network</string></property>
                 <property name="maximumHeight"><number>320</number></property>
                </widget>
               </item>
@@ -92,7 +92,7 @@
              <layout class="QVBoxLayout">
               <item>
                <widget class="QListWidget" name="lst_jupmoons">
-                <property name="toolTip"><string>Transits of the Galilean moons and their shadows across Jupiter's disc — visible from your site at night</string></property>
+                <property name="toolTip"><string>Transits of the Galilean moons and their shadows across Jupiter's disc: visible from your site at night</string></property>
                 <property name="maximumHeight"><number>190</number></property>
                </widget>
               </item>

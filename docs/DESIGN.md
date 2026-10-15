@@ -2,6 +2,13 @@
 
 *[Versión en español](DESIGN.es.md)*
 
+> **Note (2026-10-15): this is a historical design document.** It describes the
+> first-stage design; the product moved on since. The Observatory tab folded into
+> the Capture step, the Sun and the sky went to the Tools menu, telescope control
+> is no longer out of scope (ADR-030/081), the tabs are Tonight · Projects ·
+> Campaigns, and the default configuration ships **no** MPC code. The living
+> description is `docs/user/` and the ADRs in `docs/adr/`.
+
 ## Vision
 
 **Plan your night, understand every object, tell your science.**

@@ -350,4 +350,14 @@ otherwise.
   validity checks** but does **not** process the batch. It is the rehearsal: use
   it to check the report is right without committing it.
 
+## Further reading
+
+The depth lives in the repository, in the topic documents the app opens from
+its **?**:
+
+- [`docs/ASTROMETRY.md`](../ASTROMETRY.md): the centroid, the combination by
+  1/sigma^2, the error budget and the Find_Orb handoff, with a glossary;
+- [`docs/MPC_SUBMISSION.md`](../MPC_SUBMISSION.md): the ADES and 80-column
+  formats and the submission threshold.
+
 Next: [08. Reporting it](08-posts.md).

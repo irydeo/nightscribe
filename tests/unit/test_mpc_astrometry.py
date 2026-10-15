@@ -469,3 +469,9 @@ def test_report_context_says_what_is_missing():
     assert "the contact email" in missing
     assert "the observer's name" in missing
     assert "the telescope" in missing
+
+
+def test_iso_time_marks_the_instant_as_utc():
+    # ADES obsTime is ISO 8601 UTC and asks for the zone to be explicit; the
+    # old value had no trailing Z, so a reader had to assume it (QA-12).
+    assert mpc._iso_time(_MJD).endswith("Z")

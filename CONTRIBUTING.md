@@ -84,7 +84,27 @@ test.
 
 Read `docs/adr/` first. To change a decision, update or supersede the ADR. To add a
 data source, follow `docs/DATA_SOURCES.md` (one module per source, TTL, graceful
-degradation) and record it in an ADR.
+degradation) and record it in an ADR. For the three recipes that come up most (a new
+source, a new target kind, a new editor tab), see `docs/DEVELOPING.md`.
+
+## Release
+
+The version comes from the git tag: `setuptools-scm` reads it, so tagging
+`v0.1.0` makes the built package and the app's own `--version` report `0.1.0`.
+Nothing to edit by hand.
+
+1. Move the `[Unreleased]` entries of `CHANGELOG.md` (and its Spanish twin)
+   under the new version, with today's date.
+2. Check the `Development Status` classifier in `pyproject.toml` still matches
+   the milestone (`3 - Alpha`, `4 - Beta`, `5 - Production/Stable`).
+3. Land it on `main`: the `preview.yml` workflow builds the artifacts (Windows
+   installer and portable zip, `.deb`, `.rpm`) and publishes them as the rolling
+   pre-release, after the unit suite passes.
+4. Tag and push: `git tag -a v0.1.0 -m "NightScribe 0.1.0"` then
+   `git push origin v0.1.0`.
+5. Create the GitHub release from the tag, with the artifacts from step 3 and
+   the notes from the CHANGELOG. Mark it as the latest release, not a
+   pre-release.
 
 ## Pull requests
 

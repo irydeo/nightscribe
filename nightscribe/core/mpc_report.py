@@ -238,27 +238,20 @@ def package(text, out, obs_code=None, expected_obj=None):
 
 
 def _pack_desig(name):
-    # Best-effort packing of a provisional designation for the cross-check.
-    # "2021EQ3" -> "J01EQ3" (year 2000+ -> first char I=2000, J=2001...)
-    # "2026ziz" -> packed minor planet provisional (not SN)
-    name = name.strip().upper().replace(" ", "")
-    # strip SN/AT prefix if present
-    name = re.sub(r"^(SN|AT)\d*", "", name)
-    if len(name) < 5:
+    # Best-effort packing of a designation for the cross-check.
+    # @args: name - the designation, e.g. "2021 EQ3" or "2026 AB12"
+    # @return: the packed form, or None
+    # It delegates to the full packer (mpc_astrometry._pack_provisional): the
+    # old local mapping counted letters from 1800 and dropped the year, so
+    # 2026 packed as "mAB12" instead of "K26A12B" (QA-11) and the validator's
+    # warning showed a designation that does not exist. The import is local
+    # because mpc_astrometry imports this module.
+    name = (name or "").strip()
+    if not name:
         return None
-    # try provisional: YYYY + 4-char half-month/number
-    m = re.match(r"^(\d{4})([A-Z])(\w+)$", name)
-    if m:
-        year = int(m.group(1))
-        if 1800 <= year <= 1899:
-            c = chr(65 + (year - 1800))  # A=1800
-        elif 1900 <= year <= 1999:
-            c = chr(74 + (year - 1900))  # J=1900, but A=1800, I=1808...
-        elif 2000 <= year <= 2099:
-            c = chr(65 + (year - 2000) + 18)  # I=1808... actually:
-        else:
-            return None
-        rest = m.group(2) + m.group(3)
-        if len(rest) >= 4:
-            return f"{c}{rest[:4]}"
-    return None
+    name = re.sub(r"^(?:SN|AT)\s*\d*", "", name.upper())
+    try:
+        from . import mpc_astrometry
+        return mpc_astrometry._pack_provisional(name)
+    except Exception:
+        return None

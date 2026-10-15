@@ -13,7 +13,7 @@ authors = [
 ]
 keywords = ["astronomy", "NEO", "comets", "supernovae", "exoplanets", "observatory", "MPC"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: X11 Applications :: Qt",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -31,14 +31,20 @@ dependencies = [
     "numpy>=1.26",
     "platformdirs>=4.0",
     "Pillow>=10.0",
+    # The MP4 export needs an ffmpeg binary; imageio-ffmpeg brings one. It is
+    # a hard dependency for pip (the export works out of the box) and only
+    # Recommends in the .deb, where Debian policy treats a video encoder as
+    # optional (see tools/build_deb.py). The divergence is deliberate: the app
+    # degrades gracefully without it (the MP4 button says so).
     "imageio-ffmpeg>=0.5",
     "astropy>=6.0",
     "scipy>=1.11",
     "photutils>=1.10",
     # The portable GPU backend travels with the app (ADR-091): pyopencl is a
     # normal dependency so OpenCL works out of the box on NVIDIA, AMD and Intel.
-    # The GPU PATH itself stays off by default and the app runs unchanged on a
-    # machine with no OpenCL device or no ICD loader; CuPy (CUDA) stays manual.
+    # The GPU path is ON by default (ADR-089 revision, 2026-10-15) and the app
+    # runs unchanged on a machine with no OpenCL device or no ICD loader;
+    # CuPy (CUDA) stays manual.
     "pyopencl>=2024.1",
 ]
 
@@ -53,7 +59,7 @@ nightscribe = "nightscribe.__main__:main"
 
 [project.urls]
 Homepage = "https://www.irydeo.com"
-Repository = "https://github.com/<pending>/nightscribe"
+Repository = "https://github.com/irydeo/nightscribe"
 
 [tool.setuptools_scm]
 version_scheme = "guess-next-dev"
@@ -65,6 +71,29 @@ include = ["nightscribe*"]
 [tool.setuptools.package-data]
 "nightscribe.gui" = ["ui/*.ui", "i18n/*.qm"]
 "nightscribe" = ["assets/*", "assets/hads-coverage/*"]
+
+# The documentation travels with the package, in the layout the in-app
+# browser and the offline assistant index expect (ADR-070). Every directory
+# that holds .md files needs its own entry: setuptools' data-files FLATTENS
+# a globbed tree into one target dir, which would break the manual's
+# relative links. tests/unit/test_packaging.py walks docs/ and fails when a
+# directory is left out, so this list cannot rot silently.
+[tool.setuptools.data-files]
+"share/nightscribe/docs" = [
+    "docs/*.md",
+    "docs/*.hrz",
+    "docs/*.targets",
+    "docs/*.txt",
+]
+"share/nightscribe/docs/adr" = ["docs/adr/*.md"]
+"share/nightscribe/docs/user" = ["docs/user/*.md"]
+"share/nightscribe/docs/PLANS" = ["docs/PLANS/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-minor-planets" = ["docs/PLANS/astrometry-minor-planets/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-perf" = ["docs/PLANS/astrometry-perf/*.md"]
+"share/nightscribe/docs/PLANS/astrometry-snr" = ["docs/PLANS/astrometry-snr/*.md"]
+"share/nightscribe/docs/PLANS/hads" = ["docs/PLANS/hads/*.md"]
+"share/nightscribe/docs/PLANS/ux" = ["docs/PLANS/ux/*.md"]
+"share/nightscribe/docs/PLANS/variables" = ["docs/PLANS/variables/*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

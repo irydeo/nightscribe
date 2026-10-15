@@ -213,6 +213,12 @@ def _isolated_config_data(monkeypatch):
     # language (ADR-014: the code's strings are English, Spanish is a
     # translation) and let a test that checks Spanish ask for it.
     monkeypatch.setitem(config._data, "language", "en")
+    # Cap the combine's own thread pool. With `-n auto` on a 12-core machine
+    # every xdist worker spawned a pool of cores-1 threads at once, and a
+    # worker crashed (nondeterministically, in the track & stack tests,
+    # 2026-10-15). Two keeps the parallel path exercised without the
+    # oversubscription; the CI (2-4 cores) never saw it.
+    monkeypatch.setitem(config._data, "astrometry_threads", 2)
 
 
 @pytest.fixture(autouse=True)

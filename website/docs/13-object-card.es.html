@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>13. Entender un objeto · NightScribe</title>
+<meta name="description" content="13. Entender un objeto">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="13-object-card.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <details class="side-fold" open><summary class="side-title">Índice</summary><nav class="toc"><a class="toc-link" href="index.es.html">Guía de usuario</a><a class="toc-link" href="01-getting-started.es.html"><span>01</span>01. Primeros pasos</a><a class="toc-link" href="02-tonight.es.html"><span>02</span>02. Planificar la noche</a><a class="toc-link" href="03-projects.es.html"><span>03</span>03. Proyectos</a><a class="toc-link" href="04-campaigns.es.html"><span>04</span>04. Campañas y vigilias</a><a class="toc-link" href="05-capture.es.html"><span>05</span>05. Captura</a><a class="toc-link" href="06-photometry.es.html"><span>06</span>06. Fotometría</a><a class="toc-link" href="07-astrometry.es.html"><span>07</span>07. Astrometría</a><a class="toc-link" href="08-posts.es.html"><span>08</span>08. Contarlo</a><a class="toc-link" href="09-cli.es.html"><span>09</span>09. La línea de comandos</a><a class="toc-link" href="10-settings.es.html"><span>10</span>10. Configuración</a><a class="toc-link" href="11-assistant.es.html"><span>11</span>11. El asistente</a><a class="toc-link" href="12-gpu.es.html"><span>12</span>12. La tarjeta gráfica</a><a class="toc-link on" href="13-object-card.es.html"><span>13</span>13. Entender un objeto</a><a class="toc-link" href="14-troubleshooting.es.html"><span>14</span>14. Cuando algo va mal</a></nav></details>
+    <p class="side-back"><a href="../index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>13. Entender un objeto</h1><p>Planificar te dice <em>qué</em> observar. Este capítulo es la otra mitad: <em>qué estás mirando</em>. NightScribe tiene una puerta para cada objeto que conoce, y la ficha que hay detrás es la misma la abras desde donde la abras.</p><h2 id="tres-formas-de-abrirla">Tres formas de abrirla</h2><ul><li><p>el cuadro de la barra superior: <strong>Explorar un objeto…</strong> (escribe un nombre y pulsa Intro);</p></li><li><p><strong>Herramientas → Explorar objeto…</strong>;</p></li><li><p>doble clic en cualquier fila de la lista <strong>Esta noche</strong>, o el botón de la fila.</p></li></ul><p>El nombre se busca en VSX, SIMBAD, JPL SBDB, Horizons, CAD, TNS y el NASA Exoplanet Archive, así que sirve para un asteroide, un cometa, una supernova, una variable o una estrella con exoplaneta. Si el objeto no está en ningún catálogo, la vista <strong>Esta noche</strong> te deja crearlo a mano.</p><h2 id="la-ficha">La ficha</h2><p>La ficha es una tarjeta de presentación, no un volcado de datos:</p><ul><li><p>un <strong>gancho</strong> y unos cuantos puntos divulgativos, en español e inglés: la frase que dirías en voz alta para explicar por qué este objeto interesa;</p></li><li><p>una <strong>tabla de parámetros donde cada fila está explicada</strong>: la familia orbital, el MOID (la distancia mínima a la que la órbita llega a la de la Tierra, en distancias lunares), el tamaño estimado desde la magnitud absoluta, el próximo acercamiento, la fecha de descubrimiento. Es multilínea y nada se corta;</p></li><li><p>los <strong>gráficos</strong>: la órbita (animada por fecha, con lecturas al pasar el ratón), el cielo de la noche con <em>tu</em> silueta de horizonte y la ventana segura sombreada, el campo del survey y la curva de luz cuando la hay. En la app son gráficos vectoriales vivos (zoom, arrastre, hover); los mismos motores generan los PNG;</p></li><li><p>los <strong>chips de captura</strong>: magnitud actual, ritmo aparente, la exposición máxima sin estela con tu cámara, la ventana y las horas por encima del horizonte, más coordenadas copiables en decimal y sexagesimal con su época.</p></li></ul><blockquote class="why"><strong>¿Por qué cada fila viene explicada?</strong> Porque «MOID 0,03 UA» no le dice nada a casi nadie, y «puede acercarse a doce distancias lunares» lo dice todo. Las cifras son las mismas; solo cambia el lector. Las explicaciones viven en un único sitio (<code>core/explain.py</code>), así que un tipo, una clase espectral o un método de descubrimiento se describen igual aparezcan donde aparezcan.</blockquote><h2 id="de-la-ficha-al-proyecto">De la ficha al proyecto</h2><p>La ficha es un punto de partida, no un callejón: <strong>Crear proyecto</strong> convierte el objeto en un proyecto y te deja en su ficha, con las coordenadas, la ventana y la magnitud ya rellenas (capítulo 03). A partir de ahí el flujo es el de siempre: captura, análisis, publicación.</p><p>Siguiente: <a href="14-troubleshooting.es.html">14. Cuando algo va mal</a>.</p></article>
+    <nav class="pn"><a class="pn-prev" href="12-gpu.es.html"><span>Anterior</span>12. La tarjeta gráfica</a><a class="pn-next" href="14-troubleshooting.es.html"><span>Siguiente</span>14. Cuando algo va mal</a></nav>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

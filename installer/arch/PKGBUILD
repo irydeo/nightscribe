@@ -46,7 +46,9 @@ build() {
 package() {
     cd "$srcdir/$pkgname"
 
-    # The Python package, into the system site-packages.
+    # The Python package, into the system site-packages. This also drops the
+    # documentation in usr/share/nightscribe/docs (the wheel's data-files),
+    # which is where paths.docs_dir() looks on a system install.
     python -m installer --destdir="$pkgdir" dist/*.whl
 
     # The launcher, the desktop entry and the icons.
@@ -61,6 +63,10 @@ EOF
     install -Dm644 installer/io.github.irydeo.nightscribe.metainfo.xml \
         "$pkgdir/usr/share/metainfo/io.github.irydeo.nightscribe.metainfo.xml"
     install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    # Find_Orb's own licence notice: the package ships Find_Orb (a separate
+    # GPLv2 program) and has to say so.
+    install -Dm644 installer/findorb-notice.txt \
+        "$pkgdir/usr/share/licenses/$pkgname/findorb-notice.txt"
     for s in 16 32 48 64 128 256; do
         install -Dm644 "nightscribe/assets/appicon-$s.png" \
             "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/nightscribe.png"

@@ -48,6 +48,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -260,13 +261,54 @@ def run(input_path, binary, env_file=None, cpu_limit=DEFAULT_CPU_LIMIT,
         # `~/.find_orb` inside NightScribe's data folder and, seeded with the
         # shipped data, is what lets the `fo` we ship run at all (see
         # _seed_findorb_home).
-        proc = subprocess.run(args, cwd=workdir, capture_output=True,
-                              text=True, timeout=timeout,
-                              env=_private_env())
-    except (subprocess.TimeoutExpired, OSError) as err:
+        proc = subprocess.Popen(args, cwd=workdir, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True,
+                                env=_private_env())
+    except OSError as err:
         return False, workdir, f"Find_Orb failed: {err}"
-    log = (proc.stdout or "") + (proc.stderr or "")
+    # Poll instead of subprocess.run: a run can last up to the CPU limit or
+    # the wall timeout, and the observer's Cancel has to be able to stop it.
+    # subprocess.run(timeout=...) cannot be interrupted, so the button used
+    # to do nothing until `fo` finished on its own (QA-07).
+    deadline = time.monotonic() + float(timeout) if timeout else None
+    while True:
+        try:
+            out, err = proc.communicate(timeout=0.2)
+            break
+        except subprocess.TimeoutExpired:
+            pass
+        if cancel is not None and cancel():
+            _terminate(proc)
+            try:
+                proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            return False, workdir, "Find-Orb cancelled"
+        if deadline is not None and time.monotonic() >= deadline:
+            _terminate(proc)
+            try:
+                proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            return False, workdir, f"Find_Orb failed: timeout after {timeout}s"
+    log = (out or "") + (err or "")
     return True, workdir, log
+
+
+def _terminate(proc):
+    # @args: proc - the subprocess.Popen running `fo`
+    # @return: None. Terminate, then kill if it does not answer.
+    try:
+        proc.terminate()
+    except Exception:
+        pass
+    try:
+        proc.wait(timeout=5)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
 
 
 def parse_output(workdir):

@@ -168,13 +168,21 @@ For a transit project, the editor adds the EXOTIC block: NightScribe
 prepares the `inits.json` (with your observatory and camera data from
 Settings), runs EXOTIC in its own environment if you configured it, imports
 its curve and parameters, and exports the 3-column file for **ExoClock**
-with the `ExoClock_info.txt` filled in. You can also fit the transit inside
-the app (quadratic limb-darkening model) for a quick T_mid estimate before
-submitting anything.
+with the `ExoClock_info.txt` filled in.
 
 > **Why ExoClock?** Because ESA's Ariel mission needs to know *when* each
 > planet transits years from now, and transits drift. Your curve, even from
 > a 20 cm telescope, updates the ephemeris of a planet a space telescope
 > will observe.
+
+## Further reading
+
+The depth lives in the repository, in the topic documents the app opens from
+its **?**:
+
+- [`docs/PHOTOMETRY.md`](../PHOTOMETRY.md): the full treatment of the zero
+  point, the comparison stars and the errors, with a glossary;
+- [`docs/SNR.md`](../SNR.md): the signal-to-noise budget and the limits;
+- [`docs/PRECISION.md`](../PRECISION.md): what the numbers mean, measured.
 
 Next: [07. Astrometry](07-astrometry.md).

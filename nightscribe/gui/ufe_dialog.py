@@ -566,6 +566,11 @@ class UfeDialog(QWidget):
         self.btn_ask.clicked.connect(self._open_assistant)
         self._ask_tip = self.btn_ask.toolTip()
         self._assistant_win = None
+        # The editor's guide, reachable with no network and no model: the
+        # assistant next to it is optional, so help cannot depend on it
+        # (UX-20).
+        self.btn_docs = self._ui.btn_docs
+        self.btn_docs.clicked.connect(self._open_docs)
         # the AI master switch (ADR-075): off, the "?" is disabled with the
         # reason, so no AI dialog can be reached from the editor
         from ..core.sources import llm
@@ -1961,6 +1966,19 @@ class UfeDialog(QWidget):
         self.btn_ask.setToolTip(
             self._ask_tip if on else self.tr(
                 "The AI is off: turn it on in Settings → Integrations."))
+
+    def _open_docs(self):
+        # The editor's guide, opened from the copy installed with the app:
+        # no network and no model. The "?" next to it is the assistant, which
+        # is optional (ADR-075), so the help does not depend on it (UX-20).
+        # @return: None
+        from .. import paths as paths_mod
+        from .doc_viewer import open_browser
+        from .pretty import ui_lang
+        root = paths_mod.docs_dir()
+        name = "UFE.es.md" if ui_lang() == "es" else "UFE.md"
+        start = root / name if (root / name).exists() else None
+        open_browser(root, self, start=start)
 
     def _open_assistant(self):
         # Open the assistant scoped to this editor (ADR-075). One window,

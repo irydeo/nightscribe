@@ -86,7 +86,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_height"><property name="text"><string>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_height"><property name="text"><string>Altitude of the observatory above sea level (m): enters the parallax and atmospheric terms</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_aavso">
                <item><widget class="QLabel" name="lbl_aavso"><property name="text"><string>AAVSO code:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -583,14 +583,14 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_extremumd"><property name="text"><string>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_extremumd"><property name="text"><string>A campaign variable whose maximum/minimum is this many days or less away counts as imminent: it lands in Tonight (window of 0 = today)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_vigils">
                <item><widget class="QLabel" name="lbl_vigils"><property name="text"><string>Variable vigils:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
                <item><widget class="QPlainTextEdit" name="edt_vigils"><property name="minimumSize"><size><width>0</width><height>70</height></size></property><property name="maximumSize"><size><width>16777215</width><height>70</height></size></property></widget></item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_vigils"><property name="text"><string>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_vigils"><property name="text"><string>Standing watch list checked against the latest ZTF magnitude: one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_aavso_feed">
                <item><widget class="QCheckBox" name="chk_aavso"><property name="text"><string>AAVSO channel in Tonight</string></property></widget></item>
@@ -602,7 +602,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Show the AAVSO editorial channel: forum alerts and active observing campaigns, as Tonight suggestions when the star is up</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item><widget class="QCheckBox" name="chk_follow_guide"><property name="text"><string>Put the guider back before each observation of a follow run</string></property><property name="toolTip"><string>A slew stops the guider, so the follow run restarts it before capturing each observation, using the calibration you already have. Turn it off if you guide by hand or do not guide at all.</string></property></widget></item>
              <item><widget class="QCheckBox" name="chk_follow_calibrate"><property name="text"><string>Calibrate the guider at the start of a follow run</string></property><property name="toolTip"><string>Off by default: the guider starts with the calibration it already has. Turn it on when you know the calibration is stale (a new setup, a new guide scope orientation).</string></property></widget></item>
             </layout>
@@ -1199,7 +1199,7 @@
                <item><widget class="QLineEdit" name="edt_aavso_token"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_aavso_token"><property name="text"><string>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_aavso_token"><property name="text"><string>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token: without it they stay silent</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>

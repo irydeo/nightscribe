@@ -188,15 +188,16 @@ def _QWidget():
 # ---------------- phase E: the smart card button ----------------
 
 def test_card_button_explore_when_no_project(window, monkeypatch):
-    # No active project for this object -> "Explore" button, wired to
-    # _open_explore_dialog with the target's name.
+    # No active project for this object -> "Create project" button (the
+    # Welcome CTA promises creating), wired to _open_explore_dialog with the
+    # target's name.
     import nightscribe.gui.main_window as mw
     monkeypatch.setattr(mw.project, "list_projects",
                         lambda db, status=None: [])
     t = {"id": "snX", "name": "SN 2026abc", "kind": "sn"}
     btn = window._card_button(t)
-    assert "Explore" in btn.text() or "Explorar" in btn.text(), \
-        f"expected Explore label, got {btn.text()!r}"
+    assert "Create project" in btn.text() or "Crear proyecto" in btn.text(), \
+        f"expected Create project label, got {btn.text()!r}"
     called = {}
     monkeypatch.setattr(window, "_open_explore_dialog",
                         lambda name: called.update(n=name))

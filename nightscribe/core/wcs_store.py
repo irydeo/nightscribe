@@ -43,6 +43,13 @@ def _atomic_replace(path, data):
             fh.write(data)
             fh.flush()
             os.fsync(fh.fileno())
+        # A temp file is created 0600; the observer's FITS should keep its own
+        # mode (a solved frame that quietly becomes owner-only is a surprise,
+        # and another account or tool may need to read it).
+        try:
+            os.chmod(tmp, os.stat(path).st_mode)
+        except OSError:
+            pass
         os.replace(tmp, path)
     except Exception:
         try:

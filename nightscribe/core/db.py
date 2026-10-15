@@ -561,14 +561,17 @@ def _migrate(conn):
         # walk a version number backwards (a test fixture, a restored backup)
         # while the tables are still there, and an ALTER would die on the
         # duplicate instead of finishing the walk.
-        cols = {row[1] for row in conn.execute(
-            "PRAGMA table_info(astrometry_points)")}
-        if "mag_auto" not in cols:
-            conn.execute(
-                "ALTER TABLE astrometry_points ADD COLUMN mag_auto REAL")
-        if "mag_source" not in cols:
-            conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
-                         " mag_source TEXT DEFAULT 'auto'")
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "astrometry_points" in tables:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(astrometry_points)")}
+            if "mag_auto" not in cols:
+                conn.execute(
+                    "ALTER TABLE astrometry_points ADD COLUMN mag_auto REAL")
+            if "mag_source" not in cols:
+                conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
+                             " mag_source TEXT DEFAULT 'auto'")
         conn.execute("PRAGMA user_version = 18")
     if v < 19:
         # ADR-072 rev: the gain the app measured on the observer's own
@@ -602,14 +605,17 @@ def _migrate(conn):
         # ADR-086: the project-level combined check/report across runs lives
         # in its own table (one row per project) so the project's JSON context
         # stays light.
-        cols = {row[1] for row in conn.execute(
-            "PRAGMA table_info(astrometry_points)")}
-        if "mag_err" not in cols:
-            conn.execute(
-                "ALTER TABLE astrometry_points ADD COLUMN mag_err REAL")
-        if "centroid_source" not in cols:
-            conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
-                         " centroid_source TEXT DEFAULT 'auto'")
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "astrometry_points" in tables:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(astrometry_points)")}
+            if "mag_err" not in cols:
+                conn.execute(
+                    "ALTER TABLE astrometry_points ADD COLUMN mag_err REAL")
+            if "centroid_source" not in cols:
+                conn.execute("ALTER TABLE astrometry_points ADD COLUMN"
+                             " centroid_source TEXT DEFAULT 'auto'")
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS astrometry_combined (
             project_id    INTEGER PRIMARY KEY
@@ -626,8 +632,10 @@ def _migrate(conn):
         # matching already keys on, so keeping it as a fourth kind only
         # asked the observer to classify the same frame twice. The rows move
         # to "dark" and the recipe finds them by exposure.
-        conn.execute(
-            "UPDATE calib_masters SET kind='dark' WHERE kind='dark_flat'")
+        if "calib_masters" in {r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'")}:
+            conn.execute(
+                "UPDATE calib_masters SET kind='dark' WHERE kind='dark_flat'")
         conn.execute("PRAGMA user_version = 21")
     if v < 22:
         # ADR-061 rev (2026-10-15): the master library gains a PROJECT. A
@@ -637,14 +645,17 @@ def _migrate(conn):
         # project uses it, and a project can ADOPT another project's master
         # with a LINK (a second row on the same file). The recipe prefers the
         # project's own masters, then the shared ones.
-        cols = {row[1] for row in conn.execute(
-            "PRAGMA table_info(calib_masters)")}
-        if "project_id" not in cols:
+        tables = {row[0] for row in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "calib_masters" in tables:
+            cols = {row[1] for row in conn.execute(
+                "PRAGMA table_info(calib_masters)")}
+            if "project_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE calib_masters ADD COLUMN project_id INTEGER")
             conn.execute(
-                "ALTER TABLE calib_masters ADD COLUMN project_id INTEGER")
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_calib_project"
-            " ON calib_masters(project_id, kind)")
+                "CREATE INDEX IF NOT EXISTS idx_calib_project"
+                " ON calib_masters(project_id, kind)")
         conn.execute("PRAGMA user_version = 22")
     conn.commit()
 

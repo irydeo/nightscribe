@@ -106,7 +106,7 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
 |---|---|
 | **Obligatorio** | Linux o Windows · Python 3.11+ (recomendado 3.12) *o* el instalador autónomo (sin Python) · ~500 MB de disco · conexión a internet para los datos en vivo (todo lo demás funciona offline) |
 | **Recomendado** | Tu **código de observatorio MPC** (p. ej. `Z41`): el asistente inicial resuelve tus coordenadas automáticamente y desbloquea la lista de NEOs específica de tu sitio · tu **fichero de horizonte local** (`.hrz` de TheSkyX o simples pares «az alt») · la apertura de tu telescopio y el píxel/focal de tu cámara |
-| **Opcional** | **CCDciel o NINA/PINS** en ejecución local, si quieres que la app maneje montura y cámara (la integración con el observatorio; un backend a la vez) · cuatro claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, bot de TNS, token AAVSO) · dos herramientas externas opcionales, **Find_Orb** (el chequeo contra otros observadores) y **EXOTIC** (la reducción de tránsitos); ver *Integraciones opcionales* |
+| **Opcional** | **CCDciel o NINA/PINS** en ejecución local, si quieres que la app maneje montura y cámara (la integración con el observatorio; un backend a la vez) · cinco claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, atlas de contaminación lumínica, bot de TNS, token AAVSO) · el **asistente** opcional (un modelo que configures) · **EXOTIC** (la reducción de tránsitos), la única herramienta externa que instalas a mano: **Find_Orb** viaja dentro de los instaladores y de los paquetes Linux; ver *Integraciones opcionales* |
 
 Sin cuentas, sin registros, sin telemetría: NightScribe corre en tu ordenador
 y solo habla con los servicios públicos de datos listados más abajo.
@@ -474,7 +474,8 @@ Cada fuente externa, qué te aporta, con qué frescura, y si necesita clave.
 Toda la red pasa por una **caché SQLite con TTL por fuente** (la columna
 «refresco»): las consultas repetidas son instantáneas y gratuitas para el
 servicio. Si una fuente cae, el resto de la app nunca se rompe; las fuentes
-están listadas en **Ayuda → Acerca de NightScribe**.
+están listadas en **Ayuda → Acerca de NightScribe** (las principales; la lista
+completa está en `docs/DATA_SOURCES.md`).
 
 **Fuentes de planificación (alimentan Esta noche):**
 
@@ -547,7 +548,9 @@ lo dice. Se configuran en **Herramientas → Configuración → Integraciones**.
 | **Credenciales de bot TNS** | Imágenes de descubrimiento dentro de la app (respetando la licencia de cada survey) |
 | **Token API de AAVSO** | Fotometría comunitaria para las vigilias de estrellas brillantes |
 | **Código de observador AAVSO** | Se rellena en las exportaciones fotométricas y en el handoff a EXOTIC |
-| **Find_Orb** (binario externo) | El chequeo de tu medida astrométrica contra las observaciones que publicaron otras estaciones, antes del informe MPC. Sin él el chequeo no está disponible, y la app lo dice en vez de fingirlo |
+| **Clave de contaminación lumínica** (gratuita, lightpollutionmap.info) | El atlas de brillo del cielo de tu sitio: el contexto Bortle que usan las notas de calidad del cielo |
+| **Asistente** (opcional, apagado por defecto) | Un panel de chat que responde desde la propia guía y los ADRs de la app, offline y sin embeddings. Necesita un modelo que configures; sin él la app no cambia (ADR-075) |
+| **Find_Orb** (viaja en los instaladores y los paquetes Linux) | El chequeo de tu medida astrométrica contra las observaciones que publicaron otras estaciones, antes del informe MPC. Viaja dentro de NightScribe, así que funciona de serie; desde un árbol de fuentes lo instalas tú, y la app lo dice en vez de fingirlo |
 | **EXOTIC** (Python 3.10 o anterior, externo) | La reducción de tránsitos: la app escribe el handoff, ejecuta EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto. Sin él el handoff sigue siendo tuyo para lanzarlo a mano |
 
 ## Tus datos son tuyos
@@ -568,8 +571,10 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/python -m nightscribe tonight    # mejores objetivos de esta noche (CLI)
 ```
 
-Todo lo que hace la GUI tiene su contrapartida en línea de comandos (`--help`
-en cada uno para más detalles):
+Todo lo que hace la GUI de **planificación y publicación** tiene su
+contrapartida en línea de comandos (`--help` en cada uno para más detalles).
+La **reducción** (el editor FITS: calibración, track & stack, astrometría,
+fotometría, períodos) vive en la GUI:
 
 | Comando | Qué hace |
 |---|---|

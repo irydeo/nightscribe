@@ -118,3 +118,24 @@ def test_the_help_menu_can_open_the_log(log_dir, monkeypatch):
     finally:
         config.is_configured = orig
         w.close()
+
+
+def test_an_uncaught_exception_reaches_the_log(monkeypatch):
+    # An exception in a Qt slot (outside the workers) was printed to stderr,
+    # which a GUI launched from a menu does not have (QA-15). The hook sends
+    # it to the log. QApplication is faked away so no dialog is shown.
+    import sys
+    from PySide6.QtWidgets import QApplication
+    from nightscribe import __main__ as cli
+    monkeypatch.setattr(QApplication, "instance", staticmethod(lambda: None))
+    seen = []
+    monkeypatch.setattr(cli.logger, "critical",
+                        lambda *a, **k: seen.append(a))
+    cli._install_excepthook()
+    try:
+        raise ValueError("boom")
+    except ValueError:
+        sys.excepthook(*sys.exc_info())
+    finally:
+        sys.excepthook = sys.__excepthook__
+    assert seen

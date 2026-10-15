@@ -495,6 +495,18 @@ class VisitWindow(QDialog):
                 lambda _it: self._on_open_run())
             self._populate_runs()
 
+        # ---- free space (ADR-062 phase 9): a run's originals can be moved
+        # into the project's procesados/ and brought back. It lives next to
+        # the runs because it acts on a run's frames, and nothing is deleted.
+        self._free_lbl = getattr(self._ui, "vp_lbl_free", None)
+        btn_free = getattr(self._ui, "vp_btn_free", None)
+        btn_restore = getattr(self._ui, "vp_btn_restore", None)
+        if btn_free is not None:
+            btn_free.clicked.connect(self._on_free_space)
+        if btn_restore is not None:
+            btn_restore.clicked.connect(self._on_restore_space)
+        self._update_free_hint()
+
         # ---- measurements (light-curve kinds)
         if self._curve_kind:
             self._build_measurements_block(s)
@@ -701,6 +713,128 @@ class VisitWindow(QDialog):
         run_id = item.data(Qt.UserRole)
         if run_id is not None:
             self._open_run(run_id)
+
+    # ------------------------------------------------------ free space
+
+    def _visit_run_ids(self):
+        # @return: the run ids to act on: the selected row, or every run of
+        #          the visit when nothing is selected
+        ids = []
+        tbl = self._runs_tbl
+        if tbl is not None:
+            rows = tbl.selectionModel().selectedRows()
+            if rows:
+                item = tbl.item(rows[0].row(), 0)
+                if item is not None and item.data(Qt.UserRole) is not None:
+                    ids.append(item.data(Qt.UserRole))
+        if ids:
+            return ids
+        if callable(self._runs_for_session):
+            try:
+                runs = self._runs_for_session(self._sid) or []
+            except Exception:
+                runs = []
+            return [r.get("id") for r in runs if r.get("id") is not None]
+        return []
+
+    def _free_say(self, text):
+        # @args: text - the one-line result shown under the runs
+        if self._free_lbl is not None:
+            self._free_lbl.setText(text)
+
+    def _update_free_hint(self):
+        # @return: None. One line: how many frames this visit could free, so
+        #          the button never acts blind.
+        from ...core import free_space
+        n = 0
+        for rid in self._visit_run_ids():
+            try:
+                n += free_space.freeable(self._db, rid)["n"]
+            except Exception:
+                pass
+        if n:
+            self._free_say(self.tr(
+                "%1 original frames can be moved to procesados/.").replace(
+                    "%1", str(n)))
+        else:
+            self._free_say("")
+
+    def _on_free_space(self):
+        from ...core import free_space, project as project_mod
+        ids = self._visit_run_ids()
+        if not ids:
+            self._free_say(self.tr("This visit has no runs yet."))
+            return
+        p = project_mod.get(self._db, self._pid)
+        if p is None:
+            return
+        storage = project_mod.storage_dir(p)
+        n, nbytes = 0, 0
+        for rid in ids:
+            f = free_space.freeable(self._db, rid)
+            n += f["n"]
+            nbytes += f["bytes"]
+        if n == 0:
+            self._free_say(self.tr(
+                "Nothing to free: the frames are already in procesados/."))
+            return
+        dest = str(Path(storage) / "procesados")
+        mb = nbytes / (1024 * 1024)
+        if QMessageBox.question(
+                self, self.tr("Free space"),
+                self.tr("Move %1 original frames (%2 MB) to %3?\n\n"
+                        "Nothing is deleted: Bring back undoes it.")
+                .replace("%1", str(n)).replace("%2", f"{mb:.0f}")
+                .replace("%3", dest),
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        moved, errors = 0, 0
+        try:
+            for rid in ids:
+                rep = free_space.move_to_processed(self._db, rid, storage)
+                moved += rep.moved
+                errors += len(rep.errors)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if errors:
+            self._free_say(self.tr("%1 frames moved, %2 could not be moved.")
+                           .replace("%1", str(moved)).replace("%2", str(errors)))
+        else:
+            self._free_say(self.tr("%1 frames moved to procesados/.").replace(
+                "%1", str(moved)))
+        self._populate_runs()
+        self._populate_resources()
+
+    def _on_restore_space(self):
+        from ...core import free_space
+        ids = self._visit_run_ids()
+        if not ids:
+            self._free_say(self.tr("This visit has no runs yet."))
+            return
+        from PySide6.QtWidgets import QApplication
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        moved, renamed, errors = 0, 0, 0
+        try:
+            for rid in ids:
+                rep = free_space.restore(self._db, rid)
+                moved += rep.moved
+                renamed += len(rep.renamed)
+                errors += len(rep.errors)
+        finally:
+            QApplication.restoreOverrideCursor()
+        if moved == 0 and errors == 0:
+            self._free_say(self.tr("Nothing to bring back."))
+            return
+        msg = self.tr("%1 frames brought back.").replace("%1", str(moved))
+        if renamed:
+            msg += " " + self.tr(
+                "%1 landed next to a file with the same name.").replace(
+                    "%1", str(renamed))
+        self._free_say(msg)
+        self._populate_runs()
+        self._populate_resources()
 
     def _on_analyze(self):
         # The kind's own analysis (ADR-045 review): the host opens the

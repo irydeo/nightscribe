@@ -34,7 +34,7 @@ same core; all expensive work (network, ephemerides) is cached in SQLite.
 
 | Module | Responsibility |
 |---|---|
-| `nightscribe/__main__.py` | CLI entry: `tonight`, `explore`, `post`, `solar`, `blink`, `history`, `gui` |
+| `nightscribe/__main__.py` | CLI entry: `tonight`, `explore`, `post`, `solar`, `blink`, `history`, `sequence`, `inject`, `project`, `gui` |
 | `nightscribe/config.py` | Persistent settings (observatory, aperture, language, API keys); MPC code → coordinates resolution |
 | `nightscribe/paths.py` | Per-OS config/data dirs (platformdirs) |
 | `core/db.py` | SQLite: `http_cache` (TTL per source), `targets`, `observations`, `settings`. Single access point |
@@ -82,7 +82,9 @@ Qt signals back to the UI. The CLI is synchronous.
 ## Internationalisation
 
 Qt Linguist: every visible string through `self.tr()`; sources in
-`gui/i18n/nightscribe_{es,en}.ts`, compiled to `.qm` with `pyside6-lrelease`.
+`gui/i18n/nightscribe_{es,en}.ts`, compiled to `.qm` through `tools/i18n.py`
+(lupdate + lrelease, renamed atomically: a raw lrelease under a running app
+crashes it, ADR-079).
 UI language selectable in Settings (default: OS locale). Generated content (posts,
 phrases) is always produced in both languages independently of the UI language.
 
@@ -90,8 +92,8 @@ phrases) is always produced in both languages independently of the UI language.
 
 SQLite file in the user data dir (see `paths.py`). Schema versioned with a simple
 `PRAGMA user_version` migration ladder. TTLs per source are defined in
-`core/db.py` (NOAA 1 h, NEOfixer/ephemerides 12 h, Rochester/COBS/ESA/PCCP 6 h,
-SBDB/SIMBAD/CAD/ExoClock 7 d).
+`core/db.py` (NOAA 1 h, NEOfixer/Horizons 12 h, Rochester/COBS/ESA/PCCP 6 h,
+ExoClock 24 h, SBDB/SIMBAD/CAD 7 d).
 
 ## Errors
 

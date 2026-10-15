@@ -196,8 +196,8 @@ temperature, exposure, filter). When indexing you declare what each file
 - **Bias**: the electronic read offset (zero exposure).
 - **Dark**: thermal current, at the same exposure as the lights. *A dark
   already includes the bias*, so with a dark you do not need a separate
-  bias.
-- **Flat dark**: at the flats' exposure.
+  bias. A "dark of the flats" (at the flats' exposure) is just a dark: index
+  it as **Dark** with its own exposure, not as a fourth kind.
 - **Flat**: per filter, normalised.
 
 > **Why calibrate?** Because your sensor lies in three known, repeatable
@@ -237,5 +237,14 @@ called a model and not a flat for exactly that reason.
 > move, because the tiles they spoil are dropped by themselves. You can open
 > it with **See the model** and judge it: it has to be a smooth surface, with
 > no star and no mote.
+
+## Further reading
+
+This chapter is the tour; the depth lives in the repository, in the topic
+documents the app itself opens from its **?**:
+
+- [`docs/SEQUENCES.md`](../SEQUENCES.md): the sequence export, the capture
+  recipe and its troubleshooting section;
+- [`docs/UFE.md`](../UFE.md): the FITS editor in full, calibration included.
 
 Next: [06. Photometry](06-photometry.md).

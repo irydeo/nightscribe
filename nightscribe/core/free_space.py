@@ -52,6 +52,7 @@ class MoveReport:
     skipped: list = field(default_factory=list)
     errors: list = field(default_factory=list)
     destination: str | None = None
+    renamed: list = field(default_factory=list)   # (wanted, actual) on restore
 
 
 def freeable(db, run_id):
@@ -230,16 +231,26 @@ def restore(db, run_id, progress=None, cancel=None):
         if not src.exists():
             report.skipped.append(moved_to)
             continue
-        dest = Path(original)
-        dest.parent.mkdir(parents=True, exist_ok=True)
+        wanted = Path(original)
+        wanted.parent.mkdir(parents=True, exist_ok=True)
+        # The original name may be taken again (the observer recaptured into
+        # the same folder): os.replace would OVERWRITE the new frame and it
+        # would be gone in silence. The restore lands on a free name instead,
+        # and the registry follows so the visit stays truthful.
+        dest = _unique(wanted)
         try:
             _move(src, dest)
         except OSError as err:
             report.errors.append(f"{src.name}: {err}")
             continue
+        if dest != wanted:
+            report.renamed.append((str(wanted), str(dest)))
         _follow_path(db, str(src), str(dest))
-        db.execute("UPDATE astrometry_frames SET archived=0, moved_to=NULL"
-                   " WHERE id=?", (frame_id,))
+        # The manifest's `path` is the frame's CURRENT home: keep it honest
+        # when the name changed, or the run would point at a file that is no
+        # longer there.
+        db.execute("UPDATE astrometry_frames SET archived=0, moved_to=NULL,"
+                   " path=? WHERE id=?", (str(dest), frame_id))
         report.moved += 1
         if progress is not None:
             progress(index, total, src.name)

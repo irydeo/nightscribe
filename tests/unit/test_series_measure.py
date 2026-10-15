@@ -1261,3 +1261,30 @@ def test_the_settings_gain_skips_the_measurement(tmp_path, monkeypatch):
     resolved, report = sm._resolve_gain(_config(wcs, comps), paths)
     assert not seen.get("called")
     assert report["source"] == "settings" and report["gain"] == 2.0
+
+
+def test_night_key_uses_the_local_noon_boundary(monkeypatch):
+    # UTC+9: the local evening crosses 12:00 UT, and the old
+    # `floor(mjd - 0.5)` boundary (noon UTC) split one night in two, so the
+    # per-night aperture (T3), the multi-night detrend (T5) and the per-night
+    # QC ran on half nights. With the site's own noon both instants share one
+    # key, and the key still renders the evening's civil date.
+    import datetime
+    monkeypatch.setattr(sm, "_local_offset_days", lambda mjd: 9.0 / 24.0)
+
+    def _mjd(iso):
+        t = datetime.datetime.fromisoformat(iso)
+        return (t - datetime.datetime(1858, 11, 17)).total_seconds() / 86400.0
+
+    evening = sm._night_of(_mjd("2026-10-15T09:00:00"))   # local 18:00
+    late = sm._night_of(_mjd("2026-10-15T12:00:00"))      # local 21:00
+    assert evening == late
+    assert sm._night_label(evening) == "2026-10-15"
+
+
+def test_local_offset_days_matches_the_machine_clock():
+    # The offset is what the observing journal groups by (ADR-036); on this
+    # machine it must simply be a finite number in [-1, 1] days.
+    off = sm._local_offset_days(61300.0)
+    assert isinstance(off, float)
+    assert -1.0 <= off <= 1.0

@@ -123,7 +123,7 @@
       <property name="bottomMargin"><number>0</number></property>
       <item>
        <widget class="QToolButton" name="btn_vtab">
-        <property name="text"><string>PROYECTOS</string></property>
+        <property name="text"><string>PROJECTS</string></property>
         <property name="toolTip"><string>Show or hide the project list</string></property>
         <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
         <property name="maximumSize"><size><width>28</width><height>16777215</height></size></property>
@@ -162,6 +162,7 @@
      <addaction name="separator"/>
      <addaction name="action_welcome"/>
      <addaction name="action_guide_web"/>
+     <addaction name="action_docs_offline"/>
      <addaction name="separator"/>
      <addaction name="action_log"/>
      <addaction name="separator"/>
@@ -202,6 +203,10 @@
   <action name="action_guide_web">
     <property name="text"><string>User guide (web)</string></property>
     <property name="toolTip"><string>The same guide as a web page, in your browser: handy to read on a phone or to send to somebody</string></property>
+  </action>
+  <action name="action_docs_offline">
+    <property name="text"><string>User guide (offline)</string></property>
+    <property name="toolTip"><string>The guide that travels inside the install, opened without a network: for an observatory with no connection</string></property>
   </action>
   <action name="action_log">
     <property name="text"><string>Open the log…</string></property>

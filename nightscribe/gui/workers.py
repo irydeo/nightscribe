@@ -124,6 +124,7 @@ class TonightWorker(QThread):
     # Builds tonight's target list and scores it in the background.
     finished = Signal(list, list, str)  # top, all_scored, error message
     progress = Signal(dict)             # phase message {key, label, index, total}
+    cancelled = Signal()                # the observer stopped the run
 
     def __init__(self, cfg, db, date=None, top=3):
         super().__init__()
@@ -165,7 +166,11 @@ class TonightWorker(QThread):
                                             self._top)
             self.finished.emit(top, all_scored, "")
         except _Cancelled:
-            return              # the app is closing: no signal, no error
+            # The observer pressed Cancel (or the app is closing): say so, so
+            # the host can put the button back instead of leaving it on
+            # "Cancel" forever.
+            self.cancelled.emit()
+            return
         except Exception as err:  # never crash the GUI on data problems
             logger.exception("tonight worker failed: %s", err)
             self.finished.emit([], [], str(err))

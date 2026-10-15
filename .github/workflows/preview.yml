@@ -59,6 +59,16 @@ jobs:
             libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
             libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
 
+      - name: OpenCL (so the GPU path's tests actually run)
+        # The OpenCL backend is ON by default and ships with the app, but its
+        # 32 tests used to SKIP on every runner (no ICD loader), so the
+        # hand-written kernels were only ever exercised on the author's card.
+        # pocl is a CPU OpenCL implementation: with it installed the tests run
+        # in CI too, on the same kernels the observers get.
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            ocl-icd-libopencl1 pocl-opencl-icd
+
       - name: Install the package and dev dependencies
         run: |
           python -m pip install --upgrade pip

@@ -111,7 +111,7 @@ def test_activation_hands_over_name_and_project(qapp, seeded):
 def test_cli_history_uses_the_journal(qapp, seeded, capsys,
                                       monkeypatch):
     from nightscribe import __main__ as cli
-    monkeypatch.setattr(cli, "db", seeded)
+    monkeypatch.setattr(cli, "_db", lambda: seeded)
     cli.cmd_history(args=None)
     out = capsys.readouterr().out
     assert "Noche / Night" in out and "R CrB" in out

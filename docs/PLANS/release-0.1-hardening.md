@@ -120,6 +120,8 @@ no de ingeniería, y es la que más caro se paga en una primera versión públic
   (el test que cae cambia entre ejecuciones; con `-n 4` la suite queda verde, y el árbol base
   sin cambios también falla, así que es **preexistente**). El CI no lo ve porque sus runners
   tienen 2–4 núcleos. Mismo dominio que QA-10: fiabilidad de la suite en máquinas grandes.
+  **Resuelto en P3**: el conftest acota el pool de hilos del combine por proceso, y `-n auto`
+  vuelve a pasar.
 - **Extensibilidad y proceso**: `db._migrate` de 586 líneas (DEV-12), red fuera del caché sin
   lista de exenciones (DEV-10), sin `docs/DEVELOPING.md` (DEV-11), sin guardianes de índice ADR
   ni de `requests` (DEV-13, DEV-14), `imageio-ffmpeg` dura frente a opcional (DEV-16), ficheros
@@ -227,16 +229,20 @@ para todo el worker de xdist.
 
 ### P3: mantenibilidad (no bloquea la salida, sí la evolución por terceros)
 
-- **A11** test de contrato de `kinds` (cada `id` con caso en planner, enrich, suggest, narrative,
-  glyph, overview).
-- **DEV-14** guardián de «`requests` solo en `core/sources/`».
-- **A9** guardián de la raya en texto visible y corrección de `AGENTS.md`.
-- **QA-17**, **A4** tests de migración v18, v20 y v21 (el de `restore` con destino ocupado vive
-  en el paquete F9).
-- **DEV-11** `docs/DEVELOPING.md` con tres recetas (nueva fuente, nuevo tipo, nueva pestaña UFE).
-- **QA-18** acotar el paralelismo de la suite en máquinas grandes (limitar los workers de xdist
-  o los hilos del combine por proceso) para que un contribuyente de 16 núcleos no vea un crash
-  no determinista.
+- **A11** (hecho) test de contrato de `kinds`: los mapas que deben cubrir todos los tipos (color,
+  chip, análisis, campos de contexto y hashtags) fallan el día que se añade uno sin ellos. Ya ha
+  cazado un hueco real: `alert` no tenía hashtags.
+- **DEV-14** (hecho) guardián de las fronteras: `requests` solo en `core/sources/`, y la GUI no
+  abre SQLite.
+- **A9** (hecho) guardián de la raya en la guía y en las cadenas de la interfaz, y `AGENTS.md`
+  corregido (solo la línea que enuncia la regla conserva el carácter). Los comentarios del código
+  mantienen las suyas: son historia, y la regla va de prosa.
+- **QA-17**, **A4** (hecho) guarda de tabla en las migraciones v18, v20 y v21, con sus tests
+  (incluido el caso «la tabla no está y aun así llega arriba»).
+- **DEV-11** (hecho) `docs/DEVELOPING.md` y su gemela ES, con las tres recetas, enlazado desde
+  CONTRIBUTING.
+- **QA-18** (hecho) el conftest acota el pool de hilos del combine por proceso: con `-n auto` en
+  la máquina de 12 núcleos la suite vuelve a pasar, dos veces seguidas.
 
 *Agendado, fuera de la 0.1:* refactor de `main_window.py` (A12), `db._migrate` (DEV-12) y los
 módulos grandes secundarios.

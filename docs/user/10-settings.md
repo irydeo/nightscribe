@@ -111,9 +111,15 @@ one click away behind the **Advanced** door.
   moved, and they go in **by files or by folder**: each frame is classified
   by its own header (`IMAGETYP`), so you never say which is a dark and which
   is a flat. There are **three kinds, not four**: a "dark of the flats" is a
-  dark, and its exposure is what makes it valid. The library lives only
-  here; the editor's Calibration tab **reads** it and links back to this
-  page.
+  dark, and its exposure is what makes it valid. The app can also **build
+  the masters** from a folder of frames: it groups them by their key,
+  combines them with the median and writes the master in the library folder.
+  Every master has an **owner**: the ones a project builds are its own, a
+  bias or a flat can be **shared** with everyone, and a project can **use**
+  another's without copying it. The table says who owns each row ("Shared"
+  when it belongs to all) and from here you change the owner. The library
+  lives only here; the editor's Calibration tab **reads** it and links back
+  to this page.
 - **Plate solver**: *Auto* tries local ASTAP and falls back to
   nova.astrometry.net; you can also force one. **ASTAP binary**: path to
   the executable (empty = look for `astap` on the PATH), with **Test** to

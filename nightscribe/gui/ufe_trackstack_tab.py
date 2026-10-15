@@ -1320,7 +1320,8 @@ class UfeTrackStackTab(QWidget):
             calibrate=self.chk_calibrate.isChecked(),
             manual_ref=manual_ref,
             packed=ctx.get("packed") or ctx.get("id"),
-            groups=self._resolved_groups()[0]))
+            groups=self._resolved_groups()[0],
+            project_id=ctx.get("pid")))
         self._worker.progress.connect(self._on_progress)
         self._worker.finished.connect(self._on_finished)
         self._worker.failed.connect(self._on_failed)

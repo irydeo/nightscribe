@@ -2716,8 +2716,12 @@ class MainWindow(QMainWindow):
             lambda: self._settings_master_add(dlg))
         dlg.btn_master_add_dir.clicked.connect(
             lambda: self._settings_master_add_dir(dlg))
+        dlg.btn_master_build.clicked.connect(
+            lambda: self._settings_master_build(dlg))
         dlg.btn_master_remove.clicked.connect(
             lambda: self._settings_master_remove(dlg))
+        dlg.btn_master_share.clicked.connect(
+            lambda: self._settings_master_share(dlg))
         dlg.tbl_masters.itemSelectionChanged.connect(
             lambda: self._settings_masters_sync(dlg))
         self._settings_masters_refresh(dlg)
@@ -2742,8 +2746,10 @@ class MainWindow(QMainWindow):
         masters = calibration.list_masters(db)
         tbl = dlg.tbl_masters
         tbl.setRowCount(len(masters))
+        names = {}
         for row, m in enumerate(masters):
             cells = [Path(m.path).name, self._master_kind_label(m.kind),
+                     self._master_project_label(m.project_id, names),
                      m.camera or "", _master_num(m.gain),
                      _master_num(m.temp_c), _master_num(m.exptime_s),
                      m.filter or "", (m.created or "")[:10]]
@@ -2757,11 +2763,38 @@ class MainWindow(QMainWindow):
                 tbl.setItem(row, col, item)
         self._settings_masters_sync(dlg)
 
+    def _master_project_label(self, project_id, cache):
+        # @args: project_id - the master's project, or None for a shared one,
+        #        cache - {pid: name} reused across the table
+        # @return: the project's name, or a word for a master every project
+        #          can use. The library shows WHO owns each master, because
+        #          the same file can back several rows: the owner's and every
+        #          project that adopted it (ADR-061 rev).
+        if project_id is None:
+            return self.tr("Shared")
+        if project_id not in cache:
+            from ..core import project
+            p = project.get(db, project_id) or {}
+            cache[project_id] = p.get("object_name") or f"#{project_id}"
+        return cache[project_id]
+
     def _settings_masters_sync(self, dlg):
         # @args: dlg - the settings dialog
         # @return: None
         selected = bool(dlg.tbl_masters.selectionModel().selectedRows())
         dlg.btn_master_remove.setEnabled(selected)
+        dlg.btn_master_share.setEnabled(selected)
+        if selected:
+            from ..core import calibration
+            mid = self._settings_master_selected_id(dlg)
+            ref = next((m for m in calibration.list_masters(db)
+                        if m.id == mid), None)
+            # The button says what it will DO, not what the row is: a master
+            # already shared offers to take the sharing back.
+            shared = ref is not None and ref.project_id is None
+            dlg.btn_master_share.setText(
+                self.tr("Stop sharing") if shared
+                else self.tr("Share with every project"))
 
     def _settings_master_selected_id(self, dlg):
         # @args: dlg - the settings dialog
@@ -2882,6 +2915,141 @@ class MainWindow(QMainWindow):
         self._settings_masters_refresh(dlg)
         dlg.lbl_master_status.setText(
             self.tr("Removed %1 from the library.").replace("%1", name))
+
+    def _settings_master_build(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. Builds masters from a folder of calibration frames
+        #          and indexes them as SHARED, because this IS the global
+        #          library: what is built here every project can use. The
+        #          build runs off the GUI thread (a night of frames is a lot
+        #          of pixels) and the originals are KEPT: deleting the
+        #          observer's own data is the observer's call.
+        from pathlib import Path
+        from ..core import calibration
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Build masters from a folder of calibration "
+                         "frames"), "")
+        if not folder:
+            return
+        files = sorted(
+            str(p) for p in Path(folder).rglob("*")
+            if p.is_file() and p.suffix.lower() in (".fits", ".fit", ".fts"))
+        if not files:
+            dlg.lbl_master_status.setText(
+                self.tr("No FITS frames in that folder."))
+            return
+        self._start_master_build(dlg, files, str(calibration.calib_root()),
+                                 project_id=None, shared=True,
+                                 delete_sources=False)
+
+    def _start_master_build(self, dlg, files, out_dir, project_id=None,
+                            shared=False, delete_sources=False):
+        # @args: dlg - the dialog that asked, files - the frames, out_dir -
+        #        the library folder, project_id/shared - who owns the
+        #        masters, delete_sources - remove the frames once each master
+        #        is written AND indexed (the caller confirms that first)
+        # @return: None. One worker for both entry points (the library and a
+        #          project's Calibration tab); the button is locked while it
+        #          runs so a second build cannot race the first.
+        from .workers import CalibrationBuildWorker, hold
+        worker = hold(CalibrationBuildWorker(
+            files, out_dir, db, project_id=project_id, shared=shared,
+            delete_sources=delete_sources))
+        self._master_build_worker = worker
+        status = dlg.lbl_master_status
+        button = getattr(dlg, "btn_master_build", None)
+        worker.progress.connect(
+            lambda done, total, kind: status.setText(
+                self.tr("Building masters… %1 of %2").replace(
+                    "%1", str(done)).replace("%2", str(total))))
+        worker.finished.connect(
+            lambda result: self._master_build_done(dlg, result))
+        worker.failed.connect(lambda msg: status.setText(msg))
+        if button is not None:
+            button.setEnabled(False)
+            worker.finished.connect(
+                lambda _r: button.setEnabled(True))
+            worker.failed.connect(lambda _m: button.setEnabled(True))
+        status.setText(self.tr("Building masters…"))
+        worker.start()
+
+    def _master_build_done(self, dlg, result):
+        # @args: dlg - the settings dialog, result - build_masters' dict
+        # @return: None. Refreshes the library and says, in plain language,
+        #          what was built, what was left out and why. A group with a
+        #          SINGLE frame is called out: it is a copy of that frame,
+        #          not an average, so it carries the frame's own noise.
+        self._settings_masters_refresh(dlg)
+        built = result.get("built", [])
+        bits = []
+        if built:
+            kinds = {}
+            for item in built:
+                kinds[item["kind"]] = kinds.get(item["kind"], 0) + 1
+            bits.append(self.tr("Built %1 masters:").replace(
+                "%1", str(len(built))) + " " + ", ".join(
+                    f"{n} {self._master_kind_label(k).lower()}"
+                    for k, n in sorted(kinds.items())))
+            if any(item.get("single") for item in built):
+                bits.append(self.tr(
+                    "A group had a single frame, so its master is a copy of "
+                    "that frame and not an average: one more frame is what "
+                    "brings the noise down."))
+        else:
+            bits.append(self.tr("Nothing was built."))
+        skipped = result.get("skipped", [])
+        if skipped:
+            bits.append(self.tr("%1 frames were left out: they are not "
+                                "calibration frames.").replace(
+                                    "%1", str(len(skipped))))
+        for kind, why in result.get("errors", [])[:3]:
+            bits.append(f"✕ {kind}: {why}")
+        if result.get("cancelled"):
+            bits.append(self.tr("Cancelled: the masters built so far are "
+                                "kept."))
+        dlg.lbl_master_status.setText("  ".join(bits))
+
+    def _settings_master_share(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. Changes WHO owns the selected master: shared with
+        #          every project (project_id NULL), or one project's own. The
+        #          file never moves and is never copied: ownership is a
+        #          property of the ROW, and the same file can back the
+        #          owner's row and the rows of every project that adopted it
+        #          (ADR-061 rev). Any kind can be shared.
+        from pathlib import Path
+        from PySide6.QtWidgets import QInputDialog
+        from ..core import calibration, project
+        mid = self._settings_master_selected_id(dlg)
+        if mid is None:
+            return
+        master = next((m for m in calibration.list_masters(db)
+                       if m.id == mid), None)
+        if master is None:
+            return
+        name = Path(master.path).name
+        shared_label = self.tr("Shared (every project)")
+        projects = project.list_projects(db) or []
+        labels = [shared_label] + [
+            (p.get("object_name") or f"#{p.get('id')}") for p in projects]
+        current = 0
+        if master.project_id is not None:
+            for index, p in enumerate(projects):
+                if p.get("id") == master.project_id:
+                    current = index + 1
+                    break
+        choice, ok = QInputDialog.getItem(
+            dlg, self.tr("Who owns this master"), name, labels, current,
+            False)
+        if not ok:
+            return
+        index = labels.index(choice)
+        new_pid = None if index == 0 else projects[index - 1].get("id")
+        calibration.set_master_project(db, mid, new_pid)
+        self._settings_masters_refresh(dlg)
+        dlg.lbl_master_status.setText(
+            self.tr("%1 now belongs to %2.").replace("%1", name).replace(
+                "%2", choice))
 
     def _horizon_browse_into(self, dlg):
         # @args: dlg - the settings dialog; fills its file field with a

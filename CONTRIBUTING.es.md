@@ -76,7 +76,9 @@ test funcional.
 
 Lee primero `docs/adr/`. Para cambiar una decisión, actualiza o reemplaza el ADR. Para
 añadir una fuente de datos, sigue `docs/DATA_SOURCES.md` (un módulo por fuente, TTL,
-degradación elegante) y regístrala en un ADR.
+degradación elegante) y regístrala en un ADR. Para las tres recetas que más salen (una
+fuente nueva, un tipo de objetivo nuevo, una pestaña nueva del editor), mira
+`docs/DEVELOPING.md`.
 
 ## Pull requests
 

@@ -84,7 +84,8 @@ test.
 
 Read `docs/adr/` first. To change a decision, update or supersede the ADR. To add a
 data source, follow `docs/DATA_SOURCES.md` (one module per source, TTL, graceful
-degradation) and record it in an ADR.
+degradation) and record it in an ADR. For the three recipes that come up most (a new
+source, a new target kind, a new editor tab), see `docs/DEVELOPING.md`.
 
 ## Pull requests
 

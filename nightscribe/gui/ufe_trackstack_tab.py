@@ -1015,6 +1015,36 @@ class UfeTrackStackTab(QWidget):
 
     # ------------------------------------------------------------- visit
 
+    def clear_session(self):
+        # A different project or visit is a different session (reported
+        # 2026-10-15: the previous RUN's face - its strip, its tables, its
+        # report, its check and its Undo - travelled to the next visit).
+        # Nothing is deleted: the run lives in its project.
+        # @return: None
+        self._clear_run()
+        self._ctx_paths = None        # the frames are the NEW visit's
+
+    def _clear_run(self):
+        # @return: None. The run's own face goes; the frames and the
+        #          grouping are NOT touched (they are the visit's).
+        self._anim_stop()
+        self._base_snr = None
+        self._result = None
+        self._run_id = None
+        self._restore_asked = False   # a new visit may hold its own run
+        self._thumbs.clear()
+        self.tbl_points.setRowCount(0)
+        self.tbl_snr.setRowCount(0)
+        self._fill_report_text("")
+        self.txt_notes.setVisible(False)
+        self._hide_manual()
+        self._hide_residuals()
+        self._show_result_area(False)
+        self.cmb_group.clear()
+        self.cmb_group.setEnabled(False)
+        self._sync_report_buttons()
+        self._sync_animate_button()
+
     def _sync_context(self):
         # The visit arms the tab (D15): with no visit the stack button
         # stays DISABLED and the object line says why (a dead button
@@ -1055,20 +1085,7 @@ class UfeTrackStackTab(QWidget):
             self._n_unreadable = max(0, len(paths) - len(self._frames))
             # a different visit invalidates the last run: its stacks, its
             # check and its report belong to the other sequence
-            self._anim_stop()
-            self._base_snr = None
-            self._result = None
-            self.cmb_group.clear()
-            self.cmb_group.setEnabled(False)
-            self._fill_report_text("")
-            self.txt_notes.setVisible(False)
-            self._hide_manual()
-            self._hide_residuals()
-            self._show_result_area(False)
-            self._sync_report_buttons()
-            self._sync_animate_button()
-            # a different visit may hold its own saved run: ask again
-            self._restore_asked = False
+            self._clear_run()
             # and the calibration's automatic default follows THIS visit's
             # frames (camera, filter, temperature): a library that matches
             # turns it on, and only while nobody has chosen

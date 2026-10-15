@@ -181,6 +181,18 @@ class UfeCalibrationTab(QWidget):
 
     # ------------------------------------------------------------ recipe
 
+    def clear_session(self):
+        # A different project or visit is a different session (reported
+        # 2026-10-15): the previous visit's recipe line must not travel to
+        # the next one. The library is consulted live, so there is nothing
+        # else to drop.
+        # @return: None
+        self._ctx_paths = None
+        self._recipe = None
+        self.lbl_recipe.setText(self.tr(
+            "Open the editor from a visit to see its recipe."))
+        self.lbl_warnings.setText("")
+
     def _sync_context(self):
         # The recipe shown is the FIRST frame's: a visit is one camera,
         # one filter and one temperature, so its header speaks for all of

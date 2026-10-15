@@ -388,7 +388,9 @@ class UfeDialog(QWidget):
         for tab in (getattr(self, "tab_measure", None),
                     getattr(self, "tab_compare", None),
                     getattr(self, "tab_annotate", None),
-                    getattr(self, "tab_blink", None)):
+                    getattr(self, "tab_blink", None),
+                    getattr(self, "tab_calibration", None),
+                    getattr(self, "tab_trackstack", None)):
             clear = getattr(tab, "clear_session", None)
             if callable(clear):
                 try:

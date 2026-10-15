@@ -106,6 +106,25 @@ def test_visit_arms_the_tab(qapp, tmp_path):
     assert "2026 QX" in tab.lbl_object.text()
 
 
+def test_a_new_session_clears_the_previous_run(qapp, tmp_path):
+    # Reported 2026-10-15: opening another visit kept the previous RUN's
+    # face (its strip, its tables, its Undo). clear_session() leaves the
+    # run behind; the run lives in its project, never in the tab.
+    tab, _host = _tab(qapp, tmp_path)
+    tab._result = {"status": "ok", "points": [1, 2]}
+    tab._run_id = 77
+    tab.tbl_points.setRowCount(3)
+    tab.tbl_snr.setRowCount(2)
+    tab._show_result_area(True)
+    tab.clear_session()
+    assert tab._result is None
+    assert tab._run_id is None
+    assert tab._ctx_paths is None
+    assert tab.tbl_points.rowCount() == 0
+    assert tab.tbl_snr.rowCount() == 0
+    assert tab._restore_asked is False
+
+
 def test_the_tab_finds_an_embedded_host(qapp, tmp_path):
     # ADR-053: the editor is a PAGE of the shell, so window() from a tab is
     # the MAIN window and the hooks live in an ancestor. The helper above

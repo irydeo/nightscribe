@@ -196,21 +196,34 @@ una ejecución real.
 
 ### P2: primer contacto y UX (lo que hace abandonar)
 
-- **B12** ayuda de la CLI bilingüe.
-- **A6** documentación local en el menú Ayuda (tras B5).
-- **A7** bloquear o resolver el código MPC sin coordenadas.
-- **A8** cancelación real en «Calcular la noche» y en Find_Orb.
-- **F9** cablear la fase 9 (liberar espacio) en la ventana de visita. **A1 primero**: `restore`
-  con destino ocupado resuelve con `_unique` y registra el nombre real (nunca pisa un fichero
-  recapturado). Después la acción con confirmación (§9.5), las dos casillas (§9.3: originales a
-  `procesados`, calibrados borrados), progreso y cancelación, restauración y el cierre de los
-  handles de mmap (D32). Tests: `restore` con destino ocupado y el resto de la fase 9.
-- **UX-03**, **UX-06**, **UX-07**, **UX-21**.
-- **B10** capítulo Explore, **B11** capítulo de resolución de problemas, **A14** enlazar los docs
-  de tema desde la guía.
+- **B12** (hecho) ayuda de la CLI bilingüe: los textos viven en una tabla por idioma, elegida
+  como la de la GUI (el configurado, o el del SO si es «system»), sin Qt para que `--help` no
+  pague por importar PySide6.
+- **A6** (hecho) puerta offline a la guía en el menú Ayuda (**Guía (offline)**), con revisión en
+  ADR-070 (no es la puerta general que se retiró: abre la guía, no cualquier documento).
+- **A7** (hecho) `_apply_site` resuelve el código MPC sin coordenadas y, si no resuelve, **no**
+  guarda el código: el sitio no queda en 0,0 y la app sigue pidiendo observatorio.
+- **A8** (hecho) el botón ↻ es **Cancelar** mientras se calcula (el worker ya tenía `cancel()`,
+  nadie lo llamaba), y `findorb.run` sondea `Popen` para que el Cancelar del chequeo funcione.
+- **F9** (hecho, con recortes anotados) la ventana de visita gana **Liberar espacio…** y **Traer
+  de vuelta…**, con confirmación (número, tamaño, destino) y el arreglo de **A1** por delante:
+  `restore` nunca pisa un fichero recapturado (usa `_unique`, sigue el registro y lo reporta).
+  *Recortes:* el borrado de calibrados (§9.3) no tiene registro de rutas todavía, la oferta
+  automática al terminar un run (§9.2) y el cierre explícito de handles mmap (D32) quedan
+  pendientes.
+- **UX-03**, **UX-06**, **UX-07**, **UX-21** (hecho): la fila dice «Crear proyecto», el estado
+  vacío distingue red de tipos vacíos, la confirmación de borrado dice que las tomas en disco se
+  conservan, y el paso de datos se rotula como informativo.
+- **B10**, **B11**, **A14** (hecho): capítulos 13 (la ficha de objeto) y 14 (cuando algo va mal),
+  y los capítulos 05-07 enlazan los docs de tema (el generador de la web los mapea al
+  repositorio, que es donde se publican).
 
 *Aceptación:* un usuario nuevo completa *primer arranque, primer proyecto, calcular la noche*
 sin abrir el manual, y `--help` responde en el idioma del sistema.
+
+*Estado (2026-10-15): **implementado**.* Suite verde (3584 con `-n 4`), web regenerada. De
+camino se arregló una fuga de tests real: dos fixtures dejaban `config.is_configured` a `True`
+para todo el worker de xdist.
 
 ### P3: mantenibilidad (no bloquea la salida, sí la evolución por terceros)
 
@@ -237,13 +250,13 @@ atómicas de derivados, permisos del FITS, `imageio-ffmpeg`, `_pack_desig`, `obs
 
 ## 6. Checklist de publicación de la 0.1
 
-- [ ] `pyproject.toml`: URL real, clasificador a `4 - Beta`, versión == tag
+- [x] `pyproject.toml`: URL real (B4). Pendiente: clasificador a `4 - Beta` y versión == tag
 - [ ] `CHANGELOG.md` y proceso de release en `CONTRIBUTING` (DEV-06, QA-16)
-- [ ] `.deb`, `.rpm`, PKGBUILD y wheel con `docs/` y ayuda offline verificada por test
-- [ ] README sin promesas incumplidas (CLI, Find_Orb, recuento de claves, asistente)
-- [ ] Suite verde en las dos plataformas; los 33 *skips* explicados o cubiertos
-- [ ] ADR-091 revisada y `gpu.py` coherente
-- [ ] Guía con capítulo Explore, troubleshooting y sin la contradicción del flat dark
+- [x] `.deb`, `.rpm`, PKGBUILD y wheel con `docs/` y ayuda offline verificada por test (B5)
+- [x] README sin promesas incumplidas (CLI, Find_Orb, recuento de claves, asistente) (B7, B8, A13)
+- [x] Suite verde en las dos plataformas; los 33 *skips* explicados o cubiertos (QA-18 aparte)
+- [x] ADR-091 revisada y `gpu.py` coherente (A5); *pendiente: confirmar la cobertura OpenCL en CI*
+- [x] Guía con capítulo de ficha de objeto, troubleshooting y sin la contradicción del flat dark (B9, B10, B11)
 - [ ] Licencia GPL y aviso de Find_Orb presentes en los paquetes
 
 ---

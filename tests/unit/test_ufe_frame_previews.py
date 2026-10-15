@@ -302,6 +302,38 @@ def test_the_preview_takes_the_column_and_the_caption_rides_on_it(
     widget.deleteLater()
 
 
+def test_a_loaded_preview_follows_a_wider_column(qapp, tmp_path):
+    # Reported 2026-10-15: with the previews LOADED, widening the panel grew
+    # the row and left the image at the size it had when it arrived (the
+    # placeholder was re-scaled on resize, the real icon was not). The
+    # stretched image is kept and re-scaled, so the preview follows the
+    # column instead of staying small and centred in a bigger row.
+    from PySide6.QtCore import QSize
+    from nightscribe.gui.widgets.frame_previews import FramePreviews
+    from nightscribe.gui.workers import FrameThumbWorker
+    paths = [_frame(tmp_path / f"f{i}.fits") for i in range(2)]
+    widget = FramePreviews()
+    widget.resize(320, 600)
+    widget.show()
+    widget.set_frames(paths)
+    worker = FrameThumbWorker(paths)
+    worker.sampled.connect(widget.set_fact)
+    worker.run()                        # in this thread: it is a plain loop
+    qapp.processEvents()
+    small = widget._thumb
+
+    def painted(index):
+        return widget.item(index).icon().pixmap(
+            QSize(widget._thumb, widget._thumb)).width()
+
+    assert painted(0) == small
+    widget.resize(560, 600)
+    qapp.processEvents()
+    assert widget._thumb > small
+    assert painted(0) == widget._thumb      # the image follows the column
+    widget.deleteLater()
+
+
 def test_the_list_fills_the_panel_s_height(qapp, tmp_path):
     # Reported 2026-10-06: the list was 264 px of a 640 px panel because the
     # panel's trailing spacer was Expanding and took the rest. It is Fixed

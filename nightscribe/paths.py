@@ -135,3 +135,39 @@ def project_dir(project_id, slug="", root=""):
     p = base / f"{project_id}-{safe}"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+# The prefix every scratch entry the app writes to the SYSTEM temp folder
+# carries, so a sweep can tell the app's own leftovers from everyone else's
+# (a run's `fo` folder, the phase chart's scratch, a captured frame).
+TEMP_PREFIX = "nightscribe-"
+
+
+def sweep_temp(max_age_s=24 * 3600):
+    # Removes the app's OWN leftovers in the system temp folder. The app
+    # writes there for work that has to exist as a PATH (Find_Orb's folders,
+    # the phase chart's scratch PNG, a captured frame the editor reads by
+    # path) and removes each one when it is done; a crash or a kill leaves
+    # it behind, so the OLD ones go at startup. Only entries older than
+    # `max_age_s` are touched, which is what keeps a second instance working
+    # RIGHT NOW out of it.
+    # @args: max_age_s - how old a leftover must be (seconds)
+    # @return: how many entries were removed
+    import shutil
+    import tempfile
+    import time
+    root = Path(tempfile.gettempdir())
+    now = time.time()
+    removed = 0
+    for entry in root.glob(TEMP_PREFIX + "*"):
+        try:
+            if now - entry.stat().st_mtime < max_age_s:
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry, ignore_errors=True)
+            else:
+                entry.unlink(missing_ok=True)
+            removed += 1
+        except OSError:
+            continue
+    return removed

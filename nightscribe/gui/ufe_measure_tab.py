@@ -588,6 +588,9 @@ class UfeMeasureTab(QWidget):
         if level is None:
             level = "warn" if text.startswith("⚠") else "info"
         self.lbl_status.setText(text)      # the tab's own record (hidden)
+        # the record wears the level's colour too: the tab and the window's
+        # line say the same sentence in the same colour (one source)
+        theme.paint_level(self.lbl_status, level)
         if self._status_hook is not None:
             self._status_hook(text, level)
 
@@ -1623,6 +1626,11 @@ class UfeMeasureTab(QWidget):
         # block up. The resize event refits it once there is a real width.
         if lbl is None or not lbl.isVisible() or lbl.width() < 50:
             return
+        # the floor is CLEARED first: Qt clamps heightForWidth to the
+        # widget's minimumHeight, so a label measured once at a narrow width
+        # could never come back down when the column grew (the same defect
+        # the Astrometry panel's labels carried, measured 2026-10-15)
+        lbl.setMinimumHeight(0)
         need = lbl.heightForWidth(lbl.width())
         if need and need > 0:
             lbl.setMinimumHeight(int(need))

@@ -253,6 +253,19 @@ class PhaseDialog(QDialog):
                 logger.warning("could not save the period: %s", err)
         super().accept()
 
+    def closeEvent(self, event):
+        # The chart's scratch folder goes with the window: it was created
+        # for the preview and never removed, one `nightscribe-phase-*` per
+        # open (reported 2026-10-15). The exported PNG the observer asked
+        # for is a COPY in the project, never this one.
+        # @args: event - the QCloseEvent
+        tmp = getattr(self, "_tmp", None)
+        if tmp:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+            self._tmp = None
+        super().closeEvent(event)
+
     def _on_export(self):
         from ..core import photometry_export  # noqa: F401  (keeps the
         # export path in one place: the module owns the CSV conventions)

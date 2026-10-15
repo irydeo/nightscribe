@@ -202,6 +202,7 @@ class FramePreviews(QListWidget):
             f"QListWidget::item:selected {{ background: {theme.C_SEL}; }}")
         self._paths = []
         self._facts = []          # one dict per frame (or None until read)
+        self._images = []         # one STRETCHED image per frame (unscaled)
         self._problems_only = False
         self._thumb = 140         # the side, until the list is laid out
         self._hue = theme.C_ACCENT   # the caption's colour: the object's own
@@ -234,8 +235,11 @@ class FramePreviews(QListWidget):
             item = self.item(index)
             item.setData(Qt.UserRole + 1, QSize(room, room))
             item.setSizeHint(QSize(room + 2 * GAP, room + 2 * GAP))
-            if item.icon().isNull():
-                item.setIcon(self._placeholder)
+            # A REAL preview is re-scaled to the new side. It used to keep
+            # the size it had when it arrived, so widening the panel grew the
+            # row and left the image small and centred in it (reported
+            # 2026-10-15: "si hago más grande el panel, no se incrementan").
+            self._set_icon(index)
         self.viewport().update()
 
     def resizeEvent(self, event):
@@ -258,6 +262,7 @@ class FramePreviews(QListWidget):
         self.clear()
         self._paths = [str(p) for p in paths or []]
         self._facts = [dict(facts or {}) for _p in self._paths]
+        self._images = [None] * len(self._paths)
         for index, path in enumerate(self._paths):
             item = QListWidgetItem(self._placeholder, self._caption(index))
             item.setToolTip(Path(path).name)
@@ -284,11 +289,12 @@ class FramePreviews(QListWidget):
             return
         facts = self._facts[index]
         if sample is not None:
-            item.setIcon(QPixmap.fromImage(self._image(sample)))
-        elif facts.get("broken"):
-            item.setIcon(self._broken_icon())
-        elif item.icon().isNull():
-            item.setIcon(self._placeholder)
+            # The STRETCHED image is kept UNScaled: _fit_thumb re-scales it
+            # when the column changes, so a preview that arrives before the
+            # panel is laid out is not stuck at that size (reported
+            # 2026-10-15).
+            self._images[index] = self._gray(sample)
+        self._set_icon(index)
         # the item's text is the caption (the delegate paints it over the
         # image; Qt is not asked to lay it out)
         item.setText(self._caption(index))
@@ -403,22 +409,40 @@ class FramePreviews(QListWidget):
             bits.append(self.tr("The last run could not register it"))
         return "\n".join(bits)
 
-    def _image(self, sample):
+    def _gray(self, sample):
         # @args: sample - the small float array
-        # @return: a QImage, stretched by ITS OWN percentiles (each frame
-        #          readable on its own; the tooltip carries the numbers for
-        #          the comparison) and scaled to the preview's side keeping
-        #          the frame's own proportions (a non-square sensor is
-        #          letterboxed, never squashed)
-        from PySide6.QtCore import Qt as _Qt
+        # @return: the frame as a grayscale QImage, stretched by ITS OWN
+        #          percentiles (each frame readable on its own) and at the
+        #          SAMPLE's size: scaling it to the preview's side is
+        #          _set_icon's job, so a resize can redo it without paying
+        #          the stretch again.
         lo, hi = stretch.auto_limits(np.asarray(sample, dtype=np.float32))
         disp = stretch.to_uint8(stretch.apply_stretch(sample, lo, hi, 0.7))
         disp = np.ascontiguousarray(disp)
         height, width = disp.shape[:2]
-        img = QImage(disp.data, width, height, width,
-                     QImage.Format_Grayscale8).copy()
-        return img.scaled(self._thumb, self._thumb, _Qt.KeepAspectRatio,
-                          _Qt.SmoothTransformation)
+        return QImage(disp.data, width, height, width,
+                      QImage.Format_Grayscale8).copy()
+
+    def _set_icon(self, index):
+        # @args: index - the frame
+        # @return: None. What the row wears: its preview (scaled to the
+        #          current side keeping the frame's own proportions, so a
+        #          non-square sensor is letterboxed and never squashed), the
+        #          alert mark when it could not be read, or the placeholder
+        #          until its read lands. Called from _fit_thumb too, so the
+        #          image FOLLOWS the column and a resize is not lost.
+        item = self.item(index)
+        if item is None:
+            return
+        img = self._images[index] if index < len(self._images) else None
+        if img is not None:
+            item.setIcon(QPixmap.fromImage(img.scaled(
+                self._thumb, self._thumb, Qt.KeepAspectRatio,
+                Qt.SmoothTransformation)))
+        elif index < len(self._facts) and self._facts[index].get("broken"):
+            item.setIcon(self._broken_icon())
+        else:
+            item.setIcon(self._placeholder)
 
     def _make_placeholder(self):
         # @return: the icon every row wears until its preview is read

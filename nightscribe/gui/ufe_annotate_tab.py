@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (QFileDialog, QMessageBox,
 
 from ..core import fits_annotate, fits_io, wcs as wcs_mod
 from ..viz import palette
+from . import theme
 from .ui_loader import adopt_ui
 from .ufe_host import host_of
 
@@ -122,6 +123,9 @@ class UfeAnnotateTab(QWidget):
         if level is None:
             level = "warn" if text.startswith("⚠") else "info"
         self.lbl_status.setText(text)      # the tab's own record (hidden)
+        # the record wears the level's colour too: the tab and the window's
+        # line say the same sentence in the same colour (one source)
+        theme.paint_level(self.lbl_status, level)
         if self._status_hook is not None:
             self._status_hook(text, level)
 

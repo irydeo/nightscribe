@@ -169,9 +169,7 @@ Para un proyecto de tránsito, el editor añade el bloque EXOTIC: NightScribe
 prepara el `inits.json` (con tus datos de observatorio y cámara de Configuración),
 ejecuta EXOTIC en su propio entorno si lo configuraste, importa su curva y
 sus parámetros, y exporta el archivo de 3 columnas para **ExoClock** con el
-`ExoClock_info.txt` relleno. También puedes ajustar el tránsito dentro de la
-app (modelo con limb darkening cuadrático) para una estimación rápida del
-T_mid antes de enviar nada.
+`ExoClock_info.txt` relleno.
 
 > **¿Por qué ExoClock?** Porque la misión Ariel de la ESA necesita saber
 > *cuándo* transita cada planeta dentro de unos años, y los tránsitos

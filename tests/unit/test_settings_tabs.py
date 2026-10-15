@@ -11,18 +11,20 @@
 #
 ############################################################
 
-"""Settings dialog layout smoke tests (offscreen, ADR-071).
+"""Settings dialog layout smoke tests (offscreen, ADR-071 and ADR-092).
 
-The dialog is a rail of six categories (Observatory / Equipment /
+The dialog is a rail of six named categories (Observatory / Equipment /
 Observing / Measurement / Integrations / Interface) over a stack of
-scrollable pages, with a search box and collapsible advanced groups. What
-these tests lock in:
+scrollable pages, with a search box and ONE "Advanced" door per page
+behind which the expert groups live (ADR-092). What these tests lock in:
 
 * the page order and the widgets that live on each page;
 * the field table (`settings_spec.FIELDS`) covering every simple field and
   mapping to a real config key (the round-trip, one table both ways);
-* the search filtering a row by its label or its help;
-* the advanced groups opening collapsed;
+* the search filtering a row by its label or its help, and opening the
+  door when the match lives behind it;
+* the doors starting closed and handing themselves back to the observer
+  when the search box is cleared;
 * the help-below-field rule (ADR-028) on the reorganized pages.
 
 No network, no full MainWindow: the tests load the exact .ui the settings
@@ -92,10 +94,11 @@ def test_pages_in_order(qapp):
     dlg.deleteLater()
 
 
-def test_the_rail_is_icon_only_with_a_tooltip(qapp):
-    # ADR-071: the rail carries an ICON per category instead of the text;
-    # the name lives in the tooltip (and the accessible name), and every
-    # icon has its dim/active pair on disk.
+def test_the_rail_shows_icon_and_name(qapp):
+    # ADR-092: the rail carries the icon AND the name of each category
+    # (ADR-071's icon-only rail had to be hovered to be learned). The name
+    # is also the tooltip and the accessible name, and every icon keeps its
+    # dim/active pair on disk.
     from nightscribe.gui import settings_spec, settings_view, theme
     dlg = _dlg()
     settings_view.build_rail(dlg, settings_spec.CATEGORIES, lambda s: s)
@@ -103,7 +106,7 @@ def test_the_rail_is_icon_only_with_a_tooltip(qapp):
     assert rail.count() == len(settings_spec.CATEGORIES)
     for i, (_page, label, stem) in enumerate(settings_spec.CATEGORIES):
         item = rail.item(i)
-        assert item.text() == "", "the rail must be icon-only"
+        assert item.text() == label, "the rail names every category"
         assert not item.icon().isNull(), f"{stem}: icon is missing"
         assert item.toolTip() == label, f"{stem}: the tooltip is the name"
         assert theme.asset(stem + ".svg").exists(), f"{stem}.svg missing"
@@ -119,8 +122,11 @@ def test_observatory_page(qapp):
               "edt_aavso_code",
               # ADR-083: the site's sky brightness and its two helpers
               "spn_sky_brightness", "btn_sky_lookup", "btn_sky_map",
-              # the observer's own details are NOT visual: they build the MPC
-              # report's header and the band, so they live here (2026-10-11)
+              # the observer's own details are NOT visual: they build the
+              # MPC report's header and the band, so they live here
+              # (2026-10-11); ADR-092 gives them their own group, so the
+              # page is two short boxes instead of one 18-row wall
+              "grp_reports",
               "edt_observer", "edt_measurer", "edt_observer_email",
               "edt_telescope", "cmb_telescope_type", "spn_telescope_fratio",
               "edt_camera_model", "edt_mpc_comment"):
@@ -130,12 +136,15 @@ def test_observatory_page(qapp):
 
 def test_equipment_page_holds_the_unified_camera(qapp):
     # The camera options used to live in three places (a plate-scale group,
-    # a photometric-profile group and the aperture in Equipment). They are
-    # one group now, led by the preset (ADR-071).
+    # a photometric-profile group and the aperture in Equipment). ADR-071
+    # unified them under the preset; ADR-092 splits the MEASURED profile
+    # (the sensor physics the preset fills) into its own group, which lives
+    # behind the page's Advanced door.
     dlg = _dlg()
     names = _page_widgets(dlg, 1)
     for w in ("grp_equip", "grp_camera", "cmb_cam_preset", "spn_pixel_um",
               "spn_focal_mm", "cmb_camera_type", "cmb_binning",
+              "grp_camera_profile",
               "spn_cam_full_well", "spn_cam_linearity", "spn_cam_gain",
               "spn_cam_ron", "spn_cam_dark", "spn_cam_max_exp",
               "lbl_cam_ref", "spn_aperture", "spn_limit_mag"):
@@ -153,7 +162,10 @@ def test_observing_page(qapp):
               "spn_moon_illum", "grp_session",
               "spn_sn_cadence", "spn_event_mag", "spn_extremum_days",
               "chk_aavso", "edt_vigils", "grp_storage", "edt_projects_root",
-              "btn_projects_browse", "btn_projects_reset"):
+              "btn_projects_browse", "btn_projects_reset",
+              # ADR-092: the follow run's guider handling is session
+              # behaviour (the Capture step reads it), not a site fact
+              "chk_follow_guide", "chk_follow_calibrate"):
         assert w in names, f"{w} expected on the Observing page"
     dlg.deleteLater()
 
@@ -376,6 +388,82 @@ def _is_descendant(widget, ancestor):
             return True
         node = node.parent()
     return False
+
+
+def _dlg_with_doors():
+    # @return: (dlg, doors) with the full view treatment applied, the same
+    #          order on_open_settings uses
+    from nightscribe.gui import settings_spec, settings_view
+    dlg = _dlg()
+    settings_view.build_rail(dlg, settings_spec.CATEGORIES, lambda s: s)
+    settings_view.title_groups(dlg)
+    doors = settings_view.make_advanced_doors(
+        dlg, settings_spec.ADVANCED_GROUPS, lambda s: s)
+    return dlg, doors
+
+
+def test_every_advanced_group_lives_behind_a_door(qapp):
+    # ADR-092: nothing is removed; the expert groups sit behind the ONE
+    # door of their page, closed by default. The declaration is walked
+    # both ways: every named group exists and is behind a door, and no
+    # door opens on its own.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui import settings_spec
+    dlg, doors = _dlg_with_doors()
+    assert set(doors) == settings_spec.ADVANCED_GROUPS
+    widgets = {w.objectName(): w for w in dlg.findChildren(QWidget)
+               if w.objectName()}
+    for name in settings_spec.ADVANCED_GROUPS:
+        group = widgets.get(name)
+        assert group is not None, f"{name} is declared advanced but missing"
+        door = doors[name]
+        assert _is_descendant(group, door.content), \
+            f"{name} is not inside its door"
+        assert door.content.isHidden(), f"{name}'s door must start closed"
+        assert door.bar.text().startswith("▸"), "a closed door points right"
+    # the three pages that have a door, and only those
+    pages = {door.parentWidget().objectName() for door in doors.values()}
+    assert pages == {"page_equipment", "page_measurement",
+                     "page_integrations"}
+    dlg.deleteLater()
+
+
+def test_the_search_opens_the_door_of_a_hit(qapp):
+    # ADR-092: a match behind a door opens it (a search hit must be
+    # visible, not folded away); clearing the box closes it again, because
+    # the observer never asked for it.
+    from nightscribe.gui import settings_spec, settings_view
+    dlg, doors = _dlg_with_doors()
+    settings_view.wire_search(dlg, "none", doors=doors)
+    cam_door = doors["grp_camera_profile"]
+    assert cam_door.content.isHidden()
+    dlg.edt_search.setText("full well")
+    qapp.processEvents()
+    assert not cam_door.content.isHidden(), "a hit behind the door opens it"
+    assert cam_door.bar.text().startswith("▾")
+    # the rail jumps to the page that holds the hit
+    assert dlg.stk_pages.currentIndex() == 1
+    dlg.edt_search.setText("")
+    qapp.processEvents()
+    assert cam_door.content.isHidden(), "clearing hands the door back"
+    dlg.deleteLater()
+
+
+def test_the_door_keeps_the_observers_choice_over_a_search(qapp):
+    # the search borrows the door; it never steals it: a door the observer
+    # opened stays open after the box is cleared
+    from nightscribe.gui import settings_view
+    dlg, doors = _dlg_with_doors()
+    settings_view.wire_search(dlg, "none", doors=doors)
+    door = doors["grp_ai"]
+    door.bar.click()                       # the observer opens it
+    assert door.user_open and not door.content.isHidden()
+    dlg.edt_search.setText("moon")
+    qapp.processEvents()
+    dlg.edt_search.setText("")
+    qapp.processEvents()
+    assert not door.content.isHidden(), "a user-opened door stays open"
+    dlg.deleteLater()
 
 
 def test_help_labels_sit_below_their_field(qapp):

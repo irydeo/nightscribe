@@ -1,29 +1,40 @@
 # 10. Settings
 
 Everything configurable in NightScribe lives under **Tools → Settings…**.
-The dialog is a rail of six categories on the left (an icon each: hover to
-read the name), a page on the right and a **search box** on top: type a word (a field's name or the first line of
-its help) and only what matches stays on screen, across every page. Each
-field carries its help right below it. Each group shows its **title in a bar**
-that clearly starts it, and the fields below are always in view: nothing folds,
-so the page is simply a short list of titled blocks, one after the other.
+The dialog is a rail of six named categories on the left, a page on the
+right and a **search box** on top: type a word (a field's name or the first
+line of its help, like "gain", "moon" or "api key") and only what matches
+stays on screen, across every page. Each field carries its help right below
+it. Each group shows its **title in a bar** that clearly starts it.
+
+The common settings are always in view; the expert ones live behind a
+single **Advanced** door at the bottom of their page, closed by default, so
+a page reads short and finished. Nothing is removed: open the door with one
+click, or just search; a match behind a door opens it by itself, and
+clearing the box hands the door back to the state you left it in.
 
 Nothing here is mandatory except the site; each missing integration simply
 leaves its feature quiet.
 
 ## Observatory
 
-Where and who you are.
+Where and who you are. Set it once; everything is computed from here.
 
-- **MPC code**, name, coordinates and height of the observatory (**Resolve
-  coordinates** from the code, **Pick on the map…**, or by hand). This is
-  the identity of your MPC reports: if you submit astrometry, use the code.
-- **AAVSO code**: your observer code; it is written into the EXOTIC handoff
-  of transit projects.
-- **Sky brightness** (mag/arcsec²): how bright your zenith sky is; it sets the
-  suggested sub-exposure (chapter 05). **Look up** fills it from the
-  light-pollution atlas when you have the key (Integrations), or read it off
-  the map the button opens at your site.
+- **Site**: **MPC code**, name, coordinates and height of the observatory
+  (**Resolve coordinates** from the code, **Pick on the map…**, or by
+  hand). This is the identity of your MPC reports: if you submit
+  astrometry, use the code. **AAVSO code**: your observer code, written
+  into the EXOTIC handoff of transit projects. **Sky brightness**
+  (mag/arcsec²): how bright your zenith sky is; it sets the suggested
+  sub-exposure (chapter 05). **Look up** fills it from the light-pollution
+  atlas when you have the key (Integrations), or read it off the map the
+  button opens at your site.
+- **Observer and reports**: how your measurements are signed. Your name
+  (**Observer**), who measured the plate (**Measurer**; empty = the
+  observer), the **contact email** (the MPC submission cannot be sent
+  without it), the **telescope** and **camera** lines (free text, or built
+  from the aperture, the type and the focal ratio) and an optional **report
+  comment**. The MPC report's header and the chart boxes read from here.
 
 ## Equipment
 
@@ -39,13 +50,17 @@ What you observe with.
   readout/download, linearity); the system gain is never touched, because it
   is yours. The pixel size and the focal length are printed back as the
   **plate scale** (arcseconds per pixel), which is what the NEO exposure
-  advice, the photometry and the MPC report actually use. The measured profile
-  (full well, system gain, read noise, dark current, readout/download,
-  linearity, working max exposure) is one click away. The **readout + download**
-  is the app's **one per-frame overhead** (the preset fills it from the sensor,
-  by type and size; a CCD reads out in seconds): it sizes a sequence and bounds
-  a fast object's run, so a slow download means fewer frames before the object
-  leaves the field. Raise it if your mount also needs to settle between frames.
+  advice, the photometry and the MPC report actually use.
+- **Camera: measured profile** (behind the **Advanced** door): the sensor
+  physics at your gain setting (full well, system gain, read noise, dark
+  current, readout/download, linearity, working max exposure), with the
+  **Measure gain…** action. The preset already fills starting values and 0
+  means "unknown"; measure yours before trusting an error bar. The
+  **readout + download** is the app's **one per-frame overhead** (the preset
+  fills it from the sensor, by type and size; a CCD reads out in seconds):
+  it sizes a sequence and bounds a fast object's run, so a slow download
+  means fewer frames before the object leaves the field. Raise it if your
+  mount also needs to settle between frames.
 
 > **Why measure the limiting magnitude instead of trusting the datasheet?**
 > Because the real limit depends on your sky, your camera, your exposures
@@ -75,13 +90,16 @@ How the night is planned and filtered.
   your obstacles.
 - **Object kinds** shown in Tonight, the **transits** filter, the **Moon**
   constraint, the default **session** values (with the variable **vigils
-  list** and the **AAVSO channel** switch) and the **projects folder**.
+  list**, the **AAVSO channel** switch and the follow run's **guider
+  handling**: whether the guider is restarted before each observation of a
+  run, and whether it is recalibrated at the start; the Capture step reads
+  them when a run begins) and the **projects folder**.
 
 ## Measurement
 
-Everything that turns a night of frames into numbers: photometry,
-calibration and astrometry together, so whoever measures does not jump
-between pages.
+Everything that turns a night of frames into numbers. The three groups you
+see first (photometry, solver, masters) cover a normal night; the rest is
+one click away behind the **Advanced** door.
 
 - **Photometry**: the method a *new* plate starts with (the matched
   filter). An already measured plate keeps its own recipe; the plate's
@@ -96,24 +114,21 @@ between pages.
   dark, and its exposure is what makes it valid. The library lives only
   here; the editor's Calibration tab **reads** it and links back to this
   page.
-- **Astrometry**: the detection gate, the MPC submission floor, the
-  velocity sweep, the check against other stations (with **Find_Orb**) and
-  the worker threads. Its **Work** group also carries the **graphics card**
-  switch and its **backend** (on by default, with **OpenCL**; chapter 12 says
-  what it accelerates, how to install CUDA and why it changes nothing about
-  the result).
 - **Plate solver**: *Auto* tries local ASTAP and falls back to
   nova.astrometry.net; you can also force one. **ASTAP binary**: path to
   the executable (empty = look for `astap` on the PATH), with **Test** to
   check it. **Save the solved WCS into the FITS header** (on by default)
   leaves the plate solved for any program, without touching the pixels.
-- **EXOTIC (transit reduction)**: path to a **Python ≤ 3.10** and to the
-  **EXOTIC environment**. **Prepare environment** builds a private one and
-  installs EXOTIC into it (needs network the first time); **Test** checks
-  that it imports and reports its version.
-- **Advanced**: the saturation ceiling, the flat-field residual and the
-  astrometry tolerances. They have sensible defaults; touch them only if
-  you know why.
+- **Advanced**: the saturation ceiling and the flat-field residual, the
+  astrometry gates and tolerances (the detection gate, the MPC submission
+  floor, the velocity sweep, the check against other stations, the worker
+  threads and the **graphics card** with its **backend**: on by default,
+  with **OpenCL**; chapter 12 says what it accelerates, how to install CUDA
+  and why it changes nothing about the result), **Find_Orb** (the orbit
+  check) and **EXOTIC** (the transit reduction: path to a **Python ≤ 3.10**
+  and to the environment; **Prepare environment** builds a private one and
+  installs EXOTIC into it, and **Test** checks that it imports). They all
+  have sensible defaults; touch them only if you know why.
 
 ## Integrations
 
@@ -130,14 +145,15 @@ The outside world: your observatory software and the optional keys.
   blind-solving plates without WCS, transient discovery images, the community
   photometry that feeds the bright-star vigils (chapter 04) and the site's sky
   brightness (chapter 05).
-- **Language model (AI, optional, experimental)**: to draft the post and the
-  assistant (chapters 08 and 11). The endpoint is OpenAI-compatible: a cloud
-  service (OpenRouter, Groq, Google AI Studio) or a local one (Ollama, LM
-  Studio) both work. Pick the known service, paste the key and type the model,
-  or press **List models** and choose the one the endpoint gives you (with its
-  exact names if it is local); **Test connection** checks that the three agree.
-  It is off by default: with it off, the assistant and the AI buttons are
-  disabled, and nothing leaves your machine until you use it.
+- **Language model (AI, optional, experimental; behind the Advanced door)**:
+  to draft the post and the assistant (chapters 08 and 11). The endpoint is
+  OpenAI-compatible: a cloud service (OpenRouter, Groq, Google AI Studio) or
+  a local one (Ollama, LM Studio) both work. Pick the known service, paste
+  the key and type the model, or press **List models** and choose the one the
+  endpoint gives you (with its exact names if it is local); **Test
+  connection** checks that the three agree. It is off by default: with it
+  off, the assistant and the AI buttons are disabled, and nothing leaves
+  your machine until you use it.
 - **Long reports**: with this on, the AI writes a full article (Spanish and
   English) with every project fact and the generated images, not just the
   short post. It spends many more tokens, so a paid endpoint charges more for
@@ -152,11 +168,10 @@ How the app looks and speaks.
   the Moon is drawn at tonight's real phase either way. Applies at once.
 - **Icons-only top bar** (FITS editor): the action buttons show compact
   glyphs instead of their labels. Applies at once.
-- **Charts and annotations**: your name (**Observer**), who measured the
-  plate (**Measurer**; empty = the observer), the **telescope** and
-  **camera** lines, the object marker's shape and colour, and the two
-  layers of metadata (the plate's band in the editor, the corner boxes of
-  the other charts).
+- **Charts and annotations**: the object marker's shape and colour, and the
+  two layers of metadata (the plate's band in the editor, the corner boxes
+  of the other charts). Who signs them (observer, measurer, telescope,
+  camera) is set in **Observatory → Observer and reports**.
 
 > **Why is so much "optional", with no account required anywhere?** Because
 > the observatory is yours and so is the data: NightScribe works fully

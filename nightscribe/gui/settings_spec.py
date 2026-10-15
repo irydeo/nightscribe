@@ -63,7 +63,8 @@ CATEGORIES = [
 CATEGORY_INTROS = {
     "page_observatory": QT_TRANSLATE_NOOP(
         "MainWindow",
-        "Your site and your name: the coordinates everything is computed from."),
+        "Your site and your name: set it once, everything is computed "
+        "from here."),
     "page_equipment": QT_TRANSLATE_NOOP(
         "MainWindow",
         "What you observe with; it sizes the targets and the exposure."),
@@ -88,6 +89,23 @@ CATEGORY_INTROS = {
 # cannot drift from the combo's data.
 BACKEND_GROUPS = {"ccdciel": "grp_ccdciel", "nina": "grp_nina"}
 
+# The groups behind the "Advanced" door of their page (ADR-092). Nothing is
+# removed: the door keeps the common path short (a normal night never opens
+# it) while every expert knob stays one click, or one search, away. The
+# membership is DECLARATIVE and by objectName, so a group cannot drift out
+# of the door without a review of this line, and the test walks it.
+ADVANCED_GROUPS = {
+    # Equipment: the sensor physics the preset already fills (full well,
+    # linearity, gain, read noise, dark, readout, working max exposure)
+    "grp_camera_profile",
+    # Measurement: everything under the photometry method, the solver and
+    # the master library is expert territory
+    "grp_phot_adv", "grp_astro_gate", "grp_astro_sweep", "grp_astro_check",
+    "grp_astro_work", "grp_astro_adv", "grp_findorb", "grp_exotic",
+    # Integrations: the AI assistant is optional and experimental (ADR-075)
+    "grp_ai",
+}
+
 FIELDS = [
     # --- Observatory ---------------------------------------------------
     Field("edt_mpc_code", "mpc_code", "str", upper=True),
@@ -97,10 +115,6 @@ FIELDS = [
     Field("spn_height", "height", "int"),
     Field("edt_aavso_code", "aavso_code", "str", upper=True),
     Field("spn_sky_brightness", "sky_brightness_mag", "float"),
-    # ADR-084 rev: the follow run's guider handling. Both are checkboxes the
-    # Capture step reads when it starts a run.
-    Field("chk_follow_guide", "follow_guide", "bool"),
-    Field("chk_follow_calibrate", "follow_calibrate", "bool"),
     # --- Equipment -----------------------------------------------------
     Field("spn_aperture", "aperture_inches", "float"),
     Field("spn_limit_mag", "limit_mag", "float"),
@@ -128,6 +142,11 @@ FIELDS = [
     Field("chk_transit_scope_filter", "transit_scope_filter", "bool"),
     Field("spn_best_pk", "best_per_kind_n", "int"),
     Field("edt_projects_root", "projects_root", "str"),
+    # ADR-084 rev: the follow run's guider handling. Both are checkboxes the
+    # Capture step reads when it starts a run, so they live with the session
+    # defaults (ADR-092: they are session behaviour, not a site fact).
+    Field("chk_follow_guide", "follow_guide", "bool"),
+    Field("chk_follow_calibrate", "follow_calibrate", "bool"),
     # --- Measurement ---------------------------------------------------
     Field("chk_phot_matched", "phot_matched", "bool"),
     Field("spn_ccd_saturate", "ccd_saturate", "float", zero_none=True),

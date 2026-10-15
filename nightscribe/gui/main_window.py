@@ -2439,18 +2439,23 @@ class MainWindow(QMainWindow):
                 if page == start_page:
                     dlg.lst_categories.setCurrentRow(row)
                     break
-        # ADR-071 rev: every group wears a title bar and nothing folds (the
-        # title alone separates the groups); the content is always visible.
+        # ADR-071 rev: every group wears a title bar (the title alone
+        # separates the groups). ADR-092: each page's expert groups fold
+        # behind ONE "Advanced" door, closed by default; the search opens
+        # it when the match lives behind it.
         settings_view.title_groups(dlg)
         settings_view.insert_page_intros(dlg, settings_spec.CATEGORY_INTROS,
                                          self.tr)
+        doors = settings_view.make_advanced_doors(
+            dlg, settings_spec.ADVANCED_GROUPS, self.tr)
         # ADR-081: the Integrations page shows only the observatory backend's
         # own fields. The gate reads the combo, so changing it re-runs the
         # search filter and swaps the visible group.
         apply_search = settings_view.wire_search(
             dlg, self.tr("No setting matches that search."),
             eligible=settings_view.backend_gate(
-                dlg, settings_spec.BACKEND_GROUPS))
+                dlg, settings_spec.BACKEND_GROUPS),
+            doors=doors)
         dlg.cmb_obs_backend.currentIndexChanged.connect(
             lambda _i: apply_search())
         dlg.resize(max(900, dlg.sizeHint().width()),

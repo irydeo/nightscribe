@@ -1,31 +1,43 @@
 # 10. Ajustes
 
 Todo lo configurable en NightScribe vive en **Herramientas → Ajustes…**.
-El diálogo es un raíl de seis categorías a la izquierda (un icono en cada
-una: pasa el ratón para leer el nombre), una página a la derecha y un
-**buscador** arriba: escribe una palabra (el nombre de un
-campo o la primera línea de su ayuda) y solo queda en pantalla lo que
-coincide, en todas las páginas. Cada campo lleva su ayuda justo debajo. Cada
-grupo muestra su **título en una barra** que lo separa claramente, y los campos
-de debajo están siempre a la vista: nada se pliega, así que la página es una
-lista corta de bloques con título, uno tras otro.
+El diálogo es un raíl de seis categorías con nombre a la izquierda, una
+página a la derecha y un **buscador** arriba: escribe una palabra (el
+nombre de un campo o la primera línea de su ayuda, como "gain", "moon" o
+"api key") y solo queda en pantalla lo que coincide, en todas las páginas.
+Cada campo lleva su ayuda justo debajo. Cada grupo muestra su **título en
+una barra** que lo separa claramente.
+
+Los ajustes comunes están siempre a la vista; los de experto viven tras una
+única puerta **Advanced** al pie de su página, cerrada por defecto, para
+que la página se lea corta y terminada. No se ha quitado nada: abre la
+puerta con un clic, o simplemente busca; una coincidencia detrás de una
+puerta la abre sola, y al vaciar la caja la puerta vuelve al estado en que
+la dejaste.
 
 Nada de aquí es obligatorio salvo el sitio; cada integración que falte
 simplemente deja su función en silencio.
 
 ## Observatorio
 
-Dónde y quién eres.
+Dónde y quién eres. Se configura una vez; todo se calcula desde aquí.
 
-- **Código MPC**, nombre, coordenadas y altura del observatorio (**Resolver
-  coordenadas** desde el código, **Elegir en el mapa…**, o a mano). Es la
-  identidad de tus informes MPC: si envías astrometría, usa el código.
-- **Código AAVSO**: tu código de observador; se escribe en el traspaso a
-  EXOTIC de los proyectos de tránsito.
-- **Brillo de cielo** (mag/arcsec²): cuán brillante es tu cielo cenital; fija la
-  sub-exposición sugerida (capítulo 05). **Consultar** la rellena desde el atlas
-  de contaminación lumínica si tienes la clave (Integraciones), o léela del mapa
-  que abre el botón en tu sitio.
+- **Sitio**: **código MPC**, nombre, coordenadas y altura del observatorio
+  (**Resolver coordenadas** desde el código, **Elegir en el mapa…**, o a
+  mano). Es la identidad de tus informes MPC: si envías astrometría, usa el
+  código. **Código AAVSO**: tu código de observador; se escribe en el
+  traspaso a EXOTIC de los proyectos de tránsito. **Brillo de cielo**
+  (mag/arcsec²): cuán brillante es tu cielo cenital; fija la sub-exposición
+  sugerida (capítulo 05). **Consultar** la rellena desde el atlas de
+  contaminación lumínica si tienes la clave (Integraciones), o léela del
+  mapa que abre el botón en tu sitio.
+- **Observador e informes**: cómo se firman tus medidas. Tu nombre
+  (**Observador**), quién midió la placa (**Medidor**; vacío = el
+  observador), el **email de contacto** (sin él la sumisión al MPC no se
+  puede enviar), las líneas de **telescopio** y **cámara** (texto libre, o
+  construidas desde la apertura, el tipo y la relación focal) y un
+  **comentario de informe** opcional. La cabecera del informe MPC y las
+  cajas de las cartas leen de aquí.
 
 ## Equipo
 
@@ -42,14 +54,18 @@ Con qué observas.
   se toca, porque es tuya. El tamaño de píxel y la focal se devuelven
   como la **escala de placa** (arcosegundos por píxel), que es lo que usan
   de verdad el consejo de exposición de NEOs, la fotometría y el informe
-  MPC. El perfil medido (full well, ganancia del sistema, ruido de lectura,
-  corriente de oscuridad, lectura y descarga, linealidad, exposición máxima de
-  trabajo) está a un clic. La **lectura y descarga** es el **único overhead por
-  toma** de la app (el preset la rellena según el sensor, por tipo y tamaño; un
-  CCD lee en segundos): dimensiona una secuencia y acota la serie de un objeto
-  rápido, así que una descarga lenta significa menos tomas antes de que el
-  objeto salga del campo. Súbela si tu montura también necesita asentarse entre
-  tomas.
+  MPC.
+- **Cámara: perfil medido** (tras la puerta **Advanced**): la física del
+  sensor a tu ganancia (full well, ganancia del sistema, ruido de lectura,
+  corriente de oscuridad, lectura y descarga, linealidad, exposición máxima
+  de trabajo), con la acción **Medir ganancia…**. El preset ya rellena
+  valores de partida y 0 significa "desconocido"; mide los tuyos antes de
+  fiarte de una barra de error. La **lectura y descarga** es el **único
+  overhead por toma** de la app (el preset la rellena según el sensor, por
+  tipo y tamaño; un CCD lee en segundos): dimensiona una secuencia y acota
+  la serie de un objeto rápido, así que una descarga lenta significa menos
+  tomas antes de que el objeto salga del campo. Súbela si tu montura también
+  necesita asentarse entre tomas.
 
 > **¿Por qué medir la magnitud límite en vez de fiarse de la ficha?** Porque
 > el límite real depende de tu cielo, tu cámara, tus exposiciones y tu
@@ -79,13 +95,17 @@ Cómo se planifica y filtra la noche.
   sugerir lo que se esconde tras tus obstáculos.
 - Los **tipos de objeto** que salen en Tonight, el filtro de **tránsitos**,
   la restricción de **Luna**, los valores por defecto de la **sesión** (con
-  la **lista de vigilias** de variables y el interruptor del **canal
-  AAVSO**) y la **carpeta de proyectos**.
+  la **lista de vigilias** de variables, el interruptor del **canal
+  AAVSO** y el manejo del **guiado** en un follow run: si el autoguiado se
+  reanuda antes de cada observación del run y si se recalibra al arrancar;
+  el paso Captura los lee cuando el run empieza) y la **carpeta de
+  proyectos**.
 
 ## Medida
 
-Todo lo que convierte una noche de tomas en números: fotometría,
-calibración y astrometría juntas, para que quien mide no salte de página.
+Todo lo que convierte una noche de tomas en números. Los tres grupos que
+ves primero (fotometría, solver, masters) cubren una noche normal; el
+resto está a un clic tras la puerta **Advanced**.
 
 - **Fotometría**: el método con el que arranca una placa *nueva* (el filtro
   adaptado). Una placa ya medida conserva su receta; el interruptor de la
@@ -100,25 +120,23 @@ calibración y astrometría juntas, para que quien mide no salte de página.
   es un dark, y lo que lo hace válido es su exposición. La biblioteca está
   solo aquí; la pestaña Calibración del editor la **lee** y te enlaza de
   vuelta a esta página.
-- **Astrometría**: la compuerta de detección, el listón de envío al MPC, el
-  barrido de velocidades, el chequeo contra otras estaciones (con
-  **Find_Orb**) y los hilos de trabajo. Su grupo **Trabajo** lleva además el
-  interruptor de la **tarjeta gráfica** y su **backend** (encendido por
-  defecto, con **OpenCL**; el capítulo 12 cuenta qué acelera, cómo instalar
-  CUDA y por qué no cambia el resultado).
 - **Solver de placa**: *Auto* prueba ASTAP local y cae a
   nova.astrometry.net; también puedes forzar uno. **Binario ASTAP**: ruta
   al ejecutable (vacío = buscar `astap` en el PATH), con **Test** para
   comprobarlo. **Guardar la WCS resuelta en la cabecera FITS** (activado
   por defecto) deja la placa resuelta para cualquier programa, sin tocar
   los píxeles.
-- **EXOTIC (reducción de tránsitos)**: ruta a un **Python ≤ 3.10** y al
-  **entorno EXOTIC**. **Preparar entorno** crea uno privado e instala
-  EXOTIC dentro (necesita red la primera vez); **Test** comprueba que
-  importa y dice su versión.
-- **Avanzado**: el techo de saturación, el residual del flat y las
-  tolerancias de astrometría. Tienen valores por defecto sensatos; tócalos
-  solo si sabes por qué.
+- **Advanced**: el techo de saturación y el residual del flat, las
+  compuertas y tolerancias de la astrometría (la compuerta de detección, el
+  listón de envío al MPC, el barrido de velocidades, el chequeo contra
+  otras estaciones, los hilos de trabajo y la **tarjeta gráfica** con su
+  **backend**: encendida por defecto, con **OpenCL**; el capítulo 12 cuenta
+  qué acelera, cómo instalar CUDA y por qué no cambia el resultado),
+  **Find_Orb** (el chequeo de la órbita) y **EXOTIC** (la reducción de
+  tránsitos: ruta a un **Python ≤ 3.10** y al entorno; **Preparar entorno**
+  crea uno privado e instala EXOTIC dentro, y **Test** comprueba que
+  importa). Todos tienen valores por defecto sensatos; tócalos solo si
+  sabes por qué.
 
 ## Integraciones
 
@@ -136,15 +154,15 @@ El mundo exterior: tu software de observatorio y las claves opcionales.
   descubrimiento de transitorios, la fotometría de la comunidad que alimenta las
   vigilias de estrellas brillantes (capítulo 04) y el brillo de cielo del sitio
   (capítulo 05).
-- **Modelo de lenguaje (IA, opcional, experimental)**: para redactar el post y
-  el asistente (capítulos 08 y 11). El endpoint es compatible con OpenAI: sirve
-  un servicio de la nube (OpenRouter, Groq, Google AI Studio) o uno local
-  (Ollama, LM Studio). Eliges el servicio conocido, pegas la clave y escribes
-  el modelo, o pulsas **Listar modelos** y eliges el que el endpoint te dé
-  (con sus nombres exactos si es local); **Probar conexión** comprueba que los
-  tres encajan. Está apagado por defecto: con él apagado, el asistente y los
-  botones de IA quedan deshabilitados, y nada sale de tu equipo hasta que lo
-  usas.
+- **Modelo de lenguaje (IA, opcional, experimental; tras la puerta
+  Advanced)**: para redactar el post y el asistente (capítulos 08 y 11). El
+  endpoint es compatible con OpenAI: sirve un servicio de la nube
+  (OpenRouter, Groq, Google AI Studio) o uno local (Ollama, LM Studio).
+  Eliges el servicio conocido, pegas la clave y escribes el modelo, o pulsas
+  **Listar modelos** y eliges el que el endpoint te dé (con sus nombres
+  exactos si es local); **Probar conexión** comprueba que los tres encajan.
+  Está apagado por defecto: con él apagado, el asistente y los botones de IA
+  quedan deshabilitados, y nada sale de tu equipo hasta que lo usas.
 - **Informes largos**: con esto activado, la IA escribe un artículo completo
   (español e inglés) con todos los datos del proyecto y las imágenes generadas,
   no solo el post corto. Gasta muchos más tokens, así que un servicio de pago
@@ -160,11 +178,11 @@ Cómo se ve y cómo habla la app.
   cualquier caso. Se aplica al momento.
 - **Barra superior solo con iconos** (editor FITS): los botones de acción
   muestran glifos compactos en vez de sus etiquetas. Se aplica al momento.
-- **Cartas y anotaciones**: tu nombre (**Observador**), quién midió la placa
-  (**Medidor**; vacío = el observador), las líneas de **telescopio** y
-  **cámara**, la forma y el color de la marca del objeto, y las dos capas
-  de metadatos (la banda de la placa en el editor, las cajas de esquina de
-  las demás cartas).
+- **Cartas y anotaciones**: la forma y el color de la marca del objeto y
+  las dos capas de metadatos (la banda de la placa en el editor, las cajas
+  de esquina de las demás cartas). Quién las firma (observador, medidor,
+  telescopio, cámara) se configura en **Observatorio → Observador e
+  informes**.
 
 > **¿Por qué hay tanto "opcional", sin pedir cuenta en ningún sitio?** Porque
 > el observatorio es tuyo y los datos también: NightScribe funciona del todo

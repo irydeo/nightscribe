@@ -438,3 +438,68 @@ def test_export_calibrated_writes_provenance(tmp_path):
     with fits.open(out) as h:
         hist = "\n".join(str(v) for v in h[0].header["HISTORY"])
     assert "dark.fits" in hist and "flat.fits" in hist
+
+
+# --------------------------------------------------- never calibrate twice
+
+def test_export_calibrated_marks_the_copy(tmp_path):
+    # The marker is what keeps a calibrated copy from being calibrated again:
+    # the recipe cards survive the export, so without it a second run would
+    # subtract the dark and divide the flat twice.
+    data = np.full((4, 4), 10.0, dtype=np.float32)
+    out = cal.export_calibrated(data, {"INSTRUME": "TestCam"},
+                                tmp_path / "cal.fits")
+    with fits.open(out) as h:
+        header = dict(h[0].header)
+    assert header[cal.CALIBRATED_CARD] is True
+    assert cal.is_calibrated(header) is True
+
+
+def test_is_calibrated_reads_a_raw_frame_as_not_calibrated(tmp_path):
+    raw = _write_fits(tmp_path / "light.fits", np.ones((4, 4)),
+                      INSTRUME="TestCam")
+    with fits.open(raw) as h:
+        header = dict(h[0].header)
+    assert cal.is_calibrated(header) is False
+    # the string forms a header card may come back as are honoured too
+    assert cal.is_calibrated({cal.CALIBRATED_CARD: "T"}) is True
+    assert cal.is_calibrated({cal.CALIBRATED_CARD: "F"}) is False
+
+
+def test_calibrate_paths_skips_an_already_calibrated_frame(tmp_db, tmp_path):
+    # A light that already carries the marker and a matching dark in the
+    # library: the dark must NOT be subtracted a second time, and the report
+    # has to say it was skipped instead of pretending the recipe ran.
+    dark_path = _add(tmp_db, tmp_path, "dark.fits", "dark",
+                     np.full((6, 6), 50.0), exptime_s=30.0)
+    light = np.full((6, 6), 500.0, dtype=np.float32)
+    light_path = _write_fits(tmp_path / "light.fits", light, INSTRUME="TestCam",
+                             GAIN=1.0, CCD__TEMP=-10.0, EXPTIME=30.0,
+                             FILTER="R", NSCALIB=True)
+    arrays = {dark_path: np.full((6, 6), 50.0, dtype=np.float32)}
+    results = cal.calibrate_paths([light_path], tmp_db,
+                                  master_loader=_loader(arrays))
+    _path, data_cal, _header, report = results[0]
+    assert report.already is True
+    assert report.ok is True
+    assert np.allclose(data_cal, 500.0)          # the dark was NOT subtracted
+    assert any("already calibrated" in w for w in report.warnings)
+
+
+def test_frame_calibrator_skips_an_already_calibrated_frame(tmp_db, tmp_path):
+    # The track & stack reads through FrameCalibrator: the same guard has to
+    # hold there, and its summary has to count the frame as skipped.
+    _add(tmp_db, tmp_path, "dark.fits", "dark",
+         np.full((6, 6), 50.0), exptime_s=30.0)
+    light_path = _write_fits(tmp_path / "light.fits",
+                             np.full((6, 6), 500.0, dtype=np.float32),
+                             INSTRUME="TestCam", GAIN=1.0, CCD__TEMP=-10.0,
+                             EXPTIME=30.0, FILTER="R", NSCALIB=True)
+    fc = cal.FrameCalibrator(tmp_db, None)
+    out = fc(light_path)
+    assert np.allclose(out, 500.0)               # untouched
+    assert fc.reports[0][1].already is True
+    summary = fc.summary()
+    assert summary["already"] == 1
+    assert summary["offsets"] == [] and summary["flats"] == []
+

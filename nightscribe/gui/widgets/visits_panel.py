@@ -43,7 +43,6 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
                                QMessageBox, QTableWidgetItem, QWidget)
 
 from ..ui_loader import adopt_ui, drop_in, load_ui
-from .door_menu import build_door
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 # The visits list: how tall it may grow before it scrolls itself.
@@ -115,7 +114,7 @@ class VisitsPanel(QWidget):
                  curve_kind=True, kind=None, on_measure_click=None,
                  measure_series=None, astrometry=None,
                  on_visit_selected=None, runs_for_session=None, open_run=None,
-                 parent=None):
+                 mpc_prefill=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -126,6 +125,10 @@ class VisitsPanel(QWidget):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
+        # ADR-045 rev (2026-10-16): the visit's MPC block opens filled with
+        # the report its own run already produced. The host rebuilds it (it
+        # owns the astrometry data); without the hook the block stays empty.
+        self._mpc_prefill = mpc_prefill
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
         self._on_visit_selected = on_visit_selected
@@ -213,7 +216,11 @@ class VisitsPanel(QWidget):
             tag = ("  ·  " + " · ".join(chips)) if chips else ""
             notes = f"  ·  {s['notes'][:24]}…" if s["notes"] else ""
             pin = "📌 " if s.get("pinned") else ""
-            item = QListWidgetItem(f"{pin}{s['obs_date']}{tag}{notes}")
+            # ADR-045 rev: the name leads when there is one; the date stays
+            # the sort key and the folder, so it never disappears
+            name = (s.get("label") or "").strip()
+            head = f"{name}  ·  {s['obs_date']}" if name else s["obs_date"]
+            item = QListWidgetItem(f"{pin}{head}{tag}{notes}")
             item.setData(Qt.UserRole, s["id"])
             self.lst.addItem(item)
         n = len(sessions)
@@ -298,6 +305,7 @@ class VisitsPanel(QWidget):
                                 astrometry=self._astrometry,
                                 runs_for_session=self._runs_for_session,
                                 open_run=self._open_run,
+                                mpc_prefill=self._mpc_prefill,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -352,7 +360,8 @@ class VisitWindow(QDialog):
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
                  on_measure_click=None, measure_series=None, astrometry=None,
-                 runs_for_session=None, open_run=None, parent=None):
+                 runs_for_session=None, open_run=None, mpc_prefill=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -369,6 +378,7 @@ class VisitWindow(QDialog):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
+        self._mpc_prefill = mpc_prefill
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -437,6 +447,14 @@ class VisitWindow(QDialog):
         self._date_ed = self._ui.vp_visit_date
         self._date_ed.setText(s["obs_date"] or "")
         self._date_ed.editingFinished.connect(self._on_date_edited)
+        # ADR-045 rev (2026-10-16): the visit's own NAME, next to its date.
+        # The date is the folder and the sort key; the name is what the
+        # observer calls the night, and it is saved by the same gesture.
+        self._label_ed = getattr(self._ui, "vp_visit_label", None)
+        if self._label_ed is not None:
+            self._label_ed.setText(s.get("label") or "")
+            self._label_ed.textChanged.connect(self._on_date_dirty)
+            self._label_ed.editingFinished.connect(self._on_date_edited)
         # an explicit save gesture: an invisible save-on-focus-out alone
         # leaves the observer guessing whether the edit took
         self.btn_save_date = self._ui.vp_btn_save_date
@@ -466,16 +484,21 @@ class VisitWindow(QDialog):
         else:
             self.btn_analyze.setVisible(False)
         self.btn_analyze.clicked.connect(self._on_analyze)
-        # the resource actions live behind one door (the U5 pattern): their
-        # texts and tooltips stay in the Designer file and the door is a way
-        # in, not a second copy
-        self.btn_resources = self._ui.vp_btn_resources
+        # ADR-038's grammar: the panel's ONE action wears the object's own
+        # hue, the same hero button the Ficha and the series panel use. It is
+        # what says "this is the normal path" without a word, and it sits on
+        # its own row with Attach files… (asked for: attaching was buried in
+        # a "Resources ▾" door nobody opened).
+        if self._analysis_action is not None:
+            from .. import theme
+            hue = theme.KIND_COLORS.get(self._kind) or theme.C_ACCENT
+            self.btn_analyze.setStyleSheet(theme.hero_button_style(hue))
+        # the two resource actions that act on the SELECTION stay next to the
+        # list they act on, visible: with Attach out of the door there were
+        # two left, and two buttons do not need a menu.
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
         self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
         self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
-        build_door(self.btn_resources, (self._ui.vp_btn_attach,
-                                        self._ui.vp_btn_open,
-                                        self._ui.vp_btn_remove))
         self.lst_res = PassiveList()
         self.lst_res.setObjectName("vp_resources")
         self.lst_res.itemDoubleClicked.connect(
@@ -496,7 +519,7 @@ class VisitWindow(QDialog):
             self._populate_runs()
 
         # ---- free space (ADR-062 phase 9): a run's originals can be moved
-        # into the project's procesados/ and brought back. It lives next to
+        # into the project's prcd/ and brought back. It lives next to
         # the runs because it acts on a run's frames, and nothing is deleted.
         self._free_lbl = getattr(self._ui, "vp_lbl_free", None)
         btn_free = getattr(self._ui, "vp_btn_free", None)
@@ -535,11 +558,24 @@ class VisitWindow(QDialog):
         s = fu.get_session(self._db, self._sid)
         return (s or {}).get("obs_date") or ""
 
-    def _on_date_dirty(self, _text):
+    def _stored_head(self):
+        # @return: (date, name) as persisted: the two things the one save
+        #          gesture owns, so the button arms when EITHER changed
+        from ...core import followup as fu
+        s = fu.get_session(self._db, self._sid) or {}
+        return (s.get("obs_date") or "", s.get("label") or "")
+
+    def _label_text(self):
+        # @return: the name field's text ("" when the field does not exist)
+        return self._label_ed.text().strip() if self._label_ed is not None \
+            else ""
+
+    def _on_date_dirty(self, _text=None):
         # The save gesture arms exactly while the field differs from the
-        # stored date.
+        # stored date (or the name differs from the stored one).
         self.btn_save_date.setEnabled(
-            self._date_ed.text().strip() != self._stored_date())
+            (self._date_ed.text().strip(), self._label_text())
+            != self._stored_head())
 
     def _on_save_date_clicked(self):
         # The explicit save gesture shares the validation path.
@@ -550,9 +586,10 @@ class VisitWindow(QDialog):
         self._save_date()
 
     def _save_date(self):
-        # The visit's date is its name in the list: validate, save, and
-        # let the panel re-sort. An invalid date reverts to the stored
-        # one with the text selected for a retry (never a modal).
+        # The visit's date and name: validate the date, save both, and let
+        # the panel re-sort. An invalid date reverts to the stored one with
+        # the text selected for a retry (never a modal); the name is free
+        # text, so it has nothing to validate.
         from ...core import followup as fu
         txt = self._date_ed.text().strip()
         ok = False
@@ -571,6 +608,9 @@ class VisitWindow(QDialog):
             self.btn_save_date.setEnabled(False)
             return
         fu.update_session_date(self._db, self._sid, txt)
+        if self._label_ed is not None:
+            fu.update_session_label(self._db, self._sid,
+                                    self._label_ed.text())
         self.btn_save_date.setEnabled(False)   # clean again
         self._emit_change()
 
@@ -754,7 +794,7 @@ class VisitWindow(QDialog):
                 pass
         if n:
             self._free_say(self.tr(
-                "%1 original frames can be moved to procesados/.").replace(
+                "%1 original frames can be moved to prcd/.").replace(
                     "%1", str(n)))
         else:
             self._free_say("")
@@ -776,9 +816,10 @@ class VisitWindow(QDialog):
             nbytes += f["bytes"]
         if n == 0:
             self._free_say(self.tr(
-                "Nothing to free: the frames are already in procesados/."))
+                "Nothing to free: the frames are already in prcd/."))
             return
-        dest = str(Path(storage) / "procesados")
+        from ...core import free_space as free_mod
+        dest = str(Path(storage) / free_mod.PROCESSED_DIR)
         mb = nbytes / (1024 * 1024)
         if QMessageBox.question(
                 self, self.tr("Free space"),
@@ -802,7 +843,7 @@ class VisitWindow(QDialog):
             self._free_say(self.tr("%1 frames moved, %2 could not be moved.")
                            .replace("%1", str(moved)).replace("%2", str(errors)))
         else:
-            self._free_say(self.tr("%1 frames moved to procesados/.").replace(
+            self._free_say(self.tr("%1 frames moved to prcd/.").replace(
                 "%1", str(moved)))
         self._populate_runs()
         self._populate_resources()
@@ -1022,7 +1063,7 @@ class VisitWindow(QDialog):
         # for the light-curve kinds: absent means absent (the pinned
         # tests find no widget at all on the other kinds).
         ui = load_ui("visit_measurements", self)
-        self.layout().insertWidget(2, ui, 1)   # between resources, notes
+        self.layout().insertWidget(3, ui, 1)   # under the actions, above Resources
         self.spn_mag = PassiveDoubleSpinBox()
         self.spn_mag.setRange(-5.0, 30.0)
         self.spn_mag.setDecimals(3)
@@ -1123,11 +1164,32 @@ class VisitWindow(QDialog):
         # structure is the fragment ui/visit_mpc_block.ui, loaded only
         # for the MPC kinds (absent means absent).
         ui = load_ui("visit_mpc_block", self)
-        self.layout().insertWidget(2, ui)      # between resources, notes
+        self.layout().insertWidget(3, ui)      # under the actions, above Resources
         self.txt_mpc = ui.txt_mpc
         ui.vp_mpc_validate.clicked.connect(self._on_mpc_validate)
         ui.vp_mpc_save.clicked.connect(self._on_mpc_save)
         self.lbl_mpc_status = ui.vp_mpc_status
+        self._prefill_mpc_report()
+
+    def _prefill_mpc_report(self):
+        # ADR-045 rev (2026-10-16): a visit that already holds an astrometry
+        # run opens with its MPC report in the box, validated. It is the same
+        # text the editor's Astrometry tab rebuilds for that run (the
+        # generator is local and deterministic), so the observer is not asked
+        # to paste what the app has just measured. Nothing is written here:
+        # saving the report is still a deliberate gesture.
+        # @return: None
+        if not callable(self._mpc_prefill):
+            return
+        try:
+            text = self._mpc_prefill(self._sid) or ""
+        except Exception as err:
+            logger.warning("MPC report prefill failed: %s", err)
+            return
+        if not text.strip() or self.txt_mpc.toPlainText().strip():
+            return
+        self.txt_mpc.setPlainText(text)
+        self._on_mpc_validate()
 
     def _on_mpc_validate(self):
         from ...core import mpc_report

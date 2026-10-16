@@ -657,6 +657,31 @@ def _migrate(conn):
                 "CREATE INDEX IF NOT EXISTS idx_calib_project"
                 " ON calib_masters(project_id, kind)")
         conn.execute("PRAGMA user_version = 22")
+    if v < 23:
+        # ADR-062 rev (2026-10-16): the project's housekeeping folders lost
+        # their Spanish names ("procesados" -> "prcd", "descartados" ->
+        # "dscrd"). The registry keeps full paths, so the rename travels
+        # with the schema: the folders on disk and every stored path move
+        # together, once, here.
+        from . import free_space
+        free_space.migrate_legacy_dirs(conn)
+        conn.execute("PRAGMA user_version = 23")
+    if v < 24:
+        # ADR-045 rev (2026-10-16): a visit can carry a NAME of its own.
+        # The date stops being the only way to tell two nights apart (a
+        # project worked twice in a day, a second pass after midnight), and
+        # the folder layout is untouched: the label is a display name.
+        # the same idempotent guard as v9-v15: a hand-seeded old database may
+        # not carry the table at all
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "project_sessions" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(project_sessions)")}
+            if "label" not in cols:
+                conn.execute("ALTER TABLE project_sessions ADD COLUMN"
+                             " label TEXT DEFAULT ''")
+        conn.execute("PRAGMA user_version = 24")
     conn.commit()
 
 
@@ -750,6 +775,15 @@ MIGRATION_NOTES = {
         "reusable ones (bias and flat) with every project, and you can use "
         "another project's master without copying it. The app can also build "
         "the masters from your calibration frames."),
+    23: QT_TRANSLATE_NOOP("NSMigrations",
+        "The project's housekeeping folders got language-neutral names: "
+        "procesados/ is now prcd/ and descartados/ is now dscrd/. Your "
+        "already-moved frames were carried over with it, so nothing has to "
+        "be brought back by hand."),
+    24: QT_TRANSLATE_NOOP("NSMigrations",
+        "A visit can now have a name of its own: useful when a project is "
+        "worked twice in one day or a session runs past midnight, and the "
+        "date alone cannot tell the nights apart."),
 }
 
 

@@ -83,7 +83,7 @@ documenta para el apilado de objetos débiles (synthetic tracking).
     cacheada para el barrido, franjas solo para el stack final a frame completo, y
     liberación explícita por grupo.
 13. **Liberar espacio** (opt-in, nunca automático): mover los originales usados a
-    `procesados` dentro del proyecto (recuperable) y borrar aparte los calibrados
+    `prcd` dentro del proyecto (recuperable) y borrar aparte los calibrados
     exportados, con manifiesto en la base de datos.
 14. **El brillo se mide sobre los apilados, no sobre las tomas**: el objeto en
     **su** apilado, donde su luz está concentrada, y las comparsas en un
@@ -286,7 +286,7 @@ calibrate, stack following the motion, measure and report. The field's reference
     float32 frames and float64 accumulators, ROI cached for the sweep, strips only
     for the full-frame final stack, and explicit release per group.
 13. **Free space** (opt-in, never automatic): move the used originals to
-    `procesados` inside the project (recoverable) and delete the exported
+    `prcd` inside the project (recoverable) and delete the exported
     calibrated copies separately, with a manifest in the database.
 14. **The brightness is measured on the stacks, not on the frames**: the object
     on **its** stack, where its light is concentrated, and the comparisons on a
@@ -802,3 +802,28 @@ registered on the visit as `animation`.
 **Review (2026-10-13, the runs list opens a run with a double click and a wait)**: the Analysis "Astrometry runs" table opened a run only with its button; double-clicking a row opens it now (the visit window's "Runs" block already did). Opening a run loads the UFE, the visit's frames and the saved run, so a static modal busy dialog (`_with_busy`) is shown while it happens. The runs table also filters to the **visit clicked** in the Analysis list (`_analysis_visit_filter`), and an undone run shows "—" for its observations instead of its old count.
 
 **Revisión (2026-10-13, la lista de runs abre con doble clic y espera)**: la tabla «Astrometry runs» de Análisis abría un run solo con su botón; ahora doble clic en una fila lo abre (el bloque «Runs» de la ventana de la visita ya lo hacía). Abrir un run carga el UFE, los fotogramas de la visita y el run guardado, así que se muestra un diálogo de espera modal estático (`_with_busy`) mientras ocurre. La tabla de runs además filtra a la **visita pulsada** en la lista de Análisis (`_analysis_visit_filter`), y un run deshecho muestra «—» en sus observaciones en vez de su recuento viejo.
+
+**Amendment (2026-10-16, the housekeeping folders lose their language).** The two
+folders the app creates inside a project were named in Spanish (`procesados/`,
+`descartados/`). They are now `prcd/` and `dscrd/` (`free_space.PROCESSED_DIR` and
+`DISCARDED_DIR`): a folder name travels in a zip, sits next to a colleague's files and
+shows up in a path, and it should not carry a language. The rename is a **data
+migration**, not a cosmetic one: the registry stores the FULL path of every moved frame
+(`project_files.path`, `astrometry_frames.moved_to`), so renaming the folder alone would
+leave an archived frame unrestorable and the visit's list pointing at nothing. Schema
+v23 renames the folder on disk and rewrites every stored path, component by component,
+once and idempotently; a folder that fails to rename keeps BOTH its name and its paths,
+because a half-done migration is worse than an old name.
+
+**Enmienda (2026-10-16, las carpetas de trabajo pierden el idioma).** Las dos carpetas
+que la app crea dentro de un proyecto tenían nombre en español (`procesados/`,
+`descartados/`). Ahora son `prcd/` y `dscrd/` (`free_space.PROCESSED_DIR` y
+`DISCARDED_DIR`): el nombre de una carpeta viaja en un zip, se sienta junto a los
+ficheros de un colega y aparece en una ruta, y no debería llevar idioma. El renombrado
+es una **migración de datos**, no cosmética: el registro guarda la ruta COMPLETA de cada
+fotograma movido (`project_files.path`, `astrometry_frames.moved_to`), así que renombrar
+solo la carpeta dejaría un fotograma archivado sin poder recuperar y la lista de la
+visita apuntando a nada. La versión 23 del esquema renombra la carpeta en disco y
+reescribe cada ruta guardada, componente a componente, una vez y de forma idempotente;
+una carpeta que no se puede renombrar conserva TANTO su nombre COMO sus rutas, porque
+una migración a medias es peor que un nombre viejo.

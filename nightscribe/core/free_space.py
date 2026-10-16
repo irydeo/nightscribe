@@ -18,8 +18,8 @@ sequence and the report are saved, the originals are no longer needed to
 keep working, but deleting them is destructive: they are the observer's
 data, and NightScribe only knows their PATH (project.add_file stores a
 path, it never copies the frame). So this module MOVES them, it does not
-delete them: to `procesados/` inside the project, where they can be
-brought back with one call.
+delete them: to `prcd/` inside the project, where they can be brought back
+with one call.
 
 Three rules make it safe:
 
@@ -43,6 +43,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# The two housekeeping folders inside a project. Their names are short and
+# language-neutral on purpose (ADR-062 rev, 2026-10-16): a folder name
+# travels in a zip, sits next to a colleague's files and shows up in a
+# path, so "procesados"/"descartados" became "prcd"/"dscrd".
+PROCESSED_DIR = "prcd"      # frames of a successful run, brought back at will
+DISCARDED_DIR = "dscrd"     # frames the observer took out of the night
+
+# The old Spanish names, with what they are called now. The rename is a data
+# migration (migrate_legacy_dirs): the registry stores the full path of every
+# moved frame, so without it an archived frame could not be brought back.
+_LEGACY_DIRS = (("procesados", PROCESSED_DIR),
+                ("descartados", DISCARDED_DIR))
 
 
 @dataclass
@@ -110,7 +123,7 @@ def move_to_processed(db, run_id, storage_dir, progress=None, cancel=None):
     #        project's storage dir (project.storage_dir), progress -
     #        callable(done, total, label), cancel - callable() -> True
     # @return: MoveReport
-    # The frames go to `procesados/<fecha de la visita>/` inside the
+    # The frames go to `prcd/<fecha de la visita>/` inside the
     # project. The move is a rename when it can be (same filesystem) and a
     # copy-then-remove otherwise; in both cases the destination is written
     # through a temporary name and renamed, so an interrupted move never
@@ -125,7 +138,7 @@ def move_to_processed(db, run_id, storage_dir, progress=None, cancel=None):
     if not rows:
         return MoveReport()
     date = _visit_date(db, run_id, rows)
-    dest_dir = Path(storage_dir) / "procesados" / date
+    dest_dir = Path(storage_dir) / PROCESSED_DIR / date
     dest_dir.mkdir(parents=True, exist_ok=True)
     report = MoveReport(destination=str(dest_dir))
     total_bytes = sum(int(r[2] or 0) for r in rows)
@@ -265,7 +278,7 @@ def discard_files(db, paths, storage_dir, progress=None, cancel=None):
     # @return: MoveReport (moved, bytes, skipped, errors, destination)
     # THE FRAME AN OBSERVER DOES NOT WANT IN THE NIGHT. A trailed frame, one
     # under a cloud, the 0-byte one a cut capture left behind: they are taken
-    # out of the visit AND out of the way, into `descartados/` inside the
+    # out of the visit AND out of the way, into `dscrd/` inside the
     # project. Nothing is deleted (the same rule free_space follows: the
     # frames are the observer's data and the app only knows their path) and
     # the registry follows the move, so the visit's list keeps pointing at a
@@ -275,7 +288,7 @@ def discard_files(db, paths, storage_dir, progress=None, cancel=None):
     files = [str(p) for p in (paths or []) if p]
     if not files:
         return report
-    dest_dir = _Path(storage_dir) / "descartados"
+    dest_dir = _Path(storage_dir) / DISCARDED_DIR
     dest_dir.mkdir(parents=True, exist_ok=True)
     report.destination = str(dest_dir)
     total = len(files)
@@ -302,12 +315,109 @@ def discard_files(db, paths, storage_dir, progress=None, cancel=None):
     return report
 
 
+def migrate_legacy_dirs(conn):
+    # ADR-062 rev (2026-10-16): rename the project's old Spanish folders
+    # ("procesados", "descartados") to "prcd"/"dscrd" and rewrite every path
+    # that pointed into them. The registry stores the FULL path of a moved
+    # frame, so a rename without this would leave an archived frame
+    # unrestorable and the visit's list pointing at a file that is not there.
+    #
+    # It runs once, from the database migration (core/db.py, schema v23),
+    # and it is idempotent: with nothing to do it reads a couple of queries
+    # and returns. The folders are taken from the ROWS themselves, never from
+    # the Settings: a project's folder is wherever the observer put it.
+    # @args: conn - the open sqlite3 connection (inside the migration)
+    # @return: {"dirs": [renamed folders], "paths": n rows rewritten}
+    report = {"dirs": [], "paths": 0}
+
+    def _has_table(name):
+        # A hand-built or half-migrated database may not carry both tables
+        # yet (the old tests build partial schemas): never crash on that.
+        return conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+            (name,)).fetchone() is not None
+
+    has_files = _has_table("project_files")
+    has_frames = _has_table("astrometry_frames")
+    if not has_files and not has_frames:
+        return report
+
+    # 1. every storage folder that still holds a legacy one, from the paths
+    #    the registry and the run manifests kept
+    folders = set()
+    for old, _new in _LEGACY_DIRS:
+        queries = []
+        if has_files:
+            queries.append("SELECT path AS p FROM project_files"
+                           " WHERE path LIKE ?")
+        if has_frames:
+            queries.append("SELECT moved_to AS p FROM astrometry_frames"
+                           " WHERE moved_to LIKE ?")
+        for sql in queries:
+            for (raw,) in conn.execute(sql, (f"%{old}%",)).fetchall():
+                parts = Path(str(raw or "")).parts
+                if old in parts:
+                    folders.add((str(Path(*parts[:parts.index(old)])), old))
+    # 2. rename on disk. A folder already under the new name is left alone
+    #    (an interrupted migration); when BOTH exist the old one is merged
+    #    in without overwriting anything.
+    handled = set()
+    for storage, old in sorted(folders):
+        new = dict(_LEGACY_DIRS)[old]
+        old_dir, new_dir = Path(storage) / old, Path(storage) / new
+        if not old_dir.exists():
+            handled.add((storage, old))     # already moved (or gone)
+            continue
+        try:
+            if new_dir.exists():
+                for child in sorted(old_dir.iterdir()):
+                    _move(child, _unique(new_dir / child.name))
+                old_dir.rmdir()
+            else:
+                os.rename(str(old_dir), str(new_dir))
+        except OSError as err:
+            # The rename failed: leave BOTH the folder and its paths as they
+            # were, so the registry stays truthful about where the frames
+            # are (a half-done migration is worse than an old name).
+            logger.warning("could not rename %s: %s", old_dir, err)
+            continue
+        handled.add((storage, old))
+        report["dirs"].append(str(new_dir))
+    # 3. rewrite the stored paths, component by component (never a blind
+    #    string replace: "procesados_2025.fits" is a file name, not a folder)
+    for old, new in _LEGACY_DIRS:
+        targets = []
+        if has_files:
+            targets.append(("project_files", "path"))
+        if has_frames:
+            targets.extend((("astrometry_frames", "moved_to"),
+                            ("astrometry_frames", "path")))
+        for table, column in targets:
+            rows = conn.execute(
+                f"SELECT rowid, {column} FROM {table}"
+                f" WHERE {column} LIKE ?", (f"%{old}%",)).fetchall()
+            for rowid, raw in rows:
+                parts = list(Path(str(raw or "")).parts)
+                if old not in parts:
+                    continue
+                storage = str(Path(*parts[:parts.index(old)]))
+                if (storage, old) not in handled:
+                    continue
+                parts[parts.index(old)] = new
+                conn.execute(f"UPDATE {table} SET {column}=? WHERE rowid=?",
+                             (str(Path(*parts)), rowid))
+                report["paths"] += 1
+    if report["dirs"] or report["paths"]:
+        logger.info("legacy project folders migrated: %s", report)
+    return report
+
+
 def delete_calibrated(paths, progress=None, cancel=None):
     # @args: paths - the calibrated copies to remove, progress, cancel
     # @return: MoveReport (moved = how many were removed)
     # The calibrated frames are DERIVED: they can be rebuilt from the
     # originals, so they are deleted outright and are not kept in
-    # `procesados`. This is the second, independent checkbox.
+    # `prcd`. This is the second, independent checkbox.
     report = MoveReport()
     total = len(paths)
     for index, path in enumerate(paths, 1):

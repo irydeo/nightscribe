@@ -12,7 +12,7 @@
 ############################################################
 
 """Phase 9 acceptance: only a successful run's frames are offered, the
-move goes to procesados/ and the registry follows it, restoring brings
+move goes to prcd/ and the registry follows it, restoring brings
 them back, a missing frame is skipped, and the calibrated copies are
 deleted outright (they are derived). Never a hard delete of an original."""
 
@@ -60,7 +60,7 @@ def test_move_to_processed_moves_and_follows(tmp_db, tmp_path):
         # the whole path as one name on Windows (the test failed there)
         name = os.path.basename(path)
         assert not (tmp_path / name).exists()
-        moved = dest / "procesados" / "2025-10-18" / name
+        moved = dest / free_space.PROCESSED_DIR / "2025-10-18" / name
         assert moved.exists()
         row = tmp_db.execute("SELECT path, meta FROM project_files"
                              " WHERE path=?", (str(moved),)).fetchone()

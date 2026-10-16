@@ -3276,7 +3276,7 @@ class MainWindow(QMainWindow):
         name = ("user/README.es.md" if self._lang() == "es"
                 else "user/README.md")
         start = root / name if (root / name).exists() else None
-        open_browser(root, self, start=start)
+        open_browser(root, self, start=start, lang=self._lang())
 
     def _open_assistant(self, scope="app"):
         # The grounded assistant (ADR-075), non-modal and opt-in. The object
@@ -8035,6 +8035,9 @@ class MainWindow(QMainWindow):
             runs_for_session=lambda sid: _store.runs_for_session(db, sid),
             open_run=lambda run_id: self._analysis_astrometry_open_run(
                 int(run_id)),
+            # ADR-045 rev (2026-10-16): a visit that already holds an
+            # astrometry run opens with its MPC report in the box
+            mpc_prefill=lambda sid: self._visit_mpc_prefill(pid, sid),
             kind=kind)
         panel.set_project(pid)
         self._project_widgets["visits_panel"] = panel
@@ -9320,6 +9323,54 @@ class MainWindow(QMainWindow):
         if callable(show):
             show("trackstack")
         return dlg
+
+    def _visit_mpc_prefill(self, pid, session_id):
+        # ADR-045 rev (2026-10-16): the report the visit's own astrometry run
+        # already produced, rebuilt the same way the editor rebuilds it when
+        # the visit reopens (same generator, same context). The visit window's
+        # MPC box opens filled instead of asking the observer to paste what
+        # the app has just measured; nothing is written, saving is a gesture.
+        # @args: pid - project id, session_id - the visit
+        # @return: the report text, or "" when the visit holds no usable run
+        from ..core import astrometry_store as store, mpc_astrometry
+        from ..config import config
+        if pid is None or session_id is None:
+            return ""
+        try:
+            runs = [r for r in store.list_runs(db, pid)
+                    if r.get("session_id") == session_id
+                    and r.get("status") == "complete"]
+        except Exception as err:
+            logger.warning("the visit's runs could not be listed: %s", err)
+            return ""
+        if not runs:
+            return ""
+        run = runs[-1]                  # oldest first: the newest pass wins
+        # The report is built from the STACK points (the per-observation
+        # measurement), never the per-frame ones: those are the raw material,
+        # not the reportable observation.
+        points = [p for p in store.points_for_run(db, run["id"])
+                  if (p.get("source") or "stack") == "stack"]
+        if not points:
+            return ""
+        ctx = self._ufe_astrometry_context(pid, session_id) or {}
+        context = mpc_astrometry.report_context(config)
+        # The MPC knows the object by its CONFIRMED designation when the
+        # rename was applied; until then it is the temporary tag, which the
+        # packer must emit as-is (the same rule the editor's report follows).
+        confirmed = (ctx.get("confirmed") or {}).get("designation") or ""
+        designation = confirmed.strip() or (ctx.get("object_name") or "")
+        kind = None if confirmed.strip() else (
+            "neocp" if ctx.get("neocp") else None)
+        try:
+            rep = mpc_astrometry.generate(
+                points, "ades",
+                context.obs_code or str(config.get("mpc_code", "")),
+                designation, config, context=context, kind=kind)
+        except Exception as err:
+            logger.warning("the visit's report could not be rebuilt: %s", err)
+            return ""
+        return rep.get("text", "")
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -13628,7 +13679,7 @@ class MainWindow(QMainWindow):
         # @args: pid - project id, session_id - the visit, paths - the frames
         #        to move aside
         # @return: what happened, in words
-        # A REAL move, into `descartados/` inside the project (free_space
+        # A REAL move, into `dscrd/` inside the project (free_space
         # does the work and the registry follows it). Nothing is deleted and
         # the frames can be brought back from that folder.
         from ..core import free_space
@@ -13639,7 +13690,7 @@ class MainWindow(QMainWindow):
         report = free_space.discard_files(db, paths, storage)
         if report.moved:
             self._refresh_visit_after_frames(pid, session_id)
-        bits = [self.tr("%1 frames moved to discarded/.").replace(
+        bits = [self.tr("%1 frames moved to dscrd/.").replace(
             "%1", str(report.moved))]
         if report.skipped:
             bits.append(self.tr("%1 were not there any more.").replace(

@@ -264,3 +264,37 @@ because nothing is lost: the workbench carries the visit's frame navigator
 in its left pane (`ufe_visit_panel.ui`), which is exactly what the window
 would be used for while measuring, and the visit's notes are saved on every
 keystroke (`update_session_notes`).
+
+**Amendment (2026-10-16, the visit gains a name and the normal path stands out).**
+Two changes to the visit window, both from the same review. The visit now carries a
+**name of its own** (`project_sessions.label`, migration v24), edited next to the date
+and saved by the same gesture: the date stays the folder and the sort key, and the name
+is what the observer calls the night (a project worked twice in one day, a session that
+ran past midnight). The list shows `name · date` when there is one. The window also
+stopped hiding its two entry points: the kind's analysis action ("Measure the
+position…" / "Measure the series…") is painted as the panel's **hero button** in the
+object's own hue (ADR-038's grammar, the same `theme.hero_button_style` the Ficha uses)
+and sits on its own row together with a visible **"Attach files…"**; the "Resources ▾"
+door is gone, because with Attach out of it only "Open" and "Remove from visit" were
+left, and two buttons do not need a menu. Finally, a visit that already holds an
+astrometry run opens with its **MPC report already in the box**, rebuilt from the run's
+own points by the same generator the editor uses (the host rebuilds it:
+`_visit_mpc_prefill`), so the observer is not asked to paste what the app has just
+measured; saving the report is still a deliberate gesture.
+
+**Enmienda (2026-10-16, la visita gana nombre y el camino normal se destaca).** Dos
+cambios en la ventana de visita, ambos de la misma revisión. La visita pasa a tener
+**nombre propio** (`project_sessions.label`, migración v24), editable junto a la fecha
+y guardado con el mismo gesto: la fecha sigue siendo la carpeta y el criterio de orden,
+y el nombre es como el observador llama a la noche (un proyecto trabajado dos veces en
+un día, una sesión que pasó de medianoche). La lista muestra `nombre · fecha` cuando lo
+hay. La ventana además deja de esconder sus dos entradas: la acción de análisis del tipo
+(«Medir la posición…» / «Medir la serie…») se pinta como el **botón héroe** del panel
+con el color del propio objeto (la gramática del ADR-038, el mismo
+`theme.hero_button_style` de la ficha) y vive en su propia fila junto a un **«Añadir
+ficheros…»** visible; el cajón «Recursos ▾» desaparece, porque sin Añadir solo quedaban
+«Abrir» y «Quitar de la visita», y dos botones no necesitan un menú. Por último, una
+visita que ya tiene un run de astrometría se abre con su **reporte MPC ya en la caja**,
+reconstruido desde los propios puntos del run con el mismo generador que usa el editor
+(lo reconstruye el anfitrión: `_visit_mpc_prefill`), así que al observador no se le pide
+pegar lo que la app acaba de medir; guardar el reporte sigue siendo un gesto deliberado.

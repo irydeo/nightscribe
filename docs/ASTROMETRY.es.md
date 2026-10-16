@@ -436,7 +436,7 @@ está disponible** y la app lo dice; nunca finge un veredicto.
 
 Una noche son cientos de FITS. Cuando el stack, la secuencia y el reporte ya
 están guardados, la app **ofrece** mover los originales usados a una carpeta
-`procesados` dentro del proyecto (no los borra: se pueden restaurar) y borrar
+`prcd` dentro del proyecto (no los borra: se pueden restaurar) y borrar
 por separado los calibrados exportados. Solo los frames de una ejecución con
 éxito, y nada se mueve sin que tú lo confirmes.
 

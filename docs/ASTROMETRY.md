@@ -434,7 +434,7 @@ residuals from `total.json`. If Find_Orb is not configured the check is
 ## 7. Freeing space
 
 One night is hundreds of FITS. Once the stack, the sequence and the report
-are saved, the app **offers** to move the used originals to a `procesados`
+are saved, the app **offers** to move the used originals to a `prcd`
 folder inside the project (it does not delete them: they can be restored)
 and to delete the exported calibrated copies separately. Only the frames of
 a successful run, and nothing moves without your confirmation.

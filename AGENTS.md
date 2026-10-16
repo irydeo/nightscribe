@@ -150,7 +150,7 @@ nightscribe/
     astrometry_store.py # persistencia de la astrometría (ADR-062, fase 8):
                       #   astrometry_runs/points/frames, Undo por ejecución
     free_space.py     # liberar espacio (ADR-062, fase 9): mover los
-                      #   originales de un run con éxito a procesados/ dentro
+                      #   originales de un run con éxito a prcd/ dentro
                       #   del proyecto (no borrar), registrar el movimiento y
                       #   poder restaurarlos; los calibrados se borran aparte
     findorb.py        # handoff a Find_Orb (ADR-062, fase 5.2): fichero de

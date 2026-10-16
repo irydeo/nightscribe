@@ -274,6 +274,55 @@ def test_mpc_block_absent_for_sn(panel):
     assert vp._win.findChild(QPushButton, "vp_mpc_save") is None
 
 
+def test_mpc_block_opens_filled_with_the_visits_run(qapp, tmp_path):
+    # ADR-045 rev: a visit that already holds a run opens with the report
+    # its own run produced, already validated, so the observer is not asked
+    # to paste what the app has just measured. The host rebuilds the text;
+    # the window only shows it.
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitsPanel
+    from test_mpc_report import _MPC80_GOOD
+    db = Database(tmp_path / "pre.db")
+    p = project.create(db, "neo", "2026 QK")
+    sid = fu.create_session(db, p["id"], obs_date="2021-03-15")
+    seen = []
+
+    def _prefill(session_id):
+        seen.append(session_id)
+        return _MPC80_GOOD
+
+    vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None,
+                     mpc_prefill=_prefill)
+    vp.set_project(p["id"])
+    w = vp.open_visit(sid)
+    assert seen == [sid]
+    assert w.txt_mpc.toPlainText() == _MPC80_GOOD
+    assert "Valid" in w.lbl_mpc_status.text()
+    vp.close_visit_window()
+    vp.deleteLater()
+    db.close()
+
+
+def test_mpc_block_stays_empty_without_a_run(qapp, tmp_path):
+    # No run, no report: the box is left alone (the prefill is not called
+    # with an empty answer, and never writes a blank report).
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitsPanel
+    db = Database(tmp_path / "pre2.db")
+    p = project.create(db, "neo", "2026 QK")
+    sid = fu.create_session(db, p["id"])
+    vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None,
+                     mpc_prefill=lambda session_id: "")
+    vp.set_project(p["id"])
+    w = vp.open_visit(sid)
+    assert w.txt_mpc.toPlainText() == ""
+    vp.close_visit_window()
+    vp.deleteLater()
+    db.close()
+
+
 def test_mpc_save_registers_to_the_windows_visit(qapp, tmp_path,
                                                  monkeypatch):
     from test_mpc_report import _MPC80_GOOD
@@ -349,6 +398,36 @@ def test_visit_date_editable_from_the_window(panel):
     assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-21"
 
 
+def test_visit_name_editable_from_the_window(panel):
+    # ADR-045 rev: the visit carries a name of its own, saved with the same
+    # gesture as the date; the list shows it in front of the date (which
+    # stays the sort key and the folder).
+    from nightscribe.core import followup as fu
+    vp, pid, _o = panel
+    sid = fu.create_session(vp._db, pid, "2026-09-21")
+    vp.refresh()
+    w = vp.open_visit(sid)
+    assert w._label_ed is not None
+    w._label_ed.setText("first pass")
+    assert w.btn_save_date.isEnabled()        # the name alone arms the save
+    w._save_date()
+    assert fu.get_session(vp._db, sid)["label"] == "first pass"
+    vp.refresh()
+    row = next(vp.lst.item(i) for i in range(vp.lst.count())
+               if vp.lst.item(i).data(Qt.UserRole) == sid)
+    assert row.text().startswith("first pass")
+    assert "2026-09-21" in row.text()
+    # emptying it is allowed: the list falls back to the date alone
+    w2 = vp.open_visit(sid)
+    w2._label_ed.setText("")
+    w2._save_date()
+    assert fu.get_session(vp._db, sid)["label"] == ""
+    vp.refresh()
+    row = next(vp.lst.item(i) for i in range(vp.lst.count())
+               if vp.lst.item(i).data(Qt.UserRole) == sid)
+    assert row.text().startswith("2026-09-21")
+
+
 def test_pinned_visit_floats_to_the_top(panel):
     from nightscribe.core import followup as fu
     vp, pid, _o = panel
@@ -413,9 +492,14 @@ def test_visit_window_analysis_action_follows_the_kind(qapp, tmp_path):
                     measure_series=lambda s: seen.append(("series", s)))
     w.btn_analyze.click()
     assert seen == [("series", sid)]
-    # the resource actions live behind one door (a way in, not a copy)
-    assert [a.data() for a in w.btn_resources.menu().actions()] == [
-        "vp_btn_attach", "vp_btn_open", "vp_btn_remove"]
+    # The primary action is painted as the panel's hero (ADR-038) and the
+    # two resource actions that act on the selection are VISIBLE next to the
+    # list; attaching is its own visible button, not buried in a door.
+    assert w.btn_analyze.styleSheet()          # the kind's hue, applied live
+    assert not w._ui.vp_btn_attach.isHidden()
+    assert not w._ui.vp_btn_open.isHidden()
+    assert not w._ui.vp_btn_remove.isHidden()
+    assert not hasattr(w, "btn_resources")
     w.close()
     p2 = project.create(db, "neo", "2026 AB")
     sid2 = fu.create_session(db, p2["id"], obs_date="2026-09-21")

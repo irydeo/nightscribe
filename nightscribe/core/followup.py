@@ -55,14 +55,14 @@ def list_sessions(db, project_id):
     #          first by observing date (ADR-045)
     rows = db.execute(
         "SELECT id, project_id, obs_date, notes, created, pinned,"
-        " curve_run_id"
+        " curve_run_id, label"
         " FROM project_sessions WHERE project_id=?"
         " ORDER BY pinned DESC, obs_date DESC",
         (project_id,),
     ).fetchall()
     return [{"id": r[0], "project_id": r[1], "obs_date": r[2],
              "notes": r[3] or "", "created": r[4], "pinned": bool(r[5]),
-             "curve_run_id": r[6]}
+             "curve_run_id": r[6], "label": r[7] or ""}
             for r in rows]
 
 
@@ -70,7 +70,7 @@ def get_session(db, session_id):
     # @return: session dict or None
     row = db.execute(
         "SELECT id, project_id, obs_date, notes, created, pinned,"
-        " curve_run_id"
+        " curve_run_id, label"
         " FROM project_sessions WHERE id=?",
         (session_id,),
     ).fetchone()
@@ -78,7 +78,23 @@ def get_session(db, session_id):
         return None
     return {"id": row[0], "project_id": row[1], "obs_date": row[2],
             "notes": row[3] or "", "created": row[4],
-            "pinned": bool(row[5]), "curve_run_id": row[6]}
+            "pinned": bool(row[5]), "curve_run_id": row[6],
+            "label": row[7] or ""}
+
+
+def update_session_label(db, session_id, label):
+    # The visit's own NAME (ADR-045 rev, 2026-10-16): the date stays the
+    # folder and the sort key, and the label is what the observer calls the
+    # night ("first pass", "after the meridian flip"). Empty means "no name",
+    # and the list falls back to the date.
+    # @args: db - Database, session_id - the visit, label - free text
+    # @return: True if the session was found
+    cur = db.execute(
+        "UPDATE project_sessions SET label=? WHERE id=?",
+        ((label or "").strip(), session_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
 
 
 def update_session_notes(db, session_id, notes):

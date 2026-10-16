@@ -237,6 +237,28 @@ def test_notes_autosave_from_the_window(panel):
     assert fu.get_session(vp._db, sid)["notes"] == "Clear night, good seeing"
 
 
+def test_the_visit_window_gives_its_room_to_the_results_list(panel):
+    # The window is ONE page and its content is the Results list, so the list
+    # is the item that grows. A QGroupBox does not grow on its own (Preferred)
+    # and the notes QTextEdit IS Expanding, so without the stretch the extra
+    # room went to the notes and the list stayed at its size hint. The .ui
+    # cannot say it: stretch factors are not a Designer property (its
+    # layoutStretch is inert), so the code sets it and this pins it.
+    vp, _pid, _o = panel
+    vp.btn_new.click()
+    w = vp._win
+    lay = w._ui.vbox_visit
+    stretch = {lay.itemAt(i).widget().objectName(): lay.stretch(i)
+               for i in range(lay.count())
+               if lay.itemAt(i).widget() is not None}
+    assert stretch.get("grp_results") == 1
+    assert all(v == 0 for k, v in stretch.items() if k != "grp_results")
+    # and it opens big enough for the page, never shrinking below what used
+    # to be its whole window
+    assert w.width() >= 800 and w.height() >= 600
+    assert w.minimumWidth() >= 600 and w.minimumHeight() >= 480
+
+
 def test_no_measurement_block_for_non_curve_kinds(qapp, tmp_path):
     from PySide6.QtWidgets import QToolButton
     from nightscribe.core.db import Database

@@ -406,7 +406,14 @@ class VisitWindow(QDialog):
         self._open_run = open_run
         self._mpc_build = mpc_build
         self.setWindowTitle(self.tr("Visit"))
-        self.resize(640, 520)
+        # The window is ONE page (head, analysis action, Results, the folded
+        # files, the per-kind block and the notes), so it wants room: at
+        # 640x520 the Results list was left at its size hint and the notes
+        # took the rest. It opens at 880x660 and never shrinks below the size
+        # that used to be its whole window (a page squeezed to 500 px is a
+        # page nobody reads).
+        self.resize(880, 660)
+        self.setMinimumSize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self._build_ui()
 
@@ -467,6 +474,13 @@ class VisitWindow(QDialog):
         # are fragments loaded on demand (absent means absent), and the
         # Passive widgets land in their placeholders.
         self._ui = adopt_ui(self, "visit_window")
+        # The Results list is the visit's content, so IT takes the room the
+        # window has: a QGroupBox does not grow on its own (Preferred) and the
+        # notes QTextEdit IS Expanding, so without this the extra space went
+        # to the notes and the list stayed at its size hint. Stretch factors
+        # are not a Designer property (the .ui's layoutStretch is inert, as
+        # doc_viewer.ui's own note says), so the code sets it here.
+        self._ui.vbox_visit.setStretchFactor(self._ui.grp_results, 1)
         self._paint_confirmation()
 
         # ---- the head: the date READS and the name is edited in place.

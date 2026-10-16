@@ -9201,6 +9201,16 @@ class MainWindow(QMainWindow):
         obj = self._ufe_object_from_project(p)
         dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
                              session_id=session_id)
+        # The editor may already be on THIS visit holding ANOTHER run: the
+        # session key is (project, visit), so picking a different run of the
+        # same visit reset nothing and the tab kept the run it had, while the
+        # one the observer picked never loaded (measured 2026-10-16). The run
+        # is not the session, so it is asked for by name; with the right run
+        # already on stage the tab does nothing.
+        tab = getattr(dlg, "tab_trackstack", None)
+        forget = getattr(tab, "forget_run", None)
+        if run_id is not None and callable(forget):
+            forget(run_id)
         dlg.open_plate(paths[0])
         dlg.set_object(obj)
         show = getattr(dlg, "show_tab", None)

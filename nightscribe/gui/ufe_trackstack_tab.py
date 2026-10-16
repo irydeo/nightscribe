@@ -1530,6 +1530,25 @@ class UfeTrackStackTab(QWidget):
 
     # -------------------------------------------------------- the restore
 
+    def forget_run(self, run_id):
+        # @args: run_id - the run the editor was told to show (the one the
+        #        observer picked in the Analysis table or the visit's list)
+        # @return: None. A run is NOT the session: the session is the visit,
+        #          so picking ANOTHER run of the SAME visit changed nothing
+        #          and the tab kept the run it already held, while
+        #          _restore_result refused to replace it (its guard is
+        #          "_result is not None"). Measured 2026-10-16: a run with 7
+        #          observations never loaded while the editor was already on
+        #          that visit. The frames are the visit's and stay; the run's
+        #          own face goes and the saved one is asked for again, which
+        #          is the one the host was told to show. With the right run
+        #          already on stage nothing happens: re-reading the stacks
+        #          would only cost the observer's disk time.
+        if run_id is None or self._run_id == int(run_id):
+            return
+        self._clear_run()
+        self._restore_result()
+
     def _restore_result(self):
         # @return: None. The visit may already hold an astrometry run: the
         #          tab then shows it instead of an empty column, the way the

@@ -2314,6 +2314,45 @@ def test_a_saved_run_is_shown_again_when_the_visit_is_reopened(qapp, tmp_path):
     assert tab.btn_stack.isEnabled()
 
 
+def test_picking_another_run_of_the_same_visit_loads_it(qapp, tmp_path):
+    # Reported 2026-10-16: a run with 7 observations did not load. The session
+    # key is (project, visit), so picking ANOTHER run of the SAME visit reset
+    # nothing and _restore_result refused to replace the run on stage (its
+    # guard is "_result is not None"): the tab went on showing the old one.
+    # forget_run() is the door the host uses: it drops the run held and asks
+    # again, and with the right run already there it does nothing.
+    tab, host = _tab(qapp, tmp_path)
+    run_a, points_a, stacks_a = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run_a, "points": points_a,
+                                      "stacks": stacks_a}
+    tab.refresh_context()
+    assert tab._run_id == 7
+    held = tab._result
+
+    # the observer picks ANOTHER run of the same visit (7 observations)
+    run_b, points_b, stacks_b = _saved_run(tmp_path, mag=19.4)
+    run_b = dict(run_b, id=9, n_obs=7)
+    host.astrometry_result = lambda: {"run": run_b, "points": points_b,
+                                      "stacks": stacks_b}
+    # the restore alone does NOT swap (it asks once, by design)
+    tab.refresh_context()
+    assert tab._run_id == 7 and tab._result is held
+    # the door: forget what is held, ask again
+    tab.forget_run(9)
+    assert tab._run_id == 9
+    assert tab._result is not held and tab._result.get("restored")
+    assert tab.tbl_points.rowCount() == 1
+    assert tab.tbl_points.item(0, 6).text() == "19.400"
+    # and with the right run already on stage it is a no-op (no reload: the
+    # stacks are read from disk, which is not free)
+    again = tab._result
+    tab.forget_run(9)
+    assert tab._result is again
+    # a visit's own button ("the newest pass") has no run to forget
+    tab.forget_run(None)
+    assert tab._run_id == 9
+
+
 def test_a_restored_run_does_not_write_its_stacks_again(qapp, tmp_path):
     # A restored run SHOWS its stacks; rewriting them would duplicate files
     # (and cost the observer's disk). The registered files stay untouched

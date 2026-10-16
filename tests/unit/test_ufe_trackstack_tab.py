@@ -2353,6 +2353,28 @@ def test_picking_another_run_of_the_same_visit_loads_it(qapp, tmp_path):
     assert tab._run_id == 9
 
 
+def test_the_run_puts_its_observation_back_on_stage(qapp, tmp_path):
+    # The host opens the editor on the visit's FIRST PLATE (it arms the frame
+    # navigator and the rest of the workbench); with a run held that plate
+    # threw the run's stack and its measured mark away, so the host asks the
+    # run to put its observation back (reported 2026-10-16).
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab._result is not None
+    st = tab._state if tab._view is not None else tab._stack_state
+    # the plate lands on top of the run, exactly like the host's open_plate
+    st.load(host.astrometry_context()["paths"][0])
+    assert not str(st.path).endswith("2026QX_obs1.fits")
+    assert tab.show_run_on_stage() is True
+    assert str(st.path).endswith("2026QX_obs1.fits")
+    # without a run there is nothing to put back
+    tab.clear_session()
+    assert tab.show_run_on_stage() is False
+
+
 def test_a_restored_run_does_not_write_its_stacks_again(qapp, tmp_path):
     # A restored run SHOWS its stacks; rewriting them would duplicate files
     # (and cost the observer's disk). The registered files stay untouched

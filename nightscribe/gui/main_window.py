@@ -9212,6 +9212,13 @@ class MainWindow(QMainWindow):
         if run_id is not None and callable(forget):
             forget(run_id)
         dlg.open_plate(paths[0])
+        # ... and the run's own observation goes back on stage: the plate is
+        # what arms the navigator and the rest of the workbench, and loading
+        # it used to throw the run's stack away (measured 2026-10-16). With no
+        # run held, the plate is what the observer opened the editor for.
+        put_back = getattr(tab, "show_run_on_stage", None)
+        if callable(put_back):
+            put_back()
         dlg.set_object(obj)
         show = getattr(dlg, "show_tab", None)
         if callable(show):

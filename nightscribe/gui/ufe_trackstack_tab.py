@@ -1549,6 +1549,22 @@ class UfeTrackStackTab(QWidget):
         self._clear_run()
         self._restore_result()
 
+    def show_run_on_stage(self):
+        # @return: True when the run's observation is on stage. The host opens
+        #          the editor on the visit's FIRST PLATE, which is what arms
+        #          the frame navigator and the rest of the workbench; with a
+        #          run held, that plate threw the run's stack (and its measured
+        #          mark) away, and the observer opened the run to LOOK at it
+        #          (reported 2026-10-16). The stack is read again: the payload
+        #          keeps the pixels, but only state.load rebuilds the WCS, the
+        #          stretch and the annotations of that plate. Without a run
+        #          there is nothing to put back and the plate is what the
+        #          observer wants to see anyway.
+        if self._result is None or self._shown_group is None:
+            return False
+        self._show_group(self._shown_group)
+        return True
+
     def _restore_result(self):
         # @return: None. The visit may already hold an astrometry run: the
         #          tab then shows it instead of an empty column, the way the

@@ -192,16 +192,21 @@ def test_opening_a_run_tells_the_tab_which_run_to_show(window, monkeypatch):
     monkeypatch.setattr(
         proj_mod, "files_for_session",
         lambda _db, _sid: [{"kind": "fits", "path": "/tmp/plate.fits"}])
-    forgotten = []
+    calls = []
 
     class FakeTab:
         def forget_run(self, run_id):
-            forgotten.append(run_id)
+            calls.append(("forget", run_id))
+
+        def show_run_on_stage(self):
+            calls.append(("stage", None))
+            return True
 
     class FakeDlg:
         tab_trackstack = FakeTab()
 
         def open_plate(self, path):
+            calls.append(("plate", path))
             return True
 
         def set_object(self, obj):
@@ -212,10 +217,14 @@ def test_opening_a_run_tells_the_tab_which_run_to_show(window, monkeypatch):
 
     monkeypatch.setattr(window, "_ufe_open", lambda *a, **k: FakeDlg())
     window._visit_astrometry(p["id"], sid, run_id=rid)
-    assert forgotten == [rid]
+    # the run is forgotten, then the plate is loaded (it arms the navigator)
+    # and only then the run's own observation goes back on stage
+    assert [c[0] for c in calls] == ["forget", "plate", "stage"]
+    assert calls[0] == ("forget", rid)
     # and a visit's own button (no run picked) asks for nothing by name
+    calls.clear()
     window._visit_astrometry(p["id"], sid)
-    assert forgotten == [rid]
+    assert [c[0] for c in calls] == ["plate", "stage"]
 
 
 def test_a_visit_click_filters_the_runs(window):

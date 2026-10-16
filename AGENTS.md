@@ -301,7 +301,13 @@ nightscribe/
                        #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
                        #   stack_strip: la tira de apilados de las observaciones, ADR-062;
                        #   las filas ricas project_row / campaign_row + sparkline, U2/U5;
-                       #   y visits_panel: el gestor de visitas: ADR-045)
+                       #   observatory_console: la consola del observatorio
+                       #   (ADR-081 rev: estructura en ui/observatory_panel.ui,
+                       #   modos desconectada/reposo/moviéndose/capturando/
+                       #   siguiendo; tres verbos y dos casillas);
+                       #   y visits_panel: el gestor de visitas y su ventana
+                       #   (ADR-045 rev: una página con Resultados y los
+                       #   Ficheros de la noche plegados, menú por fila)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

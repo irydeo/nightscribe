@@ -1135,3 +1135,32 @@ una **copia FITS** de la placa con la WCS resuelta en esta sesión fundida dentr
 intactos, así que una resolución sin guardar también puede salir de la app. El formato
 se toma de una extensión explícita cuando la hay y del filtro elegido cuando no, y la
 extensión se normaliza en ambos casos.
+
+**Amendment (2026-10-16, the histogram strip wears the editor's glyphs).** The strip's
+four buttons (Auto, Invert, mirror left-right, mirror up-down) now carry the same 16 px
+line glyphs as the top bar (`ufe_auto`, `ufe_invert_on/off`, `ufe_mirror_h_on/off`,
+`ufe_mirror_v_on/off`), with the bar's own bargain: a missing asset degrades to the text
+and never to an empty button. **Auto and Invert keep their word** (this is a PANEL, not
+the bar, and there the house rule is that the label stays); the **mirror pair is
+icon-only**, because the "Mirror:" label right before it already says what they are and
+those two words were the widest of the row (measured: the row wanted 548 px in English
+and 706 in Spanish, a lot of the strip's width). The toggles use the bar's on/off pair
+(dim + slash), which also fixes a real gap: the sheet does not paint
+`QPushButton:checked`, so the state was barely visible. Invert gains the tooltip it was
+the only one missing, and its glyph is a half-filled rounded SQUARE on purpose: a slashed
+circle reads as a prohibition sign, and this toggle is off by default.
+
+**Enmienda (2026-10-16, la tira del histograma viste los glifos del editor).** Los cuatro
+botones de la tira (Auto, Invertir, espejo izquierda-derecha, espejo arriba-abajo) llevan
+ahora los mismos glifos de línea de 16 px que la barra superior (`ufe_auto`,
+`ufe_invert_on/off`, `ufe_mirror_h_on/off`, `ufe_mirror_v_on/off`), con el mismo trato
+que la barra: un asset que falta cae al texto y nunca a un botón vacío. **Auto e Invertir
+conservan su palabra** (esto es un PANEL, no la barra, y ahí la regla de la casa es que
+la etiqueta se queda); el **par del espejo va sin texto**, porque la etiqueta «Mirror:»
+justo delante ya dice qué son y esas dos palabras eran las más anchas de la fila (medido:
+la fila pedía 548 px en inglés y 706 en español, mucho del ancho de la tira). Los
+conmutables usan el par on/off de la barra (apagado + barra), lo que además arregla un
+hueco real: la hoja de estilo no pinta `QPushButton:checked`, así que el estado apenas se
+veía. Invertir gana el tooltip que era el único que le faltaba, y su glifo es un CUADRADO
+redondeado medio lleno a propósito: un círculo con barra se lee como señal de prohibido,
+y este conmutador está apagado por defecto.

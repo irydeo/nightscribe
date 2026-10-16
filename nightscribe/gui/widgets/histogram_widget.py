@@ -22,8 +22,8 @@ feels live without saturating the GUI thread.
 import logging
 import math
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QBrush, QColor, QPainter, QPen
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QBrush, QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (QCheckBox, QDoubleSpinBox, QFrame,
                                QHBoxLayout, QLabel, QPushButton,
                                QVBoxLayout, QWidget)
@@ -233,6 +233,13 @@ class HistogramWidget(QFrame):
         row_2.addWidget(self.btn_auto)
         self.btn_invert = QPushButton(self.tr("Invert"))
         self.btn_invert.setCheckable(True)
+        # the one tooltip this row was missing: an inverted plate is what the
+        # observer SEES, and the pixels are not touched (same promise as the
+        # two mirror buttons, said the same way)
+        self.btn_invert.setToolTip(self.tr(
+            "Show the picture inverted (a negative). Only what you see "
+            "turns: the plate, its saved marks and every measurement stay "
+            "as they are."))
         self.btn_invert.toggled.connect(self._on_invert_toggled)
         row_2.addWidget(self.btn_invert)
         # orientation (E6): mirror the PICTURE to match someone else's
@@ -255,6 +262,7 @@ class HistogramWidget(QFrame):
         self.btn_flip_v.toggled.connect(
             lambda c: self._on_flip_toggled("v", c))
         row_2.addWidget(self.btn_flip_v)
+        self._apply_row_icons()
         col.addLayout(row_2)
         self.chk_keep = QCheckBox(self.tr("Keep stretch on load"))
         self.chk_keep.setToolTip(self.tr(
@@ -264,6 +272,70 @@ class HistogramWidget(QFrame):
             lambda checked: setattr(self._state, "keep_stretch", checked))
         row_2.addWidget(self.chk_keep)
         return col
+
+    # ---------------------------------------------- the row's glyphs
+
+    def _icon(self, stem):
+        # @args: stem - the asset stem (e.g. "ufe_auto"); the SVG lives in
+        #        the bundled assets/ folder
+        # @return: the QIcon, or a null one when the asset is missing (the
+        #          caller then keeps the button's word as the fallback)
+        from .. import theme
+        path = theme.asset(stem + ".svg")
+        if not path.exists():
+            return QIcon()
+        return QIcon(path.as_posix())
+
+    def _apply_row_icons(self):
+        # @return: None. The second row's buttons wear the editor's own
+        #         glyphs (the same 16 px set the top bar uses, so the strip
+        #         and the bar read as one instrument).
+        #
+        # Auto and Invert keep their word: they are the two whose glyph alone
+        # is a riddle, and this is a PANEL, not the bar, where the house rule
+        # is that the label stays. The mirror pair goes icon-only because the
+        # "Mirror:" label right before it already says what they are, and
+        # "Left-right" / "Up-down" were the two widest labels of the row
+        # (measured 2026-10-16: the row wanted 548 px in English and 706 in
+        # Spanish, which is a lot of the strip's width for two words).
+        self._set_glyph(self.btn_auto, self._icon("ufe_auto"),
+                        self.tr("Auto"), False)
+        self._reskin_toggle(self.btn_invert, "ufe_invert",
+                            self.tr("Invert"), False)
+        self._reskin_toggle(self.btn_flip_h, "ufe_mirror_h",
+                            self.tr("Left-right"), True)
+        self._reskin_toggle(self.btn_flip_v, "ufe_mirror_v",
+                            self.tr("Up-down"), True)
+
+    def _set_glyph(self, btn, icon, label, icon_only):
+        # @args: btn - the button, icon - its glyph (may be null), label -
+        #        what it says, icon_only - True to drop the word when the
+        #        glyph is there
+        # @return: None. A missing asset ALWAYS brings the word back, even
+        #          on the icon-only pair: an icon with no label and no glyph
+        #          is a riddle, and the bar degrades exactly like this.
+        if icon.isNull():
+            btn.setIcon(QIcon())
+            btn.setText(label)
+            return
+        btn.setIcon(icon)
+        btn.setIconSize(QSize(16, 16))
+        btn.setText("" if icon_only else label)
+
+    def _reskin_toggle(self, btn, base, label, icon_only):
+        # @args: btn - a checkable button, base - its glyph stem (e.g.
+        #        "ufe_mirror_h"), label - what it says, icon_only - True to
+        #        drop the word when the glyph is there
+        # @return: None. The house convention, the same one the top bar
+        #          follows: "_on" is the accent glyph and "_off" the dim one
+        #          with a slash, so the state is SEEN and not guessed (the
+        #          app's sheet does not paint QPushButton:checked).
+        self._set_glyph(btn, self._icon(
+            base + ("_on" if btn.isChecked() else "_off")), label, icon_only)
+        btn.toggled.connect(
+            lambda checked, b=btn, s=base, lb=label, io=icon_only:
+            self._set_glyph(b, self._icon(s + ("_on" if checked else "_off")),
+                            lb, io))
 
     def _dn_spin(self, label, row):
         # @args: label - the row caption, row - the row's layout

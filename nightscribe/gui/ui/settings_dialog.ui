@@ -331,6 +331,19 @@
              </item>
              <item><widget class="QLabel" name="lblH_binning"><property name="text"><string>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_dark_filter">
+               <item><widget class="QLabel" name="lbl_dark_filter"><property name="text"><string>Dark/opaque wheel slot:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_dark_filter"><property name="editable"><bool>true</bool></property></widget></item>
+               <item>
+                <spacer name="hsp_dark_filter">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_dark_filter"><property name="text"><string>Which wheel position blocks the light. The darks and the bias of the capture plan are taken through it, and the sequence says so. Change it here if your wheel calls it something else (Opaque, D…)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -1042,6 +1055,19 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_obs_backend"><property name="text"><string>Only the fields of the program you pick here are shown. NINA (Windows) and PINS (Linux) share the same Advanced API v2 plugin, so they use the same settings.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_obs_goto">
+               <item><widget class="QLabel" name="lbl_obs_goto"><property name="text"><string>Astrometric goto by default:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_obs_astro_goto"/></item>
+               <item>
+                <spacer name="hsp_obs_goto">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_obs_goto"><property name="text"><string>The console's "Point telescope" opens with the plate-solve correction ticked: it solves the plate after the slew and corrects the pointing, which absorbs the ephemeris' error. It is the reliable route for preliminary orbits and needs a plate solver. The console's checkbox changes it for the session without touching this default.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>

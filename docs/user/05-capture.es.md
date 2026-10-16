@@ -17,18 +17,24 @@ elección desconecta el otro. En ambos casos, una condición: el programa tiene
 que estar **abierto** (y, para NINA/PINS, su plugin Advanced API instalado y
 activo); NightScribe habla con su API, no con los drivers.
 
-Desde el paso **Captura** de un proyecto:
+Desde el paso **Captura** de un proyecto lo lleva la consola **Observatory**. Su
+estado va arriba (quién responde, el estado de la montura, la temperatura, la
+versión) con el **STOP** rojo siempre a mano, y sus mandos son tres verbos y dos
+casillas:
 
-- **Conectar CCDciel** / **Conectar NINA / PINS** muestra el estado del
-  observatorio (montura, rueda de filtros, cámara) en el panel.
-- **Apuntar telescopio** hace un slew a la posición recién calculada del
-  objetivo.
-- **Goto astrométrico** hace slew, resuelve la placa y corrige a la posición
-  real del cielo: la vía fiable para una órbita preliminar.
-- **Detener goto** para el movimiento del telescopio **ahora mismo**. Se arma
-  en el instante en que pulsas cualquiera de los dos botones de apuntado y se
-  desarma cuando el apuntado termina: úsalo si la montura se va a un sitio
-  equivocado.
+- **Conectar CCDciel** / **Conectar NINA / PINS** es la única entrada, y muestra
+  el estado del observatorio (montura, rueda de filtros, cámara) en el panel. El
+  botón pequeño de encendido que hay junto al estado desconecta; el estado se
+  refresca solo cada par de segundos.
+- **Apuntar el telescopio** hace un slew a la posición recién calculada del
+  objetivo. Con **Goto astrométrico** marcado además resuelve la placa y corrige
+  a la posición real del cielo: la vía fiable para una órbita preliminar. La
+  casilla es una preferencia (su valor por defecto vive en Ajustes →
+  Integraciones) y se recuerda entre sesiones.
+- **STOP** para el movimiento del telescopio **ahora mismo**. Se arma en el
+  instante en que la montura empieza a moverse (un giro, un goto astrométrico o
+  un seguimiento) y se desarma cuando termina: úsalo si la montura se va a un
+  sitio equivocado.
 - **Enviar plan** prepara el plan (objeto, tomas × exposición, filtro, binning,
   ganancia, offset, dither) en el software y **lo lee de vuelta** (incluidos el
   binning y el dither que de verdad tiene), así que el panel muestra lo que
@@ -36,9 +42,10 @@ Desde el paso **Captura** de un proyecto:
   rango, una rueda que rechaza la ranura) se avisa **sin abortar el plan**: el
   objeto, la exposición y el recuento llegan siempre. Si el filtro del plan no
   está en tu rueda, el filtro se deja como está y la lectura de vuelta lo dice.
-- **Iniciar captura** lo lanza, y **el mismo botón la para** mientras el run
+- **Empezar la captura** lo lanza, y **el mismo botón la para** mientras el run
   está en marcha («Parar captura»): para la **cámara**, no la montura (eso es
-  Detener goto).
+  STOP). Con **Seguir el objeto** marcado corre la noche en pasadas en lugar de
+  un bloque (ver abajo), y el botón pasa a «Parar el seguimiento».
 - La lista de filtros de la tarjeta **Exposure plan** es la que tiene tu rueda
   de verdad (se lee del programa al conectar); solo cuando no hay nada
   conectado aparece la lista clásica L/R/G/B/Ha/OIII/SII.
@@ -90,6 +97,16 @@ Los valores viajan con la secuencia exportada (`.targets` de CCDciel, JSON de
 NINA) y, donde la API lo permite, se aplican en vivo; la cadencia completa de
 autofocus vive en el fichero de secuencia.
 
+Al final del mismo bloque están los **darks** y el **bias** de la noche
+(cuántos, la exposición del dark y **la ranura de rueda que usa cada uno**). Se
+ejecutan **al final**, después de las luces, en ese orden. La ranura importa: un
+dark se toma con el camino de luz bloqueado, así que no debe ir por el filtro
+que usaron las luces. Los dos arrancan en la **ranura oscura** que fijes en
+Ajustes → Equipo (`Dark` por convención) y puedes cambiar cualquiera de las dos
+para una noche concreta aquí. Los cuatro exports los llevan: CCDciel y la
+secuencia nativa de NINA como pasos reales (`DARK`/`BIAS`), el resumen de NINA en
+su lista `Calibration` y el CSV como filas con una columna `type`.
+
 ### Valores sugeridos, y por qué
 
 Cuando un proyecto todavía no tiene plan, los bloques **Exposure plan** y
@@ -126,12 +143,12 @@ lightpollutionmap.info), **Consultar** la rellena desde el atlas; sin clave,
 léela del mapa (el botón lo abre en tu sitio). Es el valor cenital y un modelo,
 así que tómalo como un buen punto de partida, no como una promesa.
 
-### Iniciar y seguir: N observaciones sin re-apuntar a mano
+### Seguir el objeto: N observaciones sin re-apuntar a mano
 
 Un objeto rápido se sale del campo: captúralo sin más y la mitad de la serie
-acaba sin él. **Iniciar y seguir…** (en el paso Captura, para un objeto en
-movimiento y con conexión) pide un **número de observaciones** y lleva el run
-entero: cada observación captura tantas tomas como caben antes de que el objeto
+acaba sin él. **Seguir el objeto** (una casilla de la consola, para un objeto en
+movimiento y con conexión) más **Empezar la captura** pide un **número de
+observaciones** y lleva el run entero: cada observación captura tantas tomas como caben antes de que el objeto
 llegue al borde del campo (el mismo cruce por el que se acota el recuento),
 luego el telescopio vuelve a apuntar a la **posición nueva** del objeto y empieza
 la siguiente. La app sigue al objeto por el cielo, observación a observación, y

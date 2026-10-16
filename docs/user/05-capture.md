@@ -17,16 +17,23 @@ switching the choice disconnects the other. One condition either way: the
 program must be **open** (and, for NINA/PINS, its Advanced API plugin
 installed and enabled); NightScribe talks to its API, not to the drivers.
 
-From a project's **Capture** step:
+From a project's **Capture** step the **Observatory** console drives it. Its
+status sits on top (who answers, the mount's state, the temperature, the
+version) with the red **STOP** always at hand, and its commands are three verbs
+and two checkboxes:
 
-- **Connect CCDciel** / **Connect NINA / PINS** shows the observatory status
-  (mount, filter wheel, camera) on the panel.
-- **Point telescope** slews to the target's freshly computed position.
-- **Astrometric Goto** slews, plate-solves and corrects to the true sky
-  position: the reliable route for a preliminary orbit.
-- **Stop goto** stops the telescope movement **right now**. It is armed the
-  moment you press either pointing button and disarmed when the pointing
-  ends: use it if the mount heads somewhere it should not.
+- **Connect CCDciel** / **Connect NINA / PINS** is the only way in, and it shows
+  the observatory status (mount, filter wheel, camera) on the panel. The small
+  power button beside the status disconnects; the status refreshes by itself
+  every couple of seconds.
+- **Point telescope** slews to the target's freshly computed position. With
+  **Astrometric goto** ticked it also plate-solves and corrects to the true sky
+  position: the reliable route for a preliminary orbit. The box is a
+  preference (its default lives in Settings → Integrations) and it is
+  remembered between sessions.
+- **STOP** halts the telescope movement **right now**. It is armed the moment
+  the mount starts moving (a slew, an astrometric goto or a follow run) and
+  disarmed when it ends: use it if the mount heads somewhere it should not.
 - **Send plan** prepares the plan (object, frames × exposure, filter, binning,
   gain, offset, dither) in the software and **reads it back** (including the
   binning and dither it is really holding), so the panel shows what actually
@@ -36,7 +43,8 @@ From a project's **Capture** step:
   your wheel, the filter is left as it is and the read-back says so.
 - **Start capture** fires it, and the **same button stops it** while the run is
   in flight ("Stop capture"): it stops the **camera**, not the mount (that is
-  Stop goto).
+  STOP). With **Follow the object** ticked it runs the night in passes instead
+  of one block (see below), and the button becomes "Stop following".
 - The filter list of the **Exposure plan** card is the one your wheel really
   has (read from the program on connect); only when nothing is connected does
   the classic L/R/G/B/Ha/OIII/SII list appear.
@@ -87,6 +95,16 @@ The values travel with the exported sequence (CCDciel `.targets`, NINA JSON)
 and, where the API allows, are applied live; the full autofocus cadence lives
 in the sequence file.
 
+At the bottom of the same block are the **darks** and the **bias** of the night
+(how many, the dark's exposure, and **the wheel slot each one uses**). They run
+**at the end**, after the light frames, in that order. The slot matters: a dark
+is taken with the light path blocked, so it must not go through the filter the
+lights used. Both start on the **dark slot** you set in Settings → Equipment
+(`Dark` by convention) and you can change either one for a single night here.
+All four exports carry them: CCDciel and the native NINA sequence as real steps
+(`DARK`/`BIAS`), the NINA summary in its `Calibration` list and the CSV as rows
+with a `type` column.
+
 ### Suggested values, and why
 
 When a project has no plan yet, the **Exposure plan** and **Capture options
@@ -122,11 +140,12 @@ light-pollution key (Settings → Integrations, from lightpollutionmap.info),
 button opens it at your site). It is the zenith value and a model, so treat it
 as a good starting point, not a promise.
 
-### Start and follow: N observations without re-pointing by hand
+### Follow the object: N observations without re-pointing by hand
 
 A fast object leaves the camera's field: capture it as-is and half the run ends
-up without it. **Start and follow…** (in the Capture step, for a moving object
-and connected) asks for a **number of observations** and drives the whole run:
+up without it. **Follow the object** (a checkbox in the console, for a moving
+object and connected) plus **Start capture** asks for a **number of
+observations** and drives the whole run:
 each observation captures as many frames as fit before the object reaches the
 edge of the field (the same crossing the frame count is bounded by), then the
 telescope points again at the object's **fresh position** and the next

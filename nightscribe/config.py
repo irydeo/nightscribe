@@ -246,6 +246,19 @@ DEFAULTS = {
     # rotation, so clicks and measurements are untouched; off leaves the
     # plate in its native orientation.
     "ufe_north_up": True,
+    # The observatory console (ADR-081 rev, 2026-10-16): the two modifiers
+    # that used to be buttons. The astrometric goto is a PREFERENCE (solve
+    # the plate after the slew and correct the pointing) and has its home in
+    # Settings > Integrations; the follow flag is only the last choice of the
+    # night, remembered so the box is not re-ticked every time.
+    "observatory_astro_goto": True,
+    "observatory_follow": False,
+    # Which wheel slot blocks the light (2026-10-16): the darks and the bias
+    # of the capture plan are taken through it, and the exported sequence
+    # says so. "Dark" is the convention; a wheel that calls it "Opaque" or
+    # "D" is one edit away, and the plan's own combos can override it for a
+    # single night without touching this.
+    "obs_dark_filter": "Dark",
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.

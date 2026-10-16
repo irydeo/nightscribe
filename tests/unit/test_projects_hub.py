@@ -739,9 +739,11 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     obs = window._obs_widgets          # connection + mount + live capture
     assert obs["ccd_connect"].isEnabled()
     assert window._ccd_connected is False
-    for key in ("ccd_disconnect", "ccd_refresh", "ccd_goto", "ccd_sync",
-                "ccd_push", "ccd_start"):
+    for key in ("ccd_disconnect", "ccd_goto", "ccd_sync", "ccd_push",
+                "ccd_start"):
         assert not obs[key].isEnabled(), f"{key} should start disabled"
+    # the Refresh button is gone: the poll refreshes by itself (ADR-081 rev)
+    assert "ccd_refresh" not in obs
     assert not obs["cmb_ccd_filter"].isEnabled()
     # Interfaz 1.8: the state is a chip with a dot and a colour
     assert obs["ccd_status"].text().endswith(
@@ -1374,9 +1376,9 @@ def test_refresh_position_button_forces_a_fresh_fetch(window, panel, monkeypatch
            "dec_deg": 20.0, "kind": "neo"}
     p = _create_and_select(window, "neo", "A11HPKO", ctx)
     _open_tab(window, p, "plan")
-    w = window._ccd_widgets()
-    assert "ccd_refresh_pos" in w
-    assert w["ccd_refresh_pos"].isEnabled() is True
+    # the refresh has no button any more: the poll and every goto refresh the
+    # position, so the ACTION is what is exercised here
+    assert "ccd_refresh_pos" not in window._ccd_widgets()
 
     seen = {}
 
@@ -1431,8 +1433,6 @@ def test_refresh_position_is_refused_for_a_fixed_target(window, panel):
     ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
     p = _create_and_select(window, "sn", "SN2026rf", ctx)
     _open_tab(window, p, "plan")
-    w = window._ccd_widgets()
-    assert w["ccd_refresh_pos"].isEnabled() is False
     window._ccd_refresh_position()      # must not raise
     assert "nothing" in window.statusBar().currentMessage().lower()
 
@@ -2057,9 +2057,10 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
     assert vp.current_session_id() == sid
     vp.open_visit(sid)                    # the resources live in its window
     btns = [b.text() for b in vp._win.findChildren(QPushButton)]
-    assert "Open" in btns
+    # the button rows are gone: opening a plate is the row's own gesture
+    assert "Open" not in btns
     assert "Quick analysis" not in btns
-    vp._win.lst_res.setCurrentRow(0)      # select the plate resource
+    assert vp._win.lst_files.count() == 1  # the plate, in the folded block
     opened = []
 
     class _D:
@@ -2079,7 +2080,7 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
         opened.append((tab_, hook_pid, obj, session_id))
         return _D()
     monkeypatch.setattr(window, "_ufe_open", _ufe_open)
-    vp._win._on_open_resource()
+    vp._win._on_row_open(vp._win.lst_files.item(0))
     assert opened[0][:2] == ("measure", p["id"])
     assert opened[0][3] == sid            # the hooks land on the visit
     assert opened[-1]["name"] == "SN2026visit"
@@ -3167,3 +3168,36 @@ def test_follow_progress_fills_the_bar_and_the_line(window, panel):
     w = window._ccd_widgets()
     assert w["follow_bar"].value() == 37        # (1 + 0.5) / 4
     assert "5/10" in w["follow_label"].text()
+
+def test_the_plan_keeps_the_calibration_wheel_slots(window):
+    # 2026-10-16: the darks and the bias are taken with the light path
+    # blocked, so each one carries its own wheel slot. The plan remembers
+    # them, which is what stops a change of the Settings default from
+    # rewriting a night that was already planned.
+    import json
+    from nightscribe.core import project as proj_mod
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "neo", "2026slot",
+                           {"ra_deg": 10.0, "dec_deg": 20.0})
+    _open_tab(window, p, "plan")
+    w = window._project_widgets
+    # the two combos open on the dark slot of Settings
+    from nightscribe.config import config
+    assert w["cmb_dark_filter"].currentText() == \
+        config.get("obs_dark_filter")
+    assert w["cmb_bias_filter"].currentText() == \
+        config.get("obs_dark_filter")
+    # the observer changes them for this night
+    w["cmb_dark_filter"].setCurrentText("Opaque")
+    w["cmb_bias_filter"].setCurrentText("D")
+    window._project_save_plan()
+    rows = dbmod.db.execute(
+        "SELECT data FROM project_steps WHERE project_id=? AND step='plan'",
+        (p["id"],)).fetchall()
+    data = json.loads(rows[0][0])
+    assert data["dark_filter"] == "Opaque" and data["bias_filter"] == "D"
+    # reopening the Capture step shows the plan's slots, not the default
+    _open_tab(window, p, "plan")
+    w2 = window._project_widgets
+    assert w2["cmb_dark_filter"].currentText() == "Opaque"
+    assert w2["cmb_bias_filter"].currentText() == "D"

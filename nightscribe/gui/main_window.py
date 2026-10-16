@@ -6041,6 +6041,25 @@ class MainWindow(QMainWindow):
         spn_bias = PassiveSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
         spn_bias.setValue(100)
         cal_form.addRow(self.tr("Bias:"), spn_bias)
+        # The darks and the bias are taken with the light path BLOCKED, and
+        # that is a position on the wheel: each step carries its own slot
+        # (2026-10-16). They default to the dark slot of Settings > Equipment,
+        # and the observer can change either one for this night.
+        cmb_dark_f = QComboBox()
+        cmb_dark_f.setEditable(True)
+        cmb_dark_f.addItems(self._ccd_filter_choices())
+        cmb_dark_f.setCurrentText(
+            str(plan_data.get("dark_filter")
+                or config.get("obs_dark_filter") or "Dark"))
+        cmb_bias_f = QComboBox()
+        cmb_bias_f.setEditable(True)
+        cmb_bias_f.addItems(self._ccd_filter_choices())
+        cmb_bias_f.setCurrentText(
+            str(plan_data.get("bias_filter")
+                or plan_data.get("dark_filter")
+                or config.get("obs_dark_filter") or "Dark"))
+        cal_form.addRow(self.tr("Darks filter:"), cmb_dark_f)
+        cal_form.addRow(self.tr("Bias filter:"), cmb_bias_f)
         if plan_data.get("n_darks") is not None:
             spn_darks.setValue(int(plan_data["n_darks"]))
         if plan_data.get("exp_dark"):
@@ -6050,6 +6069,11 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
+        self._project_widgets["cmb_dark_filter"] = cmb_dark_f
+        self._project_widgets["cmb_bias_filter"] = cmb_bias_f
+        cal_form.addRow(QLabel(self.tr(
+            "The darks and the bias run at the END of the night, after the "
+            "light frames.")))
 
         # --- card: sequence (multi-filter rows + exports) ---------------
         seq_card = PanelCard(self.tr("Sequence"), accent)
@@ -6145,6 +6169,8 @@ class MainWindow(QMainWindow):
         spn_darks.valueChanged.connect(self._project_save_plan)
         spn_darkexp.valueChanged.connect(self._project_save_plan)
         spn_bias.valueChanged.connect(self._project_save_plan)
+        cmb_dark_f.currentTextChanged.connect(self._project_save_plan)
+        cmb_bias_f.currentTextChanged.connect(self._project_save_plan)
         layout.addStretch()
 
     def _plan_summary_strip(self, layout, accent):
@@ -6179,11 +6205,17 @@ class MainWindow(QMainWindow):
             n_darks = spn_darks.value() if spn_darks else 0
             exp_dark = spn_darkexp.value() if (spn_darkexp and n_darks) else None
             n_bias = spn_bias.value() if spn_bias else 0
+            dark_f = self._project_widgets.get("cmb_dark_filter")
+            bias_f = self._project_widgets.get("cmb_bias_filter")
             project.update_step_data(
                 db, self._current_project["id"], "plan",
                 {"n_frames": spn.value(), "exp_s": spn_exp.value(),
                  "filter": cmb_f.currentText(), "n_darks": n_darks,
                  "exp_dark": exp_dark, "n_bias": n_bias,
+                 "dark_filter": (dark_f.currentText().strip()
+                                 if dark_f is not None else ""),
+                 "bias_filter": (bias_f.currentText().strip()
+                                 if bias_f is not None else ""),
                  # ADR-083: the capture options ride with the plan, and
                  # `suggested` says whether the observer has touched them yet
                  "capture_options": self._capture_options_from_widgets(),
@@ -6524,241 +6556,52 @@ class MainWindow(QMainWindow):
 
     def _build_capture_ccd_block(self, layout, accent=None):
         # ADR-043: the Observatory tab is gone; this is its whole control
-        # panel, rebuilt per project page inside the Capture step. Built
-        # in code (not a .ui) because it is small and per-project now;
-        # the tr() sources keep the old ObservatoryTab strings as
-        # anchors for the existing translations. The block always works
-        # on the CURRENT project: listing projects inside the observatory
-        # had no purpose, so there is no target-selection combo (a
-        # project that is not open is not what you are looking at that
-        # night).
-        # ADR-059: the panel is a PanelCard now, the same card voice as the
-        # rest of the Capture console. One card, four rows, and the status
-        # is one row of four pairs (Interfaz 1.8 had already collapsed the
-        # old three group boxes).
+        # panel, rebuilt per project page inside the Capture step.
+        # ADR-081 rev (2026-10-16): the panel is a CONSOLE now. Its structure
+        # lives in gui/ui/observatory_panel.ui and is loaded by
+        # widgets/observatory_console.py: status on top (identity, the stop
+        # always at hand, the telemetry band), the commands below and the last
+        # frame in its own panel. The pile of four button rows it replaced
+        # (Connect / Disconnect / Refresh, goto / sync / refresh position /
+        # stop, filter / push / start / follow) is gone: the poll refreshes by
+        # itself, STOP is the single stop, and the two pairs that shared a
+        # destination became checkboxes.
         # @args: layout - the Capture page layout, accent - the kind hue
+        from .widgets.observatory_console import ObservatoryConsole
         from .widgets.section_card import PanelCard
         # a new page means the old preview (and its timer) belongs to the
         # previous project: stop watching before the widgets are replaced
         self._capture_preview_reset()
-        grp = PanelCard(self.tr("Telescope and camera"),
-                        accent or theme.C_ACCENT)
-        gv = grp.body
-
-        # row 1: the connection, with a colour that says which state it is
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        lbl_s = QLabel()
-        row.addWidget(lbl_s)
-        row.addStretch()
-        btn_c = QPushButton(self.tr("Connect CCDciel"))
-        btn_d = QPushButton(self.tr("Disconnect"))
-        btn_r = QPushButton(self.tr("Refresh"))
-        row.addWidget(btn_c)
-        row.addWidget(btn_d)
-        row.addWidget(btn_r)
-        gv.addLayout(row)
-
-        # row 2: what the telescope is doing, in a 2x2 grid (hidden until
-        # CCDciel answers: four dashes are 130 px of nothing)
-        state = QWidget()
-        grid = QHBoxLayout(state)
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(18)
-        lbl_v = QLabel("—")
-        lbl_t = QLabel("—")
-        lbl_tr = QLabel("—")
-        lbl_sl = QLabel("—")
-        # ONE row of four pairs: the same four values in half the height the
-        # 2x2 grid took, and they still read left to right as "what version,
-        # how cold, is it tracking, is it moving"
-        for title, value in ((self.tr("Version"), lbl_v),
-                             (self.tr("Temperature"), lbl_t),
-                             (self.tr("Tracking"), lbl_tr),
-                             (self.tr("Slew"), lbl_sl)):
-            head = QLabel(title)
-            head.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
-            grid.addWidget(head)
-            grid.addWidget(value)
-        grid.addStretch(1)
-        self._ccd_state_grp = state
-        state.setVisible(False)
-        gv.addWidget(state)
-
-        # row 3: pointing
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        btn_goto = QPushButton(self.tr("Point telescope"))
-        btn_goto.setToolTip(self.tr(
-            "Quick slew to the freshly-computed position of a moving "
-            "target: J2000_to_Apparent + Telescope_slewasync, no "
-            "plate-solve. Fast, but assumes the ephemeris is already "
-            "accurate."))
-        btn_sync = QPushButton(self.tr("Astrometric Goto"))
-        btn_sync.setToolTip(self.tr(
-            "Slew + capture + plate-solve and correct to the true sky "
-            "position. Absorbs residual ephemeris error; the reliable "
-            "route for NEOCPs and preliminary orbits."))
-        btn_refresh_pos = QPushButton(self.tr("Refresh position"))
-        btn_refresh_pos.setToolTip(self.tr(
-            "Re-query the orbit and the ephemeris now instead of using the "
-            "cache. A preliminary orbit improves as new astrometry arrives, "
-            "so a position computed from an old one can be minutes of "
-            "motion off."))
-        # Safety stop (ADR-081): enabled the moment a goto starts, so a mount
-        # heading to the wrong place can be halted at once. It stops the
-        # MOTION, not the pointing job, and it is deliberately the only
-        # button here that does not wait for the connection poll.
-        btn_stop = QPushButton(self.tr("Stop goto"))
-        btn_stop.setToolTip(self.tr(
-            "Stop the telescope movement now. Use it if a slew or an "
-            "astrometric goto is heading somewhere it should not: it halts "
-            "the mount immediately, without waiting for the pointing to "
-            "finish."))
-        row.addWidget(btn_goto)
-        row.addWidget(btn_sync)
-        row.addWidget(btn_refresh_pos)
-        row.addWidget(btn_stop)
-        row.addStretch()
-        gv.addLayout(row)
-
-        # row 4: live capture
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        row.addWidget(QLabel(self.tr("Filter on wheel:")))
-        cmb_f = QComboBox()
-        btn_push = QPushButton(self.tr("Send plan"))
-        btn_push.setToolTip(self.tr(
-            "Prepare the current project's saved plan (object, frames × "
-            "exposure, filter, binning, gain, offset, dither) in the "
-            "observatory software and read it back to show what it is really "
-            "holding. The autofocus cadence is NOT applied live (CCDciel's API "
-            "does not expose it): it travels with the exported sequence. With "
-            "NINA the frame count is information only."))
-        btn_start = QPushButton(self.tr("Start capture"))
-        btn_start.setToolTip(self.tr(
-            "Start the staged capture in the observatory software"))
-        # ADR-084: the driven run. The observer asks for a number of
-        # observations and the app captures each one up to the field crossing,
-        # then points again at the object at its fresh ephemeris and starts the
-        # next. It becomes "Stop following" while it runs.
-        btn_follow = QPushButton(self.tr("Start and follow…"))
-        btn_follow.setToolTip(self.tr(
-            "Run N observations of a moving object without re-pointing by "
-            "hand: each one captures as many frames as fit before the object "
-            "reaches the edge of the field, then the telescope points again at "
-            "the object's fresh position and the next one starts. Needs a "
-            "moving object and a plate solver (astrometric goto)."))
-        row.addWidget(cmb_f)
-        row.addWidget(btn_push)
-        row.addWidget(btn_start)
-        row.addWidget(btn_follow)
-        row.addStretch()
-        gv.addLayout(row)
-        lbl_co = QLabel("")
-        lbl_co.setWordWrap(True)
-        lbl_co.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
-        # an empty label costs a line: it appears when it has coordinates to
-        # name and hides again when it does not
-        lbl_co.setVisible(False)
-        gv.addWidget(lbl_co)
-        # what the observatory is REALLY holding after "Send plan": a read-back
-        # confirmation, not a promise. Empty until the observer sends one.
-        lbl_staged = QLabel("")
-        lbl_staged.setWordWrap(True)
-        lbl_staged.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
-        lbl_staged.setVisible(False)
-        gv.addWidget(lbl_staged)
-        # the last frame the observatory wrote, in the window (ADR-082). Hidden
-        # until a capture has produced one: a 200 px box of nothing would be
-        # another row asking for room it does not need yet.
-        box = QWidget()
-        box.setVisible(False)
-        bl = QHBoxLayout(box)
-        bl.setContentsMargins(0, 0, 0, 0)
-        bl.setSpacing(10)
-        lbl_prev = QLabel()
-        lbl_prev.setFixedSize(200, 200)
-        lbl_prev.setAlignment(Qt.AlignCenter)
-        lbl_prev.setStyleSheet(
-            f"background: {theme.C_PANEL}; border: 1px solid {theme.C_LINE};"
-            f" border-radius: 6px; color: {theme.C_TEXT_DIM};"
-            f" font-size: 11px;")
-        lbl_prev.setText(self.tr("Waiting for the first frame…"))
-        prev_col = QVBoxLayout()
-        lbl_prev_cap = QLabel("")
-        lbl_prev_cap.setWordWrap(True)
-        lbl_prev_cap.setStyleSheet("color: %s; font-size: 11px;" % theme.C_TEXT_DIM)
-        btn_prev_open = QPushButton(self.tr("Open in the editor"))
-        btn_prev_open.setToolTip(self.tr(
-            "Load this frame in the image workbench to measure, annotate or "
-            "calibrate it. It is the frame on disk, not a copy."))
-        prev_col.addWidget(lbl_prev_cap)
-        prev_col.addWidget(btn_prev_open)
-        prev_col.addStretch(1)
-        bl.addWidget(lbl_prev)
-        bl.addLayout(prev_col)
-        bl.addStretch(1)
-        gv.addWidget(box)
-        # ADR-084 rev: the follow run's progress, in the window and not only in
-        # the status bar. Hidden until a run starts (an empty bar is noise).
-        follow_box = QWidget()
-        follow_box.setVisible(False)
-        fl = QVBoxLayout(follow_box)
-        fl.setContentsMargins(0, 0, 0, 0)
-        fl.setSpacing(4)
-        lbl_follow = QLabel("")
-        lbl_follow.setWordWrap(True)
-        prg_follow = QProgressBar()
-        prg_follow.setRange(0, 100)
-        prg_follow.setTextVisible(True)
-        fl.addWidget(lbl_follow)
-        fl.addWidget(prg_follow)
-        gv.addWidget(follow_box)
+        grp = PanelCard(self.tr("Observatory"), accent or theme.C_ACCENT)
+        console = ObservatoryConsole(grp)
+        grp.body.addWidget(console)
         layout.addWidget(grp)
-
-        self._obs_widgets = {
-            "ccd_connect": btn_c,
-            "ccd_disconnect": btn_d,
-            "ccd_refresh": btn_r,
-            "ccd_status": lbl_s,
-            "ccd_version": lbl_v,
-            "ccd_temp": lbl_t,
-            "ccd_tracking": lbl_tr,
-            "ccd_slew": lbl_sl,
-            "ccd_goto": btn_goto,
-            "ccd_sync": btn_sync,
-            "ccd_refresh_pos": btn_refresh_pos,
-            "ccd_stop": btn_stop,
-            "cmb_ccd_filter": cmb_f,
-            "ccd_push": btn_push,
-            "ccd_start": btn_start,
-            "ccd_follow": btn_follow,
-            "ccd_coords": lbl_co,
-            "ccd_staged": lbl_staged,
-            "capture_preview": box,
-            "capture_preview_img": lbl_prev,
-            "capture_caption": lbl_prev_cap,
-            "capture_open": btn_prev_open,
-            "follow_box": follow_box,
-            "follow_label": lbl_follow,
-            "follow_bar": prg_follow,
-        }
-        btn_c.clicked.connect(self._ccd_connect)
-        btn_d.clicked.connect(self._ccd_disconnect)
-        btn_r.clicked.connect(self._ccd_refresh)
-        btn_goto.clicked.connect(self._ccd_goto)
-        btn_sync.clicked.connect(self._ccd_astrometry_goto)
-        btn_refresh_pos.clicked.connect(self._ccd_refresh_position)
-        btn_stop.clicked.connect(self._ccd_stop_goto)
-        btn_push.clicked.connect(self._ccd_send_plan)
-        btn_start.clicked.connect(self._ccd_start_capture)
-        btn_follow.clicked.connect(self._ccd_follow)
-        btn_prev_open.clicked.connect(self._open_capture_frame_in_editor)
+        self._ccd_console = console
+        self._obs_widgets = console.widgets()
+        w = self._obs_widgets
+        # the connected half is what the layout tests look at ("the state row
+        # is on screen"), and it is the console's own mode that shows it
+        self._ccd_state_grp = console._ui.w_on
+        # the two modifiers are remembered: a preference, not a nightly
+        # decision. The astrometric goto also has a Settings home (its
+        # default), the follow flag is only the last choice.
+        w["ccd_sync"].setChecked(bool(config.get("observatory_astro_goto",
+                                                 True)))
+        w["ccd_follow"].setChecked(bool(config.get("observatory_follow",
+                                                   False)))
+        w["ccd_sync"].toggled.connect(
+            lambda on: config.set("observatory_astro_goto", bool(on)))
+        w["ccd_follow"].toggled.connect(
+            lambda on: config.set("observatory_follow", bool(on)))
+        w["ccd_connect"].clicked.connect(self._ccd_connect)
+        w["ccd_disconnect"].clicked.connect(self._ccd_disconnect)
+        w["ccd_goto"].clicked.connect(self._ccd_goto)
+        w["ccd_stop"].clicked.connect(self._ccd_stop_goto)
+        w["ccd_push"].clicked.connect(self._ccd_send_plan)
+        w["ccd_start"].clicked.connect(self._ccd_start_capture)
+        w["capture_open"].clicked.connect(self._open_capture_frame_in_editor)
         # a run in flight keeps its "Stop" face when the block is rebuilt
         # (navigating between projects must not hide the way to stop it)
-        if self._ccd_follow_running:
-            btn_follow.setText(self.tr("Stop following"))
         self._ccd_apply_state()
         # the wheel combo starts on the static fallback list (a real wheel
         # replaces it on connect via _ccd_fill_filters)
@@ -6789,45 +6632,33 @@ class MainWindow(QMainWindow):
                                     or self._ccd_follow_running))
 
     def _ccd_apply_state(self):
-        # Enable/disable the observatory widgets after a connection change and
-        # refresh the status line. Safe to call even before the widgets exist.
+        # Enable/disable the observatory widgets after a connection change,
+        # refresh the status line and put the console in its mode. Safe to call
+        # even before the widgets exist.
         w = self._ccd_widgets()
         if not w.get("ccd_connect"):
             return
         on = self._ccd_connected
-        state_grp = getattr(self, "_ccd_state_grp", None)
-        if state_grp is not None:
-            # the block earns its place only when it has values: four
-            # dashes are 130 px of nothing in a page that has none to spare
-            state_grp.setVisible(bool(on))
-        for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
-                    "ccd_start", "ccd_goto", "ccd_sync"):
+        for key in ("ccd_disconnect", "ccd_push", "ccd_start", "ccd_goto",
+                    "ccd_sync", "ccd_follow"):
             widget = w.get(key)
             if widget is not None:
                 widget.setEnabled(on)
-        # the position refresh is a NETWORK action, not an observatory one: it
-        # is enabled by the project (a moving target) even with the mount off,
-        # because the observer may want the freshest orbit before connecting
-        btn_rp = w.get("ccd_refresh_pos")
-        if btn_rp is not None:
+        # ADR-084: the follow run needs a moving object and a live connection;
+        # while it runs the checkbox stays on (it is the run's flag)
+        cb_follow = w.get("ccd_follow")
+        if cb_follow is not None:
             proj = self._current_project
-            btn_rp.setEnabled(bool(proj)
-                              and proj.get("kind") in ("neo", "comet", "pccp"))
-        # ADR-084: the start-and-follow run needs a moving object and a live
-        # connection; while it runs the button stays on (it is the Stop).
-        btn_rec = w.get("ccd_follow")
-        if btn_rec is not None:
-            proj = self._current_project
-            btn_rec.setEnabled(
+            cb_follow.setEnabled(
                 bool(self._ccd_follow_running)
                 or (on and bool(proj)
                     and proj.get("kind") in ("neo", "comet", "pccp")))
         # while the run owns the client, the single-shot commands are locked so
         # two workers never talk to the server at once (ADR-084); the safety
-        # Stop goto stays armed through _ccd_update_stop()
+        # Stop stays armed through _ccd_update_stop()
         if self._ccd_follow_running:
-            for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
-                        "ccd_start", "ccd_goto", "ccd_sync"):
+            for key in ("ccd_disconnect", "ccd_push", "ccd_start", "ccd_goto",
+                        "ccd_sync"):
                 widget = w.get(key)
                 if widget is not None:
                     widget.setEnabled(False)
@@ -6842,8 +6673,7 @@ class MainWindow(QMainWindow):
         self._ccd_update_capture()
         # Interfaz 1.8: the state is a COLOUR, not a sentence. Green with a
         # dot when the observatory answers, amber when it does not: it is the
-        # one thing the observer glances at before trusting anything else in
-        # this panel, and it used to be grey text like everything else.
+        # one thing the observer glances at before trusting anything else.
         if not on:
             if self._ccd_backend == "nina":
                 w["ccd_status"].setText(
@@ -6853,9 +6683,6 @@ class MainWindow(QMainWindow):
                     "\u25cf " + self.tr("CCDciel: not connected"))
             w["ccd_status"].setStyleSheet(
                 f"color: {theme.C_WARN}; font-weight: 600;")
-            w["ccd_connect"].setStyleSheet(
-                f"background: {theme.composite(theme.C_ACCENT, '2e')};"
-                f" border: 1px solid {theme.C_ACCENT}; color: {theme.C_TEXT};")
             w["ccd_version"].setText(self.tr("—"))
             w["ccd_temp"].setText(self.tr("—"))
             w["ccd_tracking"].setText(self.tr("—"))
@@ -6869,8 +6696,47 @@ class MainWindow(QMainWindow):
                 f" · {self._ccd_version}")
             w["ccd_status"].setStyleSheet(
                 f"color: {theme.C_GOOD}; font-weight: 600;")
-            w["ccd_connect"].setStyleSheet("")
             self._ccd_fill_filters()
+        self._ccd_console_where()
+        self._ccd_set_mode()
+
+    def _ccd_console_where(self):
+        # @return: None. The disconnected state says WHERE the app will look,
+        #          so "not configured" and "not running" cannot be confused.
+        console = getattr(self, "_ccd_console", None)
+        if console is None:
+            return
+        configured = bool(observatory.backend(config))
+        host, port = "", ""
+        try:
+            client = self._ccd_client or observatory.make_client(config)
+            host, port = client.host, client.port
+        except Exception:
+            configured = False
+        console.set_backend_hint(self._ccd_backend_label(), host, port,
+                                 configured)
+
+    def _ccd_set_mode(self):
+        # @return: None. The console shows the region its mode calls for
+        #          (observatory_console): off / idle / moving / capturing /
+        #          following.
+        console = getattr(self, "_ccd_console", None)
+        if console is None:
+            return
+        from .widgets.observatory_console import (MODE_CAPTURING,
+                                                  MODE_FOLLOWING, MODE_IDLE,
+                                                  MODE_MOVING, MODE_OFF)
+        if not self._ccd_connected:
+            mode = MODE_OFF
+        elif self._ccd_follow_running:
+            mode = MODE_FOLLOWING
+        elif self._ccd_capturing:
+            mode = MODE_CAPTURING
+        elif self._ccd_goto_running:
+            mode = MODE_MOVING
+        else:
+            mode = MODE_IDLE
+        console.set_mode(mode)
 
     def _ccd_connect(self):
         # Manual connect button (ADR-030/ADR-081): build the client for the
@@ -7196,11 +7062,18 @@ class MainWindow(QMainWindow):
         w = self._ccd_widgets()
         if not w.get("ccd_goto"):
             return
+        # ONE verb, two methods: the checkbox decides whether the pointing is
+        # trusted (a plain slew) or corrected with a plate solve. It is the
+        # same destination either way, which is why it is not a second button.
+        if w["ccd_sync"].isChecked():
+            self._ccd_astrometry_goto()
+            return
         w["ccd_slew"].setText(self.tr("Slewing…"))
         w["ccd_goto"].setEnabled(False)
         # arm the safety stop the moment the goto starts (ADR-081)
         self._ccd_goto_running = True
         self._ccd_update_stop()
+        self._ccd_set_mode()
         action = self._ccd_point_action(
             lambda c, ra, dec: c.slew_target(ra, dec), ctx)
         self._ccd_point_target = p
@@ -7281,7 +7154,7 @@ class MainWindow(QMainWindow):
         btn = w.get("ccd_stop")
         if btn is not None:
             btn.setEnabled(False)
-            btn.setText(self.tr("Stopping…"))
+            btn.setText("⏹ " + self.tr("Stopping…"))
 
         def action(c):
             return c.abort_motion()
@@ -7296,7 +7169,7 @@ class MainWindow(QMainWindow):
         w = self._ccd_widgets()
         btn = w.get("ccd_stop")
         if btn is not None:
-            btn.setText(self.tr("Stop goto"))
+            btn.setText("⏹ " + self.tr("STOP"))
         if error:
             self.statusBar().showMessage(error, 8000)
         else:
@@ -7315,8 +7188,7 @@ class MainWindow(QMainWindow):
         # off, and it runs on its own worker (ADR-030: never on the GUI
         # thread).
         p = self._current_project
-        w = self._ccd_widgets()
-        if not p or not w.get("ccd_refresh_pos"):
+        if not p:
             return
         if p.get("kind") not in ("neo", "comet", "pccp"):
             self.statusBar().showMessage(
@@ -7329,9 +7201,7 @@ class MainWindow(QMainWindow):
         obj_id = (ctx.get("id") or ctx.get("packed")
                   or p.get("object_name") or "")
         site = self._site_code()
-        btn = w["ccd_refresh_pos"]
-        btn.setEnabled(False)
-        btn.setText(self.tr("Refreshing…"))
+        self.statusBar().showMessage(self.tr("Refreshing the position…"), 4000)
         # a bound slot of this QObject, not a lambda: a lambda would run on
         # the worker's thread and touch the GUI from there
         self._pos_target = p
@@ -7348,11 +7218,6 @@ class MainWindow(QMainWindow):
     def _ccd_on_refreshed_position(self, pos, project_row):
         # @args: pos - the worker's position dict (or {}), project_row - the
         #        project the refresh was for (the current one may have moved)
-        w = self._ccd_widgets()
-        btn = w.get("ccd_refresh_pos")
-        if btn is not None:
-            btn.setEnabled(True)
-            btn.setText(self.tr("Refresh position"))
         cur = self._current_project
         if (not cur or not project_row
                 or cur.get("id") != project_row.get("id")):
@@ -7490,22 +7355,37 @@ class MainWindow(QMainWindow):
         btn = w.get("ccd_start")
         if btn is None:
             return
-        if self._ccd_capturing:
+        if self._ccd_follow_running:
+            btn.setText(self.tr("Stop following"))
+            btn.setToolTip(self.tr(
+                "Stop the follow run. It stops the camera AND the loop that "
+                "re-points the telescope, so the mount is not left slewing"))
+        elif self._ccd_capturing:
             btn.setText(self.tr("Stop capture"))
             btn.setToolTip(self.tr(
                 "Stop the capture in progress. It stops the CAMERA, not the "
-                "mount (that is Stop goto)."))
+                "mount (that is STOP)."))
         else:
             btn.setText(self.tr("Start capture"))
             btn.setToolTip(self.tr(
                 "Start the staged capture in the observatory software"))
 
     def _ccd_start_capture(self):
-        # One button, two jobs: stop while capturing, start otherwise.
+        # One button, three jobs: stop the run in flight, follow the object
+        # when the box is ticked, or start the staged plan. The follow loop
+        # and the plain capture share the button because they are the same
+        # intention ("run the night") with another method.
+        w = self._ccd_widgets()
+        if self._ccd_follow_running:
+            self._ccd_follow_cancel()
+            return
         if self._ccd_capturing:
             self._ccd_run(self._ccd_on_stopped, lambda c: c.stop_capture())
-        else:
-            self._ccd_run(self._ccd_on_started, lambda c: c.start_capture())
+            return
+        if w.get("ccd_follow") is not None and w["ccd_follow"].isChecked():
+            self._ccd_follow()
+            return
+        self._ccd_run(self._ccd_on_started, lambda c: c.start_capture())
 
     def _ccd_on_started(self, _result, error):
         if error:
@@ -7665,9 +7545,6 @@ class MainWindow(QMainWindow):
         # the loop owns the client: stop the dashboard poll so two workers do
         # not talk to the same server at once (ADR-084)
         self._ccd_timer.stop()
-        w = self._ccd_widgets()
-        if w.get("ccd_follow"):
-            w["ccd_follow"].setText(self.tr("Stop following"))
         self._ccd_follow_show(0, self.tr("Follow run started."))
         self._ccd_apply_state()
         worker.start()
@@ -7787,8 +7664,6 @@ class MainWindow(QMainWindow):
         self._ccd_follow_running = False
         self._ccd_timer.start()
         w = self._ccd_widgets()
-        if w.get("ccd_follow"):
-            w["ccd_follow"].setText(self.tr("Start and follow…"))
         self._ccd_apply_state()
         if error:
             self._ccd_follow_show(0, self.tr("Follow run failed: %1").replace(
@@ -11687,6 +11562,14 @@ class MainWindow(QMainWindow):
                 and spn_darkexp and spn_bias):
             return
         n_darks = spn_darks.value()
+        # the calibration steps carry their own wheel slot (2026-10-16)
+        dark_f = self._project_widgets.get("cmb_dark_filter")
+        bias_f = self._project_widgets.get("cmb_bias_filter")
+        cal_filters = {
+            "dark_filter": (dark_f.currentText().strip()
+                            if dark_f is not None else ""),
+            "bias_filter": (bias_f.currentText().strip()
+                            if bias_f is not None else "")}
         # B8: SN multi-filter plans use the step rows; other kinds use the
         # legacy single-filter fields.
         steps = None
@@ -11700,14 +11583,14 @@ class MainWindow(QMainWindow):
                 n_darks=n_darks,
                 exp_dark=spn_darkexp.value() if n_darks else None,
                 n_bias=spn_bias.value(), steps=steps,
-                recipe=self._capture_options_from_widgets())
+                recipe=self._capture_options_from_widgets(), **cal_filters)
         else:
             plan = sequence.make_plan(
                 spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
                 n_darks=n_darks,
                 exp_dark=spn_darkexp.value() if n_darks else None,
                 n_bias=spn_bias.value(),
-                recipe=self._capture_options_from_widgets())
+                recipe=self._capture_options_from_widgets(), **cal_filters)
         ctx = self._current_project.get("context") or {}
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),

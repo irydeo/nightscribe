@@ -39,8 +39,18 @@ def test_make_plan_defaults_overhead():
 def test_make_plan_calibration():
     p = sequence.make_plan(30, 60.0, "L", overhead_s=15.0,
                            n_darks=25, exp_dark=None, n_bias=100)
-    assert p["darks"] == {"count": 25, "exp_s": 60.0}
-    assert p["bias"] == {"count": 100}
+    # the two steps carry their own wheel slot: a dark is taken with the light
+    # path blocked, and that is a position on the wheel (2026-10-16)
+    assert p["darks"] == {"count": 25, "exp_s": 60.0, "filter": "Dark"}
+    assert p["bias"] == {"count": 100, "filter": "Dark"}
+    # and the slot is the observer's, not the app's
+    p2 = sequence.make_plan(30, 60.0, "L", n_darks=5, n_bias=5,
+                            dark_filter="Opaque")
+    assert p2["darks"]["filter"] == "Opaque"
+    assert p2["bias"]["filter"] == "Opaque"   # the bias follows the dark's
+    p3 = sequence.make_plan(30, 60.0, "L", n_darks=5, n_bias=5,
+                            dark_filter="Opaque", bias_filter="D")
+    assert p3["bias"]["filter"] == "D"
     # darks pay exposure + overhead, bias pays overhead only
     assert p["duration_s"] == (30 * 75 + 25 * 75 + 100 * 15)
 
@@ -65,6 +75,31 @@ def test_export_csv(tmp_path):
     assert rows[0]["filter"] == "L"
     assert rows[0]["ra_deg"] == "180.000000"
     assert rows[4]["frame"] == "5"
+
+
+def _all_of_type(node, name):
+    # @args: node - a decoded NINA sequence, name - the $type's class name
+    # @return: every dict of that type, in document order (the walk order is
+    #          the order the sequence runs in, which is what the test needs)
+    out = []
+
+    def walk(n):
+        if isinstance(n, dict):
+            if str(n.get("$type", "")).split(".")[-1].split(",")[0] == name:
+                out.append(n)
+            for v in n.values():
+                walk(v)
+        elif isinstance(n, list):
+            for v in n:
+                walk(v)
+
+    walk(node)
+    return out
+
+
+def _csv_rows(path):
+    with open(path, encoding="utf-8") as f:
+        return list(csv.DictReader(f))
 
 
 def _find_type(node, name):
@@ -447,3 +482,54 @@ def test_ccdciel_hads_window_duration_covers_two_periods(tmp_path):
                               tmp_path / "seq.csv")
     text = open(out, encoding="utf-8").read()
     assert "00:28" in text
+
+def test_the_calibration_steps_carry_their_own_wheel_slot(tmp_path):
+    # 2026-10-16: a dark is taken with the LIGHT PATH BLOCKED, and that is a
+    # position on the wheel. Each calibration step writes its own slot, and
+    # the four formats say the same thing: the light frames first, then the
+    # darks, then the bias.
+    t = _target()
+    plan = sequence.make_plan(5, 60.0, "L", n_darks=3, exp_dark=60.0,
+                              n_bias=4, dark_filter="Opaque")
+
+    # CCDciel: the slot is the plan's, not the hardcoded "Dark"
+    root = _parse_targets(
+        sequence.export_ccdciel(t, plan, tmp_path / "s.targets")).getroot()
+    steps = root.findall(".//Plan/Steps/*")
+    assert [s.get("FrameType") for s in steps] == ["Light", "Dark", "Bias"]
+    assert steps[1].get("Filter") == "Opaque"
+    assert steps[2].get("Filter") == "Opaque"
+    assert steps[2].get("Exposure") == "0"
+
+    # NINA native: DARK and BIAS TakeExposure items AFTER the lights, each
+    # behind its own SwitchFilter, with the bias at exposure 0
+    data = json.loads(open(sequence.export_nina(
+        t, plan, tmp_path / "n.json"), encoding="utf-8").read())
+    dso = _find_type(data, "DeepSkyObjectContainer")
+    images = [i["ImageType"] for i in _all_of_type(dso, "TakeExposure")]
+    assert images == ["LIGHT", "DARK", "BIAS"]
+    dark = [i for i in _all_of_type(dso, "TakeExposure")
+            if i["ImageType"] == "DARK"][0]
+    bias = [i for i in _all_of_type(dso, "TakeExposure")
+            if i["ImageType"] == "BIAS"][0]
+    assert dark["ExposureTime"] == 60.0 and bias["ExposureTime"] == 0.0
+    switches = [i["Filter"]["_name"] for i in _all_of_type(dso, "SwitchFilter")]
+    assert switches == ["L", "Opaque", "Opaque"]
+    ids, refs = _ids_and_refs(data)
+    assert all(r in ids for r in refs)
+
+    # NINA summary: the calibration is part of the plan, with its slot
+    s = json.loads(open(sequence.export_nina_summary(
+        t, plan, tmp_path / "s.json"), encoding="utf-8").read())
+    cal = s["Metadata"]["Calibration"]
+    assert cal[0] == {"FrameType": "Dark", "Count": 3, "Exposure_s": 60.0,
+                      "Filter": "Opaque"}
+    assert cal[1]["FrameType"] == "Bias" and cal[1]["Count"] == 4
+
+    # CSV: one row per frame, the calibration included and typed
+    out = sequence.export_csv(t, plan, tmp_path / "s.csv")
+    rows = _csv_rows(out)
+    assert [r["type"] for r in rows] == (["light"] * 5 + ["dark"] * 3
+                                         + ["bias"] * 4)
+    assert rows[-1]["filter"] == "Opaque"
+    assert float(rows[-1]["exposure_s"]) == 0.0

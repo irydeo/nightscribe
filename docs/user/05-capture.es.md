@@ -187,19 +187,25 @@ CCDciel se respeta el recuento.
 
 ## Calibración: bias, darks y flats
 
-La pestaña **Calibración** del editor FITS gestiona una **biblioteca de
-masters** y la receta de cada visita.
+La pestaña **Calibración** del editor FITS gestiona la **biblioteca de
+masters** y la receta de cada visita. La biblioteca vive en **Ajustes →
+Medida**, su única casa: la pestaña la lee, resuelve la receta contra la
+primera toma de la visita, y **Ajustes de calibración…** es la puerta hacia
+allí. **Calibrar la visita** es una pasada puntual sobre las tomas de la
+visita, no el interruptor que calibra el apilado: cada motor que aplica la
+calibración tiene su propia casilla en su propia pestaña, y la de Astrometría
+(**Aplicar la calibración**) es de tres estados, con la biblioteca decidiendo
+hasta que tú eliges.
 
-La biblioteca se indexa, no se copia: señalas tus FITS maestros y la app lee
+La biblioteca se indexa, no se copia: señalas tus FITS masters y la app lee
 de sus cabeceras lo que los hace válidos (cámara, ganancia, temperatura,
-exposición, filtro). Al indexar declaras qué *es* cada fichero:
-
-- **Bias**: el offset electrónico de lectura (exposición cero).
-- **Dark**: corriente térmica, a la misma exposición que las luces. *Un dark
-  ya incluye el bias*, así que con dark no hace falta bias aparte. Un «dark
-  de flats» (a la exposición de los flats) es un dark: se indexa como
-  **Dark** con su exposición, no como un cuarto tipo.
-- **Flat**: por filtro, normalizado.
+exposición, filtro). **Qué es cada fichero lo dice su propia cabecera**
+(`IMAGETYP`): **Bias**, **Dark** o **Flat**. Solo cuando la cabecera calla
+decide la exposición, y de forma estrecha: en cero es un bias, y de cinco
+segundos en adelante es un dark; lo de en medio no se adivina, y una toma de
+luz se rechaza sola. Son **tres tipos, no cuatro**: un «dark de flats» es un
+**Dark** a la exposición del flat, y la exposición es lo que el emparejamiento
+ya mira.
 
 > **¿Por qué calibrar?** Porque tu sensor miente de tres maneras conocidas y
 > repetibles: añade un pedestal electrónico a cada píxel (bias), acumula
@@ -214,21 +220,70 @@ exposición, filtro). Al indexar declaras qué *es* cada fichero:
 > color. Un flat de V no corrige un R: la sombra de la misma mota cae en otro
 > sitio si la rueda aparca distinto.
 
-**La receta de la visita**: al abrir el editor desde una visita, la app
-resuelve qué master de la biblioteca usa cada pieza, leyendo la cabecera del
-primer frame, y avisa de lo que falte (Avisos). **Calibrar la visita**
-aplica la receta a todos los frames; la calibración trabaja en memoria y
-solo escribe copias FITS si marcas la exportación.
+**Con qué se empareja cada pieza**, y por qué no con más:
 
-**Si no tienes flat para un filtro**: la opción *Model the vignetting from
-the frames* muestrea el cielo en una rejilla de teselas sobre una veintena
-de tomas repartidas y ajusta una superficie suave a lo que tienen en común:
-el viñeteo del tren, que está fijo en el fotograma. Las teselas que una
-estrella, una galaxia o una mota desplazan fuera de la tendencia las tira el
-propio ajuste, así que ninguna fuente acaba en el modelo. Corrige el
-**viñeteo** (el sistemático que importa, alrededor de una décima de
-magnitud) y **no el polvo**: una superficie suave no tiene estructura fina, y
-para eso está un master real. Se llama modelo y no flat por eso mismo.
+- **Dark**: cámara, ganancia, temperatura del sensor dentro de la tolerancia
+  (por defecto **±3 °C**, en Ajustes → Medida) y **exposición exacta**. La
+  corriente térmica es el nivel, así que los cuatro importan.
+- **Bias**: cámara y ganancia. Es el pedestal de lectura y apenas se mueve con
+  la temperatura del sensor.
+- **Flat**: cámara y filtro **solo**. Su forma es la del tren óptico y su nivel
+  se normaliza, así que la ganancia y la temperatura se dejan fuera del
+  emparejamiento a propósito: exigirlas rechazaba flats reales.
+- Al flat se le quita antes su propio offset: un **dark a la exposición del
+  flat** (el mismo pozo de darks), o el **bias** cuando el flat es corto.
+
+**La biblioteca dice por qué.** Cuando un master que ves no se usa, la receta
+nombra el más cercano de ese tipo con el criterio que falló y los números («un
+dark, pero a −16 °C frente a −10 °C, tolerancia 3 °C»), así que «por qué no usa
+mi dark» tiene respuesta en vez de un encogimiento de hombros. Un flat de más
+de **30 días** se usa pero se avisa: el polvo del tren se mueve y una mota
+puede haber aparecido o desaparecido.
+
+**Cada master tiene dueño.** Un master construido con las tomas de un proyecto
+es de ese proyecto; un bias o un flat se pueden **compartir** con todos los
+proyectos. La receta prueba primero los masters del propio proyecto y los
+compartidos como respaldo, y nunca alcanza por accidente el de otro proyecto;
+uno que el proyecto no posee se marca como **«(compartido)»** en la línea de
+la receta, para que sepas que esos píxeles no son de tus noches. Un proyecto
+también puede **usar el master de otro proyecto** con un **enlace** (una
+segunda fila sobre el mismo fichero, nunca una copia), y borrar un master quita
+su fila mientras el fichero se queda en cuanto otra fila lo use.
+
+**La app puede construir los masters.** **Construir maestros…** toma una
+carpeta de tomas de calibración, clasifica cada una por su cabecera, las
+agrupa por la misma clave con la que empareja la receta (la temperatura del
+dark redondeada al grado, así que una noche de darks es un master y no un
+puñado), combina cada grupo con la **mediana** y escribe el master en la
+carpeta de la biblioteca. Un grupo de una sola toma se avisa: es una copia de
+esa toma, no una media. Los originales se borran solo si lo pides, y solo
+después de que cada master esté escrito **e** indexado, así que una
+construcción que falla a medias los deja donde estaban. **Usar el maestro de
+otro proyecto…** enlaza uno.
+
+**La receta de la visita**: al abrir el editor desde una visita, la app
+resuelve qué master de la biblioteca usa cada pieza, leyendo la cabecera de la
+primera toma, y avisa de lo que falte (**Qué falta, y por qué**). **Calibrar
+la visita** aplica la receta a todas las tomas; la calibración trabaja en
+memoria y solo escribe copias FITS si marcas la exportación. Esas copias van a
+la subcarpeta **`calibrados/`** del proyecto y se registran en la visita como
+cualquier otro producto. Cada copia lleva la tarjeta **NSCALIB**: si vuelve a
+entrar en un run, la app ve que ya está limpia y **no** le resta el dark ni le
+divide el flat otra vez (una toma doblemente calibrada no tiene señal visible
+en la imagen), y lo dicen tanto el run como la pestaña.
+
+**Si no tienes flat para un filtro**: la opción **Model the vignetting from
+the frames** (en Ajustes → Medida, su única casa; la pestaña solo la lee)
+muestrea el cielo en una rejilla de teselas sobre una veintena de tomas
+repartidas y ajusta una superficie suave a lo que tienen en común: el viñeteo
+del tren, que está fijo en el fotograma. Las teselas que una estrella, una
+galaxia o una mota desplazan fuera de la tendencia las tira el propio ajuste,
+así que ninguna fuente acaba en el modelo. Corrige el **viñeteo** (el
+sistemático que importa, alrededor de una décima de magnitud) y **no el
+polvo**: una superficie suave no tiene estructura fina, y para eso está un
+master real. Se llama modelo y no flat por eso mismo, y **un flat real siempre
+gana**: el modelo es solo el respaldo para los filtros para los que la
+biblioteca no tiene flat.
 
 > **¿Por qué basta una superficie suave?** Porque el viñeteo es suave y vale
 > 0,087 mag, mientras que el polvo vale 0,026 mag: medido contra un master
@@ -237,6 +292,12 @@ para eso está un master real. Se llama modelo y no flat por eso mismo.
 > estrellas se muevan, porque las teselas que estropean se descartan solas.
 > Lo puedes abrir con **Ver el modelo** y juzgarlo: tiene que ser una
 > superficie lisa, sin ninguna estrella ni mota.
+
+Una cosa de la que depende el modelo: se construye de las tomas **con el mismo
+dark o bias restado que la luz**. Sin él, el pedestal se queda dentro y
+comprime la forma del modelo, así que corrige solo parte del viñeteo (la
+corrección cae a alrededor del 44 % de lo que debería); la app lo dice y te
+pide indexar un bias para esa cámara.
 
 ## Para saber más
 

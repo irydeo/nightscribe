@@ -28,6 +28,7 @@ puedes leerlos de principio a fin o saltar al que necesites:
 
 | Capítulo | Qué encontrarás |
 |----------|-----------------|
+| [00. Conceptos](00-concepts.es.md) | El modelo mental: proyecto, visita, run, serie, reporte |
 | [01. Primeros pasos](01-getting-started.es.md) | Instalación, asistente inicial y ajustes del observatorio |
 | [02. Planificar la noche](02-tonight.es.md) | La vista Esta noche, la puntuación, el calendario del cielo |
 | [03. Proyectos](03-projects.es.md) | Crear y seguir proyectos: de la ficha a la publicación |

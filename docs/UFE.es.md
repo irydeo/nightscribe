@@ -78,7 +78,7 @@ las cuenta («207 tomas · 3 con problemas») y **Solo problemas** deja solo esa
 que es la forma rápida de recorrer una noche de cientos de tomas. Un clic abre
 la toma en el editor (el navegador va y viene en los dos sentidos) y el menú
 contextual la quita de la visita (el fichero NO se toca) o la mueve a la
-carpeta `descartados/` del proyecto (no se borra nada, se puede recuperar).
+carpeta `dscrd/` del proyecto (no se borra nada, se puede recuperar).
 
 El marco de la ventana ocupa lo que NECESITA y el área de trabajo se queda
 con el resto: la placa es para lo que existe la ventana. La columna de los
@@ -135,6 +135,33 @@ DR1 g (supernovas y transitorios; la placa es la que cargaste con
   SN mapeada por el WCS de tu placa.
 * **GIF… / MP4… / PNG…** exportan el par (lado a lado el PNG), con el
   zoom de recorte sobre la SN que elijas.
+
+## Calibración en el editor
+
+El botón **Calibrar** de la fila de herramientas abre la ventana
+**Calibración** (su pestaña propia): la receta de la visita resuelta contra
+la biblioteca de masters, y el run **Calibrar la visita**. Lee la receta de la
+primera toma de la visita, dice qué master usa cada pieza (uno que este
+proyecto no posee se marca «(compartido)») y qué falta, con el criterio que
+falló un master rechazado y los números. La biblioteca y la política (el
+modelo de viñeteo, la tolerancia de temperatura del dark) viven en **Ajustes
+→ Medida**, y **Ajustes de calibración…** es la puerta hacia allí.
+
+**Calibrar la visita** aplica la receta a todas las tomas como una pasada
+puntual (primero el offset, después el flat); trabaja en memoria y solo
+escribe copias FITS si marcas **Exportar los frames calibrados (copias
+FITS)**. Esas copias van a la subcarpeta `calibrados/` del proyecto y se
+registran en la visita como cualquier otro producto; cada una lleva la tarjeta
+`NSCALIB`, así que un run que la lee de vuelta la deja en paz en vez de
+restarle el dark dos veces, y el informe lo dice. Cuando la biblioteca no
+tiene flat para un filtro y la política del modelo está encendida, el run
+escribe además el modelo de viñeteo junto a la visita, y **Ver el modelo** lo
+abre: tiene que ser una superficie lisa, sin ninguna estrella ni mota.
+
+El interruptor por motor es aparte: la casilla **Aplicar la calibración** de
+la pestaña Astrometría es la que hace que el track & stack calibre cada toma
+al leerla. El capítulo [05. Captura](user/05-capture.es.md) tiene la física,
+las reglas de emparejamiento y los avisos completos.
 
 ## Fotometría
 

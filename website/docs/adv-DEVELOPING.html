@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe: developing · NightScribe</title>
+<meta name="description" content="NightScribe: developing">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="adv-DEVELOPING.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.html">
+      Advanced guide</a></p>
+    <p class="side-back"><a href="index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe: developing</h1><p><em><a href="adv-DEVELOPING.html">Versión en español</a></em></p><p>This is the short path for a maintainer: how to run things and the three recipes that come up most (a new data source, a new target kind, a new editor tab). The rules live in <a href="https://github.com/irydeo/nightscribe/blob/main/docs/AGENTS.md"><code>AGENTS.md</code></a>; the decisions live in <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="running-it">Running it</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m pytest tests/unit -n auto --dist loadfile   # fast, offline
+.venv/bin/python -m pytest tests/functional                     # hits the network
+.venv/bin/python -m nightscribe gui</code></pre><p>The unit suite is offline by design: a <code>requests</code> call raises and the source's own fallback must handle it. It also caps its own thread pools (the combine). On a machine with many cores, <code>-n auto</code> can still make a worker die now and then (a native crash we have not pinned down); <code>-n 4</code>, or <code>PYTEST_XDIST_AUTO_NUM_WORKERS=4</code>, is steadier. The CI, with 2-4 cores, is unaffected.</p><h2 id="the-rules-that-are-tests">The rules that are tests</h2><p>Some house rules are held by a test, so a PR breaks loudly instead of quietly: <code>test_help_texts.py</code> (a help names no concrete case), <code>test_em_dash.py</code> (no em dash in the guide or the interface strings), <code>test_import_boundaries.py</code> (<code>requests</code> only in <code>core/sources/</code>, no SQLite in the GUI), <code>test_docs_links.py</code> (every doc link resolves, the ADR index is complete), <code>test_site_build.py</code> (the committed website is what the generator produces), <code>test_i18n.py</code> (both catalogues complete and in sync), and <code>test_kinds_contract.py</code> (every kind has a colour, a chip, an analysis, context fields and hashtags).</p><h2 id="recipe-a-new-data-source">Recipe: a new data source</h2><ol><li><p><strong>One module per source</strong>, <code>nightscribe/core/sources/&lt;name&gt;.py</code>. It exposes a small <code>fetch(...)</code>/client function and never calls <code>requests</code> directly: it goes through the cache, <code>db.http_get(key, "&lt;source&gt;", fetch)</code>, so the TTL and the offline behaviour are not its business.</p></li><li><p><strong>Register the TTL</strong> in <code>core/db.py</code> (<code>SOURCE_TTL</code>). Pick it from how often the upstream really changes (a static atlas is 30 days, a discovery list is hours).</p></li><li><p><strong>Wire it in</strong>: <code>core/planner.py</code> if it feeds Tonight (add a stage to the <code>stages</code> list and a phase to <code>PHASES</code>), <code>core/enrich.py</code> if it is context for the object card.</p></li><li><p><strong>Document it</strong> in <code>docs/DATA_SOURCES.md</code> (the endpoint, what it gives, the TTL, whether it needs a key), and add it to the source list in the <strong>About</strong> box.</p></li><li><p><strong>Test it</strong>: a unit test with the source faked (the suite is offline) and a functional test that hits the real endpoint.</p></li></ol><h2 id="recipe-a-new-target-kind">Recipe: a new target kind</h2><p>A kind is a string id written by hand in a lot of places, so this is a hunt. Start at <code>core/kinds.py</code> (the canonical <code>KINDS</code> list, plus <code>ANALYSIS</code> and <code>_CONTEXT_FIELDS</code>), then:</p><ul><li><p><code>gui/theme.py</code>: <code>KIND_COLORS</code> and <code>KIND_LABELS</code> (the chip);</p></li><li><p><code>core/planner.py</code>: a builder and its phase;</p></li><li><p><code>core/suggest.py</code>: how it scores and its "why tonight";</p></li><li><p><code>core/narrative.py</code>: the hook and the hashtags;</p></li><li><p><code>gui/overview.py</code>: the object card's rows for the kind;</p></li><li><p><code>core/project.py</code>: <code>VALID_KINDS</code> if it can be a project.</p></li></ul><p><code>test_kinds_contract.py</code> fails until the maps cover the new id, which is the cheap safety net; the if-chains are still yours to find. Add the kind's tests and, if it brings a source, its <code>DATA_SOURCES.md</code> entry.</p><h2 id="recipe-a-new-editor-ufe-tab">Recipe: a new editor (UFE) tab</h2><p>The unified FITS editor's tabs follow ADR-005: the interface is a Designer file, the code wires it.</p><ol><li><p><strong>The structure</strong> in <code>nightscribe/gui/ui/ufe_&lt;name&gt;_tab.ui</code>: every text and tooltip lives here, with <code>&lt;class&gt;</code> = the owning class and <code>objectName</code> = the Python attribute.</p></li><li><p><strong>The tab</strong> in <code>nightscribe/gui/ufe_&lt;name&gt;_tab.py</code>: load the <code>.ui</code> with <code>ui_loader.load_ui</code>, wire the signals, fill the data. Custom widgets (a canvas, a histogram) never enter the <code>.ui</code>: a placeholder <code>QWidget</code> plus <code>replaceWidget</code>.</p></li><li><p><strong>Every visible string through <code>self.tr()</code></strong>, and run <code>tools/i18n.py</code> (never a raw <code>lrelease</code>).</p></li><li><p><strong>Register it</strong> in <code>gui/ufe_dialog.py</code> (the tab bar and the shared state, <code>gui/ufe_state.py</code>).</p></li><li><p><strong>Test it</strong> offscreen: build the tab against a temp plate and assert what it shows and what it writes.</p></li></ol><h2 id="committing">Committing</h2><p>Code, comments and commit messages in English; one concern per commit; the tests green; the docs (both languages) updated. If you change a decision, update or supersede its ADR.</p></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

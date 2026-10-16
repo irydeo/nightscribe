@@ -350,6 +350,8 @@ img { max-width: 100%; }
 .toc-link.on { background: var(--sel); color: #fff; }
 .toc-link.on span { color: #dce6ff; }
 .side-back { margin: 14px 0 0; padding: 0 10px; font-size: 13px; }
+.adv-list { margin: 0 0 26px; padding-left: 18px; }
+.adv-list li { margin: 6px 0; }
 
 .paper {
   background: var(--paper); color: var(--paper-text);

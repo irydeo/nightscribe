@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe: desarrollar · NightScribe</title>
+<meta name="description" content="NightScribe: desarrollar">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="adv-DEVELOPING.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.es.html">
+      Guía avanzada</a></p>
+    <p class="side-back"><a href="index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe: desarrollar</h1><p><em><a href="adv-DEVELOPING.es.html">English version</a></em></p><p>Este es el camino corto para quien mantiene el proyecto: cómo ejecutarlo y las tres recetas que más salen (una fuente de datos nueva, un tipo de objetivo nuevo, una pestaña nueva del editor). Las reglas están en <a href="https://github.com/irydeo/nightscribe/blob/main/docs/AGENTS.md"><code>AGENTS.md</code></a>; las decisiones, en <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="ejecutarlo">Ejecutarlo</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m pytest tests/unit -n auto --dist loadfile   # rápido, sin red
+.venv/bin/python -m pytest tests/functional                     # con red
+.venv/bin/python -m nightscribe gui</code></pre><p>La suite unitaria es offline a propósito: una llamada a <code>requests</code> lanza, y el fallback propio de la fuente tiene que gestionarlo. Además acota sus propios pools de hilos (el combine). En una máquina con muchos núcleos, <code>-n auto</code> puede hacer que un worker muera de vez en cuando (un crash nativo que no hemos localizado); <code>-n 4</code>, o <code>PYTEST_XDIST_AUTO_NUM_WORKERS=4</code>, es más estable. El CI, con 2-4 núcleos, no se ve afectado.</p><h2 id="las-reglas-que-son-tests">Las reglas que son tests</h2><p>Algunas reglas de la casa las sostiene un test, para que una PR falle a voces en vez de en silencio: <code>test_help_texts.py</code> (una ayuda no nombra el caso concreto), <code>test_em_dash.py</code> (ni en la guía ni en las cadenas de la interfaz), <code>test_import_boundaries.py</code> (<code>requests</code> solo en <code>core/sources/</code>, nada de SQLite en la GUI), <code>test_docs_links.py</code> (todo enlace de la documentación resuelve, el índice de ADR está completo), <code>test_site_build.py</code> (la web commiteada es la que produce el generador), <code>test_i18n.py</code> (los dos catálogos completos y en sincronía) y <code>test_kinds_contract.py</code> (cada tipo tiene color, chip, análisis, campos de contexto y hashtags).</p><h2 id="receta-una-fuente-de-datos-nueva">Receta: una fuente de datos nueva</h2><ol><li><p><strong>Un módulo por fuente</strong>, <code>nightscribe/core/sources/&lt;nombre&gt;.py</code>. Expone una función <code>fetch(...)</code>/cliente pequeña y nunca llama a <code>requests</code> directamente: pasa por la caché, <code>db.http_get(key, "&lt;fuente&gt;", fetch)</code>, así que el TTL y el comportamiento offline no son su problema.</p></li><li><p><strong>Registra el TTL</strong> en <code>core/db.py</code> (<code>SOURCE_TTL</code>). Elígelo por cada cuánto cambia de verdad lo de arriba (un atlas estático son 30 días, una lista de descubrimientos son horas).</p></li><li><p><strong>Conéctala</strong>: <code>core/planner.py</code> si alimenta Esta noche (añade una etapa a la lista <code>stages</code> y una fase a <code>PHASES</code>), <code>core/enrich.py</code> si es contexto para la ficha del objeto.</p></li><li><p><strong>Documéntala</strong> en <code>docs/DATA_SOURCES.md</code> (el endpoint, qué da, el TTL, si necesita clave) y añádela a la lista de fuentes del cuadro <strong>Acerca de</strong>.</p></li><li><p><strong>Pruébala</strong>: un test unitario con la fuente simulada (la suite es offline) y un test funcional que pegue al endpoint real.</p></li></ol><h2 id="receta-un-tipo-de-objetivo-nuevo">Receta: un tipo de objetivo nuevo</h2><p>Un tipo es un id de texto escrito a mano en muchos sitios, así que esto es una cacería. Empieza en <code>core/kinds.py</code> (la lista canónica <code>KINDS</code>, más <code>ANALYSIS</code> y <code>_CONTEXT_FIELDS</code>), y luego:</p><ul><li><p><code>gui/theme.py</code>: <code>KIND_COLORS</code> y <code>KIND_LABELS</code> (el chip);</p></li><li><p><code>core/planner.py</code>: un constructor y su fase;</p></li><li><p><code>core/suggest.py</code>: cómo puntúa y su «por qué esta noche»;</p></li><li><p><code>core/narrative.py</code>: el gancho y los hashtags;</p></li><li><p><code>gui/overview.py</code>: las filas de la ficha del objeto para el tipo;</p></li><li><p><code>core/project.py</code>: <code>VALID_KINDS</code> si puede ser un proyecto.</p></li></ul><p><code>test_kinds_contract.py</code> falla hasta que los mapas cubren el id nuevo, que es la red de seguridad barata; las cadenas de <code>if</code> las tienes que encontrar tú. Añade los tests del tipo y, si trae una fuente, su entrada en <code>DATA_SOURCES.md</code>.</p><h2 id="receta-una-pestaña-nueva-del-editor-ufe">Receta: una pestaña nueva del editor (UFE)</h2><p>Las pestañas del editor FITS unificado siguen el ADR-005: la interfaz es un fichero de Designer, el código la cablea.</p><ol><li><p><strong>La estructura</strong> en <code>nightscribe/gui/ui/ufe_&lt;nombre&gt;_tab.ui</code>: cada texto y tooltip vive aquí, con <code>&lt;class&gt;</code> = la clase propietaria y <code>objectName</code> = el atributo de Python.</p></li><li><p><strong>La pestaña</strong> en <code>nightscribe/gui/ufe_&lt;nombre&gt;_tab.py</code>: carga el <code>.ui</code> con <code>ui_loader.load_ui</code>, cablea las señales, rellena los datos. Los widgets propios (un canvas, un histograma) nunca entran al <code>.ui</code>: un <code>QWidget</code> de relleno más <code>replaceWidget</code>.</p></li><li><p><strong>Toda cadena visible por <code>self.tr()</code></strong>, y ejecuta <code>tools/i18n.py</code> (nunca un <code>lrelease</code> crudo).</p></li><li><p><strong>Regístrala</strong> en <code>gui/ufe_dialog.py</code> (la barra de pestañas y el estado compartido, <code>gui/ufe_state.py</code>).</p></li><li><p><strong>Pruébala</strong> offscreen: monta la pestaña sobre una placa temporal y comprueba lo que muestra y lo que escribe.</p></li></ol><h2 id="commitear">Commitear</h2><p>Código, comentarios y mensajes de commit en inglés; un asunto por commit; los tests en verde; la documentación (los dos idiomas) al día. Si cambias una decisión, actualiza o supera su ADR.</p></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

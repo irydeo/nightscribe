@@ -10,6 +10,10 @@ mientras funciona. Si apareció un diálogo y se desvaneció, o un paso falló
 sin decir por qué, la respuesta está casi siempre ahí. Cuando reportes un
 problema, adjunta ese fichero.
 
+El fichero no crece sin límite: rota por tamaño, así que la carpeta guarda el
+registro actual y unos pocos anteriores (unos pocos megabytes como mucho) y
+nunca hay que limpiarlo a mano.
+
 ## No hay red
 
 NightScribe funciona sin conexión para todo lo que no necesita datos en vivo:

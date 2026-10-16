@@ -364,9 +364,11 @@ La profundidad vive en el repositorio, en los documentos de tema que la app
 abre desde su **?**:
 
 - [`docs/ASTROMETRY.es.md`](../ASTROMETRY.es.md): el centroide, la
-  combinación por 1/sigma^2, el presupuesto de error y el handoff a Find_Orb,
-  con glosario;
+  combinación por 1/sigma^2, el presupuesto de error y el handoff a Find_Orb;
 - [`docs/MPC_SUBMISSION.es.md`](../MPC_SUBMISSION.es.md): los formatos ADES y
   de 80 columnas y el listón de envío.
+
+Para las palabras que este capítulo comparte con el resto de la guía (proyecto,
+visita, run, serie, reporte), consulta [00. Conceptos](00-concepts.es.md).
 
 Siguiente: [08. Contarlo](08-posts.es.md).

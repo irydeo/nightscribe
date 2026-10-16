@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe — Motor de sugerencias y scoring · NightScribe</title>
+<meta name="description" content="NightScribe — Motor de sugerencias y scoring">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.es.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.es.html">Guía de usuario</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a>
+      <a class="lang" href="adv-SCORING.html">EN</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.es.html">
+      Guía avanzada</a></p>
+    <p class="side-back"><a href="index.es.html">
+      Volver al principio</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe — Motor de sugerencias y scoring</h1><p><em><a href="adv-SCORING.es.html">English version</a></em></p><p>El motor de sugerencias (<code>core/suggest.py</code>) convierte cinco listas heterogéneas de objetivos en una respuesta: <strong>«estos son tus mejores objetivos esta noche, y aquí está el porqué»</strong>. Todo son reglas simples y testeables — sin machine learning, sin magia.</p><h2 id="score-unificado-0100">Score unificado: 0–100</h2><p>Cada objetivo recibe un score construido con cuatro familias ponderadas:</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Familia</th><th style="text-align:left">Peso</th><th style="text-align:left">Qué mide</th></tr></thead><tbody><tr><td style="text-align:left">Prioridad científica</td><td style="text-align:left">0–35</td><td style="text-align:left">Score NEOfixer (NEOs), brillo+frescura (SNs), actividad/perihelio (cometas), score PCCP, prioridad ExoClock + deriva O-C (tránsitos)</td></tr><tr><td style="text-align:left">Observabilidad</td><td style="text-align:left">0–30</td><td style="text-align:left">Altitud máxima esta noche, horas sobre la altitud mínima, magnitud vs. límites del usuario, interferencia lunar, % de tránsito cubierto</td></tr><tr><td style="text-align:left">Urgencia</td><td style="text-align:left">0–20</td><td style="text-align:left">Urgencia NEOfixer, arco corto, días desde el descubrimiento, perihelio inminente, degradación de efeméride (O-C)</td></tr><tr><td style="text-align:left">Gancho divulgativo ★</td><td style="text-align:left">0–15</td><td style="text-align:left">«¿Qué buena historia es?» — nuestro diferencial</td></tr></tbody></table></div><p>★ Bonus divulgativos (se acumulan, tope 15):</p><ul><li><p>NEO: en el NEOCP, impactor potencial (Sentry), objetivo radar/NHATS, MOID &lt; 0,05 UA, aproximación prevista &lt; 10 LD próximamente.</p></li><li><p>Cometa: dinámicamente nuevo (primera visita), perihelio en días, outburst detectado (mag observada ≫ predicción M1/K1), más brillante que 12 («¡prismáticos!»).</p></li><li><p>Supernova: más brillante que 15, galaxia anfitriona famosa (M51, M101, NGC...), descubierta en la última semana.</p></li><li><p>Tránsito: sistema famoso (HD 209458, TRAPPIST-1, 55 Cnc...), tránsito completo visible, prioridad alta para Ariel de la ESA.</p></li><li><p>PCCP: score de cometa &gt; 50 en la página del MPC.</p></li></ul><h3 id="realimentación-del-historial">Realimentación del historial</h3><p>Desde SQLite (<code>observations</code>): los objetivos <strong>observados pero aún no publicados</strong> ganan +5 de urgencia («lo observaste el martes — ¡cuéntalo!»); los <strong>ya publicados</strong> en los últimos 30 días pierden el bonus divulgativo (decaimiento por novedad).</p><h2 id="top-n-con-diversidad-de-tipos">Top N con diversidad de tipos</h2><p><code>top_n</code> primero elige el mejor objetivo <strong>de cada tipo</strong> (NEO, SN, cometa, PCCP, tránsito) y luego rellena los huecos con los siguientes mejores scores. Una noche con un NEO, un cometa y un tránsito vale más que tres NEOs — científicamente y para la audiencia.</p><p>Detalles por objeto en la app: <strong>NObs</strong> (observaciones acumuladas: más = órbita más fiable — una comprobación rápida de realidad para candidatos NEO) y <strong>Descubierto</strong> (fecha de descubrimiento para transitorios; fecha de la aproximación para las alertas de acercamiento).</p><h2 id="frases-por-qué-esta-noche">Frases «por qué esta noche»</h2><p>Una frase generada por objetivo del Top, ES + EN. Basada en reglas en <code>narrative.py</code>: gana la primera regla que aplica, así las frases son específicas, no genéricas. Ejemplos:</p><ul><li><p>NEOCP: <em>«En la página de confirmación del MPC: cada medida cuenta para su órbita.»</em></p></li><li><p>Arco corto: <em>«Arco de una sola oposición: esta semana es la ventana antes de perderlo.»</em></p></li><li><p>SN reciente: <em>«Descubierta hace 6 días y aún en aumento; su luz ha viajado 55 millones de años.»</em></p></li><li><p>PCCP: <em>«Score de cometa 85/100 en el PCCP del MPC: tu imagen podría confirmarlo.»</em></p></li><li><p>Tránsito: <em>«Un planeta de 1,4 Júpiters eclipsa su estrella un 1,5% durante 3 h — tu curva de luz ayuda a la misión Ariel de la ESA.»</em></p></li><li><p>Aproximación: <em>«Pasa a 3,2 distancias lunares el jueves: más cerca que la Luna es una historia.»</em></p></li></ul><p>Cada tarjeta muestra además: magnitud, altitud máxima + hora (o ventana de tránsito), coste estimado en minutos si se conoce, y botones de acción.</p><h2 id="filtrado-de-factibilidad">Filtrado de factibilidad</h2><p>El equipo del usuario entra por Configuración (apertura, magnitud límite). La política es <strong>híbrida</strong> (ADR-025):</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Familia</th><th style="text-align:left">Política</th><th style="text-align:left">Dónde</th></tr></thead><tbody><tr><td style="text-align:left">SN, cometas, exoplanetas</td><td style="text-align:left"><strong>Duro</strong> — fuera de alcance, fuera de la lista</td><td style="text-align:left"><code>sources/rochester.py</code>, <code>sources/cobs.py</code>, <code>core/transits.py</code></td></tr><tr><td style="text-align:left">NEO, PCCP</td><td style="text-align:left"><strong>Suave</strong> — la magnitud es una predicción, se hunde el score y se etiqueta; <strong>nunca se descarta</strong></td><td style="text-align:left"><code>core/suggest.py</code> → <code>beyond_limit()</code></td></tr></tbody></table></div><p>Los objetivos fuera de alcance (en el caso suave) se muestran atenuados, nunca ocultos: planificar es saber qué hay ahí arriba, aunque esta noche no puedas con ello.</p><h2 id="pruebas">Pruebas</h2><p>Los tests unitarios usan objetivos sintéticos con propiedades conocidas («un NEOCP brillante debe superar a un asteroide numerado de mag 21»); los funcionales ejecutan el motor completo contra las fuentes reales para el sitio configurado.</p></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Informar de un fallo</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

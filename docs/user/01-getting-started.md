@@ -4,10 +4,15 @@
 
 Three paths, depending on how comfortable you are with a terminal:
 
-- **Windows installer** (no Python needed): download `NightScribeSetup-*.exe`
-  from the [releases page](https://github.com/irydeo/nightscribe/releases) and
-  run it. Windows SmartScreen will warn because the binary is unsigned:
-  *More info → Run anyway*.
+- **Installer or package** (no Python needed): on the
+  [releases page](https://github.com/irydeo/nightscribe/releases) pick the
+  Windows installer `NightScribeSetup-*.exe` (or the portable
+  `NightScribe-*-windows-x64.zip` to run without installing), or on Linux the
+  `.deb` (Debian, Ubuntu, Mint:
+  `sudo apt install ./nightscribe_*_amd64.deb`) or the `.rpm` (Fedora,
+  openSUSE: `sudo dnf install ./nightscribe-*.x86_64.rpm`), then run
+  `nightscribe gui`. Windows SmartScreen will warn because the binary is
+  unsigned: *More info → Run anyway*.
 - **pip**: `pip install nightscribe` inside a virtual environment, then
   `nightscribe gui`.
 - **From source** (if you plan to contribute): clone the repository, create

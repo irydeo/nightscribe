@@ -77,7 +77,7 @@ counts them ("207 frames · 3 with problems") and **Only problems** shows just
 those, which is the fast way through a night of hundreds of frames. A click
 opens the frame in the editor (the navigator follows both ways) and the context
 menu takes a frame out of the visit (the file is NOT touched) or moves it to
-the project's `discarded/` folder (nothing is deleted, it can be brought back).
+the project's `dscrd/` folder (nothing is deleted, it can be brought back).
 
 The chrome takes what it NEEDS and the work area gets everything else: the
 plate is what the window is for. The panel column opens at 420 px and can be
@@ -131,6 +131,33 @@ with "Load FITS…"):
   mapped through your plate's WCS.
 * **GIF… / MP4… / PNG…** export the pair (side by side for PNG), with
   the crop zoom on the SN of your choice.
+
+## Calibration in the editor
+
+The **Calibrate** button in the tools row opens the **Calibration** window
+(its own tab): the visit's recipe resolved against the master library, and
+the **Calibrate the visit** run. It reads the recipe for the visit's first
+frame, says which master each piece uses (one this project does not own is
+marked "(shared)") and what is missing, with the criterion a rejected master
+failed and the numbers. The library and the policy (the vignetting model,
+the dark's temperature tolerance) live in **Settings → Measurement**, and
+**Calibration settings…** is the door there.
+
+**Calibrate the visit** applies the recipe to every frame as a one-off run
+(offset first, flat second); it works in memory, and it writes FITS copies
+only if **Export the calibrated frames (FITS copies)** is ticked. Those
+copies land in the project's `calibrados/` subfolder and register to the
+visit like any other product; each carries the `NSCALIB` card, so a run that
+reads it back leaves it alone instead of subtracting the dark twice, and the
+report says so. When the library has no flat for a filter and the model
+policy is on, the run also writes the vignetting model next to the visit,
+and **See the model** opens it: it has to be a smooth surface, with no star
+and no mote.
+
+The per-engine switch is separate: the Astrometry tab's **Apply the
+calibration** is what makes the track & stack calibrate each frame as it is
+read. Chapter [05. Capture](user/05-capture.md) has the physics, the
+matching rules and the warnings in full.
 
 ## Photometry
 

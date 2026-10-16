@@ -185,20 +185,24 @@ count is honoured.
 
 ## Calibration: bias, darks and flats
 
-The **Calibration** tab of the FITS editor manages a **master library** and
-each visit's recipe.
+The **Calibration** tab of the FITS editor manages the **master library** and
+each visit's recipe. The library itself lives in **Settings → Measurement**,
+its single home: the tab reads it, resolves the recipe against the visit's
+first frame, and **Calibration settings…** is the door there. **Calibrate the
+visit** is a one-off run over the visit's frames, not the switch that
+calibrates the stack: every pipeline that applies the calibration has its own
+checkbox in its own tab, and the Astrometry one (**Apply the calibration**) is
+three-state, with the library deciding until you choose.
 
 The library is indexed, not copied: you point at your master FITS and the
 app reads from their headers what makes them valid (camera, gain,
-temperature, exposure, filter). When indexing you declare what each file
-*is*:
-
-- **Bias**: the electronic read offset (zero exposure).
-- **Dark**: thermal current, at the same exposure as the lights. *A dark
-  already includes the bias*, so with a dark you do not need a separate
-  bias. A "dark of the flats" (at the flats' exposure) is just a dark: index
-  it as **Dark** with its own exposure, not as a fourth kind.
-- **Flat**: per filter, normalised.
+temperature, exposure, filter). **What each file is comes from its own
+header** (`IMAGETYP`): **Bias**, **Dark** or **Flat**. Only when the header is
+silent does the exposure decide, and narrowly: at zero it is a bias, and from
+five seconds up it is a dark; anything in between is not guessed, and a light
+frame refuses itself. There are **three kinds, not four**: a "dark of the
+flats" is a **Dark** at the flat's exposure, and the exposure is what the
+matching already keys on.
 
 > **Why calibrate?** Because your sensor lies in three known, repeatable
 > ways: it adds an electronic pedestal to every pixel (bias), it accumulates
@@ -214,21 +218,68 @@ temperature, exposure, filter). When indexing you declare what each file
 > flat does not correct an R frame: the same speck's shadow lands elsewhere
 > if the wheel parks differently.
 
+**What each piece is matched on**, and why it is not more:
+
+- **Dark**: camera, gain, sensor temperature within the tolerance (default
+  **±3 °C**, set in Settings → Measurement) and **exact exposure**. The
+  thermal current is the level, so all four matter.
+- **Bias**: camera and gain. It is the read-out pedestal, and it barely moves
+  with the sensor's temperature.
+- **Flat**: camera and filter **only**. Its shape is the optical train's and
+  its level is normalised away, so the gain and the temperature are left out
+  of the match on purpose: requiring them rejected real flats.
+- A flat's own offset is removed first: a **dark at the flat's exposure**
+  (the same pool of darks), or the **bias** when the flat is short.
+
+**The library says why.** When a master you can see is not used, the recipe
+names the closest one of that kind with the criterion it failed and the
+numbers ("a dark, but at −16 °C against −10 °C, tolerance 3 °C"), so "why is
+it not using my dark" has an answer instead of a shrug. A flat older than
+**30 days** is used but flagged: the train's dust moves, and a mote may have
+appeared or gone.
+
+**Every master has an owner.** A master built from a project's frames belongs
+to that project; a bias or a flat can be **shared** with every project. The
+recipe tries the project's own masters first and the shared ones as the
+fallback, and it never reaches another project's master by accident; one the
+project does not own is marked **"(shared)"** in the recipe line, so you know
+those pixels are not from your nights. A project can also **use another
+project's master** with a **link** (a second row on the same file, never a
+copy), and deleting a master takes its row out while the file stays as long
+as another row points at it.
+
+**The app can build the masters.** **Build masters…** takes a folder of
+calibration frames, classifies each by its header, groups them by the same
+key the recipe matches on (a dark's temperature rounded to the degree, so a
+night of darks is one master and not a handful), combines each group with the
+**median** and writes the master in the library folder. A group of a single
+frame is called out: it is a copy of that frame, not an average. The
+originals are deleted only if you ask, and only after each master is written
+**and** indexed, so a build that fails halfway leaves them where they were.
+**Use another project's master…** links one in.
+
 **The visit's recipe**: when you open the editor from a visit, the app
 resolves which library master each piece uses, reading the first frame's
-header, and warns about anything missing (Warnings). **Calibrate the visit**
-applies the recipe to every frame; calibration works in memory and only
-writes FITS copies if you tick the export box.
+header, and warns about anything missing (**What is missing, and why**).
+**Calibrate the visit** applies the recipe to every frame; calibration works
+in memory and only writes FITS copies if you tick the export box. Those
+copies land in the project's **`calibrados/`** subfolder and register to the
+visit like any other product. Each copy carries the **NSCALIB** card: feeding
+it back into a run, the app sees it is already clean and does **not** subtract
+the dark and divide the flat a second time (a double-calibrated frame has no
+tell in the image), and both the run and the tab say so.
 
 **If you have no flat for a filter**: the *Model the vignetting from the
-frames* option samples the sky on a grid of tiles over a score of spread
-frames and fits a smooth surface to what they have in common: the train's
-vignetting, which is fixed on the frame. The tiles that a star, a galaxy or
-a mote pushed off the trend are thrown away by the fit itself, so no source
-ends up in the model. It corrects the **vignetting** (the systematic that
-matters, about a tenth of a magnitude) and **not the dust**: a smooth
-surface has no fine structure, and that is what a real master is for. It is
-called a model and not a flat for exactly that reason.
+frames* option (in Settings → Measurement, its single home; the tab only reads
+it) samples the sky on a grid of tiles over a score of spread frames and fits
+a smooth surface to what they have in common: the train's vignetting, which is
+fixed on the frame. The tiles that a star, a galaxy or a mote pushed off the
+trend are thrown away by the fit itself, so no source ends up in the model. It
+corrects the **vignetting** (the systematic that matters, about a tenth of a
+magnitude) and **not the dust**: a smooth surface has no fine structure, and
+that is what a real master is for. It is called a model and not a flat for
+exactly that reason, and **a real flat always wins**: the model is the
+fallback only for the filters the library has no flat for.
 
 > **Why is a smooth surface enough?** Because the vignetting is smooth and
 > worth 0.087 mag, while the dust is worth 0.026 mag: measured against a real
@@ -237,6 +288,12 @@ called a model and not a flat for exactly that reason.
 > move, because the tiles they spoil are dropped by themselves. You can open
 > it with **See the model** and judge it: it has to be a smooth surface, with
 > no star and no mote.
+
+One thing the model depends on: it is built from the frames **with the same
+dark or bias removed as the light**. Without one, the pedestal stays in and
+compresses the model's shape, so it corrects only part of the vignetting (the
+correction drops to about 44 % of what it should be); the app says so and asks
+you to index a bias for that camera.
 
 ## Further reading
 

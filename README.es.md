@@ -113,15 +113,21 @@ y solo habla con los servicios públicos de datos listados más abajo.
 
 ## Tus primeros cinco minutos
 
-1. **Instala** (detalles en [INSTALL.es.md](INSTALL.es.md); en Windows hay un
-   [instalador autónomo](https://github.com/irydeo/nightscribe/releases), sin
-   necesidad de Python):
+1. **Instala.** No necesitas Python: todos los ficheros están en la
+   [página de Releases](https://github.com/irydeo/nightscribe/releases). Elige
+   tu sistema:
+   - **Windows**: ejecuta el instalador `NightScribeSetup-*.exe` (por usuario,
+     sin permisos de administrador). SmartScreen avisará porque el binario no
+     está firmado: elige *Más información → Ejecutar de todas formas*.
+     ¿Prefieres no instalar nada? Descomprime el zip portable
+     `NightScribe-*-windows-x64.zip` y ejecuta `nightscribe.exe gui`.
+   - **Linux**: instala el `.deb` (Debian, Ubuntu, Mint) con
+     `sudo apt install ./nightscribe_*_amd64.deb`, o el `.rpm` (Fedora,
+     openSUSE) con `sudo dnf install ./nightscribe-*.x86_64.rpm`, y luego
+     ejecuta `nightscribe gui`.
 
-   ```bash
-   python3 -m venv --system-site-packages .venv
-   .venv/bin/pip install -r requirements.txt
-   .venv/bin/python -m nightscribe gui
-   ```
+   Los pasos completos por sistema están en [INSTALL.es.md](INSTALL.es.md).
+   Ejecutar desde el código fuente es la última opción de allí, para colaborar.
 
 2. **El asistente solo pide una cosa: tu observatorio.** Escribe tu código MPC
    y tus coordenadas se rellenan desde la lista del MPC; o introduce nombre,
@@ -134,6 +140,17 @@ y solo habla con los servicios públicos de datos listados más abajo.
 5. Cuando tengas un minuto, abre **Herramientas → Configuración…**: fichero de
    horizonte, magnitud límite, escala de placa de la cámara, valores de sesión.
    Todo trae valores por defecto sensatos; nada más es obligatorio.
+
+### Desde el código fuente (para colaborar)
+
+NightScribe también se ejecuta desde un clon; el recorrido completo por sistema
+está en [INSTALL.es.md](INSTALL.es.md). La versión corta:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m nightscribe gui
+```
 
 ## Una noche completa (y las semanas siguientes)
 
@@ -564,15 +581,15 @@ telemetría. Desinstala y borra la carpeta: no queda nada en ningún otro sitio.
 
 ## Inicio rápido y CLI
 
+Instala primero (ver *Tus primeros cinco minutos*). Luego todo lo que hace la
+GUI de **planificación y publicación** tiene su contrapartida en línea de
+comandos (`--help` en cada uno para más detalles):
+
 ```bash
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m nightscribe gui        # aplicación de escritorio
-.venv/bin/python -m nightscribe tonight    # mejores objetivos de esta noche (CLI)
+nightscribe gui        # aplicación de escritorio
+nightscribe tonight    # mejores objetivos de esta noche (CLI)
 ```
 
-Todo lo que hace la GUI de **planificación y publicación** tiene su
-contrapartida en línea de comandos (`--help` en cada uno para más detalles).
 La **reducción** (el editor FITS: calibración, track & stack, astrometría,
 fotometría, períodos) vive en la GUI:
 
@@ -589,8 +606,9 @@ fotometría, períodos) vive en la GUI:
 | `project …` | gestión mínima de proyectos: `list`, `create`, `advance`, `show`, `close`, `reopen`, `files` |
 | `inject <carpeta>` | inyección y recuperación: se añaden fuentes sintéticas de brillo conocido a una copia de tus tomas y se miden de vuelta, para decir hasta dónde llega de verdad el pipeline |
 
-Consulta [INSTALL.es.md](INSTALL.es.md) para instrucciones completas por
-sistema operativo, el paquete pip y el instalador autónomo, y
+Consulta [INSTALL.es.md](INSTALL.es.md) para las instrucciones completas por
+sistema operativo (primero el instalador autónomo y los paquetes Linux, después
+el paquete pip y la ejecución desde el código fuente), y
 [CONTRIBUTING.es.md](CONTRIBUTING.es.md) para colaborar.
 
 ## Documentación

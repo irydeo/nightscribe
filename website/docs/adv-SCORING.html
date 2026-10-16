@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe — Suggestion Engine &amp; Scoring · NightScribe</title>
+<meta name="description" content="NightScribe — Suggestion Engine &amp; Scoring">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="adv-SCORING.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.html">
+      Advanced guide</a></p>
+    <p class="side-back"><a href="index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe — Suggestion Engine &amp; Scoring</h1><p><em><a href="adv-SCORING.html">Versión en español</a></em></p><p>The suggestion engine (<code>core/suggest.py</code>) turns five heterogeneous target lists into one answer: <strong>"these are your best targets tonight, and here is why"</strong>. Everything is plain, testable rules — no machine learning, no magic.</p><h2 id="unified-score-0100">Unified score: 0–100</h2><p>Each target gets a score built from four weighted families:</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Family</th><th style="text-align:left">Weight</th><th style="text-align:left">What it measures</th></tr></thead><tbody><tr><td style="text-align:left">Scientific priority</td><td style="text-align:left">0–35</td><td style="text-align:left">NEOfixer score (NEOs), brightness+freshness (SNe), activity/perihelion (comets), PCCP score, ExoClock priority + O-C drift (transits)</td></tr><tr><td style="text-align:left">Observability</td><td style="text-align:left">0–30</td><td style="text-align:left">Max altitude tonight, hours above min altitude, magnitude vs. user limits, Moon interference, transit coverage %</td></tr><tr><td style="text-align:left">Urgency</td><td style="text-align:left">0–20</td><td style="text-align:left">NEOfixer urgency, short arc, days since discovery, perihelion imminence, ephemeris degradation (O-C)</td></tr><tr><td style="text-align:left">Outreach hook ★</td><td style="text-align:left">0–15</td><td style="text-align:left">"How good a story is this?" — our differentiator</td></tr></tbody></table></div><p>★ Outreach bonuses (stacked, capped at 15):</p><ul><li><p>NEO: NEOCP listed, potential impactor (Sentry), radar/NHATS target, MOID &lt; 0.05 AU, predicted approach &lt; 10 LD soon.</p></li><li><p>Comet: dynamically new (first visit), perihelion within days, outburst detected (observed mag ≫ M1/K1 prediction), brighter than 12 ("binoculars!").</p></li><li><p>Supernova: brighter than 15, famous host galaxy (M51, M101, NGC...), discovered within the last week.</p></li><li><p>Transit: famous system (HD 209458, TRAPPIST-1, 55 Cnc...), full transit visible, high priority for ESA Ariel.</p></li><li><p>PCCP: comet score &gt; 50 on the MPC page.</p></li></ul><h3 id="history-feedback">History feedback</h3><p>From SQLite (<code>observations</code>): targets <strong>observed but not yet posted</strong> get +5 urgency ("you observed it on Tuesday — tell the world!"); targets <strong>already posted</strong> in the last 30 days lose the outreach bonus (novelty decay).</p><h2 id="top-n-with-kind-diversity">Top N with kind diversity</h2><p><code>top_n</code> first picks the best target <strong>of each kind</strong> (NEO, SN, comet, PCCP, transit) and then fills the remaining slots with the next best scores. A night with a NEO, a comet and a transit beats three NEOs — both scientifically and for the audience.</p><p>Per-object details shown in the app: <strong>NObs</strong> (accumulated observations: more means a more reliable orbit — a quick reality check for NEO candidates) and <strong>Discovered</strong> (discovery date for transients; approach date for close-approach alerts).</p><h2 id="why-tonight-phrases">"Why tonight" phrases</h2><p>One generated one-liner per top target, ES + EN. Rule-based in <code>narrative.py</code>: the first matching rule wins, so phrases are specific, not generic. Examples:</p><ul><li><p>NEOCP: <em>"On the MPC confirmation page: every measurement counts for its orbit."</em></p></li><li><p>Short arc: <em>"Single-opposition arc: this week is the window before it is lost."</em></p></li><li><p>Fresh SN: <em>"Discovered 6 days ago and still rising; its light has travelled 55 million years."</em></p></li><li><p>PCCP: <em>"Comet score 85/100 on the MPC's PCCP: your image could confirm it."</em></p></li><li><p>Transit: <em>"A planet 1.4× Jupiter eclipses its star by 1.5% for 3 h — your light curve helps ESA's Ariel mission."</em></p></li><li><p>Close approach: <em>"Passes at 3.2 lunar distances on Thursday: closer than the Moon is a story."</em></p></li></ul><p>Each card also shows: magnitude, max altitude + time (or transit window), estimated cost in minutes when known, and action buttons.</p><h2 id="feasibility-filtering">Feasibility filtering</h2><p>User equipment enters through Settings (telescope aperture, limiting magnitude). The policy is <strong>hybrid</strong> (ADR-025):</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Family</th><th style="text-align:left">Policy</th><th style="text-align:left">Where</th></tr></thead><tbody><tr><td style="text-align:left">SNe, comets, exoplanets</td><td style="text-align:left"><strong>Hard cut</strong> — out of reach means out of the list</td><td style="text-align:left"><code>sources/rochester.py</code>, <code>sources/cobs.py</code>, <code>core/transits.py</code></td></tr><tr><td style="text-align:left">NEOs, PCCPs</td><td style="text-align:left"><strong>Soft warning</strong> — the magnitude is a prediction, so we sink the score and flag the card / CLI row; we never drop the target</td><td style="text-align:left"><code>core/suggest.py</code> → <code>beyond_limit()</code></td></tr></tbody></table></div><p>Targets beyond reach are shown dimmed, never hidden (in the soft case): planning is about knowing what is up there, even if you cannot take it tonight.</p><h2 id="testing">Testing</h2><p>Unit tests use synthetic targets with known properties ("a bright NEOCP must outscore a mag-21 numbered asteroid"); functional tests run the whole engine against live sources for the configured site.</p></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

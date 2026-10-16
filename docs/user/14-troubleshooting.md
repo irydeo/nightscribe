@@ -10,6 +10,10 @@ you to do.
 If a dialog appeared and vanished, or a step failed without saying why, the
 answer is almost always in there. When you report a problem, attach that file.
 
+The file does not grow without a limit: it rotates by size, so the folder holds
+the current log and a few older ones (a handful of megabytes at most) and you
+never have to clean it by hand.
+
 ## There is no network
 
 NightScribe works offline for everything that does not need live data: the

@@ -540,7 +540,7 @@ you so. Configure them in **Tools → Settings → Integrations**.
 | **AAVSO API token** | Community photometry for the bright-star vigils |
 | **AAVSO observer code** | Filled into the photometry exports and the EXOTIC handoff |
 | **Light-pollution key** (free, lightpollutionmap.info) | The sky-brightness atlas at your site: the Bortle context the sky-quality notes use |
-| **Assistant** (optional, off by default) | A chat panel that answers from the app's own guide and ADRs, offline and without embeddings. It needs a model you configure; without it the app is unchanged (ADR-075) |
+| **Assistant** (optional, off by default) | A chat panel that answers from the app's own guide and design notes, offline and without embeddings. It needs a model you configure; without it the app is unchanged |
 | **Find_Orb** (ships with the installers and the Linux packages) | The check of your astrometric measurement against the observations other stations published, before the MPC report. It travels inside NightScribe, so it works out of the box; from a source checkout you install it yourself, and the app says so instead of pretending |
 | **EXOTIC** (external Python 3.10 or older) | The transit reduction: the app writes the handoff, runs EXOTIC for you and imports its light curve and parameters into the project. Without it the handoff is still yours to run by hand |
 
@@ -592,8 +592,8 @@ walks the whole cycle, from the first run to the MPC report, in short
 chapters with the "why" of each option. It is published as a website:
 **<https://irydeo.github.io/nightscribe/>** (**Help → User guide (web)**).
 
-Design, architecture, data sources, scoring, workflows and every decision
-(ADRs) live in [`docs/`](docs/), in Spanish and English.
+Design, architecture, data sources, scoring, workflows and every design
+decision live in [`docs/`](docs/), in Spanish and English.
 
 Something missing, wrong or unclear? [Open an issue](https://github.com/irydeo/nightscribe/issues).
 

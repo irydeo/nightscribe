@@ -2495,6 +2495,13 @@ class MainWindow(QMainWindow):
             self.tr("Auto (CUDA, then OpenCL)"), "auto")
         dlg.cmb_astro_gpu_backend.addItem(
             self.tr("CUDA (NVIDIA, installed by hand)"), "cuda")
+        # The astrometric catalogue the report declares in its NET line. The
+        # list comes from the generator (one source), and the app cannot know
+        # which one the solver used: the observer picks it, and the tooltip
+        # says so.
+        from ..core import mpc_astrometry
+        for code, name in mpc_astrometry.catalog_choices():
+            dlg.cmb_astro_astcat.addItem(name, code)
         # "which card does it see?" is the first thing an observer wants to
         # know when a switch comes on by default, so the answer is shown and
         # it follows the backend the observer picks
@@ -8035,9 +8042,11 @@ class MainWindow(QMainWindow):
             runs_for_session=lambda sid: _store.runs_for_session(db, sid),
             open_run=lambda run_id: self._analysis_astrometry_open_run(
                 int(run_id)),
-            # ADR-045 rev (2026-10-16): a visit that already holds an
-            # astrometry run opens with its MPC report in the box
-            mpc_prefill=lambda sid: self._visit_mpc_prefill(pid, sid),
+            # the visit's MPC block opens the SAME report window as the
+            # editor's Astrometry tab (ADR-080); the host rebuilds the text
+            # from the visit's own astrometry run
+            mpc_build=lambda sid, fmt, sub: self._visit_mpc_report(
+                pid, sid, fmt, sub),
             kind=kind)
         panel.set_project(pid)
         self._project_widgets["visits_panel"] = panel
@@ -9324,27 +9333,29 @@ class MainWindow(QMainWindow):
             show("trackstack")
         return dlg
 
-    def _visit_mpc_prefill(self, pid, session_id):
-        # ADR-045 rev (2026-10-16): the report the visit's own astrometry run
-        # already produced, rebuilt the same way the editor rebuilds it when
-        # the visit reopens (same generator, same context). The visit window's
-        # MPC box opens filled instead of asking the observer to paste what
-        # the app has just measured; nothing is written, saving is a gesture.
-        # @args: pid - project id, session_id - the visit
-        # @return: the report text, or "" when the visit holds no usable run
+    def _visit_mpc_report(self, pid, session_id, fmt="ades", submission=None):
+        # The report the visit's own astrometry run produced, rebuilt the same
+        # way the editor rebuilds it (same generator, same context): the visit
+        # opens the SAME report window (ADR-080), so there is nothing to paste.
+        # Nothing is written here, saving the report is a deliberate gesture.
+        # @args: pid - project id, session_id - the visit, fmt - the
+        #        generator's format key, submission - the ACK/target the
+        #        header carries (from the send dialog)
+        # @return: {"text", "kept"} for the report controller, or None when
+        #          the visit holds no usable run
         from ..core import astrometry_store as store, mpc_astrometry
         from ..config import config
         if pid is None or session_id is None:
-            return ""
+            return None
         try:
             runs = [r for r in store.list_runs(db, pid)
                     if r.get("session_id") == session_id
                     and r.get("status") == "complete"]
         except Exception as err:
             logger.warning("the visit's runs could not be listed: %s", err)
-            return ""
+            return None
         if not runs:
-            return ""
+            return None
         run = runs[-1]                  # oldest first: the newest pass wins
         # The report is built from the STACK points (the per-observation
         # measurement), never the per-frame ones: those are the raw material,
@@ -9352,7 +9363,7 @@ class MainWindow(QMainWindow):
         points = [p for p in store.points_for_run(db, run["id"])
                   if (p.get("source") or "stack") == "stack"]
         if not points:
-            return ""
+            return None
         ctx = self._ufe_astrometry_context(pid, session_id) or {}
         context = mpc_astrometry.report_context(config)
         # The MPC knows the object by its CONFIRMED designation when the
@@ -9364,13 +9375,14 @@ class MainWindow(QMainWindow):
             "neocp" if ctx.get("neocp") else None)
         try:
             rep = mpc_astrometry.generate(
-                points, "ades",
+                points, fmt or "ades",
                 context.obs_code or str(config.get("mpc_code", "")),
-                designation, config, context=context, kind=kind)
+                designation, config, context=context,
+                submission=submission, kind=kind)
         except Exception as err:
             logger.warning("the visit's report could not be rebuilt: %s", err)
-            return ""
-        return rep.get("text", "")
+            return None
+        return {"text": rep.get("text", ""), "kept": len(rep.get("kept") or [])}
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -13182,9 +13194,6 @@ class MainWindow(QMainWindow):
             if callable(result_hook):
                 result_hook(
                     lambda: self._ufe_astrometry_result(hook_pid, session_id))
-            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
-            if callable(mpc_hook):
-                mpc_hook(self._ufe_mpc_send)
             # ADR-061 rev: the master library and the model policy live
             # in Settings, their single home; the editor's Calibration tab
             # only READS them, and this hook is its "Calibration settings…"
@@ -13309,9 +13318,6 @@ class MainWindow(QMainWindow):
             centroid_hook = getattr(dlg, "set_manual_centroid_hook", None)
             if callable(centroid_hook):
                 centroid_hook(None)
-            mpc_hook = getattr(dlg, "set_mpc_send_hook", None)
-            if callable(mpc_hook):
-                mpc_hook(None)
             settings_hook = getattr(dlg, "set_open_settings_hook", None)
             if callable(settings_hook):
                 settings_hook(None)
@@ -14168,22 +14174,6 @@ class MainWindow(QMainWindow):
             return None
         removed = store.delete_run(db, run_id)
         return removed.get("points") if isinstance(removed, dict) else removed
-
-    def _ufe_mpc_send(self, text):
-        # The Track & Stack tab's report lands in the visit's MPC paste
-        # box (ADR-045 form A: the block lives in the visit window), and
-        # the block's own ADR-022 validator speaks right away.
-        # @args: text - the generated report
-        # @return: True when the block received it
-        win = self._visit_window()
-        txt = getattr(win, "txt_mpc", None)
-        if txt is None:
-            return False
-        txt.setPlainText(text)
-        validate = getattr(win, "_on_mpc_validate", None)
-        if callable(validate):
-            validate()
-        return True
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its

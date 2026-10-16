@@ -54,11 +54,13 @@ rest follow it.
 ## The MPC report is rejected
 
 The report has to match the format the Minor Planet Center accepts, and the
-observations have to be good enough. Before you send anything, the
-**Manage MPC report** block validates it line by line: the format (80 columns
-or ADES PSV), the dates, the codes and a signal-to-noise list. If the MPC
-itself rejects a report, its message names the line; fix it there and
-validate again. The astrometry chapter (07) walks the whole path.
+observations have to be good enough. The app builds the report from your
+measurements and checks it as it builds it: the format (80 columns or ADES
+PSV), the dates, the codes and the signal-to-noise of each observation. Where
+you measured, it also says which observations it does not recommend sending
+(the decision stays yours). If the MPC itself rejects a report, its message
+names the line; fix the measurement and build the report again. The astrometry
+chapter (07) walks the whole path.
 
 ## EXOTIC is not configured
 

@@ -20,8 +20,8 @@ El selector de arriba decide sobre qué responde:
 - **Este objeto**: tu proyecto abierto. El asistente lee su ficha: el objeto
   con sus parámetros explicados, la noche planificada, tus visitas, las
   magnitudes medidas y el veredicto de la campaña.
-- **La app**: la guía de usuario y los ADR. Preguntas como «¿cómo calibro las
-  tomas?» o «¿qué significa el MOID?».
+- **La app**: la guía de usuario y las notas de diseño de la app. Preguntas
+  como «¿cómo calibro las tomas?» o «¿qué significa el MOID?».
 - **El editor**: lo que tienes cargado (la placa, la pestaña, si tiene WCS)
   más la guía. «Quiero hacer la curva de luz, ¿puedo?» se responde con lo que
   hay en pantalla y con los pasos de la guía.

@@ -41,7 +41,7 @@ creates them; here it is enough to know that the project is the widest box.
 
 ## Visit
 
-A **visit** is one observing night on that project (ADR-045). Everything the
+A **visit** is one observing night on that project. Everything the
 night produced hangs from the visit: the FITS plates, the imported photometry,
 the ephemerides, the reports, the charts, the notes. Keeping the night as its
 own box is what lets the app show you "what came out of a given night" without
@@ -55,8 +55,8 @@ is not what you would call that night.
 
 ## Astrometry run
 
-An **astrometry run** is one execution of track & stack over a visit's frames
-(ADR-062). It has its own measured points, its own stack files, its report and
+An **astrometry run** is one execution of track & stack over a visit's frames.
+It has its own measured points, its own stack files, its report and
 its undo, so a run is a self-contained result and not a scratch pad.
 
 A visit can hold several runs: several passes in one night, each with its own

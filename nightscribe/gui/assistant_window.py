@@ -66,7 +66,7 @@ class AssistantWindow(QDialog):
                            self.tr("This object: %1").replace(
                                "%1", self._object_name)))
         scopes.append((assistant.SCOPE_APP,
-                       self.tr("The app (guide and ADRs)")))
+                       self.tr("The app (guide and design notes)")))
         if editor_state_provider is not None:
             scopes.append((assistant.SCOPE_EDITOR, self.tr("The editor")))
         for key, label in scopes:
@@ -107,7 +107,7 @@ class AssistantWindow(QDialog):
         elif scope == assistant.SCOPE_EDITOR:
             txt = self.tr("The editor's state and the guide")
         else:
-            txt = self.tr("The user guide and the ADRs")
+            txt = self.tr("The user guide and the design notes")
         self._ui.lbl_context.setText(txt)
 
     def _append(self, role, text):

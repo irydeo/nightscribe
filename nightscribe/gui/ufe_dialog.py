@@ -160,7 +160,6 @@ class UfeDialog(QWidget):
         # the stage goes back to the panel in the column when it closes.
         self._tools = {}
         self._active_tool = None
-        self._mpc_send_hook = None
         # the passes of the visit (one night, one curve, 2026-09-30): the
         # list and which of them the chart shows
         self._visit_passes_hook = None
@@ -1484,25 +1483,6 @@ class UfeDialog(QWidget):
             return True
         except Exception as err:
             logger.warning("open settings hook failed: %s", err)
-            return False
-
-    def set_mpc_send_hook(self, fn):
-        # @args: fn - callable(text) -> True when the visit's MPC block
-        #        received the report, or None
-        # @return: None
-        self._mpc_send_hook = fn if callable(fn) else None
-
-    def send_to_mpc_block(self, text):
-        # The Track & Stack tab's report lands in the visit's MPC paste
-        # box, where the ADR-022 validator has the last word.
-        # @args: text - the generated report
-        # @return: True when the block received it
-        if self._mpc_send_hook is None:
-            return False
-        try:
-            return bool(self._mpc_send_hook(text))
-        except Exception as err:
-            logger.warning("mpc send hook failed: %s", err)
             return False
 
     def set_astrometry_persist_hook(self, fn):

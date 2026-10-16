@@ -41,7 +41,7 @@ crearlos; aquí basta con saber que el proyecto es la caja más ancha.
 
 ## Visita
 
-Una **visita** es una noche de observación de ese proyecto (ADR-045). Todo lo
+Una **visita** es una noche de observación de ese proyecto. Todo lo
 que produjo la noche cuelga de la visita: las placas FITS, la fotometría
 importada, las efemérides, los reportes, los gráficos, las notas. Mantener la
 noche como su propia caja es lo que permite a la app enseñarte «qué salió de
@@ -56,7 +56,7 @@ medianoche y la fecha del calendario no es la que tú llamarías esa noche.
 ## Run de astrometría
 
 Un **run de astrometría** es una ejecución de track & stack sobre los frames de
-una visita (ADR-062). Tiene sus propios puntos medidos, sus propios ficheros
+una visita. Tiene sus propios puntos medidos, sus propios ficheros
 apilados, su reporte y su deshacer, así que un run es un resultado
 autocontenido y no un borrador.
 

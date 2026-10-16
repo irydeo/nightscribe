@@ -282,6 +282,15 @@ own points by the same generator the editor uses (the host rebuilds it:
 `_visit_mpc_prefill`), so the observer is not asked to paste what the app has just
 measured; saving the report is still a deliberate gesture.
 
+**Amendment (2026-10-16, the visit reuses the report window).** The visit's MPC block
+stops being a paste box with its own validator: it is now a **button** ("MPC report…")
+that opens the SAME window the editor's Astrometry tab opens, plus one **status line**.
+The report is rebuilt from the visit's own astrometry run (`_visit_mpc_report`) by the
+same generator and the same shared controller (ADR-080), so there are no longer two
+behaviours that can drift apart; on save, the file is registered to the visit. "Form A"
+holds where it matters: without a visit there is no block, and the report still hangs
+from the visit.
+
 **Enmienda (2026-10-16, la visita gana nombre y el camino normal se destaca).** Dos
 cambios en la ventana de visita, ambos de la misma revisión. La visita pasa a tener
 **nombre propio** (`project_sessions.label`, migración v24), editable junto a la fecha
@@ -298,3 +307,12 @@ visita que ya tiene un run de astrometría se abre con su **reporte MPC ya en la
 reconstruido desde los propios puntos del run con el mismo generador que usa el editor
 (lo reconstruye el anfitrión: `_visit_mpc_prefill`), así que al observador no se le pide
 pegar lo que la app acaba de medir; guardar el reporte sigue siendo un gesto deliberado.
+
+**Enmienda (2026-10-16, la visita reutiliza la ventana de reporte).** El bloque MPC de
+la visita deja de ser una caja de pegado con su propio validador: ahora es un **botón**
+(«Reporte MPC…») que abre la MISMA ventana que la pestaña Astrometría del editor, más
+una **línea de estado**. El reporte se reconstruye desde el propio run de astrometría
+de la visita (`_visit_mpc_report`) con el mismo generador y el mismo controlador
+compartido (ADR-080), así que ya no hay dos comportamientos que puedan divergir; al
+guardar, el fichero se registra en la visita. La «forma A» se mantiene en lo que
+importa: sin visita no hay bloque, y el reporte sigue colgando de la visita.

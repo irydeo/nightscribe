@@ -90,7 +90,7 @@ def test_the_manual_comes_first_and_the_plans_are_not_listed(qapp, tmp_path):
     assert "UFE.md" in loose and "SEQUENCES.md" in loose
     # the other topic docs and the ADRs live in the advanced branches
     assert "PHOTOMETRY.md" in labels["Advanced documentation"]
-    assert "ADR-001-pyside6.md" in labels["Design decisions (ADR)"]
+    assert "ADR-001-pyside6.md" in labels["Design decisions"]
     view.deleteLater()
 
 
@@ -101,7 +101,7 @@ def test_the_tree_follows_the_app_language(qapp, tmp_path):
     assert labels["User guide"] == ["README.es.md", "01-getting-started.es.md",
                                     "02-tonight.es.md"]
     assert "UFE.es.md" in labels.get("", [])
-    assert "ADR-001-pyside6.es.md" in labels["Design decisions (ADR)"]
+    assert "ADR-001-pyside6.es.md" in labels["Design decisions"]
     assert es.default_file().name == "README.es.md"
     es.deleteLater()
 

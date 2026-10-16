@@ -769,6 +769,19 @@
               </layout>
              </item>
              <item><widget class="QLabel" name="lblH_astro_floor"><property name="text"><string>Per observation. The MPC recommends 20 or more. Below this floor the app WARNS: it says it does not recommend sending the observation, but it keeps it in the report and the decision is yours (uncheck it in the Astrometry tab to leave it out). The app ships 10 on purpose: it is a recommendation, and real submissions at about 16 have been accepted. Sending a marginal detection is taking the risk of a false tracklet</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_astro_astcat">
+               <item><widget class="QLabel" name="lbl_astro_astcat"><property name="text"><string>Astrometric catalogue:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QComboBox" name="cmb_astro_astcat"><property name="toolTip"><string>The catalogue the measured positions are referred to, and the one the MPC report declares in its NET line. It has to be the catalogue the SOLVER used, and the app cannot know it for you: ASTAP resolves against the star database you have installed, and nova.astrometry.net uses Gaia DR2. Gaia DR3 is the default because it is what a current local database holds</string></property></widget></item>
+               <item>
+                <spacer name="hsp_astro_astcat">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_astro_astcat"><property name="text"><string>It goes into the report as the catalogue the astrometry is referred to, and the MPC checks it against the rest of the observations of that object: declaring one you did not use is a wrong statement about the measurement, not a cosmetic detail</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>

@@ -243,24 +243,28 @@ def test_no_measurement_block_for_non_curve_kinds(qapp, tmp_path):
 
 # ---------------- the night's astrometry block (ADR-045, form A) -------
 
-def _neo_panel(qapp, tmp_path):
-    # @return: (panel, pid) for a NEO project (the MPC block shows)
+def _neo_panel(qapp, tmp_path, mpc_build=None):
+    # @return: (panel, pid, db) for a NEO project (the MPC block shows)
     from nightscribe.core.db import Database
     from nightscribe.core import project
     from nightscribe.gui.widgets.visits_panel import VisitsPanel
     db = Database(tmp_path / "m.db")
     p = project.create(db, "neo", "2099 MPC",
                        {"ra_deg": 10.0, "dec_deg": 20.0})
-    vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None)
+    vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None,
+                     mpc_build=mpc_build)
     vp.set_project(p["id"])
     return vp, p["id"], db
 
 
 def test_mpc_block_lives_in_the_window_for_neo(qapp, tmp_path):
+    # The visit keeps a button and a status line, no paste box: the report
+    # is built from the visit's own astrometry (ADR-080).
     from PySide6.QtWidgets import QPushButton
     vp, _pid, db = _neo_panel(qapp, tmp_path)
     vp.btn_new.click()
-    assert vp._win.findChild(QPushButton, "vp_mpc_save") is not None
+    assert vp._win.findChild(QPushButton, "vp_mpc_open") is not None
+    assert vp._win.findChild(QPushButton, "vp_mpc_save") is None
     vp.close_visit_window()
     vp.deleteLater()
     db.close()
@@ -271,42 +275,44 @@ def test_mpc_block_absent_for_sn(panel):
     from PySide6.QtWidgets import QPushButton
     vp, _pid, _o = panel
     vp.btn_new.click()
-    assert vp._win.findChild(QPushButton, "vp_mpc_save") is None
+    assert vp._win.findChild(QPushButton, "vp_mpc_open") is None
 
 
-def test_mpc_block_opens_filled_with_the_visits_run(qapp, tmp_path):
-    # ADR-045 rev: a visit that already holds a run opens with the report
-    # its own run produced, already validated, so the observer is not asked
-    # to paste what the app has just measured. The host rebuilds the text;
-    # the window only shows it.
+def test_mpc_block_shows_the_visits_run_in_the_shared_window(qapp, tmp_path):
+    # The visit opens the SAME report window as the editor's Astrometry tab
+    # (ADR-080), filled with the report its own run produced, so the observer
+    # is not asked to paste what the app has just measured.
     from nightscribe.core.db import Database
     from nightscribe.core import project, followup as fu
     from nightscribe.gui.widgets.visits_panel import VisitsPanel
+    from nightscribe.gui.ufe_report_dialog import UfeReportDialog
     from test_mpc_report import _MPC80_GOOD
     db = Database(tmp_path / "pre.db")
     p = project.create(db, "neo", "2026 QK")
     sid = fu.create_session(db, p["id"], obs_date="2021-03-15")
     seen = []
 
-    def _prefill(session_id):
-        seen.append(session_id)
-        return _MPC80_GOOD
+    def _build(session_id, fmt, submission):
+        seen.append((session_id, fmt))
+        return {"text": _MPC80_GOOD, "kept": 2}
 
     vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None,
-                     mpc_prefill=_prefill)
+                     mpc_build=_build)
     vp.set_project(p["id"])
     w = vp.open_visit(sid)
-    assert seen == [sid]
-    assert w.txt_mpc.toPlainText() == _MPC80_GOOD
-    assert "Valid" in w.lbl_mpc_status.text()
+    assert seen and seen[0][0] == sid          # the host rebuilt it
+    assert isinstance(w._report.dialog, UfeReportDialog)
+    assert w._report.text == _MPC80_GOOD
+    assert "2" in w.lbl_mpc_status.text()      # how many are ready
     vp.close_visit_window()
     vp.deleteLater()
     db.close()
 
 
-def test_mpc_block_stays_empty_without_a_run(qapp, tmp_path):
-    # No run, no report: the box is left alone (the prefill is not called
-    # with an empty answer, and never writes a blank report).
+def test_mpc_block_says_there_is_nothing_without_a_run(qapp, tmp_path):
+    # No run, no report: the button opens nothing (an empty window reads as
+    # broken) and the status line says why.
+    from PySide6.QtWidgets import QPushButton
     from nightscribe.core.db import Database
     from nightscribe.core import project, followup as fu
     from nightscribe.gui.widgets.visits_panel import VisitsPanel
@@ -314,10 +320,31 @@ def test_mpc_block_stays_empty_without_a_run(qapp, tmp_path):
     p = project.create(db, "neo", "2026 QK")
     sid = fu.create_session(db, p["id"])
     vp = VisitsPanel(db, lang="en", kind="neo", on_change=lambda: None,
-                     mpc_prefill=lambda session_id: "")
+                     mpc_build=lambda session_id, fmt, submission: None)
     vp.set_project(p["id"])
     w = vp.open_visit(sid)
-    assert w.txt_mpc.toPlainText() == ""
+    assert w._report.text == ""
+    assert "no astrometry run" in w.lbl_mpc_status.text().lower()
+    w.findChild(QPushButton, "vp_mpc_open").click()
+    assert w._report.dialog.isHidden()
+    vp.close_visit_window()
+    vp.deleteLater()
+    db.close()
+
+
+def test_mpc_button_opens_the_shared_report_window(qapp, tmp_path):
+    # The visit's button opens the SAME report window the editor uses, on the
+    # visit's own report.
+    from PySide6.QtWidgets import QPushButton
+    from test_mpc_report import _MPC80_GOOD
+    build = lambda sid, fmt, sub: {"text": _MPC80_GOOD, "kept": 2}
+    vp, _pid, db = _neo_panel(qapp, tmp_path, mpc_build=build)
+    vp.btn_new.click()
+    w = vp._win
+    assert w._report.dialog.isHidden()          # not open yet
+    w.findChild(QPushButton, "vp_mpc_open").click()
+    assert not w._report.dialog.isHidden()
+    assert w._report.text == _MPC80_GOOD
     vp.close_visit_window()
     vp.deleteLater()
     db.close()
@@ -328,15 +355,15 @@ def test_mpc_save_registers_to_the_windows_visit(qapp, tmp_path,
     from test_mpc_report import _MPC80_GOOD
     from nightscribe.core import project as proj_mod
     from PySide6.QtWidgets import QFileDialog
-    vp, pid, db = _neo_panel(qapp, tmp_path)
+    build = lambda sid, fmt, sub: {"text": _MPC80_GOOD, "kept": 2}
+    vp, pid, db = _neo_panel(qapp, tmp_path, mpc_build=build)
     vp.btn_new.click()
     w = vp._win
     sid = vp.current_session_id()
     out = tmp_path / "report.txt"
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
                         lambda *a, **k: (str(out), ""))
-    w.txt_mpc.setPlainText(_MPC80_GOOD)
-    w._on_mpc_save()
+    w._report.save()
     rows = proj_mod.list_files(db, pid)
     assert len(rows) == 1 and rows[0]["kind"] == "report"
     assert rows[0]["session_id"] == sid
@@ -353,15 +380,15 @@ def test_mpc_save_matching_date_warns_nothing(qapp, tmp_path, monkeypatch):
     from test_mpc_report import _MPC80_GOOD
     from nightscribe.core import followup as fu
     from PySide6.QtWidgets import QFileDialog
-    vp, pid, db = _neo_panel(qapp, tmp_path)
+    build = lambda sid, fmt, sub: {"text": _MPC80_GOOD, "kept": 2}
+    vp, pid, db = _neo_panel(qapp, tmp_path, mpc_build=build)
     sid = fu.create_session(db, pid, obs_date="2021-03-15")
     vp.refresh()
     w = vp.open_visit(sid)
     out = tmp_path / "report.txt"
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
                         lambda *a, **k: (str(out), ""))
-    w.txt_mpc.setPlainText(_MPC80_GOOD)
-    w._on_mpc_save()
+    w._report.save()
     assert "⚠" not in w.lbl_mpc_status.text()
     vp.close_visit_window()
     vp.deleteLater()

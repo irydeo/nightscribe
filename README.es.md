@@ -566,7 +566,7 @@ lo dice. Se configuran en **Herramientas → Configuración → Integraciones**.
 | **Token API de AAVSO** | Fotometría comunitaria para las vigilias de estrellas brillantes |
 | **Código de observador AAVSO** | Se rellena en las exportaciones fotométricas y en el handoff a EXOTIC |
 | **Clave de contaminación lumínica** (gratuita, lightpollutionmap.info) | El atlas de brillo del cielo de tu sitio: el contexto Bortle que usan las notas de calidad del cielo |
-| **Asistente** (opcional, apagado por defecto) | Un panel de chat que responde desde la propia guía y los ADRs de la app, offline y sin embeddings. Necesita un modelo que configures; sin él la app no cambia (ADR-075) |
+| **Asistente** (opcional, apagado por defecto) | Un panel de chat que responde desde la propia guía y las notas de diseño de la app, offline y sin embeddings. Necesita un modelo que configures; sin él la app no cambia |
 | **Find_Orb** (viaja en los instaladores y los paquetes Linux) | El chequeo de tu medida astrométrica contra las observaciones que publicaron otras estaciones, antes del informe MPC. Viaja dentro de NightScribe, así que funciona de serie; desde un árbol de fuentes lo instalas tú, y la app lo dice en vez de fingirlo |
 | **EXOTIC** (Python 3.10 o anterior, externo) | La reducción de tránsitos: la app escribe el handoff, ejecuta EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto. Sin él el handoff sigue siendo tuyo para lanzarlo a mano |
 
@@ -620,7 +620,7 @@ opción. Se publica como web: **<https://irydeo.github.io/nightscribe/>**
 (**Ayuda → Guía de usuario (web)**).
 
 Diseño, arquitectura, fuentes de datos, scoring, flujos de trabajo y todas las
-decisiones (ADRs) están en [`docs/`](docs/), en español e inglés.
+decisiones de diseño están en [`docs/`](docs/), en español e inglés.
 
 ¿Falta algo, algo está mal o no se entiende? [Abre una incidencia](https://github.com/irydeo/nightscribe/issues).
 

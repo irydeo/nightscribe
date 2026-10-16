@@ -144,7 +144,7 @@ class DocViewer(QDialog):
                 self._add_item(advanced, path)
         adr = self._root / "adr"
         if adr.is_dir():
-            adr_branch = self._branch(self.tr("Design decisions (ADR)"),
+            adr_branch = self._branch(self.tr("Design decisions"),
                                       expanded=False)
             for path in self._language_files(adr):
                 self._add_item(adr_branch, path)

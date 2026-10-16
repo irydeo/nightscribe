@@ -171,6 +171,11 @@ FIELDS = [
     # items carry the id as data and are filled in code (QUiLoader does not
     # read userData from a .ui; ADR-005).
     Field("cmb_astro_gpu_backend", "astrometry_gpu_backend", "combo"),
+    # The catalogue the positions are referred to and the MPC report declares
+    # in its NET line: the items are the ADES codes (from
+    # core.mpc_astrometry._NET_DESC) and are filled in code for the same
+    # reason as the backend's.
+    Field("cmb_astro_astcat", "astrometry_astcat", "combo"),
     Field("spn_astro_fallback_margin", "astrometry_fallback_margin_px",
           "int"),
     Field("spn_astro_disagree_arcsec", "astrometry_disagree_arcsec", "float"),

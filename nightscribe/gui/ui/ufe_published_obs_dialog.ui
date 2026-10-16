@@ -18,7 +18,7 @@
    <item>
     <widget class="QLabel" name="lbl_residuals_hint">
      <property name="text">
-      <string>The published observations Find_Orb used, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination. A residual is how far an observation sits from the orbit fitted to the rest; a fraction of an arcsecond is the normal scale, and a value many times larger than the neighbours marks a problem with that measurement. Our own rows are highlighted.</string>
+      <string>These are the observations other stations have already published that Find_Orb fitted the orbit to, with ours among them and highlighted. Each row carries the instant, the station, the direction and the residual in right ascension and declination. A residual is how far an observation sits from the orbit fitted to the rest: a fraction of an arcsecond is the normal scale, and a value many times larger than its neighbours marks a problem with that measurement.</string>
      </property>
      <property name="wordWrap"><bool>true</bool></property>
     </widget>

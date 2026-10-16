@@ -205,7 +205,7 @@ DEFAULTS = {
     "astrometry_gpu_backend": "opencl",
     "astrometry_disagree_arcsec": 0.5,
     "astrometry_disagree_sigma": 3.0,
-    "astrometry_astcat": "Gaia2",
+    "astrometry_astcat": "Gaia3",
     # The check against other observers (ADR-062): Find_Orb is an external
     # tool; NightScribe SHIPS a copy (ADR-079) and the path below overrides
     # it when the observer wants their own. The residual is normalised by our
@@ -355,6 +355,18 @@ class Config:
                 and "calib_pseudo_flat" in self._data:
             self._data["calib_vignette_model"] = self._data.pop(
                 "calib_pseudo_flat")
+        # The astrometric catalogue became CHOOSABLE on 2026-10-16, and its
+        # default moved from Gaia DR2 to Gaia DR3 (what a current star
+        # database holds). The key was never settable before, so a stored
+        # "Gaia2" is the OLD DEFAULT and not a choice: it moves once. The
+        # marker is what keeps a Gaia DR 2 the observer picks in Settings
+        # afterwards from being bumped back on every load.
+        if not self._data.get("_astcat_migrated"):
+            if str(self._data.get("astrometry_astcat") or "") in ("",
+                                                                  "Gaia2"):
+                self._data["astrometry_astcat"] = \
+                    DEFAULTS["astrometry_astcat"]
+            self._data["_astcat_migrated"] = True
 
     def save(self):
         # Writes the current configuration to disk, ATOMICALLY: a power cut

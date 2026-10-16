@@ -138,7 +138,7 @@ class ReportContext:
     focal_ratio: float | None = None
     telescope_type: str = ""
     detector: str = "CCD"
-    astcat: str = "Gaia2"
+    astcat: str = "Gaia3"
     comment: str = ""
 
     def tel_body(self):
@@ -199,6 +199,19 @@ def _net_name(astcat):
     return _NET_DESC.get(key, key)
 
 
+def catalog_choices():
+    # @return: [(code, name)] every catalogue a report can declare, in the
+    #          order the Settings combo shows them: Gaia first and newest
+    #          first, because that is what a current solve refers to.
+    # The app CANNOT know which one the solver used (ASTAP resolves against
+    # the database the observer installed; nova uses Gaia DR2), so the choice
+    # is the observer's and it is a statement about the measurement, not a
+    # cosmetic detail.
+    order = ("Gaia3", "Gaia3E", "Gaia2", "Gaia1", "UCAC4", "PS1_DR1",
+             "SkyMapper2", "ATLAS2", "2MASS", "USNOB1", "USNOA2")
+    return [(code, _NET_DESC[code]) for code in order if code in _NET_DESC]
+
+
 def report_context(cfg=None):
     # @args: cfg - Config, dict or None
     # @return: a ReportContext read from the settings
@@ -236,7 +249,7 @@ def report_context(cfg=None):
         aperture_m=aperture_m, focal_ratio=ratio,
         telescope_type=str(g("telescope_type", "") or "").strip(),
         detector="CMO" if mode == "CMO" else "CCD",
-        astcat=str(g("astrometry_astcat", "Gaia2") or "Gaia2"),
+        astcat=str(g("astrometry_astcat", "Gaia3") or "Gaia3"),
         comment=str(g("mpc_report_comment", "") or "").strip())
 
 
@@ -719,7 +732,7 @@ def to_ades_psv(points, obs_code, designation, cfg=None, context=None,
     # @return: the ADES PSV block. ADES carries what 80 columns cannot: the
     #          rmsRA/rmsDec and the astrometric catalogue. The "mode" cell is
     #          the instrument type from the camera setting (CCD / CMO).
-    astcat = _cfg_get(cfg, "astrometry_astcat", "Gaia2")
+    astcat = _cfg_get(cfg, "astrometry_astcat", "Gaia3")
     if context is not None:
         astcat = context.astcat or astcat
     mode, _code = instrument_mode(cfg)
@@ -758,7 +771,7 @@ def to_ades_xml(points, obs_code, designation, cfg=None, context=None,
     #          an <ades version="2017"> with one <obsBlock>.
     import xml.etree.ElementTree as ET
 
-    astcat = _cfg_get(cfg, "astrometry_astcat", "Gaia2")
+    astcat = _cfg_get(cfg, "astrometry_astcat", "Gaia3")
     if context is not None:
         astcat = context.astcat or astcat
     mode, _code = instrument_mode(cfg)

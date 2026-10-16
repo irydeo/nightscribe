@@ -114,7 +114,7 @@ class VisitsPanel(QWidget):
                  curve_kind=True, kind=None, on_measure_click=None,
                  measure_series=None, astrometry=None,
                  on_visit_selected=None, runs_for_session=None, open_run=None,
-                 mpc_prefill=None, parent=None):
+                 mpc_build=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -125,10 +125,10 @@ class VisitsPanel(QWidget):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
-        # ADR-045 rev (2026-10-16): the visit's MPC block opens filled with
-        # the report its own run already produced. The host rebuilds it (it
-        # owns the astrometry data); without the hook the block stays empty.
-        self._mpc_prefill = mpc_prefill
+        # The visit's MPC block opens the same report window as the editor's
+        # Astrometry tab. The host rebuilds the text from the visit's own run
+        # (it owns the astrometry data); without the hook the block says so.
+        self._mpc_build = mpc_build
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
         self._on_visit_selected = on_visit_selected
@@ -305,7 +305,7 @@ class VisitsPanel(QWidget):
                                 astrometry=self._astrometry,
                                 runs_for_session=self._runs_for_session,
                                 open_run=self._open_run,
-                                mpc_prefill=self._mpc_prefill,
+                                mpc_build=self._mpc_build,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -360,7 +360,7 @@ class VisitWindow(QDialog):
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
                  on_measure_click=None, measure_series=None, astrometry=None,
-                 runs_for_session=None, open_run=None, mpc_prefill=None,
+                 runs_for_session=None, open_run=None, mpc_build=None,
                  parent=None):
         super().__init__(parent)
         self._db = db
@@ -378,7 +378,7 @@ class VisitWindow(QDialog):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
-        self._mpc_prefill = mpc_prefill
+        self._mpc_build = mpc_build
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -475,7 +475,7 @@ class VisitWindow(QDialog):
             self.btn_analyze.setToolTip(self.tr(
                 "Stack this visit's frames along the object's motion and "
                 "measure its position, checked against the other observers "
-                "(track & stack, ADR-062)"))
+                "(track & stack)"))
         elif self._analysis_action == "photometry":
             self.btn_analyze.setText(self.tr("Measure the series…"))
             self.btn_analyze.setToolTip(self.tr(
@@ -1157,94 +1157,85 @@ class VisitWindow(QDialog):
         return proj_mod.get(self._db, self._pid)
 
     def _build_mpc_block(self):
-        # The night's astrometry (NEO/PCCP): paste the MPC 80-col or ADES
-        # lines, validate them, save the report. The report registers to
-        # THIS visit — the measurements are the visit's product, so the
-        # block lives here and nowhere else (ADR-045, form A). The
-        # structure is the fragment ui/visit_mpc_block.ui, loaded only
-        # for the MPC kinds (absent means absent).
+        # The night's astrometry (NEO/PCCP): the report window is the SAME one
+        # the editor's Astrometry tab opens (ADR-080), through the shared
+        # controller. The visit keeps a button and one status line: there is
+        # nothing to paste here, because the report is built from the visit's
+        # own astrometry run. It registers to THIS visit (the measurements are
+        # the visit's product, ADR-045 form A), so the block lives here and
+        # nowhere else. The structure is the fragment ui/visit_mpc_block.ui,
+        # loaded only for the MPC kinds (absent means absent).
+        from ..mpc_report_controller import MpcReportController
         ui = load_ui("visit_mpc_block", self)
-        self.layout().insertWidget(3, ui)      # under the actions, above Resources
-        self.txt_mpc = ui.txt_mpc
-        ui.vp_mpc_validate.clicked.connect(self._on_mpc_validate)
-        ui.vp_mpc_save.clicked.connect(self._on_mpc_save)
+        self.layout().insertWidget(3, ui)   # under the actions, above Resources
         self.lbl_mpc_status = ui.vp_mpc_status
-        self._prefill_mpc_report()
+        self._report = MpcReportController(
+            self, self._build_mpc_report,
+            is_neocp=self._mpc_is_neocp, object_name=self._mpc_object_name,
+            save_dir=self._mpc_save_dir,
+            on_saved=self._on_mpc_saved, on_report=self._on_mpc_ready,
+            say=self.lbl_mpc_status.setText)
+        ui.vp_mpc_open.clicked.connect(self._report.open_window)
+        # the visit opens knowing whether it has something to report
+        self._report.regenerate(quiet=True)
 
-    def _prefill_mpc_report(self):
-        # ADR-045 rev (2026-10-16): a visit that already holds an astrometry
-        # run opens with its MPC report in the box, validated. It is the same
-        # text the editor's Astrometry tab rebuilds for that run (the
-        # generator is local and deterministic), so the observer is not asked
-        # to paste what the app has just measured. Nothing is written here:
-        # saving the report is still a deliberate gesture.
-        # @return: None
-        if not callable(self._mpc_prefill):
-            return
-        try:
-            text = self._mpc_prefill(self._sid) or ""
-        except Exception as err:
-            logger.warning("MPC report prefill failed: %s", err)
-            return
-        if not text.strip() or self.txt_mpc.toPlainText().strip():
-            return
-        self.txt_mpc.setPlainText(text)
-        self._on_mpc_validate()
+    def _mpc_is_neocp(self):
+        # @return: True while the object is on the confirmation page, so the
+        #          send dialog starts on the NEOCP target
+        return bool((self._project() or {}).get("context", {}).get("neocp"))
 
-    def _on_mpc_validate(self):
-        from ...core import mpc_report
-        from ...config import config
-        text = self.txt_mpc.toPlainText()
-        if not text.strip():
-            self.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
+    def _mpc_object_name(self):
+        # @return: the object's name, for the saved file's default name
+        return (self._project() or {}).get("object_name") or ""
+
+    def _mpc_save_dir(self):
+        # @return: the project's own folder, where the report belongs (the
+        #          measurements are the visit's product and hang from it)
+        from ...core import project as proj_mod
         p = self._project()
-        result = mpc_report.validate(
-            text, obs_code=config.get("mpc_code", ""),
-            expected_obj=(p or {}).get("object_name"))
-        if result["valid"]:
-            status = (self.tr("Valid: %1 lines, %2")
-                      .replace("%1", str(result["n_lines"]))
-                      .replace("%2", result["format"]))
-            if result["warnings"]:
-                status += " ⚠ " + "; ".join(result["warnings"])
-            self.lbl_mpc_status.setText(status)
-        else:
-            self.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
+        return proj_mod.storage_dir(p) if p else None
 
-    def _on_mpc_save(self):
-        # Package and register the report to THIS visit; when the
-        # report's own first measurement disagrees with the visit's date,
-        # say so (a report hung on the wrong night is a silent database
-        # sin), without blocking.
+    def _build_mpc_report(self, fmt, submission, quiet):
+        # @args: fmt - the generator's format key, submission - the ACK/target
+        #        the header carries, quiet - True when the rebuild is not news
+        # @return: {"text", "kept"} or None. The host rebuilds the report from
+        #          the visit's own astrometry run (the run and its points live
+        #          in the database, and the host owns them). Nothing is written
+        #          here. The status line is the visit's only voice, so it says
+        #          WHY there is nothing even on a quiet rebuild: with the
+        #          window shut, an unexplained click reads as broken.
+        if not callable(self._mpc_build):
+            self.lbl_mpc_status.setText(
+                self.tr("This visit has no astrometry to report."))
+            return None
+        try:
+            out = self._mpc_build(self._sid, fmt, submission)
+        except Exception as err:
+            logger.warning("the visit's MPC report could not be built: %s", err)
+            self.lbl_mpc_status.setText(
+                self.tr("The visit's astrometry could not be rebuilt."))
+            return None
+        if not out or not str(out.get("text") or "").strip():
+            self.lbl_mpc_status.setText(
+                self.tr("This visit has no astrometry run to report yet."))
+            return None
+        return out
+
+    def _on_mpc_ready(self):
+        # @return: None. The report is in the window: the status line says how
+        #          many observations it carries and what the button does.
+        self.lbl_mpc_status.setText(self.tr(
+            "%1 observation(s) ready to report. Open the report window to "
+            "review, save or send it.").replace(
+                "%1", str(self._report.kept)))
+
+    def _on_mpc_saved(self, path, text):
+        # @return: None. Register the saved report to THIS visit; when the
+        #          report's own first measurement disagrees with the visit's
+        #          date, say so (a report hung on the wrong night is a silent
+        #          database sin), without blocking.
         from ...core import followup as fu, mpc_report
         from ...core import project as proj_mod
-        from ...config import config
-        text = self.txt_mpc.toPlainText()
-        if not text.strip():
-            self.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
-        p = self._project()
-        obj = (p or {}).get("object_name", "")
-        outdir = proj_mod.storage_dir(p) if p else Path.home()
-        default = outdir / f"{obj}_mpc_report.txt"
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Save MPC report"), str(default),
-            "Text files (*.txt);;All files (*)")
-        if not out:
-            return
-        path, result = mpc_report.package(
-            text, out, obs_code=config.get("mpc_code", ""),
-            expected_obj=obj)
-        if not path:
-            self.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
-            return
         proj_mod.add_file(self._db, self._pid, path, "report",
                           session_id=self._sid)
         note = ""
@@ -1255,9 +1246,7 @@ class VisitWindow(QDialog):
                 "⚠ the report's first measurement is from %1, not this "
                 "visit's date").replace("%1", rep_date)
         self.lbl_mpc_status.setText(
-            self.tr("Saved: %1 (%2 lines)")
-            .replace("%1", path).replace("%2", str(result["n_lines"]))
-            + note)
+            self.tr("Saved: %1").replace("%1", path) + note)
         self._populate_resources()
         self._emit_change()
 

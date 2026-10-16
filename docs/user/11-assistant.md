@@ -20,8 +20,8 @@ The selector on top decides what it answers about:
 - **This object**: your open project. The assistant reads its fact sheet: the
   object with its explained parameters, the planned night, your visits, the
   measured magnitudes and the campaign verdict.
-- **The app**: the user guide and the ADRs. Questions like "how do I calibrate
-  the frames?" or "what does MOID mean?".
+- **The app**: the user guide and the app's design notes. Questions like "how
+  do I calibrate the frames?" or "what does MOID mean?".
 - **The editor**: what you have loaded (the plate, the tab, whether it has a
   WCS) plus the guide. "I want to make the light curve, can I?" is answered
   from what is on screen and from the guide's steps.

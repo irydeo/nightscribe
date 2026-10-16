@@ -2,27 +2,32 @@
 <!--
   Visit window (ADR-045, form A): the visit's non-modal work window.
   Loaded by gui/widgets/visits_panel.py through gui/ui_loader.py.
-  The Measurements and Astrometry blocks are per-kind fragments
-  (ui/visit_measurements.ui, ui/visit_mpc_block.ui) loaded only when the
-  project's kind calls for them: absent means absent, as the pinned
-  tests demand. The PassiveList / PassiveDoubleSpinBox wheel guards are
-  custom widgets inserted into the placeholders in code (ADR-005).
+
+  Redesign (2026-10-16): one night, one page. The head reads the date (fixed:
+  it is changed from the "..." menu) and edits the NAME in place. The kind's
+  analysis action is the hero button. The visit's products (runs, reports,
+  charts, measured points) are the RESULTS list; the raw frames of the night
+  live in a FOLDED block below, with their count. The per-kind blocks are
+  fragments (ui/visit_measurements.ui, ui/visit_mpc_block.ui) loaded only when
+  the kind calls for them: absent means absent, as the pinned tests demand.
+  The PassiveList wheel guards are custom widgets inserted into the
+  placeholders in code (ADR-005).
 -->
 <ui version="4.0">
  <class>VisitWindow</class>
  <widget class="QWidget" name="VisitWindow">
   <layout class="QVBoxLayout" name="vbox_visit"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
-   <property name="layoutStretch"><string notr="true">0,0,0,1,0,0,0</string></property>
+   <property name="layoutStretch"><string notr="true">0,0,0,0,0,1,0,0</string></property>
    <item>
     <layout class="QHBoxLayout" name="row_head">
-     <property name="layoutStretch"><string notr="true">1,0,0,0,0</string></property>
-     <item><widget class="QLineEdit" name="vp_visit_date"><property name="placeholderText"><string notr="true">YYYY-MM-DD</string></property><property name="toolTip"><string>The visit's date (its name in the list). Points already saved to it keep their own MJD</string></property><property name="maximumSize"><size><width>150</width><height>16777215</height></size></property><property name="font"><font><bold>true</bold></font></property></widget></item>
-     <item><widget class="QLineEdit" name="vp_visit_label"><property name="placeholderText"><string>Name (optional)</string></property><property name="toolTip"><string>A name for this visit, on top of its date (a second pass the same night, a session that ran past midnight…). The date stays the folder and the sort order</string></property><property name="maximumSize"><size><width>220</width><height>16777215</height></size></property></widget></item>
-     <item><widget class="QPushButton" name="vp_btn_save_date"><property name="text"><string>Save</string></property><property name="toolTip"><string>Save the visit's date and name (the date is its name in the list)</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <property name="layoutStretch"><string notr="true">0,1,0,0</string></property>
+     <item><widget class="QLabel" name="vp_visit_date"><property name="text"><string/></property><property name="font"><font><bold>true</bold><pointsize>12</pointsize></font></property><property name="toolTip"><string>The visit's date: its folder and its order in the list. Change it from the ... menu</string></property></widget></item>
+     <item><widget class="QLineEdit" name="vp_visit_label"><property name="placeholderText"><string>Name (optional)</string></property><property name="toolTip"><string>A name for this visit, on top of its date (a second pass the same night, a session that ran past midnight…). The date stays the folder and the sort order</string></property></widget></item>
      <item><widget class="QPushButton" name="vp_btn_pin"><property name="text"><string notr="true">📌</string></property><property name="toolTip"><string>Pin the visit: it floats to the top of the list</string></property><property name="checkable"><bool>true</bool></property></widget></item>
-     <item><widget class="QPushButton" name="vp_btn_delete"><property name="text"><string>Delete visit…</string></property></widget></item>
+     <item><widget class="QToolButton" name="vp_btn_more"><property name="text"><string notr="true">⋯</string></property><property name="toolTip"><string>More: change the visit's date, delete the visit</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
     </layout>
    </item>
+   <item><widget class="QLabel" name="vp_lbl_saved"><property name="visible"><bool>false</bool></property><property name="text"><string/></property><property name="styleSheet"><string notr="true">color: #46a758;</string></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_actions">
      <item><widget class="QPushButton" name="vp_btn_analyze"><property name="text"><string>Analyse…</string></property><property name="toolTip"><string>The visit's own analysis, chosen by the object's kind: the track &amp; stack for the objects that move, the series for the ones that vary. The blink and the rest of the reduction live in the editor, which this opens</string></property></widget></item>
@@ -42,42 +47,19 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="grp_res">
-     <property name="title"><string>Resources</string></property>
-     <layout class="QVBoxLayout" name="vbox_res"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
-      <item>
-       <layout class="QHBoxLayout" name="row_res">
-        <item><widget class="QPushButton" name="vp_btn_open"><property name="text"><string>Open</string></property><property name="toolTip"><string>Plates open in the FITS editor; everything else opens with the system</string></property></widget></item>
-        <item><widget class="QPushButton" name="vp_btn_remove"><property name="text"><string>Remove from visit</string></property><property name="toolTip"><string>Unlink the selected resource (the file on disk is never touched)</string></property></widget></item>
-        <item><spacer name="hsp_res"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-       </layout>
-      </item>
-      <item><widget class="QWidget" name="ph_resources"/></item>
+    <widget class="QGroupBox" name="grp_results">
+     <property name="title"><string>Results</string></property>
+     <layout class="QVBoxLayout" name="vbox_results">
+      <item><widget class="QLabel" name="vp_lbl_results"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+      <item><widget class="QWidget" name="ph_results"/></item>
      </layout>
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="grp_runs">
-     <property name="title"><string>Runs</string></property>
-     <layout class="QVBoxLayout" name="vbox_runs">
-      <item><widget class="QLabel" name="vp_lbl_runs"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-      <item><widget class="QTableWidget" name="vp_tbl_runs">
-        <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
-        <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
-        <property name="editTriggers"><enum>QAbstractItemView::NoEditTriggers</enum></property>
-        <property name="maximumSize"><size><width>16777215</width><height>150</height></size></property>
-        <column><property name="text"><string>When</string></property></column>
-        <column><property name="text"><string>Observations</string></property></column>
-        <column><property name="text"><string>State</string></property></column>
-      </widget></item>
-      <item>
-       <layout class="QHBoxLayout" name="row_free">
-        <item><widget class="QLabel" name="vp_lbl_free"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-        <item><spacer name="hsp_free"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-        <item><widget class="QPushButton" name="vp_btn_restore"><property name="text"><string>Bring back…</string></property><property name="toolTip"><string>Move this visit's frames back from prcd/ to where they were. A name already taken is not overwritten: the frame lands next to it</string></property></widget></item>
-        <item><widget class="QPushButton" name="vp_btn_free"><property name="text"><string>Free space…</string></property><property name="toolTip"><string>Move the original frames of the selected run into the project's prcd/ folder. Nothing is deleted, and Bring back undoes it</string></property></widget></item>
-       </layout>
-      </item>
+    <widget class="QWidget" name="grp_files">
+     <layout class="QVBoxLayout" name="vbox_files"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
+      <item><widget class="QToolButton" name="vp_btn_files"><property name="text"><string>Files of the night</string></property><property name="toolTip"><string>The visit's raw frames, folded away: the plates of the night, the ephemerides and any other input. What the visit produced is above, in Results</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property></widget></item>
+      <item><widget class="QWidget" name="ph_files"><property name="visible"><bool>false</bool></property></widget></item>
      </layout>
     </widget>
    </item>
@@ -85,7 +67,7 @@
    <item>
     <layout class="QHBoxLayout" name="row_bottom">
      <item><spacer name="hsp_bottom"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-     <item><widget class="QPushButton" name="vp_btn_close"><property name="text"><string>Save and close</string></property><property name="toolTip"><string>Flush the date edit if pending and close the window (everything else already saved itself)</string></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_close"><property name="text"><string>Close</string></property><property name="toolTip"><string>Close the window; everything already saved itself</string></property></widget></item>
     </layout>
    </item>
   </layout>

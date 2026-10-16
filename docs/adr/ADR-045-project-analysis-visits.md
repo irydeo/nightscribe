@@ -316,3 +316,35 @@ de la visita (`_visit_mpc_report`) con el mismo generador y el mismo controlador
 compartido (ADR-080), así que ya no hay dos comportamientos que puedan divergir; al
 guardar, el fichero se registra en la visita. La «forma A» se mantiene en lo que
 importa: sin visita no hay bloque, y el reporte sigue colgando de la visita.
+
+**Enmienda (2026-10-16, la ventana de visita es una página).** La ventana había
+acumulado quince widgets en seis filas y mezclaba edición, acción y gestión de
+contenido al mismo nivel. Ahora responde, en orden de lectura, a tres preguntas:
+qué noche es, qué toca hacer con ella y qué contiene. La **cabecera** lee la fecha
+(es la carpeta y el orden: se cambia desde el menú **⋯** con un calendario, nunca
+escribiendo encima) y edita el **nombre** en línea, que se guarda al confirmar con
+una línea «Guardado» en lugar del botón permanente. Debajo, **una** acción héroe
+(elegida por el tipo) y «Añadir ficheros…». El contenido se parte en dos: los
+**Resultados** (runs, reportes, cartas y medidas, en una lista ordenada por hora,
+con doble clic para abrir y menú por fila para todo lo demás) y los **Ficheros de
+la noche** (las placas y demás materia prima) en un bloque **plegado** con su
+recuento. Las filas de botones «Open / Remove» y «Bring back… / Free space…»
+desaparecen: sus acciones viven en el menú de la fila. La entrada rápida de
+magnitud se pliega tras «Añadir una medida a mano» (las medidas ya son filas de
+Resultados, estaban listadas dos veces). Borrar la visita vive en el menú ⋯.
+
+**Amendment (2026-10-16, the visit window is one page).** The window had
+accumulated fifteen widgets in six rows, mixing editing, action and content
+management at the same level. It now answers, in reading order, three questions:
+which night this is, what to do with it, and what it holds. The **head** reads the
+date (it is the folder and the order: it is changed from the **⋯** menu with a
+calendar, never by typing over it) and edits the **name** in place, saved on commit
+with a "Saved" line instead of the permanent button. Below it, **one** hero action
+(chosen by the kind) and "Attach files…". The content is split in two: **Results**
+(runs, reports, charts and measurements, in one list ordered by time, double-click
+to open and a per-row menu for everything else) and the **Files of the night** (the
+plates and the rest of the raw material) in a **folded** block with its count. The
+"Open / Remove" and "Bring back… / Free space…" button rows are gone: their actions
+live in the row's menu. The quick magnitude entry is folded behind "Add a
+measurement by hand" (measurements are rows in Results now, they were listed
+twice). Deleting the visit lives in the ⋯ menu.

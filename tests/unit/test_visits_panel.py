@@ -144,6 +144,8 @@ def test_attach_generic_file_needs_no_dialog(panel, monkeypatch, tmp_path):
 
 
 def test_remove_resource_unlinks_only(panel, monkeypatch, tmp_path):
+    # The row carries its own action now: the "Remove from visit" button row
+    # is gone and the removal is what the row's menu does.
     from nightscribe.core import project as proj_mod
     from PySide6.QtWidgets import QDialog, QFileDialog
     vp, pid, _o = panel
@@ -154,8 +156,8 @@ def test_remove_resource_unlinks_only(panel, monkeypatch, tmp_path):
                         lambda *a, **k: ([fake], ""))
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.Accepted)
     w._on_attach()
-    w.lst_res.setCurrentRow(0)
-    w._on_remove_resource()
+    row = w.lst_files.item(0)
+    w._row_remove_file(row.data(Qt.UserRole)["id"])
     assert proj_mod.list_files(vp._db, pid) == []
 
 
@@ -171,13 +173,17 @@ def test_open_fits_routes_to_the_editor_callback(panel, monkeypatch,
                         lambda *a, **k: ([fake], ""))
     monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.Accepted)
     w._on_attach()
-    w.lst_res.setCurrentRow(0)
-    w._on_open_resource()
+    # a plate is RAW material: it lives in the folded block, and opening it is
+    # the row's double click
+    w._on_row_open(w.lst_files.item(0))
     assert opened == [(fake, sid)]
 
 
 def test_measurements_add_and_delete(panel):
+    # The point is a row in Results now (the old list is gone) and removing
+    # it is the row's own action, with a confirmation.
     from nightscribe.core import followup as fu
+    from PySide6.QtWidgets import QMessageBox
     vp, pid, _o = panel
     vp.btn_new.click()
     w = vp._win
@@ -188,9 +194,16 @@ def test_measurements_add_and_delete(panel):
     pts = fu.list_points(vp._db, pid)
     assert len(pts) == 1 and pts[0]["session_id"] == sid
     assert pts[0]["source"] == "manual"
-    w.lst_meas.setCurrentRow(0)
-    w._on_delete_measurement()
+    assert w.lst_results.count() == 1
+    assert w.lst_results.item(0).data(Qt.UserRole)["type"] == "point"
+    orig = QMessageBox.question
+    QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.Yes)
+    try:
+        w._row_remove_point(pts[0]["id"])
+    finally:
+        QMessageBox.question = orig
     assert fu.list_points(vp._db, pid) == []
+    assert w.lst_results.count() == 0
 
 
 def test_delete_visit_keeps_points_unlinked(panel):
@@ -225,6 +238,7 @@ def test_notes_autosave_from_the_window(panel):
 
 
 def test_no_measurement_block_for_non_curve_kinds(qapp, tmp_path):
+    from PySide6.QtWidgets import QToolButton
     from nightscribe.core.db import Database
     from nightscribe.core import project
     from nightscribe.gui.widgets.visits_panel import VisitsPanel
@@ -233,9 +247,10 @@ def test_no_measurement_block_for_non_curve_kinds(qapp, tmp_path):
     vp = VisitsPanel(db, lang="en", curve_kind=False)
     vp.set_project(p["id"])
     vp.btn_new.click()
-    assert vp._win.findChild(PassiveList, "vp_measurements") is None
-    # resources and notes remain for every kind
-    assert vp._win.findChild(PassiveList, "vp_resources") is not None
+    assert vp._win.findChild(QToolButton, "vp_btn_add_point") is None
+    # Results and the folded frames stay for every kind
+    assert vp._win.findChild(PassiveList, "vp_results") is not None
+    assert vp._win.findChild(PassiveList, "vp_files") is not None
     vp.close_visit_window()
     vp.deleteLater()
     db.close()
@@ -397,48 +412,63 @@ def test_mpc_save_matching_date_warns_nothing(qapp, tmp_path, monkeypatch):
 
 # ---------------- pin and the editable date (ADR-045 review) -----------
 
-def test_visit_date_editable_from_the_window(panel):
+def test_visit_date_changes_from_the_more_menu(panel, qapp):
+    # The date is a folder name and a sort key: it is READ in the head and
+    # changed with a calendar, never by typing over it. A typo there renames
+    # a night, which is what the old free-text field allowed.
     from nightscribe.core import followup as fu
+    from PySide6.QtWidgets import QDialog
     vp, pid, _o = panel
     vp.btn_new.click()
     sid = vp.current_session_id()
-    # the save gesture arms exactly while the field is dirty (the field
-    # report: an invisible save-on-focus-out alone leaves the observer
-    # guessing)
-    btn = vp._win.btn_save_date
-    assert not btn.isEnabled()
-    vp._win._date_ed.setText("2026-09-20")
-    assert btn.isEnabled()
-    btn.click()
+    w = vp._win
+    assert w._date_lbl.text() == fu.get_session(vp._db, sid)["obs_date"]
+    # the menu carries it (and deleting the visit)
+    labels = [a.text() for a in w._ui.vp_btn_more.menu().actions()]
+    assert "Change the date…" in labels and "Delete the visit…" in labels
+    # the dialog: accept with a date of our own
+    from PySide6.QtCore import QDate
+    orig = QDialog.exec
+
+    def _accept(self):
+        self.dt_date.setDate(QDate(2026, 9, 20))
+        return QDialog.Accepted
+
+    QDialog.exec = _accept
+    try:
+        w._on_change_date()
+    finally:
+        QDialog.exec = orig
     assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-20"
-    assert not btn.isEnabled()          # clean again after the save
+    assert w._date_lbl.text() == "2026-09-20"
+    assert w._saved_lbl.isVisible()          # the line says it took
     assert vp.lst.item(0).text().startswith("2026-09-20")
-    # Enter/focus-out shares the same path
-    vp._win._date_ed.setText("2026-09-21")
-    vp._win._on_date_edited()
-    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-21"
-    # an invalid date reverts to the stored one, text selected, no crash
-    vp._win._date_ed.setText("ayer por la noche")
-    vp._win._on_date_edited()
-    assert vp._win._date_ed.text() == "2026-09-21"
-    assert not btn.isEnabled()
-    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-21"
+    # cancelling changes nothing
+    QDialog.exec = lambda self: QDialog.Rejected
+    try:
+        w._on_change_date()
+    finally:
+        QDialog.exec = orig
+    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-20"
 
 
 def test_visit_name_editable_from_the_window(panel):
-    # ADR-045 rev: the visit carries a name of its own, saved with the same
-    # gesture as the date; the list shows it in front of the date (which
-    # stays the sort key and the folder).
+    # ADR-045 rev: the visit carries a name of its own, edited in place and
+    # saved on commit; the "Saved" line says it took (it replaced the button,
+    # whose only job was answering that question). The list shows the name in
+    # front of the date, which stays the sort key and the folder.
     from nightscribe.core import followup as fu
     vp, pid, _o = panel
     sid = fu.create_session(vp._db, pid, "2026-09-21")
     vp.refresh()
     w = vp.open_visit(sid)
     assert w._label_ed is not None
+    assert not w._saved_lbl.isVisible()      # nothing saved yet
     w._label_ed.setText("first pass")
-    assert w.btn_save_date.isEnabled()        # the name alone arms the save
-    w._save_date()
+    assert not w._saved_lbl.isVisible()      # typing hides the line
+    w._save_head()                           # Enter / leaving the field
     assert fu.get_session(vp._db, sid)["label"] == "first pass"
+    assert w._saved_lbl.isVisible()
     vp.refresh()
     row = next(vp.lst.item(i) for i in range(vp.lst.count())
                if vp.lst.item(i).data(Qt.UserRole) == sid)
@@ -447,7 +477,7 @@ def test_visit_name_editable_from_the_window(panel):
     # emptying it is allowed: the list falls back to the date alone
     w2 = vp.open_visit(sid)
     w2._label_ed.setText("")
-    w2._save_date()
+    w2._save_head()
     assert fu.get_session(vp._db, sid)["label"] == ""
     vp.refresh()
     row = next(vp.lst.item(i) for i in range(vp.lst.count())
@@ -472,34 +502,17 @@ def test_pinned_visit_floats_to_the_top(panel):
     assert vp.lst.item(0).data(Qt.UserRole) != sid_old
 
 
-def test_save_and_close_flushes_the_date_and_closes(panel, qapp):
-    # The explicit closing gesture: a dirty valid date saves, the window
-    # closes and the panel forgets it (the destroyed signal).
+def test_close_flushes_the_pending_name(panel, qapp):
+    # The closing gesture flushes a pending name edit: nothing is lost
+    # silently, and the window closes (the panel forgets it).
     from nightscribe.core import followup as fu
     vp, pid, _o = panel
     vp.btn_new.click()
     sid = vp.current_session_id()
     w = vp._win
-    w._date_ed.setText("2026-09-19")
-    assert w.btn_save_date.isEnabled()
+    w._label_ed.setText("second pass")
     w.btn_close.click()
-    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-19"
-    qapp.processEvents()
-    assert vp._win is None
-
-
-def test_save_and_close_reverts_an_invalid_date(panel, qapp):
-    # a dirty INVALID value reverts to the stored one and the window
-    # still closes: nothing is ever saved silently nor lost silently
-    from nightscribe.core import followup as fu
-    vp, pid, _o = panel
-    vp.btn_new.click()
-    sid = vp.current_session_id()
-    stored = fu.get_session(vp._db, sid)["obs_date"]
-    w = vp._win
-    w._date_ed.setText("no es una fecha")
-    w.btn_close.click()
-    assert fu.get_session(vp._db, sid)["obs_date"] == stored
+    assert fu.get_session(vp._db, sid)["label"] == "second pass"
     qapp.processEvents()
     assert vp._win is None
 
@@ -519,14 +532,15 @@ def test_visit_window_analysis_action_follows_the_kind(qapp, tmp_path):
                     measure_series=lambda s: seen.append(("series", s)))
     w.btn_analyze.click()
     assert seen == [("series", sid)]
-    # The primary action is painted as the panel's hero (ADR-038) and the
-    # two resource actions that act on the selection are VISIBLE next to the
-    # list; attaching is its own visible button, not buried in a door.
+    # The primary action is painted as the panel's hero (ADR-038), and the
+    # only other button in the row is Attach files: everything else a row can
+    # do (open it, unlink it, free its frames) lives in the row's own menu,
+    # so the window needs no button rows at all.
     assert w.btn_analyze.styleSheet()          # the kind's hue, applied live
     assert not w._ui.vp_btn_attach.isHidden()
-    assert not w._ui.vp_btn_open.isHidden()
-    assert not w._ui.vp_btn_remove.isHidden()
     assert not hasattr(w, "btn_resources")
+    assert not hasattr(w._ui, "vp_btn_open")
+    assert not hasattr(w._ui, "vp_btn_remove")
     w.close()
     p2 = project.create(db, "neo", "2026 AB")
     sid2 = fu.create_session(db, p2["id"], obs_date="2026-09-21")
@@ -555,14 +569,18 @@ def test_visit_window_lists_its_runs_and_opens_one(qapp, tmp_path):
     w = VisitWindow(db, p["id"], sid, lang="en", kind="neo",
                     runs_for_session=lambda s: runs,
                     open_run=lambda rid: opened.append(rid))
-    tbl = w._ui.vp_tbl_runs
-    assert tbl.rowCount() == 2
-    assert tbl.item(0, 1).text() == "2"          # a live run says its count
-    assert tbl.item(1, 1).text() == "—"          # an undone one does not
-    assert tbl.item(1, 2).text() == "undone"
-    tbl.selectRow(0)
-    w._on_open_run()
+    # the runs are rows of the Results list, one per pass, oldest first
+    assert w.lst_results.count() == 2
+    first = w.lst_results.item(0).data(Qt.UserRole)
+    second = w.lst_results.item(1).data(Qt.UserRole)
+    assert first == {"type": "run", "id": 7}
+    assert second == {"type": "run", "id": 8}
+    assert "2 obs · complete" in w.lst_results.item(0).text()
+    assert "undone" in w.lst_results.item(1).text()
+    # double click opens it in the editor (the host's callback)
+    w._on_row_open(w.lst_results.item(0))
     assert opened == [7]
+    # and the row's menu carries the same action plus the frames' fate
     w.close()
     db.close()
 
@@ -677,7 +695,7 @@ def test_attach_fits_lists_the_exception(panel, monkeypatch, tmp_path):
 def test_free_space_moves_the_run_frames_and_brings_them_back(
         panel, monkeypatch, tmp_path):
     # ADR-062 phase 9 wired into the visit (A2): the originals of a run move
-    # to procesados/ and come back. Nothing is deleted.
+    # to prcd/ and come back. Nothing is deleted.
     from PySide6.QtWidgets import QMessageBox
     from nightscribe.core import astrometry_store as store
     import nightscribe.core.project as proj_mod
@@ -702,10 +720,12 @@ def test_free_space_moves_the_run_frames_and_brings_them_back(
     w = vp._win
     # the panel fixture does not wire the runs callback: give it the one run
     w._runs_for_session = lambda sid: [{"id": run, "status": "complete"}]
-    w._populate_runs()
-    w._on_free_space()
+    w._populate_content()
+    # the row's menu offers it (with the count), and the action is per run
+    assert w._freeable(run) == len(frames)
+    w._free_runs([run])
     for i in range(len(frames)):
         assert not (tmp_path / f"fr{i}.fits").exists()
-    w._on_restore_space()
+    w._restore_runs([run])
     for i in range(len(frames)):
         assert (tmp_path / f"fr{i}.fits").exists()

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Change a visit's date (ADR-045 rev): the tiny dialog the visit window's
+  "..." menu opens. The date is the visit's folder and its order in the list,
+  so it deserves a calendar and not a free-text field. Loaded by
+  gui/widgets/visits_panel.py through gui/ui_loader.py.
+-->
+<ui version="4.0">
+ <class>VisitDateDialog</class>
+ <widget class="QDialog" name="VisitDateDialog">
+  <property name="windowTitle"><string>Change the visit's date</string></property>
+  <layout class="QVBoxLayout" name="vbox_date"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item><widget class="QLabel" name="lbl_date"><property name="text"><string>The visit's date is its folder and its order in the list. The measurements already saved keep their own moment</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDateEdit" name="dt_date"><property name="calendarPopup"><bool>true</bool></property><property name="displayFormat"><string notr="true">yyyy-MM-dd</string></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Save|QDialogButtonBox::Cancel</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

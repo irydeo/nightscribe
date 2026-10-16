@@ -1019,8 +1019,51 @@ def _reg_build():
                     dtype=np.float64 if wide else np.float32,
                     shifts=((56, 48, 40, 32, 24, 16, 8, 0) if wide
                             else (24, 16, 8, 0)))
+        # A device that MISCOMPILES a kernel answers wrongly in silence, and
+        # the backend's whole contract is "a faster road to the SAME answer,
+        # never a different one" (ADR-089). pocl 5/6 does exactly that with
+        # the block median's quickselect: with optimisations on the median
+        # comes out 0 and the source image is the RAW frame (measured
+        # 2026-10-15 on the CI, both the float and the double build; with
+        # -cl-opt-disable it is right). The program is checked ONCE here
+        # against the CPU and REFUSED when it disagrees: the estimate then
+        # runs on the CPU, which is slower but right.
+        if not _reg_verify():
+            _reg.update(ok=False, program=None)
+            continue
         return True
     return False
+
+
+def _reg_verify():
+    # @return: True when the kernels AGREE with the CPU on a small case
+    # Small on purpose (96^2): this runs once per program build, and it only
+    # has to tell a working device from a broken one, not to measure.
+    from . import register
+    rng = np.random.default_rng(0)
+    yy, xx = np.mgrid[0:96, 0:96]
+    img = (rng.normal(1000.0, 4.0, (96, 96))
+           + 3000.0 * np.exp(-((xx - 40.0) ** 2 + (yy - 48.0) ** 2)
+                             / (2 * 2.0 ** 2)))
+    want = register.source_image(img)
+    try:
+        got = _frame_stars(img, None)
+    except Exception as err:                                   # noqa: BLE001
+        logger.warning("the registration kernels did not run: %s", err)
+        return False
+    if got is None:
+        return False
+    src = np.asarray(got[0])
+    if src.shape != want.shape:
+        return False
+    worst = float(np.max(np.abs(src - want)))
+    tol = 1e-6 if _reg["wide"] else 1e-2
+    if worst > tol:
+        logger.warning(
+            "the registration kernels disagree with the CPU by %.3g ADU on "
+            "this device: the estimate will run on the CPU", worst)
+        return False
+    return True
 
 
 def _reg_kernel(name):

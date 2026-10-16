@@ -714,7 +714,7 @@
              <item><widget class="QLabel" name="lbl_master_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_calib_policy">
-               <item><widget class="QCheckBox" name="chk_calib_vignette_model"><property name="text"><string>Model the vignetting from the frames when the library has no flat</string></property><property name="toolTip"><string>Sample the sky on a grid of tiles and fit a smooth surface to what they have in common: the train's vignetting, which is fixed on the frame. The tiles that a star, a galaxy or a dust mote pushed off the trend are thrown away by the fit itself, so no source ends up in the model. It is used ONLY for the filters the library has no flat for (a real flat always wins). It is built from the frames with the SAME dark/bias removed as the light: without one the pedestal compresses its shape, and the app says so. It corrects the vignetting (the systematic that matters, about a tenth of a magnitude) and NOT the dust, because a smooth surface has no fine structure; the library still takes a real master for that. This is the calibration's own policy and this is its single home: every pipeline that applies the calibration reads this same switch, the stack included</string></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_calib_vignette_model"><property name="text"><string>Model the vignetting from the frames when the library has no flat</string></property><property name="toolTip"><string>Sample the sky on a grid of tiles and fit a smooth surface to what they have in common: the train's vignetting, which is fixed on the frame. Spoiled tiles are thrown away by the fit itself. It is used only for the filters the library has no flat for (a real flat always wins), and it corrects the vignetting (about a tenth of a magnitude) but not the dust: a smooth surface has no fine structure. Every pipeline that calibrates reads this one switch, the stack included</string></property></widget></item>
                <item>
                 <spacer name="hsp_calib_policy">
                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -825,7 +825,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_astro_check"><property name="text"><string>Compares our measurement with the observations other stations have published (needs Find_Orb, in Integrations) and blocks the report when our point stands out of the cloud. It filters, it does not prove: on a short arc a wrong observation fits just as well</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_astro_check"><property name="text"><string>Compares our measurement with what other stations have published and blocks the report when our point stands out. It needs Find_Orb (Integrations). It filters rather than proves: on a short arc a wrong observation fits just as well</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_astro_check_more">
                <item><widget class="QLabel" name="lbl_astro_check_floor"><property name="text"><string>Residual floor (″):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
@@ -840,7 +840,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_astro_check_more"><property name="text"><string>A residual below the floor in arcseconds is never an outlier (the other stations' own noise is bigger than that), and only the observations inside the window are compared</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_astro_check_more"><property name="text"><string>A residual below the floor is never an outlier: the other stations' own noise is larger. Only the observations inside the window are compared</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>
@@ -1361,7 +1361,7 @@
              <item>
               <layout class="QHBoxLayout" name="row_chart_data">
                <item><widget class="QLabel" name="lbl_chart_data"><property name="text"><string>Plate band:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows (position, magnitude, date, exposure, kit, station, scale, field)</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. The colour says how much to trust it: ink for what this plate's own solution places, dimmed for what is only the catalogue's, and for the magnitude a scale of its own: GREEN clean (error up to 0.05), ORANGE usable but not clean (up to 0.15 or a light caveat), RED not worth reporting without looking, and WHITE for a catalogue value. Off, the band keeps the object's name only</string></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows (position, magnitude, date, exposure, kit, station, scale, field)</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. Ink for what this plate's own solution places, dimmed for the catalogue's, and for the magnitude a scale of its own: GREEN clean (error up to 0.05), ORANGE usable but not clean (up to 0.15 or a light caveat), RED not worth reporting without looking, WHITE for a catalogue value. Off, the band keeps the object's name only</string></property></widget></item>
                <item>
                 <spacer name="hsp_chart_data">
                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -1422,7 +1422,19 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_ufe"><property name="text"><string>The editor's action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them. It applies at once, no restart needed. The unified editor is the only door to the FITS work: the classic dialogs retired once it became the default, so there is nothing to switch back to.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item>
+              <layout class="QHBoxLayout" name="row_ufe_north">
+               <item><widget class="QLabel" name="lbl_ufe_north"><property name="text"><string>North up on open:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_ufe_north_up"/></item>
+               <item>
+                <spacer name="hsp_ufe_north">
+                 <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 <property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property>
+                </spacer>
+               </item>
+              </layout>
+             </item>
+             <item><widget class="QLabel" name="lblH_ufe"><property name="text"><string>The editor's action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them. It applies at once, no restart needed. The unified editor is the only door to the FITS work: the classic dialogs retired once it became the default, so there is nothing to switch back to. North up on open turns a plate that carries astrometry so that north points up, the way charts and acquisition screens show the sky; the mirror buttons in the editor still work either way.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
           </item>

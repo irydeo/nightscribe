@@ -1745,12 +1745,12 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     # the exact numbers live in the ADR and in the code, and a help that cites
     # one visit ages badly (2026-10-07, the same rule the other helps follow)
     assert "0.087" not in tab.chk_calibrate.toolTip()
-    # ADR-061 rev: it no longer needs dither (the tiles a star spoiled are
-    # thrown away, so a static field works); what it does need is a dark/bias,
-    # or the pedestal compresses the model, and the tooltip says so.
+    # ADR-061 rev: it no longer needs dither (a spoiled tile is discarded by
+    # the fit itself, so a static field works); what it does need is a
+    # dark/bias, or the pedestal compresses the model, and the tooltip says so.
     assert "dark/bias" in tab.chk_calibrate.toolTip()
-    assert "star" in tab.chk_calibrate.toolTip()
-    assert "thrown away" in tab.chk_calibrate.toolTip()
+    assert "built from the frames themselves" in tab.chk_calibrate.toolTip()
+    assert "a real flat always wins" in tab.chk_calibrate.toolTip()
 
 
 def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(

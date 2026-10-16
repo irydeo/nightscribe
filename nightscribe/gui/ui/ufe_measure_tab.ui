@@ -196,11 +196,11 @@
          <string>Matched filter (weigh each pixel by the star's shape)</string>
         </property>
         <property name="toolTip">
-         <string>WHAT IT IS: instead of adding up the pixels inside a circle, each pixel is weighed by how much light the star's shape says it should hold, and the total is divided by the sum of those weights. With a known shape and white noise that is the best linear estimator there is, so it is not a trick, it is the arithmetic optimum. It is applied to the target AND to every comparison star, because the zero point has to come from the same arithmetic as the target.
+         <string>WHAT IT IS: each pixel is weighed by how much light the star's shape says it should hold, and the total is divided by the sum of those weights. For a known shape that is the best linear estimator there is, and it is applied to the target and to every comparison star alike.
 
-WHAT IT PRODUCES, measured on real data: it improves the aperture's signal-to-noise by about half as much again on a stacked series; it makes the zero point's error some two and a half times smaller; and it halves the brightness bias at low signal-to-noise. It costs a little more time. The shape comes from the seeing measured on the plate, so nothing extra is asked of you.
+WHAT IT BUYS, measured on real data: about half again the signal-to-noise on a stacked series, a zero point error some two and a half times smaller, and half the brightness bias at low signal-to-noise, for a little more time.
 
-THE RISKS, said plainly: it moves the magnitude that gets published, so a curve built before this will show a step of a few hundredths of a magnitude (towards the truth, not away from it); and its flux follows the shape of the star, so where that shape changes across the field (a visit with two runs, a field with coma) it can move by a tenth of a magnitude from star to star, which the zero point spreads out but does not erase. Both were measured against a real catalogue: the zero point's error comes out about the same as the aperture's, and against the catalogue the aperture UNDERESTIMATES the faint stars where the filter does not. It has not been checked on host-subtracted images, nor with a trailed object. The aperture's value is kept beside the reported one either way, so you can always compare. Untick it to go back to the aperture: the proven path</string>
+WHAT IT COSTS: it moves the published magnitude (a step of a few hundredths, towards the truth) and, where the star's shape changes across the field, up to a tenth from star to star. The aperture's value stays beside the reported one, so you can always compare</string>
         </property>
        </widget>
       </item>

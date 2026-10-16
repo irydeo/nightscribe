@@ -27,6 +27,13 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 MONO = FIXTURES / "sn2026zji_new_image.fits"
 
+# A small TAN solution for the export tests: the same shape the solver
+# hands back (CRVAL/CRPIX/CTYPE/CD), enough for Wcs.from_header.
+_FAKE_CARDS = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 8.0,
+               "CRPIX2": 8.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+               "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0,
+               "CD2_2": 0.0003}
+
 
 @pytest.fixture(scope="module")
 def qapp():
@@ -123,9 +130,55 @@ def test_export_png_via_dialog(dlg, monkeypatch, tmp_path):
     dlg.state.load(MONO)
     out = tmp_path / "export.png"
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
-                        staticmethod(lambda *a, **k: (str(out), "")))
-    dlg._on_export_png()
+                        staticmethod(lambda *a, **k:
+                                     (str(out), "PNG image (*.png)")))
+    dlg._on_export()
     assert out.exists() and out.stat().st_size > 0
+
+
+def test_export_fits_copy_via_dialog(dlg, monkeypatch, tmp_path):
+    # The extension picks the FITS branch: a byte copy of the plate, so the
+    # observer gets the pixels, the header and the annotations back.
+    from PySide6.QtWidgets import QFileDialog
+    dlg.state.load(MONO)
+    out = tmp_path / "copy.fits"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k:
+                                     (str(out), "FITS image (*.fits *.fit)")))
+    dlg._on_export()
+    assert out.exists()
+    assert out.read_bytes() == MONO.read_bytes()
+
+
+def test_export_fits_merges_the_session_solve(dlg, monkeypatch, tmp_path):
+    # A plate solved in this session but not written to disk still exports
+    # solved: the copy carries the WCS cards the state is holding.
+    from PySide6.QtWidgets import QFileDialog
+    from nightscribe.core import fits_annotate
+    dlg.state.load(MONO)
+    dlg.state.set_wcs_cards(_FAKE_CARDS)
+    out = tmp_path / "solved.fits"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k:
+                                     (str(out), "FITS image (*.fits *.fit)")))
+    dlg._on_export()
+    cards, _off = fits_annotate._split_header(out.read_bytes())
+    keys = {c[:8].strip() for c in cards}
+    assert "CRVAL1" in keys and "CTYPE1" in keys
+    assert out.read_bytes() != MONO.read_bytes()
+
+
+def test_export_appends_the_filter_suffix(dlg, monkeypatch, tmp_path):
+    # Qt does not always append the filter's suffix: a name with none must
+    # still land a FITS file, never an extensionless one.
+    from PySide6.QtWidgets import QFileDialog
+    dlg.state.load(MONO)
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k:
+                                     (str(tmp_path / "noext"),
+                                      "FITS image (*.fits *.fit)")))
+    dlg._on_export()
+    assert (tmp_path / "noext.fits").exists()
 
 
 def test_add_feature_tab_is_the_whole_extension_api(dlg):

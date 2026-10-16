@@ -240,6 +240,12 @@ DEFAULTS = {
     # Interfaz 1.4: the Welcome sky breathes and the view fades in unless
     # this is off. Motion is opt-out, never imposed; applies live.
     "ui_animations": True,
+    # UFE (ADR-044 rev, 2026-10-16): a plate that carries astrometry opens
+    # with north up, the way charts and acquisition screens show the sky.
+    # It is a display MIRROR (see UfeImageState._apply_north_up), never a
+    # rotation, so clicks and measurements are untouched; off leaves the
+    # plate in its native orientation.
+    "ufe_north_up": True,
     # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
     # text labels by default; off restores the full labels (the tooltips
     # never change). Solving and the marker-move button keep their text.

@@ -4742,25 +4742,25 @@ class UfeTrackStackTab(QWidget):
                         "warnings on the report are the safety net.")
                 else:
                     text = self.tr(
-                        "Find_Orb is not configured: the check is not "
+                        "Find_Orb is not configured, so the check is not "
                         "available. Set it up in Settings; meanwhile the "
-                        "centred sequence and the warnings on the report are "
-                        "the safety net.")
+                        "centred sequence and the report's warnings are the "
+                        "safety net.")
             else:
                 text = self.tr("The check is not available:") \
                     + f" {check.note}"
         elif check.no_reference:
             text = self.tr(
                 "No other observations to compare with: nothing is blocked "
-                "(a real discovery has no reference); the centred sequence "
+                "(a real discovery has no reference). The centred sequence "
                 "and your own review of the report decide.")
             if check.note:
                 text += " " + check.note
         elif getattr(check, "no_fit", False):
             text = self.tr(
-                "The published observations are too few or too short an arc "
-                "for Find_Orb to fit an orbit, so there is nothing to compare "
-                "our point with yet. Nothing is blocked.")
+                "Too few published observations, or too short an arc, for "
+                "Find_Orb to fit an orbit: there is nothing to compare our "
+                "point with yet. Nothing is blocked.")
         elif check.blocked:
             text = self.tr(
                 "Our point is an outlier against the other observers: the "

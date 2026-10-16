@@ -771,7 +771,7 @@ fotogramas de la visita a la vista.**
    lista de doscientas tomas: ilegible, sin registrar por el último run. Con un
    filtro «solo problemas», el clic abre la toma en el editor y el menú
    contextual la quita de la visita (desenlaza, el fichero no se toca) o la
-   mueve a `descartados/` (nada se borra). La lectura es **muestreada**
+   mueve a `dscrd/` (nada se borra). La lectura es **muestreada**
    (`fits_io.read_sample`: una fila de cada N, ~1 MB por toma de 2048² en vez
    de 16 MB) y va en un worker.
 
@@ -1104,3 +1104,34 @@ the editor puts a lot of text on screen and it is hard to read.
    down, even with 352 px to wrap in. The floor is cleared before measuring,
    and the same defect is fixed in `ufe_measure_tab._fit_series_hint` and
    `ufe_manual_dialog`.
+
+**Amendment (2026-10-16, north up, the observer in the band and a FITS export).** Three
+small changes to the editor. A plate that carries astrometry now opens with **north up**
+(`ufe_north_up`, on by default, switchable in Settings > Interface): it is a display
+MIRROR computed from the CD matrix (`UfeImageState._apply_north_up`), never a rotation,
+because a rotation would move clicks, annotations and centroids, which live in original
+plate pixels; the plate's own orientation stays one flip away. The plate's band now says
+**who took it** (`Obs <name>`, right before the station code): the corner boxes of the
+other charts have said "Obs:" all along and the band was the one place missing it. And
+**Export…** (Ctrl+E) is no longer PNG-only: the same dialog offers a **FITS copy** of
+the plate with the WCS solved in this session merged in
+(`wcs_store.copy_with_solved_wcs`) and the pixels, the header and the annotations
+untouched, so an unsaved solve can still leave the app. The format is taken from an
+explicit extension when there is one and from the selected filter otherwise, and the
+suffix is normalised either way.
+
+**Enmienda (2026-10-16, norte arriba, el observador en la banda y exportar a FITS).**
+Tres cambios pequeños en el editor. Una placa con astrometría se abre ahora con el
+**norte arriba** (`ufe_north_up`, activo por defecto, conmutable en Ajustes > Interfaz):
+es un ESPEJO de pantalla calculado desde la matriz CD
+(`UfeImageState._apply_north_up`), nunca una rotación, porque una rotación movería
+clics, anotaciones y centroides, que viven en píxeles originales de la placa; la
+orientación propia de la placa queda a un espejo de distancia. La banda de la placa dice
+ahora **quién la tomó** (`Obs <nombre>`, justo antes del código de estación): las cajas
+de esquina de las otras cartas dicen «Obs:» desde siempre y la banda era el único sitio
+que se lo callaba. Y **Exportar…** (Ctrl+E) ya no es solo PNG: el mismo diálogo ofrece
+una **copia FITS** de la placa con la WCS resuelta en esta sesión fundida dentro
+(`wcs_store.copy_with_solved_wcs`) y los píxeles, la cabecera y las anotaciones
+intactos, así que una resolución sin guardar también puede salir de la app. El formato
+se toma de una extensión explícita cuando la hay y del filtro elegido cuando no, y la
+extensión se normaliza en ambos casos.

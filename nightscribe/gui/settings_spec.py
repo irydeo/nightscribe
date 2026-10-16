@@ -208,6 +208,7 @@ FIELDS = [
     # --- Interface -----------------------------------------------------
     Field("chk_animations", "ui_animations", "bool"),
     Field("chk_ufe_bar_icons", "ufe_bar_icons", "bool"),
+    Field("chk_ufe_north_up", "ufe_north_up", "bool"),
     Field("edt_observer", "observer_name", "str"),
     Field("edt_measurer", "measurer_name", "str"),
     Field("edt_observer_email", "observer_email", "str"),

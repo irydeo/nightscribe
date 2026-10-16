@@ -150,7 +150,7 @@ nightscribe/
     astrometry_store.py # persistencia de la astrometría (ADR-062, fase 8):
                       #   astrometry_runs/points/frames, Undo por ejecución
     free_space.py     # liberar espacio (ADR-062, fase 9): mover los
-                      #   originales de un run con éxito a procesados/ dentro
+                      #   originales de un run con éxito a prcd/ dentro
                       #   del proyecto (no borrar), registrar el movimiento y
                       #   poder restaurarlos; los calibrados se borran aparte
     findorb.py        # handoff a Find_Orb (ADR-062, fase 5.2): fichero de
@@ -301,7 +301,13 @@ nightscribe/
                        #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
                        #   stack_strip: la tira de apilados de las observaciones, ADR-062;
                        #   las filas ricas project_row / campaign_row + sparkline, U2/U5;
-                       #   y visits_panel: el gestor de visitas: ADR-045)
+                       #   observatory_console: la consola del observatorio
+                       #   (ADR-081 rev: estructura en ui/observatory_panel.ui,
+                       #   modos desconectada/reposo/moviéndose/capturando/
+                       #   siguiendo; tres verbos y dos casillas);
+                       #   y visits_panel: el gestor de visitas y su ventana
+                       #   (ADR-045 rev: una página con Resultados y los
+                       #   Ficheros de la noche plegados, menú por fila)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

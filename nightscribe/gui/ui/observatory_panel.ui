@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Observatory console (ADR-081 rev, 2026-10-16): the Capture step's control
+  surface, loaded by gui/widgets/observatory_console.py through
+  gui/ui_loader.py. It used to be built in code; the redesign gives it a
+  Designer file (ADR-005) and a console shape: STATUS on top (identity, the
+  stop always at hand, the telemetry band), COMMANDS below, and the last
+  frame in its own panel.
+
+  Three verbs and two checkboxes: Point telescope (+ Astrometric goto),
+  Send plan, Start capture (+ Follow the object). The modifiers are
+  checkboxes because each one is the SAME intention with another method,
+  never a second destination.
+
+  Modes (set by observatory_console.set_mode): off / idle / moving /
+  capturing / following.
+-->
+<ui version="4.0">
+ <class>ObservatoryConsole</class>
+ <widget class="QWidget" name="ObservatoryConsole">
+  <layout class="QVBoxLayout" name="vbox_console"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
+   <property name="spacing"><number>8</number></property>
+
+   <!-- ============ disconnected: ONE big way in ============ -->
+   <item>
+    <widget class="QWidget" name="w_off">
+     <layout class="QVBoxLayout" name="vbox_off"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>6</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>6</number></property>
+      <item><widget class="QLabel" name="lbl_off"><property name="text"><string>No connection with the observatory.</string></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+      <item><widget class="QPushButton" name="ccd_connect"><property name="text"><string>Connect CCDciel</string></property><property name="toolTip"><string>Talk to the observatory software configured in Settings: the mount, the camera and the filter wheel. The app reads its state every couple of seconds while it is connected</string></property></widget></item>
+      <item><widget class="QLabel" name="lbl_where"><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="wordWrap"><bool>true</bool></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ============ connected: the console ============ -->
+   <item>
+    <widget class="QWidget" name="w_on">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="vbox_on"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>4</number></property>
+
+      <!-- the band: who answers, and the way out of anything -->
+      <item>
+       <layout class="QHBoxLayout" name="band"><property name="spacing"><number>8</number></property>
+        <item><widget class="QLabel" name="ccd_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+        <item><spacer name="hsp_band"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+        <item><widget class="QToolButton" name="ccd_disconnect"><property name="text"><string notr="true">⏻</string></property><property name="toolTip"><string>Disconnect from the observatory software. Nothing is stopped on its side: the run you started there keeps running</string></property></widget></item>
+        <item><widget class="QPushButton" name="ccd_stop"><property name="text"><string notr="true">⏹ STOP</string></property><property name="toolTip"><string>Stop the telescope movement now. Use it if a slew or an astrometric goto is heading somewhere it should not: it halts the mount immediately, without waiting for the pointing to finish</string></property><property name="styleSheet"><string notr="true">QPushButton { background: #e5484d; border: 2px solid #ff7a85; border-radius: 8px; padding: 5px 14px; color: #ffffff; font-weight: 800; } QPushButton:hover { background: #d43a3f; } QPushButton:disabled { background: transparent; border: 2px solid #3a4156; color: #8a90a6; }</string></property></widget></item>
+       </layout>
+      </item>
+
+      <!-- the telemetry: labelled readouts, not form fields -->
+      <item>
+       <layout class="QHBoxLayout" name="telemetry"><property name="spacing"><number>14</number></property>
+        <item><widget class="QLabel" name="lbl_temp"><property name="text"><string>Temperature</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 10px;</string></property></widget></item>
+        <item><widget class="QLabel" name="ccd_temp"><property name="text"><string notr="true">—</string></property></widget></item>
+        <item><widget class="QLabel" name="lbl_track"><property name="text"><string>Tracking</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 10px;</string></property></widget></item>
+        <item><widget class="QLabel" name="ccd_tracking"><property name="text"><string notr="true">—</string></property></widget></item>
+        <item><widget class="QLabel" name="lbl_mount"><property name="text"><string>Mount</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 10px;</string></property></widget></item>
+        <item><widget class="QLabel" name="ccd_slew"><property name="text"><string notr="true">—</string></property></widget></item>
+        <item><widget class="QLabel" name="lbl_version"><property name="text"><string>Version</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 10px;</string></property></widget></item>
+        <item><widget class="QLabel" name="ccd_version"><property name="text"><string notr="true">—</string></property></widget></item>
+        <item><spacer name="hsp_tele"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item><widget class="QLabel" name="ccd_coords"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+
+      <!-- the commands: three verbs, two checkboxes -->
+      <item>
+       <layout class="QHBoxLayout" name="cmd_point"><property name="spacing"><number>8</number></property>
+        <item><widget class="QLabel" name="lbl_cmd_point"><property name="text"><string>Point</string></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+        <item><widget class="QPushButton" name="ccd_goto"><property name="text"><string>Point telescope</string></property><property name="toolTip"><string>Point the telescope at the object's position for tonight. With the astrometric goto ticked it also solves the plate and corrects the pointing, which absorbs the ephemeris' error and is the reliable route for preliminary orbits</string></property></widget></item>
+        <item><widget class="QCheckBox" name="ccd_sync"><property name="text"><string>Astrometric goto</string></property><property name="toolTip"><string>Solve the plate and correct the pointing after the slew, instead of trusting the ephemeris alone. It needs a plate solver configured in Settings</string></property></widget></item>
+        <item><spacer name="hsp_point"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="cmd_capture"><property name="spacing"><number>8</number></property>
+        <item><widget class="QLabel" name="lbl_cmd_capture"><property name="text"><string>Capture</string></property><property name="minimumSize"><size><width>70</width><height>0</height></size></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+        <item><widget class="QLabel" name="lbl_wheel"><property name="text"><string>Filter</string></property></widget></item>
+        <item><widget class="QComboBox" name="cmb_ccd_filter"/></item>
+        <item><widget class="QPushButton" name="ccd_push"><property name="text"><string>Send plan</string></property><property name="toolTip"><string>Prepare the current project's saved plan (object, frames × exposure, filter, binning, gain, offset, dither) in the observatory software and read it back to show what it is really holding. The autofocus cadence travels with the exported sequence instead, and the dark and bias steps run after the lights</string></property></widget></item>
+        <item><widget class="QPushButton" name="ccd_start"><property name="text"><string>Start capture</string></property><property name="toolTip"><string>Start the staged capture in the observatory software. With "Follow the object" ticked it runs the night in passes instead of one block</string></property></widget></item>
+        <item><widget class="QCheckBox" name="ccd_follow"><property name="text"><string>Follow the object</string></property><property name="toolTip"><string>Run the night in passes instead of one block: each one captures as many frames as fit before the object reaches the edge of the field, then the telescope points again at its fresh position and the next starts. Needs a moving object and a plate solver</string></property></widget></item>
+        <item><spacer name="hsp_capture"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item><widget class="QLabel" name="ccd_staged"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+
+      <!-- the follow run's progress -->
+      <item>
+       <widget class="QWidget" name="follow_box">
+        <property name="visible"><bool>false</bool></property>
+        <layout class="QVBoxLayout" name="vbox_follow"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property><property name="spacing"><number>4</number></property>
+         <item><widget class="QLabel" name="follow_label"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+         <item><widget class="QProgressBar" name="follow_bar"><property name="value"><number>0</number></property></widget></item>
+        </layout>
+       </widget>
+      </item>
+
+      <!-- the last frame the observatory wrote -->
+      <item>
+       <widget class="QWidget" name="capture_preview">
+        <property name="visible"><bool>false</bool></property>
+        <layout class="QHBoxLayout" name="hbox_preview"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property><property name="spacing"><number>10</number></property>
+         <item><widget class="QLabel" name="capture_preview_img"><property name="text"><string>Waiting for the first frame…</string></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="minimumSize"><size><width>200</width><height>200</height></size></property><property name="maximumSize"><size><width>200</width><height>200</height></size></property><property name="styleSheet"><string notr="true">background: #171a26; border: 1px solid #232736; border-radius: 6px; color: #8a90a6; font-size: 11px;</string></property></widget></item>
+         <item><layout class="QVBoxLayout" name="vbox_preview">
+          <item><widget class="QLabel" name="capture_caption"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
+          <item><widget class="QPushButton" name="capture_open"><property name="text"><string>Open in the editor</string></property><property name="toolTip"><string>Load this frame in the image workbench to measure, annotate or calibrate it. It is the frame on disk, not a copy</string></property></widget></item>
+          <item><spacer name="hsp_preview"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+         </layout></item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

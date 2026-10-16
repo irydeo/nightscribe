@@ -20,9 +20,48 @@ from . import markdown
 from .ui_loader import adopt_ui
 
 # The docs live at the repo root (source) or bundled (PyInstaller); the
-# browser lists every .md file and renders the selected one in a
-# QTextBrowser, so the reader never leaves the application (ADR-013:
-# documentation belongs to the project, this is its GUI door).
+# browser renders the selected .md in a QTextBrowser, so the reader never
+# leaves the application (ADR-013: documentation belongs to the project,
+# this is its GUI door).
+#
+# WHAT THE TREE SHOWS (ADR-070 rev, 2026-10-16). The manual opens on the
+# user guide: that is what the observer came for. Under it, the two topic
+# documents the app's own "?" buttons open are part of the manual too.
+# Everything else (the topic documents for enthusiasts and the design
+# decisions) lives behind its own COLLAPSED "Advanced documentation"
+# branch: reachable, but never in the way of a first read. The work plans
+# (docs/PLANS) are not listed at all: they are the project's own notebooks.
+
+# Topic docs the app opens from a "?" button, so they belong to the manual.
+_REFERENCED = ("UFE", "SEQUENCES")
+
+# The advanced guide's topic documents, in reading order. Their titles come
+# from each file's own H1, so a renamed document cannot drift from the list.
+_ADVANCED = ("ARCHITECTURE", "DESIGN", "WORKFLOWS", "DEVELOPING",
+             "DATA_SOURCES", "SCORING", "ORBITS", "CAMPAIGNS", "HADS",
+             "PHOTOMETRY", "SEQUENCES", "ASTROMETRY", "PRECISION", "SNR",
+             "UFE", "UI_EXPORTS", "VIZ", "MPC_SUBMISSION",
+             "unified-fits-editor")
+
+
+def _lang_of(path):
+    # @args: path - a doc file name or a path
+    # @return: "es" when it is the Spanish twin, "en" otherwise
+    return "es" if str(path).endswith(".es.md") else "en"
+
+
+def _pick(folder, stem, lang):
+    # @args: folder - where the doc lives, stem - its name without ".md",
+    #        lang - "en" | "es"
+    # @return: the file to read: this language's twin, or the other one when
+    #          the document has only one language (better than hiding it)
+    order = ((f"{stem}.es.md", f"{stem}.md") if lang == "es"
+             else (f"{stem}.md", f"{stem}.es.md"))
+    for name in order:
+        cand = folder / name
+        if cand.is_file():
+            return cand
+    return None
 
 _TREE_STYLE = (
     "QDialog { background: #171a26; }"
@@ -52,11 +91,16 @@ class DocViewer(QDialog):
     # inside the browser, http(s) links go to the OS browser.
     # @args: docs_root - folder that contains the docs, parent - window
 
-    def __init__(self, docs_root, parent=None):
+    def __init__(self, docs_root, parent=None, lang=None):
         super().__init__(parent)
         self._root = Path(docs_root)
         self._current = None
-        self.setWindowTitle(self.tr("Technical Documentation"))
+        # the language of the tree: the app's own when the caller says so,
+        # else read from the file it was asked to open (the "?" doors know
+        # which twin they want)
+        self._lang = lang or "en"
+        self._default = None
+        self.setWindowTitle(self.tr("Documentation"))
         self.resize(1100, 760)
         self.setStyleSheet(_TREE_STYLE)
 
@@ -79,22 +123,59 @@ class DocViewer(QDialog):
     # ---- tree -------------------------------------------------------------
 
     def _fill_tree(self):
-        # Groups the files: top-level docs first, then subfolders (adr/).
-        files = sorted(f for f in self._root.iterdir()
-                       if f.is_file() and f.suffix == ".md")
-        dirs = sorted(d for d in self._root.iterdir() if d.is_dir())
-        for f in files:
-            self._add_item(self._tree.invisibleRootItem(), f)
-        for d in dirs:
-            if not any(p.is_file() and p.suffix == ".md"
-                       for p in d.rglob("*")):
-                continue
-            dir_item = QTreeWidgetItem([d.name])
-            dir_item.setData(0, Qt.UserRole, None)
-            self._tree.addTopLevelItem(dir_item)
-            for f in sorted(d.rglob("*.md")):
-                self._add_item(dir_item, f)
-        self._tree.expandAll()
+        # The manual first (expanded), then the advanced guide (collapsed).
+        # Only ONE language is listed: the reader asked for their own.
+        user = self._root / "user"
+        if user.is_dir():
+            branch = self._branch(self.tr("User guide"), expanded=True)
+            for path in self._language_files(user):
+                self._add_item(branch, path)
+            self._default = _pick(user, "README", self._lang)
+        # the topic docs the app's own "?" buttons open: manual material
+        for stem in _REFERENCED:
+            path = _pick(self._root, stem, self._lang)
+            if path:
+                self._add_item(self._tree.invisibleRootItem(), path)
+        # the advanced guide: the topic documents and the design decisions
+        advanced = self._branch(self.tr("Advanced documentation"))
+        for stem in _ADVANCED:
+            path = _pick(self._root, stem, self._lang)
+            if path:
+                self._add_item(advanced, path)
+        adr = self._root / "adr"
+        if adr.is_dir():
+            adr_branch = self._branch(self.tr("Design decisions"),
+                                      expanded=False)
+            for path in self._language_files(adr):
+                self._add_item(adr_branch, path)
+
+    def _branch(self, name, expanded=False):
+        # @args: name - the branch label, expanded - open it right away
+        # @return: the new top-level branch item (no file behind it)
+        item = QTreeWidgetItem([name])
+        item.setData(0, Qt.UserRole, None)
+        self._tree.addTopLevelItem(item)
+        item.setExpanded(expanded)
+        return item
+
+    def _language_files(self, folder):
+        # @args: folder - a docs folder
+        # @return: one file per document, this language's twin when it
+        #          exists, README first and the numbered chapters in order
+        stems = []
+        for f in sorted(folder.glob("*.md")):
+            stem = f.name[:-len(".md")]
+            if stem.endswith(".es"):
+                stem = stem[:-len(".es")]
+            if stem not in stems:
+                stems.append(stem)
+        stems.sort(key=lambda s: (s != "README", s))
+        out = []
+        for stem in stems:
+            path = _pick(folder, stem, self._lang)
+            if path:
+                out.append(path)
+        return out
 
     def _add_item(self, parent, path):
         # @args: parent - target tree branch, path - the .md file
@@ -149,10 +230,19 @@ class DocViewer(QDialog):
         return self._render(path)
 
     def default_file(self):
-        # First top-level markdown file in the tree (WORKFLOWS in practice).
-        item = self._tree.topLevelItem(0)
-        data = item.data(0, Qt.UserRole)
-        return Path(data) if data else None
+        # @return: the manual's own index (README) when it is there, else the
+        #          first file the tree offers
+        if self._default is not None and self._default.is_file():
+            return self._default
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            data = item.data(0, Qt.UserRole)
+            if data:
+                return Path(data)
+            if item.childCount():
+                child = item.child(0)
+                return Path(child.data(0, Qt.UserRole))
+        return None
 
     def _on_item(self, item, _col):
         path = item.data(0, Qt.UserRole)
@@ -174,11 +264,15 @@ class DocViewer(QDialog):
         QDesktopServices.openUrl(url)
 
 
-def open_browser(docs_root, parent, start=None):
+def open_browser(docs_root, parent, start=None, lang=None):
     # Shows the documentation browser (modal).
     # @args: docs_root - docs folder, parent - main window,
-    #        start - initial .md file or None
-    dialog = DocViewer(docs_root, parent)
+    #        start - initial .md file or None,
+    #        lang - "en" | "es" for the tree; when omitted it is read from
+    #        the file being opened (the "?" doors pass the twin they want)
+    if lang is None and start is not None:
+        lang = _lang_of(start)
+    dialog = DocViewer(docs_root, parent, lang=lang)
     if not (start and dialog.show_file(start)):
         first = dialog.default_file()
         if first:

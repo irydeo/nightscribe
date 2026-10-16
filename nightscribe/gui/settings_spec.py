@@ -120,6 +120,9 @@ FIELDS = [
     Field("spn_limit_mag", "limit_mag", "float"),
     Field("spn_pixel_um", "pixel_um", "float"),
     Field("spn_focal_mm", "focal_mm", "float"),
+    # Which wheel slot blocks the light (2026-10-16): the darks and the bias
+    # of the capture plan are taken through it
+    Field("cmb_dark_filter", "obs_dark_filter", "combo_text"),
     Field("spn_cam_full_well", "cam_full_well_e", "float", zero_none=True),
     Field("spn_cam_linearity", "cam_linearity_adu", "float", zero_none=True),
     Field("spn_cam_gain", "ccd_gain", "float", zero_none=True),
@@ -171,6 +174,11 @@ FIELDS = [
     # items carry the id as data and are filled in code (QUiLoader does not
     # read userData from a .ui; ADR-005).
     Field("cmb_astro_gpu_backend", "astrometry_gpu_backend", "combo"),
+    # The catalogue the positions are referred to and the MPC report declares
+    # in its NET line: the items are the ADES codes (from
+    # core.mpc_astrometry._NET_DESC) and are filled in code for the same
+    # reason as the backend's.
+    Field("cmb_astro_astcat", "astrometry_astcat", "combo"),
     Field("spn_astro_fallback_margin", "astrometry_fallback_margin_px",
           "int"),
     Field("spn_astro_disagree_arcsec", "astrometry_disagree_arcsec", "float"),
@@ -185,6 +193,7 @@ FIELDS = [
     # Which observatory software the Capture step drives (ADR-081). The combo
     # items carry the backend id as data (ccdciel/nina), filled in the .ui.
     Field("cmb_obs_backend", "observatory_backend", "combo"),
+    Field("chk_obs_astro_goto", "observatory_astro_goto", "bool"),
     Field("edt_ccdciel_host", "ccdciel_host", "str"),
     Field("spn_ccdciel_port", "ccdciel_port", "int"),
     Field("chk_ccdciel_auto", "ccdciel_auto_connect", "bool"),
@@ -208,6 +217,7 @@ FIELDS = [
     # --- Interface -----------------------------------------------------
     Field("chk_animations", "ui_animations", "bool"),
     Field("chk_ufe_bar_icons", "ufe_bar_icons", "bool"),
+    Field("chk_ufe_north_up", "ufe_north_up", "bool"),
     Field("edt_observer", "observer_name", "str"),
     Field("edt_measurer", "measurer_name", "str"),
     Field("edt_observer_email", "observer_email", "str"),

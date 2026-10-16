@@ -24,6 +24,8 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QSize  # noqa: E402
+
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 MONO = FIXTURES / "sn2026zji_new_image.fits"
 
@@ -159,6 +161,72 @@ def test_dn_x_roundtrip(strip):
     dn = strip._state.d_min + 0.3 * (strip._state.d_max -
                                      strip._state.d_min)
     assert canvas.x_to_dn(canvas.dn_to_x(dn)) == pytest.approx(dn, rel=1e-4)
+
+
+def test_the_row_wears_the_editor_glyphs(strip):
+    # The strip's buttons use the same 16 px glyph set as the editor's top bar,
+    # so the two read as one instrument. Auto and Invert keep their word (this
+    # is a panel, where the house rule is that the label stays); the mirror
+    # pair is icon-only because the "Mirror:" label right before it already
+    # says what they are and their words were the widest of the row.
+    for btn in (strip.btn_auto, strip.btn_invert, strip.btn_flip_h,
+                strip.btn_flip_v):
+        assert not btn.icon().isNull(), btn.objectName() or btn.text()
+        assert btn.iconSize() == QSize(16, 16)
+    assert strip.btn_auto.text() == "Auto"
+    assert strip.btn_invert.text() == "Invert"
+    assert strip.btn_flip_h.text() == ""
+    assert strip.btn_flip_v.text() == ""
+
+
+def test_a_missing_glyph_falls_back_to_the_word(qapp, monkeypatch):
+    # The bar's own bargain: a missing asset is not an error, it is a text
+    # button. It matters most for the icon-only pair: with no glyph AND no
+    # word the button would be a riddle.
+    from pathlib import Path
+    from nightscribe.gui import theme
+    from nightscribe.gui.ufe_state import UfeImageState
+    from nightscribe.gui.widgets.histogram_widget import HistogramWidget
+    monkeypatch.setattr(theme, "asset",
+                        lambda name: Path("/nowhere") / name)
+    w = HistogramWidget(UfeImageState())
+    for btn in (w.btn_auto, w.btn_invert, w.btn_flip_h, w.btn_flip_v):
+        assert btn.icon().isNull()
+    assert w.btn_auto.text() == "Auto"
+    assert w.btn_invert.text() == "Invert"
+    assert w.btn_flip_h.text() == "Left-right"
+    assert w.btn_flip_v.text() == "Up-down"
+    w.deleteLater()
+
+
+def test_every_button_without_a_word_has_a_tooltip(strip):
+    # The rule the glyphs must not break: an icon with no label is a riddle,
+    # so a button that shows no word has to say what it does on hover.
+    for btn in (strip.btn_auto, strip.btn_invert, strip.btn_flip_h,
+                strip.btn_flip_v):
+        if not btn.text():
+            assert btn.toolTip(), "a wordless button with no tooltip"
+
+
+def _glyph(btn):
+    # @args: btn - a button
+    # @return: its glyph as raw pixels. QIcon.cacheKey() is a per-INSTANCE
+    #          handle (a new QIcon always has a new key), so it cannot say
+    #          whether two icons show the same drawing: the pixels can.
+    return bytes(btn.icon().pixmap(16, 16).toImage().constBits())
+
+
+def test_the_toggle_glyph_follows_its_state(strip):
+    # _on is the accent glyph and _off the dim one with a slash (the house
+    # convention): the state is SEEN and not guessed, which matters because
+    # the sheet does not paint QPushButton:checked.
+    for btn in (strip.btn_invert, strip.btn_flip_h, strip.btn_flip_v):
+        off = _glyph(btn)
+        btn.setChecked(True)
+        on = _glyph(btn)
+        assert on != off
+        btn.setChecked(False)
+        assert _glyph(btn) == off
 
 
 def test_strip_has_room_for_its_rows(strip):

@@ -17,18 +17,24 @@ elección desconecta el otro. En ambos casos, una condición: el programa tiene
 que estar **abierto** (y, para NINA/PINS, su plugin Advanced API instalado y
 activo); NightScribe habla con su API, no con los drivers.
 
-Desde el paso **Captura** de un proyecto:
+Desde el paso **Captura** de un proyecto lo lleva la consola **Observatory**. Su
+estado va arriba (quién responde, el estado de la montura, la temperatura, la
+versión) con el **STOP** rojo siempre a mano, y sus mandos son tres verbos y dos
+casillas:
 
-- **Conectar CCDciel** / **Conectar NINA / PINS** muestra el estado del
-  observatorio (montura, rueda de filtros, cámara) en el panel.
-- **Apuntar telescopio** hace un slew a la posición recién calculada del
-  objetivo.
-- **Goto astrométrico** hace slew, resuelve la placa y corrige a la posición
-  real del cielo: la vía fiable para una órbita preliminar.
-- **Detener goto** para el movimiento del telescopio **ahora mismo**. Se arma
-  en el instante en que pulsas cualquiera de los dos botones de apuntado y se
-  desarma cuando el apuntado termina: úsalo si la montura se va a un sitio
-  equivocado.
+- **Conectar CCDciel** / **Conectar NINA / PINS** es la única entrada, y muestra
+  el estado del observatorio (montura, rueda de filtros, cámara) en el panel. El
+  botón pequeño de encendido que hay junto al estado desconecta; el estado se
+  refresca solo cada par de segundos.
+- **Apuntar el telescopio** hace un slew a la posición recién calculada del
+  objetivo. Con **Goto astrométrico** marcado además resuelve la placa y corrige
+  a la posición real del cielo: la vía fiable para una órbita preliminar. La
+  casilla es una preferencia (su valor por defecto vive en Ajustes →
+  Integraciones) y se recuerda entre sesiones.
+- **STOP** para el movimiento del telescopio **ahora mismo**. Se arma en el
+  instante en que la montura empieza a moverse (un giro, un goto astrométrico o
+  un seguimiento) y se desarma cuando termina: úsalo si la montura se va a un
+  sitio equivocado.
 - **Enviar plan** prepara el plan (objeto, tomas × exposición, filtro, binning,
   ganancia, offset, dither) en el software y **lo lee de vuelta** (incluidos el
   binning y el dither que de verdad tiene), así que el panel muestra lo que
@@ -36,9 +42,10 @@ Desde el paso **Captura** de un proyecto:
   rango, una rueda que rechaza la ranura) se avisa **sin abortar el plan**: el
   objeto, la exposición y el recuento llegan siempre. Si el filtro del plan no
   está en tu rueda, el filtro se deja como está y la lectura de vuelta lo dice.
-- **Iniciar captura** lo lanza, y **el mismo botón la para** mientras el run
+- **Empezar la captura** lo lanza, y **el mismo botón la para** mientras el run
   está en marcha («Parar captura»): para la **cámara**, no la montura (eso es
-  Detener goto).
+  STOP). Con **Seguir el objeto** marcado corre la noche en pasadas en lugar de
+  un bloque (ver abajo), y el botón pasa a «Parar el seguimiento».
 - La lista de filtros de la tarjeta **Exposure plan** es la que tiene tu rueda
   de verdad (se lee del programa al conectar); solo cuando no hay nada
   conectado aparece la lista clásica L/R/G/B/Ha/OIII/SII.
@@ -90,6 +97,16 @@ Los valores viajan con la secuencia exportada (`.targets` de CCDciel, JSON de
 NINA) y, donde la API lo permite, se aplican en vivo; la cadencia completa de
 autofocus vive en el fichero de secuencia.
 
+Al final del mismo bloque están los **darks** y el **bias** de la noche
+(cuántos, la exposición del dark y **la ranura de rueda que usa cada uno**). Se
+ejecutan **al final**, después de las luces, en ese orden. La ranura importa: un
+dark se toma con el camino de luz bloqueado, así que no debe ir por el filtro
+que usaron las luces. Los dos arrancan en la **ranura oscura** que fijes en
+Ajustes → Equipo (`Dark` por convención) y puedes cambiar cualquiera de las dos
+para una noche concreta aquí. Los cuatro exports los llevan: CCDciel y la
+secuencia nativa de NINA como pasos reales (`DARK`/`BIAS`), el resumen de NINA en
+su lista `Calibration` y el CSV como filas con una columna `type`.
+
 ### Valores sugeridos, y por qué
 
 Cuando un proyecto todavía no tiene plan, los bloques **Exposure plan** y
@@ -126,12 +143,12 @@ lightpollutionmap.info), **Consultar** la rellena desde el atlas; sin clave,
 léela del mapa (el botón lo abre en tu sitio). Es el valor cenital y un modelo,
 así que tómalo como un buen punto de partida, no como una promesa.
 
-### Iniciar y seguir: N observaciones sin re-apuntar a mano
+### Seguir el objeto: N observaciones sin re-apuntar a mano
 
 Un objeto rápido se sale del campo: captúralo sin más y la mitad de la serie
-acaba sin él. **Iniciar y seguir…** (en el paso Captura, para un objeto en
-movimiento y con conexión) pide un **número de observaciones** y lleva el run
-entero: cada observación captura tantas tomas como caben antes de que el objeto
+acaba sin él. **Seguir el objeto** (una casilla de la consola, para un objeto en
+movimiento y con conexión) más **Empezar la captura** pide un **número de
+observaciones** y lleva el run entero: cada observación captura tantas tomas como caben antes de que el objeto
 llegue al borde del campo (el mismo cruce por el que se acota el recuento),
 luego el telescopio vuelve a apuntar a la **posición nueva** del objeto y empieza
 la siguiente. La app sigue al objeto por el cielo, observación a observación, y
@@ -187,19 +204,25 @@ CCDciel se respeta el recuento.
 
 ## Calibración: bias, darks y flats
 
-La pestaña **Calibración** del editor FITS gestiona una **biblioteca de
-masters** y la receta de cada visita.
+La pestaña **Calibración** del editor FITS gestiona la **biblioteca de
+masters** y la receta de cada visita. La biblioteca vive en **Ajustes →
+Medida**, su única casa: la pestaña la lee, resuelve la receta contra la
+primera toma de la visita, y **Ajustes de calibración…** es la puerta hacia
+allí. **Calibrar la visita** es una pasada puntual sobre las tomas de la
+visita, no el interruptor que calibra el apilado: cada motor que aplica la
+calibración tiene su propia casilla en su propia pestaña, y la de Astrometría
+(**Aplicar la calibración**) es de tres estados, con la biblioteca decidiendo
+hasta que tú eliges.
 
-La biblioteca se indexa, no se copia: señalas tus FITS maestros y la app lee
+La biblioteca se indexa, no se copia: señalas tus FITS masters y la app lee
 de sus cabeceras lo que los hace válidos (cámara, ganancia, temperatura,
-exposición, filtro). Al indexar declaras qué *es* cada fichero:
-
-- **Bias**: el offset electrónico de lectura (exposición cero).
-- **Dark**: corriente térmica, a la misma exposición que las luces. *Un dark
-  ya incluye el bias*, así que con dark no hace falta bias aparte. Un «dark
-  de flats» (a la exposición de los flats) es un dark: se indexa como
-  **Dark** con su exposición, no como un cuarto tipo.
-- **Flat**: por filtro, normalizado.
+exposición, filtro). **Qué es cada fichero lo dice su propia cabecera**
+(`IMAGETYP`): **Bias**, **Dark** o **Flat**. Solo cuando la cabecera calla
+decide la exposición, y de forma estrecha: en cero es un bias, y de cinco
+segundos en adelante es un dark; lo de en medio no se adivina, y una toma de
+luz se rechaza sola. Son **tres tipos, no cuatro**: un «dark de flats» es un
+**Dark** a la exposición del flat, y la exposición es lo que el emparejamiento
+ya mira.
 
 > **¿Por qué calibrar?** Porque tu sensor miente de tres maneras conocidas y
 > repetibles: añade un pedestal electrónico a cada píxel (bias), acumula
@@ -214,21 +237,70 @@ exposición, filtro). Al indexar declaras qué *es* cada fichero:
 > color. Un flat de V no corrige un R: la sombra de la misma mota cae en otro
 > sitio si la rueda aparca distinto.
 
-**La receta de la visita**: al abrir el editor desde una visita, la app
-resuelve qué master de la biblioteca usa cada pieza, leyendo la cabecera del
-primer frame, y avisa de lo que falte (Avisos). **Calibrar la visita**
-aplica la receta a todos los frames; la calibración trabaja en memoria y
-solo escribe copias FITS si marcas la exportación.
+**Con qué se empareja cada pieza**, y por qué no con más:
 
-**Si no tienes flat para un filtro**: la opción *Model the vignetting from
-the frames* muestrea el cielo en una rejilla de teselas sobre una veintena
-de tomas repartidas y ajusta una superficie suave a lo que tienen en común:
-el viñeteo del tren, que está fijo en el fotograma. Las teselas que una
-estrella, una galaxia o una mota desplazan fuera de la tendencia las tira el
-propio ajuste, así que ninguna fuente acaba en el modelo. Corrige el
-**viñeteo** (el sistemático que importa, alrededor de una décima de
-magnitud) y **no el polvo**: una superficie suave no tiene estructura fina, y
-para eso está un master real. Se llama modelo y no flat por eso mismo.
+- **Dark**: cámara, ganancia, temperatura del sensor dentro de la tolerancia
+  (por defecto **±3 °C**, en Ajustes → Medida) y **exposición exacta**. La
+  corriente térmica es el nivel, así que los cuatro importan.
+- **Bias**: cámara y ganancia. Es el pedestal de lectura y apenas se mueve con
+  la temperatura del sensor.
+- **Flat**: cámara y filtro **solo**. Su forma es la del tren óptico y su nivel
+  se normaliza, así que la ganancia y la temperatura se dejan fuera del
+  emparejamiento a propósito: exigirlas rechazaba flats reales.
+- Al flat se le quita antes su propio offset: un **dark a la exposición del
+  flat** (el mismo pozo de darks), o el **bias** cuando el flat es corto.
+
+**La biblioteca dice por qué.** Cuando un master que ves no se usa, la receta
+nombra el más cercano de ese tipo con el criterio que falló y los números («un
+dark, pero a −16 °C frente a −10 °C, tolerancia 3 °C»), así que «por qué no usa
+mi dark» tiene respuesta en vez de un encogimiento de hombros. Un flat de más
+de **30 días** se usa pero se avisa: el polvo del tren se mueve y una mota
+puede haber aparecido o desaparecido.
+
+**Cada master tiene dueño.** Un master construido con las tomas de un proyecto
+es de ese proyecto; un bias o un flat se pueden **compartir** con todos los
+proyectos. La receta prueba primero los masters del propio proyecto y los
+compartidos como respaldo, y nunca alcanza por accidente el de otro proyecto;
+uno que el proyecto no posee se marca como **«(compartido)»** en la línea de
+la receta, para que sepas que esos píxeles no son de tus noches. Un proyecto
+también puede **usar el master de otro proyecto** con un **enlace** (una
+segunda fila sobre el mismo fichero, nunca una copia), y borrar un master quita
+su fila mientras el fichero se queda en cuanto otra fila lo use.
+
+**La app puede construir los masters.** **Construir maestros…** toma una
+carpeta de tomas de calibración, clasifica cada una por su cabecera, las
+agrupa por la misma clave con la que empareja la receta (la temperatura del
+dark redondeada al grado, así que una noche de darks es un master y no un
+puñado), combina cada grupo con la **mediana** y escribe el master en la
+carpeta de la biblioteca. Un grupo de una sola toma se avisa: es una copia de
+esa toma, no una media. Los originales se borran solo si lo pides, y solo
+después de que cada master esté escrito **e** indexado, así que una
+construcción que falla a medias los deja donde estaban. **Usar el maestro de
+otro proyecto…** enlaza uno.
+
+**La receta de la visita**: al abrir el editor desde una visita, la app
+resuelve qué master de la biblioteca usa cada pieza, leyendo la cabecera de la
+primera toma, y avisa de lo que falte (**Qué falta, y por qué**). **Calibrar
+la visita** aplica la receta a todas las tomas; la calibración trabaja en
+memoria y solo escribe copias FITS si marcas la exportación. Esas copias van a
+la subcarpeta **`calibrados/`** del proyecto y se registran en la visita como
+cualquier otro producto. Cada copia lleva la tarjeta **NSCALIB**: si vuelve a
+entrar en un run, la app ve que ya está limpia y **no** le resta el dark ni le
+divide el flat otra vez (una toma doblemente calibrada no tiene señal visible
+en la imagen), y lo dicen tanto el run como la pestaña.
+
+**Si no tienes flat para un filtro**: la opción **Model the vignetting from
+the frames** (en Ajustes → Medida, su única casa; la pestaña solo la lee)
+muestrea el cielo en una rejilla de teselas sobre una veintena de tomas
+repartidas y ajusta una superficie suave a lo que tienen en común: el viñeteo
+del tren, que está fijo en el fotograma. Las teselas que una estrella, una
+galaxia o una mota desplazan fuera de la tendencia las tira el propio ajuste,
+así que ninguna fuente acaba en el modelo. Corrige el **viñeteo** (el
+sistemático que importa, alrededor de una décima de magnitud) y **no el
+polvo**: una superficie suave no tiene estructura fina, y para eso está un
+master real. Se llama modelo y no flat por eso mismo, y **un flat real siempre
+gana**: el modelo es solo el respaldo para los filtros para los que la
+biblioteca no tiene flat.
 
 > **¿Por qué basta una superficie suave?** Porque el viñeteo es suave y vale
 > 0,087 mag, mientras que el polvo vale 0,026 mag: medido contra un master
@@ -237,6 +309,12 @@ para eso está un master real. Se llama modelo y no flat por eso mismo.
 > estrellas se muevan, porque las teselas que estropean se descartan solas.
 > Lo puedes abrir con **Ver el modelo** y juzgarlo: tiene que ser una
 > superficie lisa, sin ninguna estrella ni mota.
+
+Una cosa de la que depende el modelo: se construye de las tomas **con el mismo
+dark o bias restado que la luz**. Sin él, el pedestal se queda dentro y
+comprime la forma del modelo, así que corrige solo parte del viñeteo (la
+corrección cae a alrededor del 44 % de lo que debería); la app lo dice y te
+pide indexar un bias para esa cámara.
 
 ## Para saber más
 

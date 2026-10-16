@@ -1,0 +1,360 @@
+<!doctype html>
+<!--
+  NightScribe · Ventana de visita, rediseño — mockup navegable para validación.
+  Fichero único, autocontenido, sin dependencias. NO es código de la app:
+  reproduce la paleta real de gui/theme.py para validar el flujo y el aspecto
+  antes de tocar gui/ui/visit_window.ui y gui/widgets/visits_panel.py.
+
+  Diseño aprobado: cabecera con la fecha fija (se cambia desde el menú ⋯) y el
+  nombre editable; la acción héroe; los RESULTADOS de la visita en una lista
+  (runs, reportes, cartas, magnitudes) y los FICHEROS de la noche en un bloque
+  plegado aparte; notas y cerrar.
+
+  Estados: Con contenido · Ficheros abiertos · Vacía · Menú ⋯ abierto.
+  Paleta: C_BG #0f121c · C_BASE #12141f · C_PANEL #171a26 · C_LINE #232736 ·
+          C_EDGE #3a4156 · C_SEL #2f4d80 · C_TEXT #e8eaf2 · C_TEXT_DIM #8a90a6 ·
+          C_ACCENT #6ab0ff · C_WARN #f76808 · C_GOOD #46a758
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe · Ventana de visita (mockup)</title>
+<style>
+  :root{
+    --bg:#0f121c; --base:#12141f; --panel:#171a26; --line:#232736; --edge:#3a4156;
+    --sel:#2f4d80; --text:#e8eaf2; --dim:#8a90a6; --accent:#6ab0ff;
+    --warn:#f76808; --good:#46a758; --hover:#212739; --row-hover:#1a1f30;
+    --neo:#4484ef; --sn:#e5484d;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;cursor:pointer}
+
+  /* ---- barra de mockup (solo validación, no existe en la app) ---- */
+  .mockbar{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:6px 12px;background:#07080d;border-bottom:1px dashed #3a4156;
+    font-size:11px;color:var(--dim);
+  }
+  .mockbar b{color:var(--warn);letter-spacing:.08em}
+  .mockbar button{
+    background:var(--panel);border:1px solid var(--edge);border-radius:4px;
+    padding:3px 10px;font-size:11px;color:var(--text);
+  }
+  .mockbar button:hover{background:var(--hover)}
+  .mockbar button.on{border-color:var(--accent);color:var(--accent)}
+
+  .stage{display:flex;justify-content:center;padding:28px 12px}
+
+  /* ---- la ventana de visita ---- */
+  .win{
+    width:560px;max-width:100%;background:var(--panel);
+    border:1px solid var(--edge);border-radius:10px;position:relative;
+    box-shadow:0 12px 40px rgba(0,0,0,.5);
+  }
+  .win-title{
+    display:flex;align-items:center;gap:8px;padding:9px 12px;
+    border-bottom:1px solid var(--line);color:var(--dim);font-size:12px;
+  }
+  .win-title .dot{width:10px;height:10px;border-radius:5px;background:var(--neo)}
+  .win-body{padding:12px 14px 10px}
+
+  /* cabecera: la fecha (fija) + el nombre + pin + menú */
+  .head{display:flex;align-items:center;gap:10px}
+  .date{font-weight:700;font-size:15px;white-space:nowrap}
+  .name{
+    flex:1;min-width:0;background:var(--base);border:1px solid var(--line);
+    border-radius:6px;padding:6px 9px;color:var(--text);
+  }
+  .name:focus{outline:none;border-color:var(--accent)}
+  .name::placeholder{color:var(--dim)}
+  .iconbtn{
+    background:transparent;border:1px solid var(--line);border-radius:6px;
+    width:30px;height:30px;display:grid;place-items:center;color:var(--dim);
+  }
+  .iconbtn:hover{background:var(--hover);color:var(--text)}
+  .iconbtn.on{color:var(--accent);border-color:var(--accent)}
+  .savedline{height:16px;margin-top:3px;font-size:11px;color:var(--good)}
+
+  /* la fila de acciones: una héroe + añadir */
+  .actions{display:flex;gap:10px;margin:10px 0 4px}
+  .hero{
+    background:linear-gradient(180deg,#5a93f2,#4484ef);color:#0d1424;
+    border:2px solid #6f9ef2;border-radius:12px;padding:12px 16px;
+    font-size:15px;font-weight:700;
+  }
+  .hero:hover{background:#5a93f2}
+  .secondary{
+    background:transparent;border:2px solid var(--edge);border-radius:12px;
+    padding:12px 16px;font-size:15px;font-weight:700;color:var(--text);
+  }
+  .secondary:hover{background:var(--hover)}
+
+  /* los dos bloques: resultados (abierto) y ficheros (plegable) */
+  .block{margin-top:12px}
+  .block h3{
+    margin:0 0 6px;font-size:12px;font-weight:700;color:var(--dim);
+    letter-spacing:.04em;text-transform:uppercase;
+  }
+  .fold{
+    display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+    background:transparent;border:none;color:var(--dim);
+    font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;
+    padding:6px 4px;border-radius:6px;
+  }
+  .fold:hover{background:var(--hover);color:var(--text)}
+  .fold .arrow{transition:transform .12s}
+  .fold.open .arrow{transform:rotate(90deg)}
+
+  .row{
+    display:flex;align-items:center;gap:10px;padding:7px 9px;
+    border-radius:6px;border:1px solid transparent;
+  }
+  .row:hover{background:var(--row-hover);border-color:var(--line)}
+  .row .glyph{width:20px;text-align:center;color:var(--accent);flex:0 0 20px}
+  .row .main{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .kind{color:var(--dim);font-size:11px;margin-left:8px}
+  .row .when{color:var(--dim);font-size:11px;flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .row .caret{
+    color:var(--dim);border:none;background:transparent;width:22px;height:22px;
+    border-radius:4px;flex:0 0 22px;
+  }
+  .row .caret:hover{background:var(--hover);color:var(--text)}
+
+  /* el menú ⋯ de la cabecera y el contextual de una fila */
+  .menu{
+    position:absolute;background:var(--panel);border:1px solid var(--edge);
+    border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:5px;
+    min-width:210px;z-index:6;
+  }
+  .menu button{
+    display:block;width:100%;text-align:left;background:transparent;border:none;
+    border-radius:5px;padding:7px 10px;color:var(--text);
+  }
+  .menu button:hover{background:var(--hover)}
+  .menu button.danger{color:var(--sn)}
+  .menu .sep{height:1px;background:var(--line);margin:5px 4px}
+
+  .notes{margin-top:12px}
+  .notes textarea{
+    width:100%;min-height:70px;background:var(--base);border:1px solid var(--line);
+    border-radius:6px;padding:8px 9px;color:var(--text);resize:vertical;font:inherit;
+  }
+  .notes textarea:focus{outline:none;border-color:var(--accent)}
+  .notes textarea::placeholder{color:var(--dim)}
+  .foot{display:flex;justify-content:flex-end;gap:10px;margin-top:10px}
+  .close{
+    background:var(--sel);border:1px solid var(--edge);border-radius:8px;
+    padding:8px 18px;color:var(--text);font-weight:600;
+  }
+  .close:hover{background:var(--hover)}
+
+  .empty-hint{
+    color:var(--dim);text-align:center;padding:18px 8px;font-size:12px;
+  }
+  .state{display:none}
+  .state.on{display:block}
+  .state .files{display:none}
+  .state .files.open{display:block}
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <b>MOCKUP</b> NightScribe · ventana de visita (rediseño)
+  <button data-s="full" class="on">Con contenido</button>
+  <button data-s="open">Ficheros abiertos</button>
+  <button data-s="empty">Vacía</button>
+  <button data-s="menu">Menú ⋯ abierto</button>
+</div>
+
+<div class="stage">
+<div class="win">
+  <div class="win-title"><span class="dot"></span> Visita · 2026 QK (NEO)</div>
+  <div class="win-body">
+
+    <!-- cabecera: la fecha se lee; se cambia desde el menú ⋯ -->
+    <div class="head">
+      <span class="date">2026-10-16</span>
+      <input class="name" value="primera pasada" placeholder="Nombre (opcional)">
+      <button class="iconbtn on" title="Fijar la visita">📌</button>
+      <button class="iconbtn" id="btn-more" title="Más">⋯</button>
+    </div>
+    <div class="savedline">Guardado</div>
+
+    <!-- el menú ⋯ de la cabecera -->
+    <div class="menu" id="headmenu" style="display:none;right:16px;top:78px">
+      <button>Cambiar la fecha…</button>
+      <div class="sep"></div>
+      <button class="danger">Borrar la visita…</button>
+    </div>
+
+    <!-- la fila de acciones: una héroe + añadir -->
+    <div class="actions">
+      <button class="hero">▶ Medir la posición…</button>
+      <button class="secondary">Añadir ficheros…</button>
+    </div>
+
+    <!-- ================= ESTADO: CON CONTENIDO ================= -->
+    <div class="state on" data-s="full">
+      <div class="block">
+        <h3>Resultados · 4</h3>
+        <div class="row">
+          <span class="glyph">⚑</span>
+          <span class="main">Run de astrometría<span class="kind">2 obs · completa</span></span>
+          <span class="when">21:40</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▤</span>
+          <span class="main">reporte_2026QK.psv<span class="kind">reporte MPC</span></span>
+          <span class="when">21:58</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▧</span>
+          <span class="main">carta_comparacion.png<span class="kind">carta</span></span>
+          <span class="when">22:31</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">◆</span>
+          <span class="main">12.34 ±0.05 (V)<span class="kind">medido</span></span>
+          <span class="when">22:05</span>
+          <button class="caret">⌄</button>
+        </div>
+      </div>
+
+      <div class="block files" id="files-full">
+        <button class="fold" data-fold="files-full"><span class="arrow">▸</span> Ficheros de la noche (12)</button>
+      </div>
+    </div>
+
+    <!-- ================= ESTADO: FICHEROS ABIERTOS ================= -->
+    <div class="state" data-s="open">
+      <div class="block">
+        <h3>Resultados · 4</h3>
+        <div class="row">
+          <span class="glyph">⚑</span>
+          <span class="main">Run de astrometría<span class="kind">2 obs · completa</span></span>
+          <span class="when">21:40</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▤</span>
+          <span class="main">reporte_2026QK.psv<span class="kind">reporte MPC</span></span>
+          <span class="when">21:58</span>
+          <button class="caret">⌄</button>
+        </div>
+      </div>
+
+      <div class="block files open" id="files-open">
+        <button class="fold open" data-fold="files-open"><span class="arrow">▸</span> Ficheros de la noche (12)</button>
+        <div class="row">
+          <span class="glyph">▦</span>
+          <span class="main">frame_0001.fits<span class="kind">placa · Clear · 60 s</span></span>
+          <span class="when">21:12</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▦</span>
+          <span class="main">frame_0002.fits<span class="kind">placa · Clear · 60 s</span></span>
+          <span class="when">21:14</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▦</span>
+          <span class="main">dark_0030.fits<span class="kind">placa · Dark · 60 s</span></span>
+          <span class="when">22:20</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▦</span>
+          <span class="main">frame_0003.fits<span class="kind">placa · Clear · 60 s</span></span>
+          <span class="when">21:16</span>
+          <button class="caret">⌄</button>
+        </div>
+        <div class="row">
+          <span class="glyph">▦</span>
+          <span class="main">… 8 más</span>
+          <span class="when"></span>
+          <button class="caret">⌄</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= ESTADO: VACÍA ================= -->
+    <div class="state" data-s="empty">
+      <div class="block">
+        <h3>Resultados · 0</h3>
+        <div class="empty-hint">
+          Nada todavía. «Añadir ficheros…» registra las placas de la noche;<br>
+          «Medir la posición…» apila y mide.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ESTADO: MENÚ CONTEXTUAL (cabecera) ============ -->
+    <div class="state" data-s="menu">
+      <div class="block">
+        <h3>Resultados · 4</h3>
+        <div class="row">
+          <span class="glyph">⚑</span>
+          <span class="main">Run de astrometría<span class="kind">2 obs · completa</span></span>
+          <span class="when">21:40</span>
+          <button class="caret">⌄</button>
+        </div>
+      </div>
+      <div class="block">
+        <h3 style="text-transform:none;color:var(--dim);font-weight:400">
+          El menú ⋯ de la cabecera lleva «Cambiar la fecha…» y «Borrar la visita…»,
+          que son las dos cosas que no se hacen todos los días.
+        </h3>
+      </div>
+    </div>
+
+    <!-- notas y pie -->
+    <div class="notes">
+      <textarea placeholder="Notas de la noche (seeing, nubes…)">Seeing 4/5, alguna nube alta al final.</textarea>
+    </div>
+    <div class="foot">
+      <button class="close">Cerrar</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  const btns = document.querySelectorAll(".mockbar button");
+  const states = document.querySelectorAll(".state");
+  const headmenu = document.getElementById("headmenu");
+  for (const b of btns) {
+    b.onclick = () => {
+      btns.forEach(x => x.classList.toggle("on", x === b));
+      states.forEach(s => s.classList.toggle("on", s.dataset.s === b.dataset.s));
+      headmenu.style.display = b.dataset.s === "menu" ? "block" : "none";
+    };
+  }
+  // el bloque de ficheros se pliega y despliega (como hará la ventana)
+  for (const f of document.querySelectorAll(".fold")) {
+    f.onclick = () => {
+      const box = document.getElementById(f.dataset.fold);
+      box.classList.toggle("open");
+      f.classList.toggle("open");
+    };
+  }
+  document.getElementById("btn-more").onclick = () => {
+    headmenu.style.display = headmenu.style.display === "block" ? "none" : "block";
+  };
+  document.querySelector(".name").addEventListener("change", () => {
+    document.querySelector(".savedline").textContent = "Guardado";
+  });
+</script>
+</body>
+</html>

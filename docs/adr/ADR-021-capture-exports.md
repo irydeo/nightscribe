@@ -188,3 +188,33 @@ la secuencia **nativa** (`SequenceRootContainer`, JSON.NET con `$type`/`$id`/
 se conserva como **«plan summary»** aparte (`*.plan.json`), para que nadie lo
 confunda con una secuencia cargable. La forma nativa está pinada contra el corpus
 de test de NINA y queda **pendiente de confirmar contra una NINA/PINS real**.
+
+**Enmienda (2026-10-16, los darks y el bias llevan su propia ranura).** Los pasos
+de calibración existían solo en el export de CCDciel y con el filtro `"Dark"` a
+fuego; en el plan eran tres contadores escondidos en «Opciones de captura». Un
+dark se toma con el **camino de luz bloqueado**, y eso es una **posición de la
+rueda**: escribir ahí el filtro de las luces le dice al observatorio que tome los
+darks a través del cristal del observador. Así que cada paso lleva su ranura
+(`darks.filter`, `bias.filter`), que arranca en la **ranura oscura** de Ajustes →
+Equipo (`obs_dark_filter`, por defecto `Dark`) y se puede cambiar por noche desde
+el propio plan. Los **cuatro** formatos dicen lo mismo: CCDciel (que ya los
+emitía) usa la ranura elegida, la secuencia nativa de NINA gana los pasos
+`DARK`/`BIAS` tras las luces (con su `SwitchFilter`, y el bias a exposición 0), el
+resumen de NINA los lista en `Metadata.Calibration` y el CSV añade una columna
+`type` **al final** (un parser que lea las siete primeras sigue funcionando) y una
+fila por fotograma de calibración. El orden es fijo: luces, darks, bias.
+
+**Amendment (2026-10-16, the darks and the bias carry their own slot).** The
+calibration steps existed only in the CCDciel export, with the filter `"Dark"`
+hardcoded, and in the plan they were three counters hidden inside "Capture
+options". A dark is taken with the **light path blocked**, and that is a
+**position on the wheel**: writing the lights' filter there tells the observatory
+to take the darks through the observer's glass. So each step carries its slot
+(`darks.filter`, `bias.filter`), which starts at the **dark slot** of Settings >
+Equipment (`obs_dark_filter`, `Dark` by default) and can be changed per night from
+the plan itself. All **four** formats say the same thing: CCDciel (which already
+emitted them) uses the chosen slot, the native NINA sequence gains the `DARK`/`BIAS`
+steps after the lights (with their `SwitchFilter`, the bias at exposure 0), the NINA
+summary lists them under `Metadata.Calibration` and the CSV adds a `type` column
+**at the end** (a parser that reads the first seven keeps working) plus one row per
+calibration frame. The order is fixed: lights, darks, bias.

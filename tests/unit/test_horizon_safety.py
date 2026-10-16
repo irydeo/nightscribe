@@ -211,6 +211,101 @@ def test_unblocked_object_keeps_full_altitude():
     assert vis["safe_max_alt"] == vis["max_alt"]
 
 
+# --- the recommended hour: safe by construction, even with a session ---
+
+def _ridge_horizon(az0=140, az1=220, top=80.0, floor=20.0):
+    # @return: a horizon with a ridge `top` deg tall across the south and a
+    #          `floor` elsewhere. The target's meridian crossing (its
+    #          highest altitude) sits behind the ridge, so the night breaks
+    #          into an eastern and a western safe span.
+    pts = [(az, top) for az in range(az0, az1 + 1, 10)]
+    pts += [(az, floor) for az in range(0, 360) if not (az0 <= az <= az1)]
+    return horizon.Horizon(pts)
+
+
+def _safe_at(h, ra, dec, t, margin=0.0):
+    # @return: True when the object clears the local horizon at instant t
+    alt, az = coords.current_altaz(ra, dec, LAT, LON, t)
+    return alt >= h.alt_at(az) + margin
+
+
+def test_best_time_with_a_session_never_leaves_the_safe_span():
+    # WITH a planned session and the peak behind the ridge, the clamp that
+    # keeps the whole session inside the safe span is exercised: the ideal
+    # start (centred on the blocked peak) falls outside the span and slides
+    # to its edge, silently. What the telescope depends on is that EVERY
+    # minute of the recommended session is safe, and that is what is checked
+    # here, sample by sample.
+    from nightscribe.core import planner
+    h = _ridge_horizon()
+    ra, dec = 0.0, 5.0
+    vis = planner._visibility(ra, dec, LAT, LON, DATE, h, 0.0, 3600)
+    assert vis["safe_window"] is not None
+    s_str, e_str = vis["safe_window"].split("|")
+    start = datetime.datetime.fromisoformat(s_str)
+    end = datetime.datetime.fromisoformat(e_str)
+    best = datetime.datetime.fromisoformat(vis["best_time"])
+    latest = datetime.datetime.fromisoformat(vis["latest_safe_start"])
+    assert start <= best <= latest
+    assert best + datetime.timedelta(seconds=3600) <= end
+    # the raw peak is blocked, so the recommendation is not it
+    assert vis["best_time"] != vis["max_time"]
+    for t, _alt, _az in coords.samples_tonight(ra, dec, LAT, LON, DATE):
+        if best <= t <= best + datetime.timedelta(seconds=3600):
+            assert _safe_at(h, ra, dec, t), t
+
+
+def test_the_window_is_the_longest_of_two_safe_spans():
+    # A night the ridge splits in two: the window shown is the LONGEST span
+    # (the chip says one range, not two), and the recommendation lies inside
+    # it. The second span is real and simply not advertised.
+    from nightscribe.core import planner
+    h = _ridge_horizon()
+    ra, dec = 0.0, 5.0
+    samples = coords.samples_tonight(ra, dec, LAT, LON, DATE)
+    spans = h.safe_spans(samples, 0.0)
+    assert len(spans) == 2, "the ridge must split the night in two"
+    longest = max(spans, key=lambda s: (s[1] - s[0]))
+    vis = planner._visibility(ra, dec, LAT, LON, DATE, h)
+    assert vis["window_start"] == longest[0].isoformat()
+    assert vis["window_end"] == longest[1].isoformat()
+    best = datetime.datetime.fromisoformat(vis["best_time"])
+    assert longest[0] <= best <= longest[1]
+    assert _safe_at(h, ra, dec, best)
+
+
+def test_best_time_without_a_session_is_the_reachable_peak():
+    # No session planned: the recommended instant is the highest altitude
+    # REACHABLE tonight (inside the longest span), never the raw peak when
+    # that one sits behind the ridge.
+    from nightscribe.core import planner
+    h = _ridge_horizon()
+    ra, dec = 0.0, 5.0
+    vis = planner._visibility(ra, dec, LAT, LON, DATE, h)
+    assert vis["best_time"] is not None
+    assert vis["best_time"] != vis["max_time"]
+    best = datetime.datetime.fromisoformat(vis["best_time"])
+    assert _safe_at(h, ra, dec, best)
+    assert vis["safe_max_alt"] < vis["max_alt"]
+
+
+def test_a_gap_in_the_samples_splits_the_spans():
+    # safe_spans breaks a span when two consecutive safe samples are more
+    # than 20 min apart: a hole in the sampling (a gap in the night) must
+    # never be crossed as if it were safe. Without the rule, the session
+    # could be planned straight through the hole.
+    h = horizon.Horizon([(az, 10.0) for az in range(0, 360, 10)])
+    base = datetime.datetime(2026, 8, 28, 21, 0)
+
+    def _t(minutes):
+        return base + datetime.timedelta(minutes=minutes)
+
+    samples = [(_t(0), 40.0, 90.0), (_t(10), 40.0, 90.0),
+               (_t(20), 40.0, 90.0), (_t(50), 40.0, 90.0),
+               (_t(60), 40.0, 90.0)]
+    assert h.safe_spans(samples, 0.0) == [(_t(0), _t(20)), (_t(50), _t(60))]
+
+
 # --- parser negatives (fallback behaviour must be honest) ---
 
 def _write(tmp_path, text, name="bad.hrz"):

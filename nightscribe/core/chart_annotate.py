@@ -282,9 +282,11 @@ ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
 # The context fields, in the order they are DROPPED when the band runs out
 # of room: the least report-critical first and the date last (a chart
 # without a date is not a chart). The camera goes before the telescope and
-# the station: the rig that took the plate is a report datum. The renderer
-# walks this list, never a half-drawn field.
-DROP_ORDER = ("fov", "psc", "equip", "filter", "stn", "tel", "date")
+# the station: the rig that took the plate is a report datum. The observer
+# goes early too: the station code already says where the plate came from,
+# and a name is the first thing to spare when the width is tight. The
+# renderer walks this list, never a half-drawn field.
+DROP_ORDER = ("fov", "psc", "equip", "obs", "filter", "stn", "tel", "date")
 # ... and the identity line, when even that does not fit: the motion goes
 # first (it is the story, not the identity), then the magnitude, and only
 # then is the position elided. The name is never dropped.
@@ -418,7 +420,7 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
     #        plate (see magnitude_role), catalog_mag - the project's/catalog
     #        magnitude or None, equipment - the camera (camera_from_header),
     #        telescope - the telescope (telescope_from_header), site - see
-    #        site_from_config (only the station is shown),
+    #        site_from_config (the observer and the station are shown),
     #        target - (ra_deg, dec_deg) of the object, for the case where
     #        there is no solution to place it on the plate, motion -
     #        {"rate_arcsec_min", "pa_deg", "measured"} of the object's
@@ -511,6 +513,13 @@ def build_band(name=None, meta=None, wcs_info=None, measured=None,
         # used to be glued into one 10-character segment and the telescope was
         # the half that got cut (2026-10-11). The label says which is which.
         context.append(_seg(f"Tel {telescope}", ROLE_CONTEXT, "tel"))
+    if (site.get("observer") or "").strip():
+        # WHO took the plate, right before the station code that says WHERE:
+        # together they are the attribution a chart carries. The corner boxes
+        # of the other charts have said "Obs:" all along; the band was the one
+        # place it was missing (asked for).
+        context.append(_seg(f"Obs {site['observer'].strip()}", ROLE_CONTEXT,
+                            "obs"))
     if (site.get("station") or "").strip():
         context.append(_seg(f"Stn {site['station'].strip()}", ROLE_CONTEXT,
                             "stn"))

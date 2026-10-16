@@ -110,15 +110,20 @@ and talks only to the public data services listed below.
 
 ## Your first five minutes
 
-1. **Install** (details in [INSTALL.md](INSTALL.md); on Windows there is a
-   [standalone installer](https://github.com/irydeo/nightscribe/releases),
-   no Python needed):
+1. **Install.** No Python needed: every file lives on the
+   [Releases page](https://github.com/irydeo/nightscribe/releases). Pick your
+   system:
+   - **Windows**: run the `NightScribeSetup-*.exe` installer (per-user, no
+     admin rights). SmartScreen warns because the binary is unsigned, so
+     choose *More info → Run anyway*. Prefer not to install anything? Unzip
+     the portable `NightScribe-*-windows-x64.zip` and run `nightscribe.exe gui`.
+   - **Linux**: install the `.deb` (Debian, Ubuntu, Mint) with
+     `sudo apt install ./nightscribe_*_amd64.deb`, or the `.rpm` (Fedora,
+     openSUSE) with `sudo dnf install ./nightscribe-*.x86_64.rpm`, then run
+     `nightscribe gui`.
 
-   ```bash
-   python3 -m venv --system-site-packages .venv
-   .venv/bin/pip install -r requirements.txt
-   .venv/bin/python -m nightscribe gui
-   ```
+   The full per-system steps are in [INSTALL.md](INSTALL.md). Running from a
+   source checkout is the last option there, for contributors.
 
 2. **The wizard asks for one thing: your observatory.** Type your MPC code and
    your coordinates are filled in from the MPC list; or enter name, latitude,
@@ -131,6 +136,17 @@ and talks only to the public data services listed below.
 5. When you have a minute, open **Tools → Settings…**: horizon file, limiting
    magnitude, camera plate scale, session defaults. Everything has a sensible
    default; nothing else is mandatory.
+
+### From source (contributors)
+
+NightScribe also runs from a checkout; the full, per-system walkthrough is in
+[INSTALL.md](INSTALL.md). The short version:
+
+```bash
+python3 -m venv --system-site-packages .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -m nightscribe gui
+```
 
 ## A whole night (and the weeks after)
 
@@ -524,7 +540,7 @@ you so. Configure them in **Tools → Settings → Integrations**.
 | **AAVSO API token** | Community photometry for the bright-star vigils |
 | **AAVSO observer code** | Filled into the photometry exports and the EXOTIC handoff |
 | **Light-pollution key** (free, lightpollutionmap.info) | The sky-brightness atlas at your site: the Bortle context the sky-quality notes use |
-| **Assistant** (optional, off by default) | A chat panel that answers from the app's own guide and ADRs, offline and without embeddings. It needs a model you configure; without it the app is unchanged (ADR-075) |
+| **Assistant** (optional, off by default) | A chat panel that answers from the app's own guide and design notes, offline and without embeddings. It needs a model you configure; without it the app is unchanged |
 | **Find_Orb** (ships with the installers and the Linux packages) | The check of your astrometric measurement against the observations other stations published, before the MPC report. It travels inside NightScribe, so it works out of the box; from a source checkout you install it yourself, and the app says so instead of pretending |
 | **EXOTIC** (external Python 3.10 or older) | The transit reduction: the app writes the handoff, runs EXOTIC for you and imports its light curve and parameters into the project. Without it the handoff is still yours to run by hand |
 
@@ -539,15 +555,16 @@ nothing remains anywhere else.
 
 ## Quickstart and CLI
 
+Install first (see *Your first five minutes*). Then everything the GUI does
+for **planning and publishing** has a command-line counterpart (`--help` on
+each for details):
+
 ```bash
-python3 -m venv --system-site-packages .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/python -m nightscribe gui        # desktop app
-.venv/bin/python -m nightscribe tonight    # best targets tonight (CLI)
+nightscribe gui        # desktop app
+nightscribe tonight    # best targets tonight (CLI)
 ```
 
-Everything the GUI does for **planning and publishing** has a command-line
-counterpart (`--help` on each for details). The **reduction** (the FITS
+The **reduction** (the FITS
 editor: calibration, track & stack, astrometry, photometry, periods) lives in
 the GUI:
 
@@ -564,9 +581,9 @@ the GUI:
 | `project …` | minimal project management: `list`, `create`, `advance`, `show`, `close`, `reopen`, `files` |
 | `inject <folder>` | injection and recovery: synthetic sources of a known brightness are added to a copy of your frames and measured back, to say how deep the pipeline really reaches |
 
-See [INSTALL.md](INSTALL.md) for full per-OS instructions, the pip package and
-the standalone installer, and [CONTRIBUTING.md](CONTRIBUTING.md) to hack on
-it.
+See [INSTALL.md](INSTALL.md) for the full per-OS instructions (the standalone
+installer and the Linux packages first, then the pip package and running from
+source), and [CONTRIBUTING.md](CONTRIBUTING.md) to hack on it.
 
 ## Documentation
 
@@ -575,8 +592,8 @@ walks the whole cycle, from the first run to the MPC report, in short
 chapters with the "why" of each option. It is published as a website:
 **<https://irydeo.github.io/nightscribe/>** (**Help → User guide (web)**).
 
-Design, architecture, data sources, scoring, workflows and every decision
-(ADRs) live in [`docs/`](docs/), in Spanish and English.
+Design, architecture, data sources, scoring, workflows and every design
+decision live in [`docs/`](docs/), in Spanish and English.
 
 Something missing, wrong or unclear? [Open an issue](https://github.com/irydeo/nightscribe/issues).
 

@@ -1,29 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Visit window fragment (ADR-045): the Measurements group, loaded only
-  for the light-curve kinds (sn/hads/variable). The class tag is
-  VisitWindow so the i18n context carries over. The spins and the list
-  are the wheel-guarded Passive widgets, inserted in code (ADR-005).
+  Visit window fragment (ADR-045): the hand measurement, loaded only for the
+  light-curve kinds (sn/hads/variable). It is FOLDED: the visit's points are
+  rows in the Results list, so this only has to offer the entry. The class tag
+  is VisitWindow so the i18n context carries over. The spins are the
+  wheel-guarded Passive widgets, inserted in code (ADR-005).
 -->
 <ui version="4.0">
  <class>VisitWindow</class>
  <widget class="QGroupBox" name="grp_meas">
   <property name="title"><string>Measurements</string></property>
   <layout class="QVBoxLayout" name="vbox_meas"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
+   <item><widget class="QToolButton" name="vp_btn_add_point"><property name="text"><string>Add a measurement by hand</string></property><property name="toolTip"><string>Type a magnitude the night gave you outside the app. It joins the visit's curve and the Results list above</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property><property name="arrowType"><enum>Qt::RightArrow</enum></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property></widget></item>
    <item>
-    <layout class="QHBoxLayout" name="row_meas">
-     <item><widget class="QLabel" name="lbl_meas_mag"><property name="text"><string>Mag:</string></property></widget></item>
-     <item><widget class="QWidget" name="ph_mag"/></item>
-     <item><widget class="QLabel" name="lbl_meas_err"><property name="text"><string>Err:</string></property></widget></item>
-     <item><widget class="QWidget" name="ph_err"/></item>
-     <item><widget class="QLabel" name="lbl_meas_filter"><property name="text"><string>Filter:</string></property></widget></item>
-     <item><widget class="QComboBox" name="cmb_filt"><property name="editable"><bool>true</bool></property></widget></item>
-     <item><widget class="QPushButton" name="vp_btn_add_meas"><property name="text"><string>Add</string></property></widget></item>
-     <item><widget class="QPushButton" name="vp_btn_del_meas"><property name="text"><string>Delete point</string></property></widget></item>
-     <item><spacer name="hsp_meas"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-    </layout>
+    <widget class="QWidget" name="w_meas">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QHBoxLayout" name="row_meas"><property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
+      <item><widget class="QLabel" name="lbl_meas_mag"><property name="text"><string>Mag:</string></property></widget></item>
+      <item><widget class="QWidget" name="ph_mag"/></item>
+      <item><widget class="QLabel" name="lbl_meas_err"><property name="text"><string>Err:</string></property></widget></item>
+      <item><widget class="QWidget" name="ph_err"/></item>
+      <item><widget class="QLabel" name="lbl_meas_filter"><property name="text"><string>Filter:</string></property></widget></item>
+      <item><widget class="QComboBox" name="cmb_filt"><property name="editable"><bool>true</bool></property></widget></item>
+      <item><widget class="QPushButton" name="vp_btn_add_meas"><property name="text"><string>Add</string></property><property name="toolTip"><string>Save the measurement to this visit. Removing it is in the row's own menu, in Results</string></property></widget></item>
+      <item><spacer name="hsp_meas"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     </layout>
+    </widget>
    </item>
-   <item><widget class="QWidget" name="ph_meas_list"/></item>
   </layout>
  </widget>
  <resources/>

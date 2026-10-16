@@ -135,7 +135,9 @@ resto está a un clic tras la puerta **Advanced**.
 - **Advanced**: el techo de saturación y el residual del flat, las
   compuertas y tolerancias de la astrometría (la compuerta de detección, el
   listón de envío al MPC, el barrido de velocidades, el chequeo contra
-  otras estaciones, los hilos de trabajo y la **tarjeta gráfica** con su
+  otras estaciones, el **catálogo astrométrico** que declara el informe MPC,
+  que tiene que ser el que usó tu resolvedor, los hilos de trabajo y la
+  **tarjeta gráfica** con su
   **backend**: encendida por defecto, con **OpenCL**; el capítulo 12 cuenta
   qué acelera, cómo instalar CUDA y por qué no cambia el resultado),
   **Find_Orb** (el chequeo de la órbita) y **EXOTIC** (la reducción de

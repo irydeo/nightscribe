@@ -29,6 +29,7 @@ them start to finish or jump to the one you need:
 
 | Chapter | What you will find |
 |---------|--------------------|
+| [00. Concepts](00-concepts.md) | The mental model: project, visit, run, series, report |
 | [01. First steps](01-getting-started.md) | Installation, initial wizard and observatory settings |
 | [02. Planning the night](02-tonight.md) | The Tonight view, the score, the sky calendar |
 | [03. Projects](03-projects.md) | Creating and tracking projects: from the card to publication |

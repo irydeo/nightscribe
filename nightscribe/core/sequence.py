@@ -33,11 +33,16 @@ logger = logging.getLogger(__name__)
 
 def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
               n_darks=0, exp_dark=None, n_bias=0, steps=None,
-              recipe=None):
+              recipe=None, dark_filter=None, bias_filter=None):
     # Builds a capture plan dict from parameters + config defaults.
     # Calibration frames are optional: Dark (count + exposure) and Bias
     # (count) steps get appended to the sequence and their wall-clock time
     # is folded into duration_s (each cal frame still pays the overhead).
+    # 2026-10-16: the two steps carry their OWN wheel slot. A dark is taken
+    # with the light path blocked, and that is a position on the wheel (an
+    # opaque slot, "Dark" by convention): writing the light's filter there
+    # would tell the observatory to take the darks through the observer's
+    # glass. The bias follows the dark's slot unless it is given its own.
     # B8: multi-filter — pass steps=[(filter, n, exp), ...] for interleaved
     # bands. Retrocompatible: a single-filter call (n_frames, exp_s,
     # filter_name) is equivalent to steps=[(filter_name, n_frames, exp_s)].
@@ -84,13 +89,16 @@ def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
     exp_dark = float(exp_dark) if exp_dark else exp_s
     n_darks = int(n_darks)
     n_bias = int(n_bias)
+    dark_filter = str(dark_filter or "Dark")
+    bias_filter = str(bias_filter or dark_filter)
     total = (total_light if steps else
              n_frames * (exp_s + overhead_s))
     total += n_darks * (exp_dark + overhead_s) + n_bias * overhead_s
     return {"n_frames": n_frames, "exp_s": exp_s,
             "filter": filter_name, "overhead_s": float(overhead_s),
-            "darks": {"count": n_darks, "exp_s": exp_dark},
-            "bias": {"count": n_bias},
+            "darks": {"count": n_darks, "exp_s": exp_dark,
+                      "filter": dark_filter},
+            "bias": {"count": n_bias, "filter": bias_filter},
             "duration_s": total,
             "steps": light_steps,
             "dither": recipe.get("dither") or {},
@@ -131,8 +139,26 @@ def export_csv(target, plan, out):
             }
             rows.append(row)
             elapsed += float(s["exp_s"]) + overhead
+    # 2026-10-16: the calibration frames are frames too, and a list that says
+    # only "30 rows" while the night also takes darks and bias is a list that
+    # lies by omission. The `type` column is LAST on purpose: a parser that
+    # reads the first seven columns keeps working.
+    cal = [("dark", plan.get("darks") or {}, True),
+           ("bias", plan.get("bias") or {}, False)]
+    for kind, step, has_exposure in cal:
+        for _i in range(int(step.get("count") or 0)):
+            rows.append({
+                "frame": len(rows) + 1, "target": name,
+                "ra_deg": f"{ra:.6f}", "dec_deg": f"{dec:+.6f}",
+                "exposure_s": (float(step.get("exp_s") or 0.0)
+                               if has_exposure else 0.0),
+                "filter": step.get("filter") or "Dark",
+                "start_time": "", "type": kind,
+            })
+    for row in rows:
+        row.setdefault("type", "light")
     _write_csv(out, ["frame", "target", "ra_deg", "dec_deg",
-                  "exposure_s", "filter", "start_time"], rows)
+                  "exposure_s", "filter", "start_time", "type"], rows)
     logger.info("CSV sequence written to %s", out)
     return str(out)
 
@@ -212,6 +238,19 @@ def export_nina_summary(target, plan, out):
         "Binning": plan.get("binning"),
         "Delay_s": plan.get("delay_s") or 0,
     }
+    # 2026-10-16: the calibration steps are part of the plan, so the summary
+    # says them (with their own wheel slot) instead of leaving them out.
+    cal = []
+    for key, frame_type in (("darks", "Dark"), ("bias", "Bias")):
+        step = plan.get(key) or {}
+        if int(step.get("count") or 0) > 0:
+            cal.append({"FrameType": frame_type,
+                        "Count": int(step["count"]),
+                        "Exposure_s": (float(step.get("exp_s") or 0.0)
+                                       if frame_type == "Dark" else 0.0),
+                        "Filter": step.get("filter") or "Dark"})
+    if cal:
+        seq["Metadata"]["Calibration"] = cal
     tw = _transit_window(target)
     if tw:
         seq["Metadata"]["StartTime"] = tw[0].isoformat()
@@ -457,6 +496,41 @@ def export_nina(target, plan, out):
             "ErrorBehavior": 0, "Attempts": 1}]
         items.append(tme)
 
+    # The calibration steps run AFTER the light frames (2026-10-16): they are
+    # the last thing the night does, and NINA's own ImageType says what each
+    # one is, so nothing has to be guessed from the file name. A bias goes in
+    # with exposure 0, which is what NINA expects for it.
+    for frame_type, key, default_filter in (("DARK", "darks", "Dark"),
+                                            ("BIAS", "bias", "Dark")):
+        step = plan.get(key) or {}
+        count = int(step.get("count") or 0)
+        if count <= 0:
+            continue
+        filter_name = step.get("filter") or default_filter
+        exposure = float(step.get("exp_s") or 0.0) if frame_type == "DARK" \
+            else 0.0
+        items.append({
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.SequenceItem.FilterWheel.SwitchFilter, NINA",
+            "Filter": _nina_filter(ids, filter_name, 0),
+            "Parent": {"$ref": dso_id}, "ErrorBehavior": 0, "Attempts": 1})
+        tme = _nina_container(
+            ids, "NINA.Sequencer.SequenceItem.Imaging.TakeManyExposures, NINA",
+            f"{frame_type.title()} x{count}", [], dso_id, expanded=False)
+        loop = {"$id": ids.next(),
+                "$type": "NINA.Sequencer.Conditions.LoopCondition, NINA",
+                "CompletedIterations": 0, "Iterations": count,
+                "Parent": {"$ref": tme["$id"]}}
+        tme["Conditions"]["$values"] = [loop]
+        tme["Items"]["$values"] = [{
+            "$id": ids.next(),
+            "$type": "NINA.Sequencer.SequenceItem.Imaging.TakeExposure, NINA",
+            "ExposureTime": exposure, "Gain": gain, "Offset": offset,
+            "Binning": binning, "ImageType": frame_type, "ExposureCount": 0,
+            "Parent": {"$ref": tme["$id"]},
+            "ErrorBehavior": 0, "Attempts": 1}]
+        items.append(tme)
+
     dso["Items"] = _nina_coll(ids, _COLL_ITEM, items)
     dso["Triggers"] = _nina_coll(ids, _COLL_TRIG,
                                  _nina_triggers(ids, dso_id, plan))
@@ -572,7 +646,8 @@ def _calibration_steps(plan):
     darks = plan["darks"]
     if darks["count"] > 0:
         spec = {"count": str(darks["count"]),
-                "exposure": f"{darks['exp_s']:g}", "filter": "Dark",
+                "exposure": f"{darks['exp_s']:g}",
+                "filter": darks.get("filter") or "Dark",
                 "frame_type": "Dark", "description": "Dark", "dither": "False",
                 "autofocus": "False", "autofocus_start": "False",
                 "dither_count": "0", "autofocus_count": "0"}
@@ -581,7 +656,8 @@ def _calibration_steps(plan):
     bias = plan["bias"]
     if bias["count"] > 0:
         spec = {"count": str(bias["count"]), "exposure": "0",
-                "filter": "Dark", "frame_type": "Bias", "description": "Bias",
+                "filter": bias.get("filter") or "Dark", "frame_type": "Bias",
+                "description": "Bias",
                 "dither": "False", "autofocus": "False",
                 "autofocus_start": "False", "dither_count": "0",
                 "autofocus_count": "0"}

@@ -10,6 +10,10 @@ mientras funciona. Si apareció un diálogo y se desvaneció, o un paso falló
 sin decir por qué, la respuesta está casi siempre ahí. Cuando reportes un
 problema, adjunta ese fichero.
 
+El fichero no crece sin límite: rota por tamaño, así que la carpeta guarda el
+registro actual y unos pocos anteriores (unos pocos megabytes como mucho) y
+nunca hay que limpiarlo a mano.
+
 ## No hay red
 
 NightScribe funciona sin conexión para todo lo que no necesita datos en vivo:
@@ -52,12 +56,13 @@ referencia y los demás le siguen.
 ## El MPC rechaza el informe
 
 El informe tiene que cuadrar con el formato que acepta el Minor Planet
-Center, y las observaciones tienen que ser buenas. Antes de enviar nada, el
-bloque **Gestionar informe MPC** lo valida línea a línea: el formato (80
-columnas o ADES PSV), las fechas, los códigos y una lista de relación
-señal/ruido. Si el MPC rechaza un informe, su mensaje nombra la línea;
-corrígela ahí y valida otra vez. El capítulo de astrometría (07) recorre todo
-el camino.
+Center, y las observaciones tienen que ser buenas. La app construye el informe
+con tus medidas y lo comprueba mientras lo construye: el formato (80 columnas
+o ADES PSV), las fechas, los códigos y la relación señal/ruido de cada
+observación. Donde mides, además te dice qué observaciones no recomienda enviar
+(la decisión sigue siendo tuya). Si el MPC rechaza un informe, su mensaje
+nombra la línea; corrige la medida y vuelve a construir el informe. El capítulo
+de astrometría (07) recorre todo el camino.
 
 ## EXOTIC no está configurado
 

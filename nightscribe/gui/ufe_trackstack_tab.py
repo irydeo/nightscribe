@@ -210,14 +210,19 @@ class UfeTrackStackTab(QWidget):
         self._recheck_timer.setInterval(600)
         self._recheck_timer.timeout.connect(self._auto_recheck)
         self._build_residuals_table()
-        # The MPC report lives in its own non-modal window (ADR-080): the
-        # Astrometry tab keeps only the "Report…" button and the note. The
-        # window's widgets are aliased here so the tab's own code (and its
-        # tests) keep speaking of cmb_format / txt_report / btn_send_mpc.
-        from .ufe_report_dialog import UfeReportDialog
-        from .mpc_send_dialog import MpcSendDialog
-        self._report_dialog = UfeReportDialog(self)
-        self._send_dialog = MpcSendDialog(self)
+        # The MPC report lives in its own non-modal windows, and the flow
+        # between them is shared with a visit (ADR-080): the controller owns
+        # the report window, the send window and everything downstream of the
+        # text. The tab only supplies the builder (the run on stage) through
+        # the hooks; its widgets are aliased here so the tab's own code (and
+        # its tests) keep speaking of cmb_format / txt_report / btn_send_mpc.
+        from .mpc_report_controller import MpcReportController
+        self._report = MpcReportController(
+            self, self._build_report, is_neocp=self._report_is_neocp,
+            object_name=self._report_object_name,
+            on_report=self._sync_report_buttons, say=self._say)
+        self._report_dialog = self._report.dialog
+        self._send_dialog = self._report.send
         self.cmb_format = self._report_dialog.cmb_format
         self.txt_report = self._report_dialog.txt_report
         self.btn_regen_report = self._report_dialog.btn_regen
@@ -228,38 +233,6 @@ class UfeTrackStackTab(QWidget):
         self.btn_close_report = self._report_dialog.btn_close
         self.btn_report = self._ui.btn_report
         self.btn_report.clicked.connect(self._open_report_window)
-        self.cmb_format.currentIndexChanged.connect(
-            lambda _i: self._on_report(quiet=True))
-        self.btn_copy_report.clicked.connect(self._copy_report)
-        self.btn_save_report.clicked.connect(self._save_report)
-        self.btn_send_mpc.clicked.connect(self._open_send_dialog)
-        self.btn_close_report.clicked.connect(self._report_dialog.hide)
-        # The report is EDITABLE (the observer's ask, 2026-10-14): a wrong
-        # designation or a line can be fixed before sending. Regenerate
-        # rebuilds it from the measurements and clears the edit.
-        self._report_dirty = False
-        self.txt_report.textChanged.connect(self._on_report_edited)
-        self.btn_regen_report.clicked.connect(
-            lambda: self._on_report(quiet=True))
-        self._send_dialog.btn_close.clicked.connect(self._send_dialog.hide)
-        self._send_dialog.btn_send.clicked.connect(self._on_mpc_submit)
-        # set before the combo signals below: set_targets() fills the combo and
-        # fires currentIndexChanged, and the intro reads this count
-        self._report_kept = None      # observations the last report carried
-        # The dialog opened with an empty box and no explanation (2026-10-13):
-        # an empty window reads as broken. The intro line says what is about
-        # to be sent, and it follows the target and the mode so it never goes
-        # stale (the app talks first, ADR-038).
-        self._send_dialog.cmb_target.currentIndexChanged.connect(
-            lambda _i: self._refresh_send_intro())
-        self._send_dialog.cmb_mode.currentIndexChanged.connect(
-            lambda _i: self._refresh_send_intro())
-        from ..core.sources import mpc_submit
-        self._send_dialog.set_targets(mpc_submit.TARGETS)
-        self._submit_worker = None
-        # the submission parameters the report's ACK line carries; the send
-        # dialog refines them and the report is rebuilt with them
-        self._submission = {"ack": "", "obj_type": ""}
         self.btn_undo = self._ui.btn_undo
         self.lbl_report_note = self._ui.lbl_report_note
         # The group's stack is shown in the MAIN stage (the shared state),
@@ -1556,6 +1529,41 @@ class UfeTrackStackTab(QWidget):
                                              else 0)))
 
     # -------------------------------------------------------- the restore
+
+    def forget_run(self, run_id):
+        # @args: run_id - the run the editor was told to show (the one the
+        #        observer picked in the Analysis table or the visit's list)
+        # @return: None. A run is NOT the session: the session is the visit,
+        #          so picking ANOTHER run of the SAME visit changed nothing
+        #          and the tab kept the run it already held, while
+        #          _restore_result refused to replace it (its guard is
+        #          "_result is not None"). Measured 2026-10-16: a run with 7
+        #          observations never loaded while the editor was already on
+        #          that visit. The frames are the visit's and stay; the run's
+        #          own face goes and the saved one is asked for again, which
+        #          is the one the host was told to show. With the right run
+        #          already on stage nothing happens: re-reading the stacks
+        #          would only cost the observer's disk time.
+        if run_id is None or self._run_id == int(run_id):
+            return
+        self._clear_run()
+        self._restore_result()
+
+    def show_run_on_stage(self):
+        # @return: True when the run's observation is on stage. The host opens
+        #          the editor on the visit's FIRST PLATE, which is what arms
+        #          the frame navigator and the rest of the workbench; with a
+        #          run held, that plate threw the run's stack (and its measured
+        #          mark) away, and the observer opened the run to LOOK at it
+        #          (reported 2026-10-16). The stack is read again: the payload
+        #          keeps the pixels, but only state.load rebuilds the WCS, the
+        #          stretch and the annotations of that plate. Without a run
+        #          there is nothing to put back and the plate is what the
+        #          observer wants to see anyway.
+        if self._result is None or self._shown_group is None:
+            return False
+        self._show_group(self._shown_group)
+        return True
 
     def _restore_result(self):
         # @return: None. The visit may already hold an astrometry run: the
@@ -4561,31 +4569,38 @@ class UfeTrackStackTab(QWidget):
         return (ctx.get("object_name") or ""), (
             "neocp" if ctx.get("neocp") else None)
 
+    # The report's live state now lives in the shared controller (ADR-080):
+    # these read-only views keep the tab's own code (and its tests) speaking
+    # of _report_dirty / _report_kept / _submission.
+    @property
+    def _report_dirty(self):
+        # @return: True when the observer changed the report text
+        return self._report.edited
+
+    @property
+    def _report_kept(self):
+        # @return: how many observations the report in the box carries
+        return self._report.kept
+
+    @property
+    def _submission(self):
+        # @return: the ACK/target the header carries (the send dialog owns it)
+        return self._report.submission
+
+    def _report_is_neocp(self):
+        # @return: True while the object is on the confirmation page, so the
+        #          send dialog starts on the NEOCP target
+        return bool((self._context() or {}).get("neocp"))
+
+    def _report_object_name(self):
+        # @return: the object's name, for the saved file's default name
+        return (self._context() or {}).get("object_name") or ""
+
     def _fill_report_text(self, text):
-        # @args: text - the generated report
-        # @return: None. Putting the text in the box fires textChanged; the
-        #          dirty flag is cleared AFTER it, because a freshly generated
-        #          report is not an edit.
-        self.txt_report.setPlainText(text)
-        self._report_dirty = False
-        self._paint_report_state()
-
-    def _on_report_edited(self):
-        # @return: None. The observer touched the report: what is in the box is
-        #          what gets sent, and the send dialog says so.
-        if self.txt_report.toPlainText():
-            self._report_dirty = True
-        self._paint_report_state()
-
-    def _paint_report_state(self):
-        # @return: None. Says, under the box, whether the report is the
-        #          generated one or the observer's edited version.
-        if self._report_dirty:
-            self.lbl_report_state.setText(self.tr(
-                "Edited: this exact text will be sent (Regenerate to rebuild "
-                "it from the measurements)."))
-        else:
-            self.lbl_report_state.setText("")
+        # @args: text - the report to show ("" clears the box)
+        # @return: None. Thin door onto the shared controller, kept because the
+        #          run's own resets clear the box from here.
+        self._report.fill(text, self._report.kept if text else 0)
 
     def _build_residuals_table(self):
         # @return: None. The published observations' table: the columns are
@@ -4742,25 +4757,25 @@ class UfeTrackStackTab(QWidget):
                         "warnings on the report are the safety net.")
                 else:
                     text = self.tr(
-                        "Find_Orb is not configured: the check is not "
+                        "Find_Orb is not configured, so the check is not "
                         "available. Set it up in Settings; meanwhile the "
-                        "centred sequence and the warnings on the report are "
-                        "the safety net.")
+                        "centred sequence and the report's warnings are the "
+                        "safety net.")
             else:
                 text = self.tr("The check is not available:") \
                     + f" {check.note}"
         elif check.no_reference:
             text = self.tr(
                 "No other observations to compare with: nothing is blocked "
-                "(a real discovery has no reference); the centred sequence "
+                "(a real discovery has no reference). The centred sequence "
                 "and your own review of the report decide.")
             if check.note:
                 text += " " + check.note
         elif getattr(check, "no_fit", False):
             text = self.tr(
-                "The published observations are too few or too short an arc "
-                "for Find_Orb to fit an orbit, so there is nothing to compare "
-                "our point with yet. Nothing is blocked.")
+                "Too few published observations, or too short an arc, for "
+                "Find_Orb to fit an orbit: there is nothing to compare our "
+                "point with yet. Nothing is blocked.")
         elif check.blocked:
             text = self.tr(
                 "Our point is an outlier against the other observers: the "
@@ -4884,15 +4899,24 @@ class UfeTrackStackTab(QWidget):
         refresh_door(self.btn_more)
 
     def _on_report(self, quiet=False):
+        # @args: quiet - True when the report is rebuilt while a visit is
+        #        reopened or the format changed: the text belongs in the box,
+        #        but it is not news
+        # @return: None. The shared controller (ADR-080) owns the window and
+        #          the flow; the tab only rebuilds the text from the run on
+        #          stage, through _build_report below.
+        self._report.regenerate(quiet=quiet)
+
+    def _build_report(self, fmt, submission, quiet):
         # The generator keeps every observation the observer did not exclude
         # and the round trip through the validator (the generator that cannot
         # pass its own judge is our bug). The floor only WARNS now; the notes
         # are re-explained here from the DATA, in the GUI's language: the
         # core's notes are internal English and never reach the user verbatim.
-        # @args: quiet - True when the report is rebuilt while a visit is
-        #        reopened: the text belongs in the box, but it is not news
-        #        (the restore already said where the run came from)
-        # @return: None
+        # @args: fmt - the generator's format key, submission - the ACK/target
+        #        the header carries, quiet - True when the rebuild is not news
+        # @return: {"text", "kept"} for the controller, or None when there is
+        #          nothing to report
         from ..core import mpc_astrometry
         ctx = self._context() or {}
         points = [sp for sp, _fp, _fl
@@ -4900,8 +4924,7 @@ class UfeTrackStackTab(QWidget):
         if not points:
             if not quiet:
                 self._say(self.tr("Measure the sequence first."))
-            return
-        fmt = self.cmb_format.currentData() or "ades"
+            return None
         context = mpc_astrometry.report_context(config)
         # The report names the object as the MPC knows it NOW: the confirmed
         # designation when the object was renamed since the visit, else the
@@ -4911,14 +4934,12 @@ class UfeTrackStackTab(QWidget):
         rep = mpc_astrometry.generate(
             points, fmt, context.obs_code or str(config.get("mpc_code", "")),
             designation, config,
-            context=context, submission=self._submission, kind=kind)
-        self._fill_report_text(rep["text"])
+            context=context, submission=submission, kind=kind)
         floor = float(config.get("astrometry_submit_snr", 20.0))
         kept = list(rep.get("kept") or [])
         excluded = list(rep.get("excluded") or [])
         kept_n = len(kept)
         total_n = kept_n + len(excluded)
-        self._report_kept = kept_n
         # WHAT CAME OUT, where the observer is looking. The report carries
         # EVERY observation unless the observer excluded one (2026-10-10): the
         # floor only recommends, so the note counts what is in and what the
@@ -4975,167 +4996,38 @@ class UfeTrackStackTab(QWidget):
                 self._notify("notes", self.tr("⚠"), level="warn")
         # and the report's own group opens: there IS something to read in it
         self._sections["report"].setCollapsed(False)
-        self._sync_report_buttons()
-        # the send dialog's intro quotes the count and the format, so it is
-        # rebuilt with the report it describes (the format combo lives in the
-        # report window: changing it there must not leave a stale claim here)
-        self._refresh_send_intro()
-        kept = len(rep.get("kept") or [])
         if not quiet:
             self._say(self.tr("Report generated: %1 observations kept."
-                              ).replace("%1", str(kept)))
+                              ).replace("%1", str(kept_n)))
+        return {"text": rep["text"], "kept": kept_n}
 
+    # The rest of the report's flow (open, copy, save, send, the intro and the
+    # gate) belongs to the shared controller now (ADR-080): these thin doors
+    # keep the tab's own code and its tests calling the same names.
     def _open_report_window(self):
-        # @return: None. Opens the MPC report window (ADR-080): the report is
-        #          rebuilt first, so the window always shows the current one.
-        self._on_report(quiet=True)
-        self._report_dialog.show()
-        self._report_dialog.raise_()
-        self._report_dialog.activateWindow()
+        # @return: None. Opens the MPC report window on the current report.
+        self._report.open_window()
 
     def _copy_report(self):
         # @return: None. The report as it reads, on the clipboard.
-        text = self.txt_report.toPlainText()
-        if not text.strip():
-            return
-        from PySide6.QtWidgets import QApplication
-        QApplication.clipboard().setText(text)
-        self._say(self.tr("Report copied to the clipboard."))
+        self._report.copy()
 
     def _save_report(self):
-        # @return: None. Writes the report into the project's folder and
-        #          registers it as a resource of the visit, so the file is
-        #          found again from the project.
-        from PySide6.QtWidgets import QFileDialog
-        text = self.txt_report.toPlainText()
-        if not text.strip():
-            return
-        ctx = self._context() or {}
-        obj = ctx.get("object_name") or "report"
-        suffix = {"mpc80": "obs80.txt", "ades": "ades.psv", "xml": "ades.xml"}
-        fmt = self.cmb_format.currentData() or "ades"
-        default = str(Path.home() / f"{obj}_{suffix.get(fmt, 'report.txt')}")
-        out, _sel = QFileDialog.getSaveFileName(
-            self, self.tr("Save MPC report"), default,
-            self.tr("All files (*)"))
-        if not out:
-            return
-        try:
-            Path(out).write_text(text.rstrip() + "\n", encoding="utf-8")
-        except OSError as err:
-            self._say(self.tr("The report could not be written:") + f" {err}")
-            return
-        self._say(self.tr("Report saved:") + f" {out}")
+        # @return: None. Writes the report into a file the observer picks.
+        self._report.save()
 
     def _open_send_dialog(self):
-        # @return: None. Sending is never silent (ADR-080): the dialog asks
-        #          for the acknowledgement email, the target and the mode.
-        if not self.txt_report.toPlainText().strip():
-            self._say(self.tr("There is no report to send."))
-            return
-        self._send_dialog.edt_ack_email.setText(
-            self._send_dialog.edt_ack_email.text()
-            or str(config.get("observer_email", "") or ""))
-        ctx = self._context() or {}
-        # The target starts at the project's own kind, as the manual promises:
-        # NEOCP for a project on the confirmation page, Unclassified otherwise.
-        # The old guard also asked for an EMPTY combo, and set_targets had
-        # already filled it, so the default never applied (measured
-        # 2026-10-13: a NEOCP project opened on Unclassified). It is set on
-        # every open, and the observer can still change it for this batch.
-        default_target = "NEOCP" if ctx.get("neocp") else "Unclassified"
-        idx = self._send_dialog.cmb_target.findData(default_target)
-        if idx >= 0:
-            self._send_dialog.cmb_target.setCurrentIndex(idx)
-        # an edited report is sent as it reads, so the ACK/target fields do
-        # not apply and the dialog says so (the observer's ask, 2026-10-14)
-        self._send_dialog.set_edited(self._report_dirty)
-        self._refresh_send_gate()
-        self._refresh_send_intro()
-        self._send_dialog.show()
-        self._send_dialog.raise_()
-        self._send_dialog.activateWindow()
+        # @return: None. Opens the send window (never silent, ADR-080).
+        self._report.open_send()
 
     def _refresh_send_intro(self):
-        # @return: None. Says, above the log, what the batch carries: how many
-        #          observations, the format, the target and the mode. Without
-        #          it the window opened empty and looked broken; the target and
-        #          the mode refresh it, so the line is never a stale claim
-        #          about what is about to go out (the app talks first, ADR-038).
-        kept = int(self._report_kept or 0)
-        if not kept:
-            self._send_dialog.lbl_intro.setText("")
-            return
-        self._send_dialog.lbl_intro.setText(self.tr(
-            "Ready to send: %1 observation(s), format %2, target %3, "
-            "mode %4. The MPC's own answer will appear below.").replace(
-                "%1", str(kept)).replace(
-                "%2", self.cmb_format.currentText()).replace(
-                "%3", self._send_dialog.cmb_target.currentText()).replace(
-                "%4", self._send_dialog.cmb_mode.currentText()))
+        # @return: None. Refreshes the send window's "what goes out" line.
+        self._report.refresh_intro()
 
     def _refresh_send_gate(self):
-        # @return: None. What the submission header still needs, said in the
-        #          dialog, and the Send button blocked while anything is
-        #          missing (ADR-080: the app never sends a half report).
-        from ..core import mpc_astrometry
-        ctx = mpc_astrometry.report_context(config)
-        # the dialog's own field is the AC2 that will be sent, so it is the
-        # one that decides: the config's email is only its prefill
-        missing = [m for m in ctx.missing() if m != "the contact email"]
-        email = self._send_dialog.edt_ack_email.text().strip()
-        if not email:
-            missing.append("the contact email")
-        self._send_dialog.lbl_missing.setText(
-            self.tr("Missing: %1. Set it in Settings → Observer, then send.")
-            .replace("%1", ", ".join(missing)) if missing else "")
-        self._send_dialog.btn_send.setEnabled(not missing)
+        # @return: None. Refreshes what the submission header still needs.
+        self._report.refresh_gate()
 
     def _on_mpc_submit(self):
-        # @return: None. Builds the report with the chosen acknowledgement
-        #          and target, then submits it off the GUI thread. The
-        #          server's own answer lands in the dialog's log. When the
-        #          observer EDITED the report, that text is sent verbatim and
-        #          is NOT rebuilt (regenerating it would throw the edit away).
-        from .workers import MpcSubmitWorker
-        dlg = self._send_dialog
-        email = dlg.edt_ack_email.text().strip()
-        ack = dlg.edt_ack.text().strip()
-        target = dlg.cmb_target.currentData() or ""
-        test = bool(dlg.cmb_mode.currentData())
-        self._submission = {"ack": ack, "obj_type": target}
-        if self._report_dirty:
-            dlg.log(self.tr("Sending your edited report as it reads."))
-        else:
-            # rebuild with the chosen ACK/target so the header carries them
-            self._on_report(quiet=True)
-        text = self.txt_report.toPlainText()
-        if not text.strip():
-            dlg.log(self.tr("Nothing to send: the report is empty."))
-            return
-        fmt = self.cmb_format.currentData() or "ades"
-        mode = self.tr("Test") if test else self.tr("Normal")
-        dlg.log(self.tr("Submitting (%1, %2)…").replace("%1", fmt)
-                .replace("%2", mode))
-        dlg.btn_send.setEnabled(False)
-        self._submit_worker = MpcSubmitWorker(
-            fmt, text, ack=ack, email=email, obj_type=target, test=test)
-        self._submit_worker.finished.connect(self._on_mpc_submit_done)
-        self._submit_worker.start()
-
-    def _on_mpc_submit_done(self, out):
-        # @args: out - mpc_submit.submit's dict
-        # @return: None. The server's own words, and the button armed again.
-        dlg = self._send_dialog
-        self._submit_worker = None
-        ok = bool(out.get("ok"))
-        dlg.log((self.tr("The MPC accepted the batch:") if ok else
-                 self.tr("The MPC did NOT accept the batch:")))
-        dlg.log(str(out.get("text") or "").strip()[:2000])
-        dlg.log(self.tr("URL: %1").replace("%1", str(out.get("url") or "")))
-        if ok:
-            self._say(self.tr("Report submitted to the MPC."))
-        else:
-            self._say(self.tr("The MPC did not accept the report: see the "
-                              "send window."))
-        self._refresh_send_gate()
+        # @return: None. Submits the report off the GUI thread.
+        self._report.submit()

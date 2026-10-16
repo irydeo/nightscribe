@@ -127,8 +127,10 @@ one click away behind the **Advanced** door.
   leaves the plate solved for any program, without touching the pixels.
 - **Advanced**: the saturation ceiling and the flat-field residual, the
   astrometry gates and tolerances (the detection gate, the MPC submission
-  floor, the velocity sweep, the check against other stations, the worker
-  threads and the **graphics card** with its **backend**: on by default,
+  floor, the velocity sweep, the check against other stations, the
+  **astrometric catalogue** the MPC report declares, which must be the one
+  your solver used, the worker threads and the **graphics card** with its
+  **backend**: on by default,
   with **OpenCL**; chapter 12 says what it accelerates, how to install CUDA
   and why it changes nothing about the result), **Find_Orb** (the orbit
   check) and **EXOTIC** (the transit reduction: path to a **Python ≤ 3.10**

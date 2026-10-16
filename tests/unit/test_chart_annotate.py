@@ -323,9 +323,34 @@ def test_the_drop_order_goes_from_the_least_to_the_most_needed():
     # the identity line the motion goes first (it is the story, not who the
     # plate is), then the magnitude, and the position is the last to go.
     # The telescope is a report datum, so it survives longer than the camera.
-    assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "tel",
-                             "date")
+    # The observer is a person's name, and the station code already says where
+    # the plate came from, so it is the first thing to spare after the camera.
+    assert ca.DROP_ORDER == ("fov", "psc", "equip", "obs", "filter", "stn",
+                             "tel", "date")
     assert ca.DROP_ORDER_NAME == ("motion", "mag", "pos")
+
+
+def test_the_band_says_who_took_the_plate():
+    # Asked for: the observer appears in the band, right before the station
+    # code. A plate with no observer configured simply does not say it (no
+    # empty "Obs"), and the field is in the drop order like any other.
+    band = ca.build_band(name="X", meta=_META, wcs_info=_WCS,
+                         site={"observer": "F. J. Calvo", "station": "Z41"})
+    second = band["lines"][1]
+    assert _roles(second) == [
+        ("2023-12-19 18:42 UT", ca.ROLE_CONTEXT),
+        ("40.0 s", ca.ROLE_CONTEXT),
+        ("Clear", ca.ROLE_CONTEXT),
+        ("Obs F. J. Calvo", ca.ROLE_CONTEXT),
+        ("Stn Z41", ca.ROLE_CONTEXT),
+        ("1.55″/px", ca.ROLE_CONTEXT),
+        ("43.0 × 32.3′", ca.ROLE_CONTEXT)]
+    assert [s["field"] for s in second] == [
+        "date", "exp", "filter", "obs", "stn", "psc", "fov"]
+    # no observer configured: the segment is not there at all
+    band = ca.build_band(name="X", meta=_META, wcs_info=_WCS,
+                         site={"station": "Z41"})
+    assert "obs" not in [s["field"] for s in band["lines"][1]]
 
 
 def test_the_camera_comes_from_the_plate_not_from_my_settings():

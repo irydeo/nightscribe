@@ -38,16 +38,41 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QDate, QSize, Qt
 from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
-                               QMessageBox, QTableWidgetItem, QWidget)
+                               QMenu, QMessageBox, QWidget)
 
 from ..ui_loader import adopt_ui, drop_in, load_ui
-from .door_menu import build_door
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 # The visits list: how tall it may grow before it scrolls itself.
 _LIST_MAX_H = 168
+
+# What a visit carries, split in two (ADR-045 rev, 2026-10-16): what it
+# PRODUCED (Results) and the RAW material (the folded "files of the night").
+# The rule is by KIND: a plate, a generic attachment and an ephemeris are
+# inputs; a report, a chart, a stack, an animation, an EXOTIC product or a
+# measured point is something the night produced.
+_RAW_KINDS = ("fits", "file", "ephemeris")
+
+# The glyph each row wears in the two lists: one per family, never a colour
+# code (the colour is the object's kind, and mixing the two reads as noise).
+_ROW_GLYPHS = {
+    "run": "⚑", "point": "◆", "fits": "▦", "stack": "▦", "image": "▧",
+    "chart": "▧", "report": "▤", "sequence": "≡", "animation": "▶",
+    "ephemeris": "✦",
+}
+
+
+def _epoch_of(value):
+    # @args: value - epoch seconds (float or string) or None
+    # @return: the epoch as a float, 0.0 when unknown. Used to sort the two
+    #          lists together: a run, a file and a point must interleave by
+    #          when they happened, and they come from three different clocks.
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class _ContentList(PassiveList):
@@ -115,7 +140,7 @@ class VisitsPanel(QWidget):
                  curve_kind=True, kind=None, on_measure_click=None,
                  measure_series=None, astrometry=None,
                  on_visit_selected=None, runs_for_session=None, open_run=None,
-                 parent=None):
+                 mpc_build=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -126,6 +151,10 @@ class VisitsPanel(QWidget):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
+        # The visit's MPC block opens the same report window as the editor's
+        # Astrometry tab. The host rebuilds the text from the visit's own run
+        # (it owns the astrometry data); without the hook the block says so.
+        self._mpc_build = mpc_build
         # the host is told which visit is selected: the Analysis curve is
         # the one of the visit you are looking at, not the project's pile
         self._on_visit_selected = on_visit_selected
@@ -213,7 +242,11 @@ class VisitsPanel(QWidget):
             tag = ("  ·  " + " · ".join(chips)) if chips else ""
             notes = f"  ·  {s['notes'][:24]}…" if s["notes"] else ""
             pin = "📌 " if s.get("pinned") else ""
-            item = QListWidgetItem(f"{pin}{s['obs_date']}{tag}{notes}")
+            # ADR-045 rev: the name leads when there is one; the date stays
+            # the sort key and the folder, so it never disappears
+            name = (s.get("label") or "").strip()
+            head = f"{name}  ·  {s['obs_date']}" if name else s["obs_date"]
+            item = QListWidgetItem(f"{pin}{head}{tag}{notes}")
             item.setData(Qt.UserRole, s["id"])
             self.lst.addItem(item)
         n = len(sessions)
@@ -298,6 +331,7 @@ class VisitsPanel(QWidget):
                                 astrometry=self._astrometry,
                                 runs_for_session=self._runs_for_session,
                                 open_run=self._open_run,
+                                mpc_build=self._mpc_build,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -352,7 +386,8 @@ class VisitWindow(QDialog):
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
                  on_measure_click=None, measure_series=None, astrometry=None,
-                 runs_for_session=None, open_run=None, parent=None):
+                 runs_for_session=None, open_run=None, mpc_build=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -369,8 +404,16 @@ class VisitWindow(QDialog):
         self._astrometry = astrometry
         self._runs_for_session = runs_for_session
         self._open_run = open_run
+        self._mpc_build = mpc_build
         self.setWindowTitle(self.tr("Visit"))
-        self.resize(640, 520)
+        # The window is ONE page (head, analysis action, Results, the folded
+        # files, the per-kind block and the notes), so it wants room: at
+        # 640x520 the Results list was left at its size hint and the notes
+        # took the rest. It opens at 880x660 and never shrinks below the size
+        # that used to be its whole window (a page squeezed to 500 px is a
+        # page nobody reads).
+        self.resize(880, 660)
+        self.setMinimumSize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
         self._build_ui()
 
@@ -427,25 +470,37 @@ class VisitWindow(QDialog):
         if s is None:
             self.close()
             return
-        # The structure is the Designer file's (ADR-005); the per-kind
-        # blocks are fragments loaded on demand (absent means absent),
-        # and the Passive widgets land in their placeholders.
+        # The structure is the Designer file's (ADR-005); the per-kind blocks
+        # are fragments loaded on demand (absent means absent), and the
+        # Passive widgets land in their placeholders.
         self._ui = adopt_ui(self, "visit_window")
+        # The Results list is the visit's content, so IT takes the room the
+        # window has: a QGroupBox does not grow on its own (Preferred) and the
+        # notes QTextEdit IS Expanding, so without this the extra space went
+        # to the notes and the list stayed at its size hint. Stretch factors
+        # are not a Designer property (the .ui's layoutStretch is inert, as
+        # doc_viewer.ui's own note says), so the code sets it here.
+        self._ui.vbox_visit.setStretchFactor(self._ui.grp_results, 1)
         self._paint_confirmation()
-        # the visit's date is its name in the list — editable in place
-        # (ADR-045 review: «pin or edit a visit's name»)
-        self._date_ed = self._ui.vp_visit_date
-        self._date_ed.setText(s["obs_date"] or "")
-        self._date_ed.editingFinished.connect(self._on_date_edited)
-        # an explicit save gesture: an invisible save-on-focus-out alone
-        # leaves the observer guessing whether the edit took
-        self.btn_save_date = self._ui.vp_btn_save_date
-        self.btn_save_date.clicked.connect(self._on_save_date_clicked)
-        self._date_ed.textChanged.connect(self._on_date_dirty)
+
+        # ---- the head: the date READS and the name is edited in place.
+        # The date is the visit's folder and its order in the list, so it is
+        # changed from the "..." menu (a calendar), never by typing over it;
+        # the name is free text and saves on commit. The "Saved" line is what
+        # replaced the old Save button: the button existed so the observer
+        # would know the edit took, and a line says it without a permanent
+        # disabled control.
+        self._date_lbl = self._ui.vp_visit_date
+        self._date_lbl.setText(s["obs_date"] or "")
+        self._label_ed = self._ui.vp_visit_label
+        self._label_ed.setText(s.get("label") or "")
+        self._label_ed.textChanged.connect(self._on_label_dirty)
+        self._label_ed.editingFinished.connect(self._save_head)
+        self._saved_lbl = self._ui.vp_lbl_saved
         self.btn_pin = self._ui.vp_btn_pin
         self.btn_pin.setChecked(bool(s.get("pinned")))
         self.btn_pin.toggled.connect(self._on_pin_toggled)
-        self._ui.vp_btn_delete.clicked.connect(self._on_delete_visit)
+        self._build_more_menu()
 
         # ---- ONE analysis action, chosen by the kind (ADR-045 review): the
         # observer does not pick between the series and the track & stack.
@@ -457,7 +512,7 @@ class VisitWindow(QDialog):
             self.btn_analyze.setToolTip(self.tr(
                 "Stack this visit's frames along the object's motion and "
                 "measure its position, checked against the other observers "
-                "(track & stack, ADR-062)"))
+                "(track & stack)"))
         elif self._analysis_action == "photometry":
             self.btn_analyze.setText(self.tr("Measure the series…"))
             self.btn_analyze.setToolTip(self.tr(
@@ -466,68 +521,61 @@ class VisitWindow(QDialog):
         else:
             self.btn_analyze.setVisible(False)
         self.btn_analyze.clicked.connect(self._on_analyze)
-        # the resource actions live behind one door (the U5 pattern): their
-        # texts and tooltips stay in the Designer file and the door is a way
-        # in, not a second copy
-        self.btn_resources = self._ui.vp_btn_resources
+        # ADR-038's grammar: the panel's ONE action wears the object's own
+        # hue, the same hero button the Ficha and the series panel use. It is
+        # what says "this is the normal path" without a word.
+        if self._analysis_action is not None:
+            from .. import theme
+            hue = theme.KIND_COLORS.get(self._kind) or theme.C_ACCENT
+            self.btn_analyze.setStyleSheet(theme.hero_button_style(hue))
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
-        self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
-        self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
-        build_door(self.btn_resources, (self._ui.vp_btn_attach,
-                                        self._ui.vp_btn_open,
-                                        self._ui.vp_btn_remove))
-        self.lst_res = PassiveList()
-        self.lst_res.setObjectName("vp_resources")
-        self.lst_res.itemDoubleClicked.connect(
-            lambda _it: self._on_open_resource())
-        drop_in(self._ui.grp_res.layout(), self._ui.ph_resources,
-                self.lst_res)
-        self._populate_resources()
 
-        # ---- the visit's own runs (ADR-086 rev): clicking a visit shows ITS
-        # runs, so the observer sees which passes measured this night and can
-        # open one in the editor without hunting in the project list.
-        self._runs_tbl = getattr(self._ui, "vp_tbl_runs", None)
-        self._runs_lbl = getattr(self._ui, "vp_lbl_runs", None)
-        if self._runs_tbl is not None:
-            self._runs_tbl.itemSelectionChanged.connect(self._on_run_selected)
-            self._runs_tbl.itemDoubleClicked.connect(
-                lambda _it: self._on_open_run())
-            self._populate_runs()
+        # ---- the visit's content, in ONE pass: Results (what it produced)
+        # and the folded frames (the raw material). Both lists read the same
+        # three sources, so they are filled together: three queries, not six.
+        self.lst_results = PassiveList()
+        self.lst_results.setObjectName("vp_results")
+        self.lst_results.itemDoubleClicked.connect(self._on_row_open)
+        self.lst_results.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.lst_results.customContextMenuRequested.connect(
+            lambda pos: self._on_row_menu(self.lst_results, pos))
+        drop_in(self._ui.grp_results.layout(), self._ui.ph_results,
+                self.lst_results)
+        self.lst_files = PassiveList()
+        self.lst_files.setObjectName("vp_files")
+        self.lst_files.itemDoubleClicked.connect(self._on_row_open)
+        self.lst_files.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.lst_files.customContextMenuRequested.connect(
+            lambda pos: self._on_row_menu(self.lst_files, pos))
+        drop_in(self._ui.grp_files.layout(), self._ui.ph_files, self.lst_files)
+        self._ui.vp_btn_files.toggled.connect(self._on_files_fold)
+        self._populate_content()
 
-        # ---- free space (ADR-062 phase 9): a run's originals can be moved
-        # into the project's procesados/ and brought back. It lives next to
-        # the runs because it acts on a run's frames, and nothing is deleted.
-        self._free_lbl = getattr(self._ui, "vp_lbl_free", None)
-        btn_free = getattr(self._ui, "vp_btn_free", None)
-        btn_restore = getattr(self._ui, "vp_btn_restore", None)
-        if btn_free is not None:
-            btn_free.clicked.connect(self._on_free_space)
-        if btn_restore is not None:
-            btn_restore.clicked.connect(self._on_restore_space)
-        self._update_free_hint()
-
-        # ---- measurements (light-curve kinds)
+        # ---- the per-kind blocks, right under the actions: the night's own
+        # astrometry (NEO/PCCP) or the quick hand measurement (curve kinds)
         if self._curve_kind:
             self._build_measurements_block(s)
-
-        # ---- the night's astrometry (NEO/PCCP; ADR-045 form A)
         if self._mpc_kind:
             self._build_mpc_block()
 
-        # ---- notes
+        # ---- notes and the closing gesture (everything else auto-saves)
         self._notes = self._ui.vp_notes
         self._notes.setText(s["notes"])
         self._notes.textChanged.connect(self._on_notes_changed)
-
-        # the explicit closing gesture (field report: with no button the
-        # observer is left guessing): everything else auto-saves; the
-        # date field flushes here (a dirty invalid value reverts to the
-        # stored one first), then the window closes
         self.btn_close = self._ui.vp_btn_close
-        self.btn_close.clicked.connect(self._on_save_and_close)
+        self.btn_close.clicked.connect(self._on_close)
 
-    # ---------------------------------------------------------- visit
+    def _build_more_menu(self):
+        # The two things that are NOT the daily work: the date (the visit's
+        # folder and its order) and deleting the visit. They live behind the
+        # "..." so the head keeps ONE job: saying which night this is.
+        menu = QMenu(self)
+        menu.addAction(self.tr("Change the date…"), self._on_change_date)
+        menu.addSeparator()
+        menu.addAction(self.tr("Delete the visit…"), self._on_delete_visit)
+        self._ui.vp_btn_more.setMenu(menu)
+
+    # ---------------------------------------------------------- the head
 
     def _stored_date(self):
         # @return: the visit's date as persisted (or "")
@@ -535,43 +583,48 @@ class VisitWindow(QDialog):
         s = fu.get_session(self._db, self._sid)
         return (s or {}).get("obs_date") or ""
 
-    def _on_date_dirty(self, _text):
-        # The save gesture arms exactly while the field differs from the
-        # stored date.
-        self.btn_save_date.setEnabled(
-            self._date_ed.text().strip() != self._stored_date())
-
-    def _on_save_date_clicked(self):
-        # The explicit save gesture shares the validation path.
-        self._save_date()
-
-    def _on_date_edited(self):
-        # Enter/focus-out saves too — the visible button is the same path.
-        self._save_date()
-
-    def _save_date(self):
-        # The visit's date is its name in the list: validate, save, and
-        # let the panel re-sort. An invalid date reverts to the stored
-        # one with the text selected for a retry (never a modal).
+    def _stored_head(self):
+        # @return: (date, name) as persisted: the two things the head owns
         from ...core import followup as fu
-        txt = self._date_ed.text().strip()
-        ok = False
-        for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y/%m/%d"):
-            try:
-                datetime.datetime.strptime(txt, fmt)
-                ok = True
-                break
-            except ValueError:
-                pass
-        if not ok or not txt:
-            self._date_ed.blockSignals(True)
-            self._date_ed.setText(self._stored_date())
-            self._date_ed.selectAll()
-            self._date_ed.blockSignals(False)
-            self.btn_save_date.setEnabled(False)
+        s = fu.get_session(self._db, self._sid) or {}
+        return (s.get("obs_date") or "", s.get("label") or "")
+
+    def _on_label_dirty(self, _text=None):
+        # Any edit puts the "Saved" line away; it comes back on the commit.
+        self._saved_lbl.setVisible(False)
+
+    def _save_head(self):
+        # Enter, or leaving the name field, saves it. Nothing to validate:
+        # the date (the only field with a shape) has its own dialog.
+        from ...core import followup as fu
+        text = self._label_ed.text().strip()
+        if text != self._stored_head()[1]:
+            fu.update_session_label(self._db, self._sid, text)
+            self._emit_change()
+        self._flash_saved()
+
+    def _flash_saved(self):
+        # @return: None. The one line that says the edit took (the reason the
+        #          old Save button existed).
+        self._saved_lbl.setText(self.tr("Saved"))
+        self._saved_lbl.setVisible(True)
+
+    def _on_change_date(self):
+        # A calendar, not a text field: the date is a folder name and a sort
+        # key, and a typo there renames a night.
+        from ...core import followup as fu
+        ui = load_ui("visit_date_dialog", self)
+        try:
+            current = datetime.date.fromisoformat(self._stored_date()[:10])
+        except ValueError:
+            current = datetime.date.today()
+        ui.dt_date.setDate(QDate(current.year, current.month, current.day))
+        if ui.exec() != QDialog.DialogCode.Accepted:
             return
-        fu.update_session_date(self._db, self._sid, txt)
-        self.btn_save_date.setEnabled(False)   # clean again
+        new = ui.dt_date.date().toString("yyyy-MM-dd")
+        fu.update_session_date(self._db, self._sid, new)
+        self._date_lbl.setText(new)
+        self._flash_saved()
         self._emit_change()
 
     def _on_pin_toggled(self, checked):
@@ -580,12 +633,10 @@ class VisitWindow(QDialog):
         fu.set_session_pinned(self._db, self._sid, checked)
         self._emit_change()
 
-    def _on_save_and_close(self):
-        # The closing gesture: a pending date edit flushes (an invalid
-        # one reverts first, per the field's own rule); everything else
-        # already saved itself, so nothing can be lost silently here.
-        if self.btn_save_date.isEnabled():
-            self._save_date()
+    def _on_close(self):
+        # The closing gesture: a pending name edit flushes first (nothing else
+        # is pending: everything saved itself as it was typed).
+        self._save_head()
         self.close()
 
     def _on_delete_visit(self):
@@ -602,14 +653,14 @@ class VisitWindow(QDialog):
         self._emit_change()
         self.close()
 
-    # ------------------------------------------------------- resources
+    # ------------------------------------------------------- the content
 
     def _kind_label(self, kind):
-        # How a resource's kind reads in the list. The registry keeps a
-        # stable English key, and showing it raw ("[exotic_figure]") made the
-        # list unreadable exactly where a visit now carries the reduction's
-        # own products. Each label is a literal self.tr() so lupdate sees it;
-        # an unknown kind still shows its key, never nothing.
+        # How a row's kind reads. The registry keeps a stable English key, and
+        # showing it raw ("[exotic_figure]") made the list unreadable exactly
+        # where a visit carries the reduction's own products. Each label is a
+        # literal self.tr() so lupdate sees it; an unknown kind still shows its
+        # key, never nothing.
         # @args: kind - the registry kind of the file
         # @return: the label
         labels = {
@@ -632,138 +683,247 @@ class VisitWindow(QDialog):
         }
         return labels.get(kind, kind)
 
-    def _populate_resources(self):
-        # Refills the visit's resource list from the registry.
-        from ...core import project as proj_mod
-        self.lst_res.clear()
-        for f in proj_mod.files_for_session(self._db, self._sid):
-            meta = f.get("meta") or {}
-            bits = [f"[{self._kind_label(f['kind'])}]",
-                    Path(f["path"]).name]
-            if meta.get("filter"):
-                bits.append(f"({meta['filter']})")
-            if meta.get("date_obs"):
-                bits.append(f"({meta['date_obs']})")
-            item = QListWidgetItem(" ".join(bits))
-            item.setToolTip(f["path"])
-            item.setData(Qt.UserRole, f["id"])
-            self.lst_res.addItem(item)
+    def _when(self, raw):
+        # @args: raw - epoch seconds (float or string)
+        # @return: "HH:MM" (local), or "" when the moment is unknown. The two
+        #          lists are chronological, so the hour leads the row: a plain
+        #          list cannot right-align a second column, and a log reads
+        #          top-down anyway.
+        try:
+            return datetime.datetime.fromtimestamp(
+                float(raw)).strftime("%H:%M")
+        except (TypeError, ValueError):
+            return ""
 
-    def _populate_runs(self):
-        # @return: None. The visit's own astrometry runs (ADR-086 rev): one
-        #          row per run, oldest first, with its state; the observer
-        #          opens one in the editor (double click or the button).
-        tbl = self._runs_tbl
-        if tbl is None:
-            return
+    def _freeable(self, run_id):
+        # @args: run_id - the execution
+        # @return: how many of its originals could still move to prcd/ (0 when
+        #          the run is unknown or the module cannot say)
+        from ...core import free_space
+        try:
+            return int(free_space.freeable(self._db, run_id)["n"])
+        except Exception:
+            return 0
+
+    def _run_row(self, run):
+        # @args: run - an astrometry run dict
+        # @return: the row dict the two lists are built from
+        undone = (run.get("status") or "") == "undone"
+        n = run.get("n_obs") or run.get("points") or 0
+        state = self.tr("undone") if undone else \
+            self.tr("%1 obs · complete").replace("%1", str(n))
+        tip = self.tr("The visit's astrometry run: open it in the editor")
+        free = self._freeable(run.get("id"))
+        if free:
+            tip += "\n" + self.tr(
+                "%1 original frames can be moved to prcd/.").replace(
+                    "%1", str(free))
+        return {"where": "results", "epoch": _epoch_of(run.get("created")),
+                "glyph": _ROW_GLYPHS["run"], "text": self.tr("Astrometry run"),
+                "kind": state, "when": self._when(run.get("created")),
+                "tip": tip, "data": {"type": "run", "id": run.get("id")}}
+
+    def _file_row(self, f):
+        # @args: f - a project_files row
+        # @return: the row dict; a raw kind goes to the folded block, the rest
+        #          to Results
+        meta = f.get("meta") or {}
+        kind = f.get("kind") or "file"
+        bits = [self._kind_label(kind)]
+        if meta.get("filter"):
+            bits.append(str(meta["filter"]))
+        if meta.get("exptime_s"):
+            bits.append(f"{float(meta['exptime_s']):g} s")
+        return {"where": "files" if kind in _RAW_KINDS else "results",
+                "epoch": _epoch_of(f.get("created")),
+                "glyph": _ROW_GLYPHS.get(kind, "▪"),
+                "text": Path(f["path"]).name, "kind": " · ".join(bits),
+                "when": self._when(f.get("created")), "tip": f["path"],
+                "data": {"type": "file", "id": f["id"], "path": f["path"],
+                         "kind": kind}}
+
+    def _point_row(self, p):
+        # @args: p - a photometry point dict
+        # @return: the row dict; the hour comes from the point's MJD (its own
+        #          moment, which the visit's date edit never rewrites)
+        err = f" ±{p['err']}" if p.get("err") is not None else ""
+        mjd = p.get("mjd") or 0.0
+        epoch = (float(mjd) + 2400000.5 - 2440587.5) * 86400.0
+        return {"where": "results", "epoch": epoch, "glyph": _ROW_GLYPHS["point"],
+                "text": f"{p.get('mag')}{err} ({p.get('filter')})",
+                "kind": self.tr("measured") if p.get("source") != "manual"
+                else self.tr("by hand"),
+                "when": self._when(epoch),
+                "tip": self.tr("A measurement of this visit"),
+                "data": {"type": "point", "id": p.get("id")}}
+
+    def _populate_content(self):
+        # @return: None. Fills both lists from the visit's three sources
+        #          (runs, files, points), each sorted by when it happened.
+        from ...core import followup as fu, project as proj_mod
+        files = proj_mod.files_for_session(self._db, self._sid)
+        points = [p for p in fu.list_points(self._db, self._pid)
+                  if p.get("session_id") == self._sid]
         runs = []
         if callable(self._runs_for_session):
             try:
                 runs = self._runs_for_session(self._sid) or []
             except Exception:
                 runs = []
-        tbl.setRowCount(len(runs))
-        for i, run in enumerate(runs):
-            when = self._run_when(run.get("created"))
-            undone = (run.get("status") or "") == "undone"
-            cells = (when,
-                     ("—" if undone else str(run.get("n_obs")
-                                             or run.get("points") or 0)),
-                     self.tr("undone") if undone
-                     else self.tr("complete"))
-            for col, text in enumerate(cells):
-                item = QTableWidgetItem(str(text))
-                if col == 0:
-                    item.setData(Qt.UserRole, run.get("id"))
-                tbl.setItem(i, col, item)
-        if self._runs_lbl is not None:
-            if runs:
-                self._runs_lbl.setText(self.tr(
-                    "This visit's runs: click one and open it in the editor."))
-            else:
-                self._runs_lbl.setText(self.tr(
-                    "This visit has no runs yet."))
+        rows = ([self._run_row(r) for r in runs]
+                + [self._file_row(f) for f in files]
+                + [self._point_row(p) for p in points])
+        results = sorted((r for r in rows if r["where"] == "results"),
+                         key=lambda r: r["epoch"])
+        raw = sorted((r for r in rows if r["where"] == "files"),
+                     key=lambda r: r["epoch"])
+        self._fill_list(self.lst_results, results)
+        self._fill_list(self.lst_files, raw)
+        empty = not results
+        self._ui.vp_lbl_results.setText(self.tr(
+            "Nothing yet: attach the night's frames or measure."))
+        self._ui.vp_lbl_results.setVisible(empty)
+        self._ui.vp_btn_files.setText(self.tr(
+            "Files of the night (%1)").replace("%1", str(len(raw))))
 
-    def _run_when(self, raw):
-        # @args: raw - epoch seconds (string or float)
-        # @return: "YYYY-MM-DD HH:MM"
-        import datetime
-        try:
-            return datetime.datetime.fromtimestamp(
-                float(raw)).strftime("%Y-%m-%d %H:%M")
-        except (TypeError, ValueError):
-            return str(raw or "")
+    def _fill_list(self, lst, rows):
+        # @args: lst - the PassiveList to fill, rows - the row dicts
+        # @return: None
+        lst.clear()
+        for row in rows:
+            text = row["text"]
+            if row["kind"]:
+                text += "   ·   " + row["kind"]
+            when = (row["when"] + "   ") if row["when"] else ""
+            item = QListWidgetItem(f"{row['glyph']}   {when}{text}")
+            item.setData(Qt.UserRole, row["data"])
+            item.setToolTip(row["tip"])
+            lst.addItem(item)
 
-    def _on_run_selected(self):
-        # @return: None. Nothing automatic: opening is a deliberate gesture.
-        pass
+    def _on_files_fold(self, open_):
+        # The folded block: the arrow follows the state, and the list is only
+        # built when it is open (the rows are cheap, but a hidden list that is
+        # still laid out is what pushed the window past the fold).
+        self._ui.ph_files.setVisible(open_)
+        self._ui.vp_btn_files.setArrowType(
+            Qt.DownArrow if open_ else Qt.RightArrow)
 
-    def _on_open_run(self):
-        # @return: None. Opens the selected run in the editor (the host owns
-        #          the navigation; without it the click is a no-op).
-        tbl = self._runs_tbl
-        if tbl is None or not callable(self._open_run):
-            return
-        rows = tbl.selectionModel().selectedRows()
-        if not rows:
-            return
-        item = tbl.item(rows[0].row(), 0)
+    # --------------------------------------------------- the row gestures
+
+    def _row_data(self, lst, pos):
+        # @args: lst - the list, pos - the click position
+        # @return: (item, data) for the row under the cursor, or (None, {})
+        item = lst.itemAt(pos)
+        if item is None:
+            return None, {}
+        return item, (item.data(Qt.UserRole) or {})
+
+    def _on_row_open(self, item):
+        # Double click: the row's own default (a run opens in the editor, a
+        # plate too, a measurement opens its plate).
+        data = item.data(Qt.UserRole) or {}
+        kind = data.get("type")
+        if kind == "run":
+            self._row_open_run(data.get("id"))
+        elif kind == "point":
+            self._row_open_point(data.get("id"))
+        else:
+            self._row_open_file(data)
+
+    def _on_row_menu(self, lst, pos):
+        # The per-row menu: everything a row can do, so the window needs no
+        # button row (Open / Remove / Free space all lived in one before).
+        item, data = self._row_data(lst, pos)
         if item is None:
             return
-        run_id = item.data(Qt.UserRole)
-        if run_id is not None:
+        kind = data.get("type")
+        menu = QMenu(self)
+        if kind == "run":
+            menu.addAction(self.tr("Open in the editor"),
+                           lambda: self._row_open_run(data.get("id")))
+            free = self._freeable(data.get("id"))
+            act = menu.addAction(
+                self.tr("Free space (%1 frames)…").replace("%1", str(free))
+                if free else self.tr("Free space…"),
+                lambda: self._free_runs([data.get("id")]))
+            act.setEnabled(bool(free))
+            menu.addAction(self.tr("Bring back the frames…"),
+                           lambda: self._restore_runs([data.get("id")]))
+        elif kind == "point":
+            menu.addAction(self.tr("Open its plate"),
+                           lambda: self._row_open_point(data.get("id")))
+            menu.addSeparator()
+            menu.addAction(self.tr("Remove the measurement"),
+                           lambda: self._row_remove_point(data.get("id")))
+        else:
+            menu.addAction(self.tr("Open"),
+                           lambda: self._row_open_file(data))
+            menu.addSeparator()
+            menu.addAction(self.tr("Remove from the visit"),
+                           lambda: self._row_remove_file(data.get("id")))
+        menu.exec(lst.mapToGlobal(pos))
+
+    def _row_open_run(self, run_id):
+        # @return: None. The host owns the navigation (it opens the editor on
+        #          the run); without it the gesture is a no-op.
+        if callable(self._open_run) and run_id is not None:
             self._open_run(run_id)
+
+    def _row_open_point(self, point_id):
+        # ADR-047: the host resolves the plate the point came from and opens
+        # it in the editor; without the callback the row stays plain.
+        if callable(self._on_measure_click) and point_id is not None:
+            self._on_measure_click(point_id)
+
+    def _row_open_file(self, data):
+        # FITS plates open in the editor (the host); everything else opens
+        # with the system, which is what the observer expects of a PDF or a
+        # chart.
+        path = data.get("path")
+        if not path:
+            return
+        if data.get("kind") == "fits" and callable(self._open_in_editor):
+            self._open_in_editor(path, self._sid)
+            return
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    def _row_remove_file(self, file_id):
+        # Unlink only; the file on disk is never touched.
+        from ...core import project as proj_mod
+        if file_id is None:
+            return
+        proj_mod.delete_file(self._db, file_id)
+        self._populate_content()
+        self._emit_change()
+
+    def _row_remove_point(self, point_id):
+        # The point is the visit's measurement: deleting it is a data change
+        # (the curve follows), so it asks first.
+        from ...core import followup as fu
+        if point_id is None:
+            return
+        if QMessageBox.question(
+                self, self.tr("Remove the measurement"),
+                self.tr("Remove this measurement from the visit? The file it "
+                        "came from is not touched."),
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        fu.delete_point(self._db, point_id)
+        self._populate_content()
+        self._emit_change()
 
     # ------------------------------------------------------ free space
 
-    def _visit_run_ids(self):
-        # @return: the run ids to act on: the selected row, or every run of
-        #          the visit when nothing is selected
-        ids = []
-        tbl = self._runs_tbl
-        if tbl is not None:
-            rows = tbl.selectionModel().selectedRows()
-            if rows:
-                item = tbl.item(rows[0].row(), 0)
-                if item is not None and item.data(Qt.UserRole) is not None:
-                    ids.append(item.data(Qt.UserRole))
-        if ids:
-            return ids
-        if callable(self._runs_for_session):
-            try:
-                runs = self._runs_for_session(self._sid) or []
-            except Exception:
-                runs = []
-            return [r.get("id") for r in runs if r.get("id") is not None]
-        return []
-
-    def _free_say(self, text):
-        # @args: text - the one-line result shown under the runs
-        if self._free_lbl is not None:
-            self._free_lbl.setText(text)
-
-    def _update_free_hint(self):
-        # @return: None. One line: how many frames this visit could free, so
-        #          the button never acts blind.
-        from ...core import free_space
-        n = 0
-        for rid in self._visit_run_ids():
-            try:
-                n += free_space.freeable(self._db, rid)["n"]
-            except Exception:
-                pass
-        if n:
-            self._free_say(self.tr(
-                "%1 original frames can be moved to procesados/.").replace(
-                    "%1", str(n)))
-        else:
-            self._free_say("")
-
-    def _on_free_space(self):
+    def _free_runs(self, run_ids):
+        # @args: run_ids - the executions whose originals move to prcd/
+        # @return: None. ADR-062 phase 9: nothing is deleted, and Bring back
+        #          undoes it. The confirmation says the count, the size and
+        #          where they land, so the gesture is never blind.
         from ...core import free_space, project as project_mod
-        ids = self._visit_run_ids()
+        ids = [r for r in (run_ids or []) if r is not None]
         if not ids:
-            self._free_say(self.tr("This visit has no runs yet."))
             return
         p = project_mod.get(self._db, self._pid)
         if p is None:
@@ -775,10 +935,11 @@ class VisitWindow(QDialog):
             n += f["n"]
             nbytes += f["bytes"]
         if n == 0:
-            self._free_say(self.tr(
-                "Nothing to free: the frames are already in procesados/."))
+            QMessageBox.information(
+                self, self.tr("Free space"),
+                self.tr("Nothing to free: the frames are already in prcd/."))
             return
-        dest = str(Path(storage) / "procesados")
+        dest = str(Path(storage) / free_space.PROCESSED_DIR)
         mb = nbytes / (1024 * 1024)
         if QMessageBox.question(
                 self, self.tr("Free space"),
@@ -799,19 +960,19 @@ class VisitWindow(QDialog):
         finally:
             QApplication.restoreOverrideCursor()
         if errors:
-            self._free_say(self.tr("%1 frames moved, %2 could not be moved.")
-                           .replace("%1", str(moved)).replace("%2", str(errors)))
-        else:
-            self._free_say(self.tr("%1 frames moved to procesados/.").replace(
-                "%1", str(moved)))
-        self._populate_runs()
-        self._populate_resources()
+            QMessageBox.warning(
+                self, self.tr("Free space"),
+                self.tr("%1 frames moved, %2 could not be moved.").replace(
+                    "%1", str(moved)).replace("%2", str(errors)))
+        self._populate_content()
 
-    def _on_restore_space(self):
+    def _restore_runs(self, run_ids):
+        # @args: run_ids - the executions whose originals come back
+        # @return: None. A name already taken is not overwritten: the frame
+        #          lands next to it (the registry follows).
         from ...core import free_space
-        ids = self._visit_run_ids()
+        ids = [r for r in (run_ids or []) if r is not None]
         if not ids:
-            self._free_say(self.tr("This visit has no runs yet."))
             return
         from PySide6.QtWidgets import QApplication
         QApplication.setOverrideCursor(Qt.WaitCursor)
@@ -825,16 +986,20 @@ class VisitWindow(QDialog):
         finally:
             QApplication.restoreOverrideCursor()
         if moved == 0 and errors == 0:
-            self._free_say(self.tr("Nothing to bring back."))
+            QMessageBox.information(
+                self, self.tr("Bring back"),
+                self.tr("Nothing to bring back."))
             return
         msg = self.tr("%1 frames brought back.").replace("%1", str(moved))
         if renamed:
             msg += " " + self.tr(
                 "%1 landed next to a file with the same name.").replace(
                     "%1", str(renamed))
-        self._free_say(msg)
-        self._populate_runs()
-        self._populate_resources()
+        if errors:
+            msg += " " + self.tr("%1 could not be moved.").replace(
+                "%1", str(errors))
+        QMessageBox.information(self, self.tr("Bring back"), msg)
+        self._populate_content()
 
     def _on_analyze(self):
         # The kind's own analysis (ADR-045 review): the host opens the
@@ -870,7 +1035,7 @@ class VisitWindow(QDialog):
             meta = metas.get(path, {}) if kind == "fits" else {}
             proj_mod.add_file(self._db, self._pid, path, kind,
                               session_id=self._sid, meta=meta)
-        self._populate_resources()
+        self._populate_content()
         self._emit_change()
 
     def _ask_batch_meta(self, paths):
@@ -978,96 +1143,39 @@ class VisitWindow(QDialog):
                 "date_obs": ui.vp_img_date.text().strip() or None,
                 "exptime_s": exp}
 
-    def _selected_resource(self):
-        # @return: the selected registry row dict, or None
-        from ...core import project as proj_mod
-        items = self.lst_res.selectedItems()
-        if not items:
-            return None
-        fid = items[0].data(Qt.UserRole)
-        row = next((f for f in proj_mod.list_files(self._db, self._pid)
-                    if f["id"] == fid), None)
-        return row
-
-    def _on_open_resource(self):
-        # Plates go to the FITS editor (the host's callback carries the
-        # visit so what is saved there lands back here); the rest open
-        # with the system.
-        f = self._selected_resource()
-        if f is None:
-            return
-        if f["kind"] == "fits" and self._open_in_editor is not None:
-            self._open_in_editor(f["path"], self._sid)
-            return
-        from PySide6.QtGui import QDesktopServices
-        from PySide6.QtCore import QUrl
-        QDesktopServices.openUrl(QUrl.fromLocalFile(f["path"]))
-
-    def _on_remove_resource(self):
-        # Unlink only; the file on disk is never touched.
-        from ...core import project as proj_mod
-        f = self._selected_resource()
-        if f is None:
-            return
-        proj_mod.delete_file(self._db, f["id"])
-        self._populate_resources()
-        self._emit_change()
-
     # ----------------------------------------------------- measurements
 
     def _build_measurements_block(self, s):
-        # Quick magnitude entry + the visit's points with a remove
-        # action. The point's MJD comes from the visit's date. The
-        # structure is the fragment ui/visit_measurements.ui, loaded only
-        # for the light-curve kinds: absent means absent (the pinned
-        # tests find no widget at all on the other kinds).
+        # The quick entry for a hand measurement, FOLDED behind its own
+        # button: the visit's points are rows in Results now (they used to be
+        # listed here as well, twice), so this block only has to say "add
+        # one". The structure is the fragment ui/visit_measurements.ui,
+        # loaded only for the light-curve kinds: absent means absent (the
+        # pinned tests find no widget at all on the other kinds).
         ui = load_ui("visit_measurements", self)
-        self.layout().insertWidget(2, ui, 1)   # between resources, notes
+        self._ui_meas = ui
+        self.layout().insertWidget(4, ui)      # under the actions, above Results
         self.spn_mag = PassiveDoubleSpinBox()
         self.spn_mag.setRange(-5.0, 30.0)
         self.spn_mag.setDecimals(3)
         self.spn_mag.setValue(16.0)
-        drop_in(ui.layout().itemAt(0).layout(), ui.ph_mag, self.spn_mag)
+        drop_in(ui.w_meas.layout(), ui.ph_mag, self.spn_mag)
         self.spn_err = PassiveDoubleSpinBox()
         self.spn_err.setRange(0.0, 9.0)
         self.spn_err.setDecimals(3)
         self.spn_err.setValue(0.0)
         self.spn_err.setSpecialValueText("—")
-        drop_in(ui.layout().itemAt(0).layout(), ui.ph_err, self.spn_err)
+        drop_in(ui.w_meas.layout(), ui.ph_err, self.spn_err)
         self.cmb_filt = ui.cmb_filt
         self.cmb_filt.addItems(_FILTERS)
         ui.vp_btn_add_meas.clicked.connect(self._on_add_measurement)
-        ui.vp_btn_del_meas.clicked.connect(self._on_delete_measurement)
-        self.lst_meas = PassiveList()
-        self.lst_meas.setObjectName("vp_measurements")
-        drop_in(ui.layout(), ui.ph_meas_list, self.lst_meas)
-        # ADR-047: a click on a row is a shortcut to its origin (the UFE
-        # opens on the plate the point was measured on); without the
-        # callback the list stays plain
-        if self._on_measure_click is not None:
-            self.lst_meas.itemClicked.connect(self._on_measure_clicked)
-        self._populate_measurements()
+        ui.vp_btn_add_point.toggled.connect(self._on_add_point_fold)
 
-    def _on_measure_clicked(self, item):
-        # ADR-047: hand the row's point id to the host (the main window
-        # resolves the plate and opens the editor); the None callback
-        # never installs this handler.
-        # @args: item - the clicked list row
-        if self._on_measure_click is None:
-            return
-        self._on_measure_click(item.data(Qt.UserRole))
-
-    def _populate_measurements(self):
-        from ...core import followup as fu
-        self.lst_meas.clear()
-        for pt in fu.list_points(self._db, self._pid):
-            if pt.get("session_id") != self._sid:
-                continue
-            err = f" ±{pt['err']}" if pt["err"] is not None else ""
-            item = QListWidgetItem(
-                f"[{pt['filter']}] mag {pt['mag']}{err}  ({pt['source']})")
-            item.setData(Qt.UserRole, pt["id"])
-            self.lst_meas.addItem(item)
+    def _on_add_point_fold(self, open_):
+        # The entry opens on demand; the arrow says which state it is in.
+        self._ui_meas.w_meas.setVisible(open_)
+        self._ui_meas.vp_btn_add_point.setArrowType(
+            Qt.DownArrow if open_ else Qt.RightArrow)
 
     def _session_mjd(self, s):
         # The visit's MJD: its observing date when parseable, else its
@@ -1089,6 +1197,8 @@ class VisitWindow(QDialog):
         return jd_from_datetime(dt) - 2400000.5
 
     def _on_add_measurement(self):
+        # A hand measurement: the point joins the visit's curve AND the
+        # Results list (one datum, one place to see it).
         from ...core import followup as fu
         mag = self.spn_mag.value()
         err = self.spn_err.value() if self.spn_err.value() > 0 else None
@@ -1096,16 +1206,7 @@ class VisitWindow(QDialog):
         s = fu.get_session(self._db, self._sid)
         fu.add_point(self._db, self._pid, self._session_mjd(s), filt,
                      mag, err=err, source="manual", session_id=self._sid)
-        self._populate_measurements()
-        self._emit_change()
-
-    def _on_delete_measurement(self):
-        from ...core import followup as fu
-        items = self.lst_meas.selectedItems()
-        if not items:
-            return
-        fu.delete_point(self._db, items[0].data(Qt.UserRole))
-        self._populate_measurements()
+        self._populate_content()
         self._emit_change()
 
     # --------------------------------------------------- MPC astrometry
@@ -1116,73 +1217,85 @@ class VisitWindow(QDialog):
         return proj_mod.get(self._db, self._pid)
 
     def _build_mpc_block(self):
-        # The night's astrometry (NEO/PCCP): paste the MPC 80-col or ADES
-        # lines, validate them, save the report. The report registers to
-        # THIS visit — the measurements are the visit's product, so the
-        # block lives here and nowhere else (ADR-045, form A). The
-        # structure is the fragment ui/visit_mpc_block.ui, loaded only
-        # for the MPC kinds (absent means absent).
+        # The night's astrometry (NEO/PCCP): the report window is the SAME one
+        # the editor's Astrometry tab opens (ADR-080), through the shared
+        # controller. The visit keeps a button and one status line: there is
+        # nothing to paste here, because the report is built from the visit's
+        # own astrometry run. It registers to THIS visit (the measurements are
+        # the visit's product, ADR-045 form A), so the block lives here and
+        # nowhere else. The structure is the fragment ui/visit_mpc_block.ui,
+        # loaded only for the MPC kinds (absent means absent).
+        from ..mpc_report_controller import MpcReportController
         ui = load_ui("visit_mpc_block", self)
-        self.layout().insertWidget(2, ui)      # between resources, notes
-        self.txt_mpc = ui.txt_mpc
-        ui.vp_mpc_validate.clicked.connect(self._on_mpc_validate)
-        ui.vp_mpc_save.clicked.connect(self._on_mpc_save)
+        self.layout().insertWidget(4, ui)   # under the actions, above Results
         self.lbl_mpc_status = ui.vp_mpc_status
+        self._report = MpcReportController(
+            self, self._build_mpc_report,
+            is_neocp=self._mpc_is_neocp, object_name=self._mpc_object_name,
+            save_dir=self._mpc_save_dir,
+            on_saved=self._on_mpc_saved, on_report=self._on_mpc_ready,
+            say=self.lbl_mpc_status.setText)
+        ui.vp_mpc_open.clicked.connect(self._report.open_window)
+        # the visit opens knowing whether it has something to report
+        self._report.regenerate(quiet=True)
 
-    def _on_mpc_validate(self):
-        from ...core import mpc_report
-        from ...config import config
-        text = self.txt_mpc.toPlainText()
-        if not text.strip():
-            self.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
+    def _mpc_is_neocp(self):
+        # @return: True while the object is on the confirmation page, so the
+        #          send dialog starts on the NEOCP target
+        return bool((self._project() or {}).get("context", {}).get("neocp"))
+
+    def _mpc_object_name(self):
+        # @return: the object's name, for the saved file's default name
+        return (self._project() or {}).get("object_name") or ""
+
+    def _mpc_save_dir(self):
+        # @return: the project's own folder, where the report belongs (the
+        #          measurements are the visit's product and hang from it)
+        from ...core import project as proj_mod
         p = self._project()
-        result = mpc_report.validate(
-            text, obs_code=config.get("mpc_code", ""),
-            expected_obj=(p or {}).get("object_name"))
-        if result["valid"]:
-            status = (self.tr("Valid: %1 lines, %2")
-                      .replace("%1", str(result["n_lines"]))
-                      .replace("%2", result["format"]))
-            if result["warnings"]:
-                status += " ⚠ " + "; ".join(result["warnings"])
-            self.lbl_mpc_status.setText(status)
-        else:
-            self.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
+        return proj_mod.storage_dir(p) if p else None
 
-    def _on_mpc_save(self):
-        # Package and register the report to THIS visit; when the
-        # report's own first measurement disagrees with the visit's date,
-        # say so (a report hung on the wrong night is a silent database
-        # sin), without blocking.
+    def _build_mpc_report(self, fmt, submission, quiet):
+        # @args: fmt - the generator's format key, submission - the ACK/target
+        #        the header carries, quiet - True when the rebuild is not news
+        # @return: {"text", "kept"} or None. The host rebuilds the report from
+        #          the visit's own astrometry run (the run and its points live
+        #          in the database, and the host owns them). Nothing is written
+        #          here. The status line is the visit's only voice, so it says
+        #          WHY there is nothing even on a quiet rebuild: with the
+        #          window shut, an unexplained click reads as broken.
+        if not callable(self._mpc_build):
+            self.lbl_mpc_status.setText(
+                self.tr("This visit has no astrometry to report."))
+            return None
+        try:
+            out = self._mpc_build(self._sid, fmt, submission)
+        except Exception as err:
+            logger.warning("the visit's MPC report could not be built: %s", err)
+            self.lbl_mpc_status.setText(
+                self.tr("The visit's astrometry could not be rebuilt."))
+            return None
+        if not out or not str(out.get("text") or "").strip():
+            self.lbl_mpc_status.setText(
+                self.tr("This visit has no astrometry run to report yet."))
+            return None
+        return out
+
+    def _on_mpc_ready(self):
+        # @return: None. The report is in the window: the status line says how
+        #          many observations it carries and what the button does.
+        self.lbl_mpc_status.setText(self.tr(
+            "%1 observation(s) ready to report. Open the report window to "
+            "review, save or send it.").replace(
+                "%1", str(self._report.kept)))
+
+    def _on_mpc_saved(self, path, text):
+        # @return: None. Register the saved report to THIS visit; when the
+        #          report's own first measurement disagrees with the visit's
+        #          date, say so (a report hung on the wrong night is a silent
+        #          database sin), without blocking.
         from ...core import followup as fu, mpc_report
         from ...core import project as proj_mod
-        from ...config import config
-        text = self.txt_mpc.toPlainText()
-        if not text.strip():
-            self.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
-        p = self._project()
-        obj = (p or {}).get("object_name", "")
-        outdir = proj_mod.storage_dir(p) if p else Path.home()
-        default = outdir / f"{obj}_mpc_report.txt"
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Save MPC report"), str(default),
-            "Text files (*.txt);;All files (*)")
-        if not out:
-            return
-        path, result = mpc_report.package(
-            text, out, obs_code=config.get("mpc_code", ""),
-            expected_obj=obj)
-        if not path:
-            self.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
-            return
         proj_mod.add_file(self._db, self._pid, path, "report",
                           session_id=self._sid)
         note = ""
@@ -1193,10 +1306,8 @@ class VisitWindow(QDialog):
                 "⚠ the report's first measurement is from %1, not this "
                 "visit's date").replace("%1", rep_date)
         self.lbl_mpc_status.setText(
-            self.tr("Saved: %1 (%2 lines)")
-            .replace("%1", path).replace("%2", str(result["n_lines"]))
-            + note)
-        self._populate_resources()
+            self.tr("Saved: %1").replace("%1", path) + note)
+        self._populate_content()
         self._emit_change()
 
     # ------------------------------------------------------------ notes

@@ -160,7 +160,6 @@ class UfeDialog(QWidget):
         # the stage goes back to the panel in the column when it closes.
         self._tools = {}
         self._active_tool = None
-        self._mpc_send_hook = None
         # the passes of the visit (one night, one curve, 2026-09-30): the
         # list and which of them the chart shows
         self._visit_passes_hook = None
@@ -502,7 +501,7 @@ class UfeDialog(QWidget):
         self.btn_load = self._ui.btn_load
         self.btn_load.clicked.connect(self._on_load)
         self.btn_export = self._ui.btn_export
-        self.btn_export.clicked.connect(self._on_export_png)
+        self.btn_export.clicked.connect(self._on_export)
         # ADR-044 rev: the tools that left the tab column. Each button is a
         # door to its window (a second press closes it, like the manual
         # tweak window), and while one is open it owns the plate (see
@@ -1486,25 +1485,6 @@ class UfeDialog(QWidget):
             logger.warning("open settings hook failed: %s", err)
             return False
 
-    def set_mpc_send_hook(self, fn):
-        # @args: fn - callable(text) -> True when the visit's MPC block
-        #        received the report, or None
-        # @return: None
-        self._mpc_send_hook = fn if callable(fn) else None
-
-    def send_to_mpc_block(self, text):
-        # The Track & Stack tab's report lands in the visit's MPC paste
-        # box, where the ADR-022 validator has the last word.
-        # @args: text - the generated report
-        # @return: True when the block received it
-        if self._mpc_send_hook is None:
-            return False
-        try:
-            return bool(self._mpc_send_hook(text))
-        except Exception as err:
-            logger.warning("mpc send hook failed: %s", err)
-            return False
-
     def set_astrometry_persist_hook(self, fn):
         # @args: fn - callable(payload: dict) -> run_id, or None
         # @return: None. The host writes the run (astrometry_runs, its
@@ -1978,7 +1958,7 @@ class UfeDialog(QWidget):
         root = paths_mod.docs_dir()
         name = "UFE.es.md" if ui_lang() == "es" else "UFE.md"
         start = root / name if (root / name).exists() else None
-        open_browser(root, self, start=start)
+        open_browser(root, self, start=start, lang=ui_lang())
 
     def _open_assistant(self):
         # Open the assistant scoped to this editor (ADR-075). One window,
@@ -2684,23 +2664,62 @@ class UfeDialog(QWidget):
             return
         self._last_dir = str(Path(path).parent)
 
-    def _on_export_png(self):
-        # Export PNG… → saves whatever the view is showing right now.
+    def _on_export(self):
+        # Export… → whatever the observer picks in the dialog: a PNG of the
+        # visible scene (the old behaviour) or a FITS copy of the plate with
+        # the WCS solved in this session merged in. The format is decided by
+        # an explicit extension when there is one, and by the selected
+        # filter otherwise: Qt does not always append the filter's suffix,
+        # and a FITS written as ".png" (or the other way round) would be a
+        # nasty surprise, so we normalise it here.
         if not self.state.has_image:
             return
         stem = Path(self.state.path).stem if self.state.path else "ufe"
-        path, _sel = QFileDialog.getSaveFileName(
-            self, self.tr("Export PNG"),
-            str(Path(self._last_dir) / f"{stem}_ufe.png")
-            if self._last_dir else f"{stem}_ufe.png",
-            "PNG (*.png)")
+        base = str(Path(self._last_dir) / stem) if self._last_dir else stem
+        path, sel = QFileDialog.getSaveFileName(
+            self, self.tr("Export"),
+            f"{base}_ufe.png",
+            self.tr("PNG image (*.png);;FITS image (*.fits *.fit)"))
         if not path:
             return
-        out = self.view.export_png(path)
-        logger.info("UFE PNG export: %s", out)
-        # ADR-045: the scene export registers like every other tab's
-        # files (no-op when no project is watching)
-        self.notify_saved([out], "chart")
+        low = path.lower()
+        if low.endswith((".fits", ".fit", ".fts")):
+            kind = "fits"
+        elif low.endswith(".png"):
+            kind = "png"
+        elif "FITS" in sel.upper():
+            kind, path = "fits", path + ".fits"
+        else:
+            kind, path = "png", path + ".png"
+        if kind == "fits":
+            out = self._export_fits(path)
+        else:
+            out = self.view.export_png(path)
+        if out is None:
+            return
+        logger.info("UFE %s export: %s", kind, out)
+        # ADR-045: the export registers like every other tab's files
+        # (no-op when no project is watching)
+        self.notify_saved([out], "chart" if kind == "png" else "fits")
+
+    def _export_fits(self, path):
+        # A FITS copy of the plate: the pixels verbatim (the annotations and
+        # the whole header ride along) plus the WCS solved in this session,
+        # which is not on disk when the observer turned "save the solved
+        # WCS" off. Warns and returns None when the copy cannot be written.
+        # @args: path - destination file
+        # @return: the Path written, or None on failure
+        from ..core import wcs_store
+        cards = getattr(self.state, "solved_cards", None) or {}
+        try:
+            return wcs_store.copy_with_solved_wcs(self.state.path, path, cards)
+        except Exception as err:
+            logger.exception("FITS export failed: %s", err)
+            QMessageBox.warning(
+                self, self.tr("Export"),
+                self.tr("Could not write the FITS copy to {0}.\n{1}")
+                .format(path, str(err)))
+            return None
 
     def _on_zoom_preset(self, factor):
         # @args: factor - None for Fit, else the absolute scale (0.5..4)
@@ -2750,7 +2769,7 @@ class UfeDialog(QWidget):
             sc.setContext(ctx)
             sc.activated.connect(fn)
         for seq, fn in (("Ctrl+O", self._on_load),
-                        ("Ctrl+E", self._on_export_png)):
+                        ("Ctrl+E", self._on_export)):
             sc = QShortcut(QKeySequence(seq), self)
             sc.setContext(ctx)
             sc.activated.connect(fn)

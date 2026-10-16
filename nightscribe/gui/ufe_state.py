@@ -73,6 +73,10 @@ class UfeImageState(QObject):
                                    # invert/flips instead of the auto
                                    # percentiles
         self.annotations = []     # ANNOTATE cards read at load (read-only)
+        self.solved_cards = {}    # WCS cards solved for THIS plate (a fresh
+                                  # solve, or the solve cache when the file
+                                  # was left unsolved). They may not be on
+                                  # disk yet, so an export merges them in.
         self._disp_scale = 1      # plate px per display px (2x2 steps)
 
     # ------------------------------------------------------------- load
@@ -87,6 +91,7 @@ class UfeImageState(QObject):
         header, data = fits_io.read_fits(path)
         self.path = str(path)
         self.header = header
+        self.solved_cards = {}
         self.data = np.ascontiguousarray(data, dtype=np.float32)
         try:
             self.wcs = wcs_mod.Wcs.from_header(header)
@@ -104,6 +109,7 @@ class UfeImageState(QObject):
             if cards:
                 header = blink.merge_solved_wcs(header, cards)
                 self.header = header
+                self.solved_cards = dict(cards)
                 try:
                     self.wcs = wcs_mod.Wcs.from_header(header)
                     logger.info("WCS reused from the solve cache: %s",
@@ -120,11 +126,43 @@ class UfeImageState(QObject):
         self.annotations = fits_annotate.read_annotations(self.path)
         if not self.keep_stretch:
             self.inverted = False
-            self.flip_h = False
-            self.flip_v = False
             self.gamma = 1.0
+            self._apply_north_up()
             self.auto()
         self.image_loaded.emit()
+
+    def _apply_north_up(self):
+        # North up by default (asked for 2026-10-16): the plate opens with
+        # north pointing up, the way charts and acquisition screens show the
+        # sky. Only a MIRROR can do it here (a rotation would break picking,
+        # annotations and centroids, which live in original plate pixels),
+        # so the rule looks at where north really points in the DATA frame:
+        # the CD matrix maps pixel steps to sky steps, and the north
+        # direction's row component is cd00/det. The display puts data row 0
+        # at the bottom, so a positive row component means north already
+        # rises toward the top and nothing is touched; a negative one means
+        # the plate is upside down and one vertical flip fixes it. A rotated
+        # plate is left as it is (north then lands on the upper half, the
+        # best a flip can do), and the Settings switch turns the whole
+        # behaviour off.
+        # @return: None; sets flip_h/flip_v before the stretch is emitted
+        self.flip_h = False
+        self.flip_v = False
+        try:
+            from ..config import config
+            enabled = bool(config.get("ufe_north_up", True))
+        except Exception:                       # no config (unit tests)
+            enabled = True
+        if not enabled or self.wcs is None:
+            return
+        try:
+            cd = self.wcs.cd
+            det = cd[0][0] * cd[1][1] - cd[0][1] * cd[1][0]
+            if det == 0.0:
+                return
+            self.flip_v = (cd[0][0] / det) < 0.0
+        except Exception as err:                # odd header: keep native
+            logger.warning("north-up skipped: %s", err)
 
     def clear(self):
         # Drops the plate (back to the empty state).
@@ -133,6 +171,7 @@ class UfeImageState(QObject):
         self.data = None
         self.wcs = None
         self.annotations = []
+        self.solved_cards = {}
         self.image_loaded.emit()
 
     def set_wcs_cards(self, cards):
@@ -145,6 +184,7 @@ class UfeImageState(QObject):
             return False
         from ..core import blink
         self.header = blink.merge_solved_wcs(self.header, cards)
+        self.solved_cards = dict(cards)
         try:
             self.wcs = wcs_mod.Wcs.from_header(self.header)
         except Exception as err:

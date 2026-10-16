@@ -356,8 +356,11 @@ The depth lives in the repository, in the topic documents the app opens from
 its **?**:
 
 - [`docs/ASTROMETRY.md`](../ASTROMETRY.md): the centroid, the combination by
-  1/sigma^2, the error budget and the Find_Orb handoff, with a glossary;
+  1/sigma^2, the error budget and the Find_Orb handoff;
 - [`docs/MPC_SUBMISSION.md`](../MPC_SUBMISSION.md): the ADES and 80-column
   formats and the submission threshold.
+
+For the words this chapter shares with the rest of the guide (project, visit,
+run, series, report), see [00. Concepts](00-concepts.md).
 
 Next: [08. Reporting it](08-posts.md).

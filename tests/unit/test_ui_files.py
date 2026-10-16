@@ -113,9 +113,11 @@ def test_visits_panel_and_window(qapp, tmp_db):
     # the visit window, light-curve kind: the measurements fragment too
     sid = followup.create_session(tmp_db, p["id"])
     w = panel.open_visit(sid)
-    _check(w, 11, "_date_ed")
+    _check(w, 11, "vp_visit_date")
     from PySide6.QtWidgets import QWidget
-    for ph in ("ph_mag", "ph_err", "ph_meas_list"):
+    # the hand-measurement entry is FOLDED: its two swapped placeholders are
+    # inside the hidden container until the entry opens
+    for ph in ("ph_mag", "ph_err"):
         wdg = w.findChild(QWidget, ph)
         assert wdg is not None and not wdg.isVisibleTo(w), \
             f"{ph}: the swapped placeholder must be hidden"

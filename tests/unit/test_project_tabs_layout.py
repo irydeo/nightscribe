@@ -227,7 +227,7 @@ def test_capture_summary_strip_reads_the_plan(window):
     assert tiles["Before dawn"].texts()[0] in ("fits", "does not fit", "—")
     titles = [c.lbl_title.text() for c in page.findChildren(PanelCard)]
     assert any("Exposure plan" in t for t in titles), titles
-    assert any("Telescope and camera" in t for t in titles), titles
+    assert any("Observatory" in t for t in titles), titles
 
 
 def test_the_project_chrome_is_three_rows(window):

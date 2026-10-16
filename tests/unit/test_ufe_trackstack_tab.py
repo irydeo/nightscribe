@@ -1745,12 +1745,12 @@ def test_calibrating_the_frames_is_optional_and_off_by_default(qapp, tmp_path):
     # the exact numbers live in the ADR and in the code, and a help that cites
     # one visit ages badly (2026-10-07, the same rule the other helps follow)
     assert "0.087" not in tab.chk_calibrate.toolTip()
-    # ADR-061 rev: it no longer needs dither (the tiles a star spoiled are
-    # thrown away, so a static field works); what it does need is a dark/bias,
-    # or the pedestal compresses the model, and the tooltip says so.
+    # ADR-061 rev: it no longer needs dither (a spoiled tile is discarded by
+    # the fit itself, so a static field works); what it does need is a
+    # dark/bias, or the pedestal compresses the model, and the tooltip says so.
     assert "dark/bias" in tab.chk_calibrate.toolTip()
-    assert "star" in tab.chk_calibrate.toolTip()
-    assert "thrown away" in tab.chk_calibrate.toolTip()
+    assert "built from the frames themselves" in tab.chk_calibrate.toolTip()
+    assert "a real flat always wins" in tab.chk_calibrate.toolTip()
 
 
 def test_applying_the_calibration_survives_and_the_hint_says_what_it_will_do(
@@ -2312,6 +2312,67 @@ def test_a_saved_run_is_shown_again_when_the_visit_is_reopened(qapp, tmp_path):
     assert "saved" in tab._status_text
     # the door to a fresh run stays open: a restore is not a lock
     assert tab.btn_stack.isEnabled()
+
+
+def test_picking_another_run_of_the_same_visit_loads_it(qapp, tmp_path):
+    # Reported 2026-10-16: a run with 7 observations did not load. The session
+    # key is (project, visit), so picking ANOTHER run of the SAME visit reset
+    # nothing and _restore_result refused to replace the run on stage (its
+    # guard is "_result is not None"): the tab went on showing the old one.
+    # forget_run() is the door the host uses: it drops the run held and asks
+    # again, and with the right run already there it does nothing.
+    tab, host = _tab(qapp, tmp_path)
+    run_a, points_a, stacks_a = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run_a, "points": points_a,
+                                      "stacks": stacks_a}
+    tab.refresh_context()
+    assert tab._run_id == 7
+    held = tab._result
+
+    # the observer picks ANOTHER run of the same visit (7 observations)
+    run_b, points_b, stacks_b = _saved_run(tmp_path, mag=19.4)
+    run_b = dict(run_b, id=9, n_obs=7)
+    host.astrometry_result = lambda: {"run": run_b, "points": points_b,
+                                      "stacks": stacks_b}
+    # the restore alone does NOT swap (it asks once, by design)
+    tab.refresh_context()
+    assert tab._run_id == 7 and tab._result is held
+    # the door: forget what is held, ask again
+    tab.forget_run(9)
+    assert tab._run_id == 9
+    assert tab._result is not held and tab._result.get("restored")
+    assert tab.tbl_points.rowCount() == 1
+    assert tab.tbl_points.item(0, 6).text() == "19.400"
+    # and with the right run already on stage it is a no-op (no reload: the
+    # stacks are read from disk, which is not free)
+    again = tab._result
+    tab.forget_run(9)
+    assert tab._result is again
+    # a visit's own button ("the newest pass") has no run to forget
+    tab.forget_run(None)
+    assert tab._run_id == 9
+
+
+def test_the_run_puts_its_observation_back_on_stage(qapp, tmp_path):
+    # The host opens the editor on the visit's FIRST PLATE (it arms the frame
+    # navigator and the rest of the workbench); with a run held that plate
+    # threw the run's stack and its measured mark away, so the host asks the
+    # run to put its observation back (reported 2026-10-16).
+    tab, host = _tab(qapp, tmp_path)
+    run, points, stacks = _saved_run(tmp_path)
+    host.astrometry_result = lambda: {"run": run, "points": points,
+                                      "stacks": stacks}
+    tab.refresh_context()
+    assert tab._result is not None
+    st = tab._state if tab._view is not None else tab._stack_state
+    # the plate lands on top of the run, exactly like the host's open_plate
+    st.load(host.astrometry_context()["paths"][0])
+    assert not str(st.path).endswith("2026QX_obs1.fits")
+    assert tab.show_run_on_stage() is True
+    assert str(st.path).endswith("2026QX_obs1.fits")
+    # without a run there is nothing to put back
+    tab.clear_session()
+    assert tab.show_run_on_stage() is False
 
 
 def test_a_restored_run_does_not_write_its_stacks_again(qapp, tmp_path):

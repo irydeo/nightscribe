@@ -50,6 +50,6 @@ def test_a_v18_database_walks_to_v19_untouched(tmp_path):
     db.commit()
     db.close()
     db = Database(path)          # the migration runs again
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 22
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 24
     assert _COLS <= _columns(db, "gains")
     assert db.execute("SELECT COUNT(*) FROM projects").fetchone()[0] == 1

@@ -17,16 +17,23 @@ switching the choice disconnects the other. One condition either way: the
 program must be **open** (and, for NINA/PINS, its Advanced API plugin
 installed and enabled); NightScribe talks to its API, not to the drivers.
 
-From a project's **Capture** step:
+From a project's **Capture** step the **Observatory** console drives it. Its
+status sits on top (who answers, the mount's state, the temperature, the
+version) with the red **STOP** always at hand, and its commands are three verbs
+and two checkboxes:
 
-- **Connect CCDciel** / **Connect NINA / PINS** shows the observatory status
-  (mount, filter wheel, camera) on the panel.
-- **Point telescope** slews to the target's freshly computed position.
-- **Astrometric Goto** slews, plate-solves and corrects to the true sky
-  position: the reliable route for a preliminary orbit.
-- **Stop goto** stops the telescope movement **right now**. It is armed the
-  moment you press either pointing button and disarmed when the pointing
-  ends: use it if the mount heads somewhere it should not.
+- **Connect CCDciel** / **Connect NINA / PINS** is the only way in, and it shows
+  the observatory status (mount, filter wheel, camera) on the panel. The small
+  power button beside the status disconnects; the status refreshes by itself
+  every couple of seconds.
+- **Point telescope** slews to the target's freshly computed position. With
+  **Astrometric goto** ticked it also plate-solves and corrects to the true sky
+  position: the reliable route for a preliminary orbit. The box is a
+  preference (its default lives in Settings → Integrations) and it is
+  remembered between sessions.
+- **STOP** halts the telescope movement **right now**. It is armed the moment
+  the mount starts moving (a slew, an astrometric goto or a follow run) and
+  disarmed when it ends: use it if the mount heads somewhere it should not.
 - **Send plan** prepares the plan (object, frames × exposure, filter, binning,
   gain, offset, dither) in the software and **reads it back** (including the
   binning and dither it is really holding), so the panel shows what actually
@@ -36,7 +43,8 @@ From a project's **Capture** step:
   your wheel, the filter is left as it is and the read-back says so.
 - **Start capture** fires it, and the **same button stops it** while the run is
   in flight ("Stop capture"): it stops the **camera**, not the mount (that is
-  Stop goto).
+  STOP). With **Follow the object** ticked it runs the night in passes instead
+  of one block (see below), and the button becomes "Stop following".
 - The filter list of the **Exposure plan** card is the one your wheel really
   has (read from the program on connect); only when nothing is connected does
   the classic L/R/G/B/Ha/OIII/SII list appear.
@@ -87,6 +95,16 @@ The values travel with the exported sequence (CCDciel `.targets`, NINA JSON)
 and, where the API allows, are applied live; the full autofocus cadence lives
 in the sequence file.
 
+At the bottom of the same block are the **darks** and the **bias** of the night
+(how many, the dark's exposure, and **the wheel slot each one uses**). They run
+**at the end**, after the light frames, in that order. The slot matters: a dark
+is taken with the light path blocked, so it must not go through the filter the
+lights used. Both start on the **dark slot** you set in Settings → Equipment
+(`Dark` by convention) and you can change either one for a single night here.
+All four exports carry them: CCDciel and the native NINA sequence as real steps
+(`DARK`/`BIAS`), the NINA summary in its `Calibration` list and the CSV as rows
+with a `type` column.
+
 ### Suggested values, and why
 
 When a project has no plan yet, the **Exposure plan** and **Capture options
@@ -122,11 +140,12 @@ light-pollution key (Settings → Integrations, from lightpollutionmap.info),
 button opens it at your site). It is the zenith value and a model, so treat it
 as a good starting point, not a promise.
 
-### Start and follow: N observations without re-pointing by hand
+### Follow the object: N observations without re-pointing by hand
 
 A fast object leaves the camera's field: capture it as-is and half the run ends
-up without it. **Start and follow…** (in the Capture step, for a moving object
-and connected) asks for a **number of observations** and drives the whole run:
+up without it. **Follow the object** (a checkbox in the console, for a moving
+object and connected) plus **Start capture** asks for a **number of
+observations** and drives the whole run:
 each observation captures as many frames as fit before the object reaches the
 edge of the field (the same crossing the frame count is bounded by), then the
 telescope points again at the object's **fresh position** and the next
@@ -185,20 +204,24 @@ count is honoured.
 
 ## Calibration: bias, darks and flats
 
-The **Calibration** tab of the FITS editor manages a **master library** and
-each visit's recipe.
+The **Calibration** tab of the FITS editor manages the **master library** and
+each visit's recipe. The library itself lives in **Settings → Measurement**,
+its single home: the tab reads it, resolves the recipe against the visit's
+first frame, and **Calibration settings…** is the door there. **Calibrate the
+visit** is a one-off run over the visit's frames, not the switch that
+calibrates the stack: every pipeline that applies the calibration has its own
+checkbox in its own tab, and the Astrometry one (**Apply the calibration**) is
+three-state, with the library deciding until you choose.
 
 The library is indexed, not copied: you point at your master FITS and the
 app reads from their headers what makes them valid (camera, gain,
-temperature, exposure, filter). When indexing you declare what each file
-*is*:
-
-- **Bias**: the electronic read offset (zero exposure).
-- **Dark**: thermal current, at the same exposure as the lights. *A dark
-  already includes the bias*, so with a dark you do not need a separate
-  bias. A "dark of the flats" (at the flats' exposure) is just a dark: index
-  it as **Dark** with its own exposure, not as a fourth kind.
-- **Flat**: per filter, normalised.
+temperature, exposure, filter). **What each file is comes from its own
+header** (`IMAGETYP`): **Bias**, **Dark** or **Flat**. Only when the header is
+silent does the exposure decide, and narrowly: at zero it is a bias, and from
+five seconds up it is a dark; anything in between is not guessed, and a light
+frame refuses itself. There are **three kinds, not four**: a "dark of the
+flats" is a **Dark** at the flat's exposure, and the exposure is what the
+matching already keys on.
 
 > **Why calibrate?** Because your sensor lies in three known, repeatable
 > ways: it adds an electronic pedestal to every pixel (bias), it accumulates
@@ -214,21 +237,68 @@ temperature, exposure, filter). When indexing you declare what each file
 > flat does not correct an R frame: the same speck's shadow lands elsewhere
 > if the wheel parks differently.
 
+**What each piece is matched on**, and why it is not more:
+
+- **Dark**: camera, gain, sensor temperature within the tolerance (default
+  **±3 °C**, set in Settings → Measurement) and **exact exposure**. The
+  thermal current is the level, so all four matter.
+- **Bias**: camera and gain. It is the read-out pedestal, and it barely moves
+  with the sensor's temperature.
+- **Flat**: camera and filter **only**. Its shape is the optical train's and
+  its level is normalised away, so the gain and the temperature are left out
+  of the match on purpose: requiring them rejected real flats.
+- A flat's own offset is removed first: a **dark at the flat's exposure**
+  (the same pool of darks), or the **bias** when the flat is short.
+
+**The library says why.** When a master you can see is not used, the recipe
+names the closest one of that kind with the criterion it failed and the
+numbers ("a dark, but at −16 °C against −10 °C, tolerance 3 °C"), so "why is
+it not using my dark" has an answer instead of a shrug. A flat older than
+**30 days** is used but flagged: the train's dust moves, and a mote may have
+appeared or gone.
+
+**Every master has an owner.** A master built from a project's frames belongs
+to that project; a bias or a flat can be **shared** with every project. The
+recipe tries the project's own masters first and the shared ones as the
+fallback, and it never reaches another project's master by accident; one the
+project does not own is marked **"(shared)"** in the recipe line, so you know
+those pixels are not from your nights. A project can also **use another
+project's master** with a **link** (a second row on the same file, never a
+copy), and deleting a master takes its row out while the file stays as long
+as another row points at it.
+
+**The app can build the masters.** **Build masters…** takes a folder of
+calibration frames, classifies each by its header, groups them by the same
+key the recipe matches on (a dark's temperature rounded to the degree, so a
+night of darks is one master and not a handful), combines each group with the
+**median** and writes the master in the library folder. A group of a single
+frame is called out: it is a copy of that frame, not an average. The
+originals are deleted only if you ask, and only after each master is written
+**and** indexed, so a build that fails halfway leaves them where they were.
+**Use another project's master…** links one in.
+
 **The visit's recipe**: when you open the editor from a visit, the app
 resolves which library master each piece uses, reading the first frame's
-header, and warns about anything missing (Warnings). **Calibrate the visit**
-applies the recipe to every frame; calibration works in memory and only
-writes FITS copies if you tick the export box.
+header, and warns about anything missing (**What is missing, and why**).
+**Calibrate the visit** applies the recipe to every frame; calibration works
+in memory and only writes FITS copies if you tick the export box. Those
+copies land in the project's **`calibrados/`** subfolder and register to the
+visit like any other product. Each copy carries the **NSCALIB** card: feeding
+it back into a run, the app sees it is already clean and does **not** subtract
+the dark and divide the flat a second time (a double-calibrated frame has no
+tell in the image), and both the run and the tab say so.
 
 **If you have no flat for a filter**: the *Model the vignetting from the
-frames* option samples the sky on a grid of tiles over a score of spread
-frames and fits a smooth surface to what they have in common: the train's
-vignetting, which is fixed on the frame. The tiles that a star, a galaxy or
-a mote pushed off the trend are thrown away by the fit itself, so no source
-ends up in the model. It corrects the **vignetting** (the systematic that
-matters, about a tenth of a magnitude) and **not the dust**: a smooth
-surface has no fine structure, and that is what a real master is for. It is
-called a model and not a flat for exactly that reason.
+frames* option (in Settings → Measurement, its single home; the tab only reads
+it) samples the sky on a grid of tiles over a score of spread frames and fits
+a smooth surface to what they have in common: the train's vignetting, which is
+fixed on the frame. The tiles that a star, a galaxy or a mote pushed off the
+trend are thrown away by the fit itself, so no source ends up in the model. It
+corrects the **vignetting** (the systematic that matters, about a tenth of a
+magnitude) and **not the dust**: a smooth surface has no fine structure, and
+that is what a real master is for. It is called a model and not a flat for
+exactly that reason, and **a real flat always wins**: the model is the
+fallback only for the filters the library has no flat for.
 
 > **Why is a smooth surface enough?** Because the vignetting is smooth and
 > worth 0.087 mag, while the dust is worth 0.026 mag: measured against a real
@@ -237,6 +307,12 @@ called a model and not a flat for exactly that reason.
 > move, because the tiles they spoil are dropped by themselves. You can open
 > it with **See the model** and judge it: it has to be a smooth surface, with
 > no star and no mote.
+
+One thing the model depends on: it is built from the frames **with the same
+dark or bias removed as the light**. Without one, the pedestal stays in and
+compresses the model's shape, so it corrects only part of the vignetting (the
+correction drops to about 44 % of what it should be); the app says so and asks
+you to index a bias for that camera.
 
 ## Further reading
 

@@ -2794,7 +2794,7 @@ def test_the_filter_switch_is_in_the_panel_and_is_the_same_recipe(dlg):
     # the long explanation (what it is, what it produces, the risks) travels
     # with it, because it is what makes the switch understandable
     tip = tab.chk_matched.toolTip()
-    assert "best linear estimator" in tip and "RISKS" in tip
+    assert "best linear estimator" in tip and "WHAT IT COSTS" in tip
     # the recipe group's header announces the method while the group is
     # closed, so the switch is not hidden inside a closed block without a
     # trace: that was the second half of the complaint

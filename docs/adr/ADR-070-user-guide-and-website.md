@@ -214,3 +214,27 @@ removed: it opens the guide, not any document, and its reason is the observatory
 with no connection, which had no way to reach the manual from the app even though
 the `.md` files travel inside the packages (the gap the 2026-10-08 revision left).
 The web guide is still the main door and the one Welcome opens.
+
+**Revision (2026-10-16, the offline manual is a manual and the advanced guide is its own
+section).** The in-app viewer listed every `.md` under `docs/`, ADRs and work plans
+included, so the manual opened on a list of design records. It now shows, in the app's
+own language, the **user guide** and the two topic documents its "?" buttons open (UFE,
+SEQUENCES), with the topic documents for enthusiasts and the design decisions behind a
+**collapsed "Advanced documentation" branch**; the work plans (`docs/PLANS`) are not
+listed at all. The same split is on the website: a new **Advanced guide** section
+(`build_advanced`) publishes one page per topic document, grouped into "How it is built"
+and "How the science is done", plus an index of the ADRs linked to the repository, where
+they are readable as they are; the work plans stay in the repository. The guide's
+sidebar and the landing link to it.
+
+**Revisión (2026-10-16, el manual offline es un manual y la guía avanzada tiene su
+sección).** El visor de la app listaba todos los `.md` de `docs/`, ADRs y planes de
+trabajo incluidos, así que el manual se abría con una lista de registros de diseño.
+Ahora muestra, en el idioma de la app, la **guía de usuario** y los dos documentos de
+tema que abren sus botones «?» (UFE, SEQUENCES), con los documentos de tema para
+entusiastas y las decisiones de diseño tras una **rama «Documentación avanzada»
+plegada**; los planes de trabajo (`docs/PLANS`) no se listan. La misma división está en
+la web: una sección nueva **Guía avanzada** (`build_advanced`) publica una página por
+documento de tema, agrupadas en «Cómo está construido» y «Cómo se hace la ciencia», más
+un índice de los ADRs enlazados al repositorio, donde se leen tal cual; los planes se
+quedan en el repositorio. El lateral de la guía y la landing enlazan con ella.

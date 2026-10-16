@@ -3147,7 +3147,7 @@ class UfeMeasureTab(QWidget):
         root = paths_mod.docs_dir()
         name = "SEQUENCES.es.md" if self._lang != "en" else "SEQUENCES.md"
         start = root / name if (root / name).exists() else None
-        open_browser(root, host_of(self), start=start)
+        open_browser(root, host_of(self), start=start, lang=self._lang)
 
     def _restore_advanced_defaults(self):
         # D25: every knob back to the .ui's shipped default.

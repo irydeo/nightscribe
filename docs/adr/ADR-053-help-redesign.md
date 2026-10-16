@@ -145,3 +145,23 @@ document (the UFE series "?", which opens `SEQUENCES`), not as a general door.
 content moves into the **About NightScribe** box, which also becomes the last
 menu entry. The separators are fixed along the way: the `.ui`'s
 `separator_help` drew nothing.
+
+**Amendment (2026-10-16, the filter lands, in ADR-070's shape).** The `exclude` and
+`locale` parameters this ADR promised for `DocViewer` are real now, but not as
+parameters: the viewer takes the language from the app (`open_browser(..., lang=...)`)
+and its tree is split in two, the **user guide** (plus the topic documents the app's "?"
+buttons open) and a **collapsed "Advanced documentation"** branch with the topic
+documents and the design decisions, so `adr/` is never listed at the top level and the
+work plans are not listed at all. The live search box above the tree was not built: it
+was never what made the manual hard to read (the flat list of every `.md` was), and the
+split answers that.
+
+**Enmienda (2026-10-16, el filtro llega, con la forma del ADR-070).** Los parámetros
+`exclude` y `locale` que este ADR prometía para `DocViewer` ya son reales, pero no como
+parámetros: el visor toma el idioma de la app (`open_browser(..., lang=...)`) y su árbol
+se divide en dos, la **guía de usuario** (más los documentos de tema que abren los
+botones «?» de la app) y una rama **«Documentación avanzada» plegada** con los
+documentos de tema y las decisiones de diseño, así que `adr/` nunca se lista arriba y
+los planes de trabajo no se listan. El buscador en vivo sobre el árbol no se construyó:
+nunca fue lo que hacía difícil leer el manual (lo era la lista plana de todos los
+`.md`), y la división lo resuelve.

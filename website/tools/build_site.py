@@ -255,6 +255,10 @@ CHROME = {
            "download": "Download", "github": "See it on GitHub",
            "read": "Read the guide", "chapters": "The guide, chapter by "
                                                  "chapter",
+           "advanced": "Advanced guide",
+           "advanced_lead": "For when you want the why: the physics, the "
+                            "formats, the algorithms and the decisions "
+                            "behind them, written down.",
            "what": "What it is", "more": "See it in the guide",
            "app": "The app", "app_lead": "Six screens of the running "
                                           "program, with real observations: "
@@ -273,6 +277,10 @@ CHROME = {
            "home": "Volver al principio", "download": "Descargar",
            "github": "Verlo en GitHub", "read": "Leer la guía",
            "chapters": "La guía, capítulo a capítulo",
+           "advanced": "Guía avanzada",
+           "advanced_lead": "Para cuando quieres el porqué: la física, los "
+                            "formatos, los algoritmos y las decisiones que "
+                            "hay detrás, por escrito.",
            "what": "Qué es", "more": "Verlo en la guía",
            "app": "La aplicación",
            "app_lead": "Seis pantallas del programa en marcha, con "
@@ -925,6 +933,8 @@ def build_landing(lang):
   <h2>{chrome["guide"]}</h2>
   <p class="lead">{chrome["chapters"]}</p>
   <div class="chapters">{chapters}</div>
+  <p class="lead"><a href="docs/advanced{_suffix(lang)}.html">
+    {chrome["advanced"]}</a>: {chrome["advanced_lead"]}</p>
 </section>
 """
     return _shell(lang=lang, title="NightScribe · "
@@ -993,7 +1003,9 @@ def _sidebar(lang, chapters, current):
                    f'{html.escape(chapter["title"][lang])}</a>')
     return (f'<details class="side-fold" open>'
             f'<summary class="side-title">{chrome["contents"]}</summary>'
-            f'<nav class="toc">{"".join(out)}</nav></details>')
+            f'<nav class="toc">{"".join(out)}</nav></details>'
+            f'<p class="side-back"><a href="advanced{_suffix(lang)}.html">'
+            f'{chrome["advanced"]}</a></p>')
 
 
 def _prev_next(lang, pages, pos):
@@ -1057,6 +1069,185 @@ def build_guide(out, lang):
             encoding="utf-8")
 
 
+# ---------------------------------------------------------- advanced guide
+
+# The advanced guide (ADR-070 rev, 2026-10-16): the topic documents that
+# live next to the manual in docs/, plus the design decisions. They are for
+# whoever wants the WHY (the physics, the formats, the algorithms), not the
+# first steps, so they get their own section and their own index and the
+# manual links to them from where they matter. The work plans (docs/PLANS)
+# are the project's own notebooks and are NOT published.
+ADVANCED_GROUPS = (
+    ("how", ("ARCHITECTURE", "DESIGN", "WORKFLOWS", "DEVELOPING",
+             "DATA_SOURCES", "UI_EXPORTS", "VIZ")),
+    ("science", ("SCORING", "ORBITS", "CAMPAIGNS", "HADS", "PHOTOMETRY",
+                 "SEQUENCES", "ASTROMETRY", "PRECISION", "SNR", "UFE",
+                 "unified-fits-editor", "MPC_SUBMISSION")),
+)
+ADV_TITLE = {
+    "en": {"how": "How it is built", "science": "How the science is done",
+           "adr": "Design decisions (ADR)",
+           "adr_lead": "Why the program is the way it is, one decision at a "
+                       "time: what was chosen, what was rejected and what it "
+                       "cost. They live in the repository, where they are "
+                       "read as they are."},
+    "es": {"how": "Cómo está construido",
+           "science": "Cómo se hace la ciencia",
+           "adr": "Decisiones de diseño (ADR)",
+           "adr_lead": "Por qué el programa es como es, decisión a decisión: "
+                       "qué se eligió, qué se descartó y cuánto costó. Viven "
+                       "en el repositorio, donde se leen tal cual."},
+}
+_ADVANCED_STEMS = {stem for _g, stems in ADVANCED_GROUPS for stem in stems}
+
+
+def _adv_doc_path(stem, lang):
+    # @args: stem - a topic document's name without ".md", lang - "en" | "es"
+    # @return: its source in this language, or in the other one when the
+    #          document has only one language
+    order = ((f"{stem}.es.md", f"{stem}.md") if lang == "es"
+             else (f"{stem}.md", f"{stem}.es.md"))
+    for name in order:
+        cand = ROOT / "docs" / name
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _adv_page(stem, lang):
+    # @args: stem, lang
+    # @return: the site page that holds one topic document
+    return f"adv-{stem}{_suffix(lang)}.html"
+
+
+def _adv_link(href, lang):
+    # @args: href - a link found in a topic document, lang - the page's
+    #        language
+    # @return: the site's target: a published topic document becomes its
+    #          page; a link to the manual becomes the guide's page; the ADRs
+    #          and the plans point at the repository, where they are
+    #          readable; anything else (http, anchors) is left alone
+    anchor = ""
+    if "#" in href:
+        href, _, anchor = href.partition("#")
+        anchor = "#" + anchor
+    if href.startswith("user/") and href.endswith(".md"):
+        stem = href[len("user/"):-len(".md")]
+        if stem.endswith(".es"):
+            stem = stem[:-len(".es")]
+        return _page_name(stem, lang) + anchor
+    if href.endswith(".md"):
+        stem = href[:-len(".md")]
+        if stem.startswith("../"):
+            stem = stem[3:]
+        if stem.endswith(".es"):
+            stem = stem[:-len(".es")]
+        if stem in _ADVANCED_STEMS:
+            return _adv_page(stem, lang) + anchor
+        twin = ".es" if lang == "es" else ""
+        if (ROOT / "docs" / f"{stem}{twin}.md").is_file():
+            return f"{REPO_URL}/blob/main/docs/{stem}{twin}.md{anchor}"
+        return f"{REPO_URL}/blob/main/docs/{stem}.md{anchor}"
+    return href
+
+
+def _doc_title(path):
+    # @args: path - a markdown document
+    # @return: its own H1, so a renamed document cannot drift from the index
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line[2:].strip()
+    return Path(path).stem
+
+
+def _adr_rows():
+    # @return: [(number, title, filename)] read from the ADR index table,
+    #          which is the one list that already exists (no second copy)
+    text = (ROOT / "docs" / "adr" / "README.md").read_text(encoding="utf-8")
+    rows = re.findall(r"\|\s*\[(\d+)\]\(([^)]+)\)\s*\|\s*([^|]+?)\s*\|", text)
+    return [(num, title.strip(), fname) for num, fname, title in rows]
+
+
+def build_advanced(out, lang):
+    # @args: out - the site's root, lang - "en" | "es"
+    # @return: None. One page per topic document plus the advanced index
+    #          (the documents grouped, the ADRs listed and linked)
+    chrome = CHROME[lang]
+    titles = ADV_TITLE[lang]
+    published = {}
+    for _group, stems in ADVANCED_GROUPS:
+        for stem in stems:
+            src = _adv_doc_path(stem, lang)
+            if src is not None:
+                published[stem] = (_doc_title(src), src)
+    for stem, (title, src) in published.items():
+        body, _heads = md_to_html(src.read_text(encoding="utf-8"),
+                                  lambda href: _adv_link(href, lang))
+        body = re.sub(r"<h1[^>]*>.*?</h1>", "", body, count=1)
+        page = f"""<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced{_suffix(lang)}.html">
+      {chrome["advanced"]}</a></p>
+    <p class="side-back"><a href="index{_suffix(lang)}.html">
+      {chrome["home"]}</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>{html.escape(title)}</h1>{body}</article>
+  </div>
+</div>
+"""
+        target = out / "docs" / _adv_page(stem, lang)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            _shell(lang=lang, title=f"{title} · NightScribe",
+                   description=title, root="../", body=page,
+                   page_class="guide-page",
+                   switcher=_adv_page(stem, _other(lang))),
+            encoding="utf-8")
+    # the index: the documents grouped, then the decisions
+    blocks = []
+    for group, stems in ADVANCED_GROUPS:
+        items = []
+        for stem in stems:
+            if stem not in published:
+                continue
+            title = published[stem][0]
+            items.append(f'<li><a href="{_adv_page(stem, lang)}">'
+                         f"{html.escape(title)}</a></li>")
+        if items:
+            blocks.append(f"<h2>{html.escape(titles[group])}</h2>"
+                          f'<ul class="adv-list">{"".join(items)}</ul>')
+    adr = "".join(
+        f'<li><a href="{REPO_URL}/blob/main/docs/adr/{fname}">'
+        f"{num} · {html.escape(title)}</a></li>"
+        for num, title, fname in _adr_rows())
+    index_body = f"""<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="index{_suffix(lang)}.html">
+      {chrome["guide"]}</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper">
+      <h1>{html.escape(chrome["advanced"])}</h1>
+      <p class="lead">{html.escape(chrome["advanced_lead"])}</p>
+      {"".join(blocks)}
+      <h2>{html.escape(titles["adr"])}</h2>
+      <p>{html.escape(titles["adr_lead"])}</p>
+      <ul class="adv-list">{adr}</ul>
+    </article>
+  </div>
+</div>
+"""
+    target = out / "docs" / f"advanced{_suffix(lang)}.html"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        _shell(lang=lang, title=f'{chrome["advanced"]} · NightScribe',
+               description=chrome["advanced_lead"], root="../",
+               body=index_body, page_class="guide-page",
+               switcher=f"advanced{_suffix(_other(lang))}.html"),
+        encoding="utf-8")
+
+
 # ------------------------------------------------------------------- assets
 
 def write_assets(out):
@@ -1105,6 +1296,7 @@ def build(out=SITE):
         (out / f"index{_suffix(lang)}.html").write_text(
             build_landing(lang), encoding="utf-8")
         build_guide(out, lang)
+        build_advanced(out, lang)
     write_assets(out)
 
 

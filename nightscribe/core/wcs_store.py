@@ -98,6 +98,27 @@ def write_solved_wcs(path, cards):
     return True
 
 
+def copy_with_solved_wcs(src, dest, cards):
+    # Writes a COPY of a plate with a solved WCS merged into its header, so
+    # an export can carry an astrometry solved this session (which may not
+    # be on disk yet when "save the solved WCS" is off) without touching
+    # the observer's original. Same header surgery as write_solved_wcs;
+    # only the destination changes, and the pixel data plus any extensions
+    # are copied verbatim. With no cards it is a plain byte copy (the
+    # file's own WCS, if it has one, is preserved untouched).
+    # @args: src - source FITS, dest - the copy to write, cards - solved
+    #        WCS cards ({} copies as-is)
+    # @return: the destination Path; raises OSError on a write problem
+    src = Path(src)
+    dest = Path(dest)
+    raw = src.read_bytes()
+    data = _rebuild(raw, cards) if cards else raw
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    logger.info("FITS copy with solved WCS written to %s", dest.name)
+    return dest
+
+
 def persist_solution(path, cards):
     # The policy door the GUI uses: writes the solution only when the
     # observer keeps the option on (default: on, ADR-051 rev).

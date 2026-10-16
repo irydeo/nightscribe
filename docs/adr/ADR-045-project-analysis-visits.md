@@ -264,3 +264,87 @@ because nothing is lost: the workbench carries the visit's frame navigator
 in its left pane (`ufe_visit_panel.ui`), which is exactly what the window
 would be used for while measuring, and the visit's notes are saved on every
 keystroke (`update_session_notes`).
+
+**Amendment (2026-10-16, the visit gains a name and the normal path stands out).**
+Two changes to the visit window, both from the same review. The visit now carries a
+**name of its own** (`project_sessions.label`, migration v24), edited next to the date
+and saved by the same gesture: the date stays the folder and the sort key, and the name
+is what the observer calls the night (a project worked twice in one day, a session that
+ran past midnight). The list shows `name · date` when there is one. The window also
+stopped hiding its two entry points: the kind's analysis action ("Measure the
+position…" / "Measure the series…") is painted as the panel's **hero button** in the
+object's own hue (ADR-038's grammar, the same `theme.hero_button_style` the Ficha uses)
+and sits on its own row together with a visible **"Attach files…"**; the "Resources ▾"
+door is gone, because with Attach out of it only "Open" and "Remove from visit" were
+left, and two buttons do not need a menu. Finally, a visit that already holds an
+astrometry run opens with its **MPC report already in the box**, rebuilt from the run's
+own points by the same generator the editor uses (the host rebuilds it:
+`_visit_mpc_prefill`), so the observer is not asked to paste what the app has just
+measured; saving the report is still a deliberate gesture.
+
+**Amendment (2026-10-16, the visit reuses the report window).** The visit's MPC block
+stops being a paste box with its own validator: it is now a **button** ("MPC report…")
+that opens the SAME window the editor's Astrometry tab opens, plus one **status line**.
+The report is rebuilt from the visit's own astrometry run (`_visit_mpc_report`) by the
+same generator and the same shared controller (ADR-080), so there are no longer two
+behaviours that can drift apart; on save, the file is registered to the visit. "Form A"
+holds where it matters: without a visit there is no block, and the report still hangs
+from the visit.
+
+**Enmienda (2026-10-16, la visita gana nombre y el camino normal se destaca).** Dos
+cambios en la ventana de visita, ambos de la misma revisión. La visita pasa a tener
+**nombre propio** (`project_sessions.label`, migración v24), editable junto a la fecha
+y guardado con el mismo gesto: la fecha sigue siendo la carpeta y el criterio de orden,
+y el nombre es como el observador llama a la noche (un proyecto trabajado dos veces en
+un día, una sesión que pasó de medianoche). La lista muestra `nombre · fecha` cuando lo
+hay. La ventana además deja de esconder sus dos entradas: la acción de análisis del tipo
+(«Medir la posición…» / «Medir la serie…») se pinta como el **botón héroe** del panel
+con el color del propio objeto (la gramática del ADR-038, el mismo
+`theme.hero_button_style` de la ficha) y vive en su propia fila junto a un **«Añadir
+ficheros…»** visible; el cajón «Recursos ▾» desaparece, porque sin Añadir solo quedaban
+«Abrir» y «Quitar de la visita», y dos botones no necesitan un menú. Por último, una
+visita que ya tiene un run de astrometría se abre con su **reporte MPC ya en la caja**,
+reconstruido desde los propios puntos del run con el mismo generador que usa el editor
+(lo reconstruye el anfitrión: `_visit_mpc_prefill`), así que al observador no se le pide
+pegar lo que la app acaba de medir; guardar el reporte sigue siendo un gesto deliberado.
+
+**Enmienda (2026-10-16, la visita reutiliza la ventana de reporte).** El bloque MPC de
+la visita deja de ser una caja de pegado con su propio validador: ahora es un **botón**
+(«Reporte MPC…») que abre la MISMA ventana que la pestaña Astrometría del editor, más
+una **línea de estado**. El reporte se reconstruye desde el propio run de astrometría
+de la visita (`_visit_mpc_report`) con el mismo generador y el mismo controlador
+compartido (ADR-080), así que ya no hay dos comportamientos que puedan divergir; al
+guardar, el fichero se registra en la visita. La «forma A» se mantiene en lo que
+importa: sin visita no hay bloque, y el reporte sigue colgando de la visita.
+
+**Enmienda (2026-10-16, la ventana de visita es una página).** La ventana había
+acumulado quince widgets en seis filas y mezclaba edición, acción y gestión de
+contenido al mismo nivel. Ahora responde, en orden de lectura, a tres preguntas:
+qué noche es, qué toca hacer con ella y qué contiene. La **cabecera** lee la fecha
+(es la carpeta y el orden: se cambia desde el menú **⋯** con un calendario, nunca
+escribiendo encima) y edita el **nombre** en línea, que se guarda al confirmar con
+una línea «Guardado» en lugar del botón permanente. Debajo, **una** acción héroe
+(elegida por el tipo) y «Añadir ficheros…». El contenido se parte en dos: los
+**Resultados** (runs, reportes, cartas y medidas, en una lista ordenada por hora,
+con doble clic para abrir y menú por fila para todo lo demás) y los **Ficheros de
+la noche** (las placas y demás materia prima) en un bloque **plegado** con su
+recuento. Las filas de botones «Open / Remove» y «Bring back… / Free space…»
+desaparecen: sus acciones viven en el menú de la fila. La entrada rápida de
+magnitud se pliega tras «Añadir una medida a mano» (las medidas ya son filas de
+Resultados, estaban listadas dos veces). Borrar la visita vive en el menú ⋯.
+
+**Amendment (2026-10-16, the visit window is one page).** The window had
+accumulated fifteen widgets in six rows, mixing editing, action and content
+management at the same level. It now answers, in reading order, three questions:
+which night this is, what to do with it, and what it holds. The **head** reads the
+date (it is the folder and the order: it is changed from the **⋯** menu with a
+calendar, never by typing over it) and edits the **name** in place, saved on commit
+with a "Saved" line instead of the permanent button. Below it, **one** hero action
+(chosen by the kind) and "Attach files…". The content is split in two: **Results**
+(runs, reports, charts and measurements, in one list ordered by time, double-click
+to open and a per-row menu for everything else) and the **Files of the night** (the
+plates and the rest of the raw material) in a **folded** block with its count. The
+"Open / Remove" and "Bring back… / Free space…" button rows are gone: their actions
+live in the row's menu. The quick magnitude entry is folded behind "Add a
+measurement by hand" (measurements are rows in Results now, they were listed
+twice). Deleting the visit lives in the ⋯ menu.

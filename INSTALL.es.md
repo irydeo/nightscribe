@@ -4,14 +4,69 @@
 
 ## Requisitos
 
-- **Python 3.11+** (recomendado 3.12)
+- **Windows o Linux.** El instalador y los paquetes Linux no necesitan Python;
+  el paquete pip y la ejecución desde el código fuente sí necesitan
+  **Python 3.11+** (recomendado 3.12).
   - Linux: `sudo apt install python3 python3-venv` (Debian/Ubuntu)
   - Windows: instalador desde [python.org](https://www.python.org/downloads/)
     (marca *"Add python.exe to PATH"*)
 - Conexión a Internet (las fuentes de datos son online; todo lo demás es offline)
-- ~500 MB libres (dependencias de Python)
+- ~500 MB libres
 
-## Opción A — desde el código fuente (recomendada para colaborar)
+## Opción A: instalador autónomo (recomendado para la mayoría)
+
+La vía más sencilla: sin Python, sin terminal, nada que configurar.
+
+Los paquetes precompilados están en la
+[página de Releases](https://github.com/irydeo/nightscribe/releases): busca
+las pre-releases `preview-*`, regeneradas en cada push a la rama de
+desarrollo.
+
+**Windows.** Cada release trae un instalador de Windows
+(`NightScribeSetup-*.exe`, por usuario, sin permisos de administrador) y un
+zip portable (`NightScribe-*-windows-x64.zip`: descomprímelo y ejecuta
+`nightscribe.exe gui`). Los binarios no están firmados, así que Windows
+SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
+
+Reinstalar actualiza **limpiamente**: el instalador desinstala antes la versión
+anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
+datos se conservan: viven en `%APPDATA%`/`%LOCALAPPDATA%`, no en la carpeta de
+instalación.
+
+**Linux.** La misma página de Releases trae un **`.deb`** (Debian 13+ / Ubuntu
+25.10+ / Mint) y un **`.rpm`** (Fedora 42+ / openSUSE Tumbleweed). Usan el
+Python del sistema y los paquetes Qt/científicos de la distro, así que pesan
+unos pocos MB y Find_Orb viaja dentro:
+
+```bash
+sudo apt install ./nightscribe_*_amd64.deb      # Debian / Ubuntu / Mint
+sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
+nightscribe gui
+```
+
+Ubuntu 24.04 LTS es demasiado antiguo (no tiene `python3-pyside6`): instala
+desde el código (Opción C).
+
+Para generar el tuyo:
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt   # incluye pyinstaller
+.venv/bin/pyinstaller installer/nightscribe.spec
+# -> dist/nightscribe/ (binario Linux) ; en Windows lo mismo -> nightscribe.exe
+```
+
+El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm` y el estilo de
+matplotlib; detalles en los comentarios de `installer/nightscribe.spec`.
+
+## Opción B: paquete pip
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
+pip install nightscribe
+nightscribe gui
+```
+
+## Opción C: desde el código fuente (recomendada para colaborar)
 
 ### Linux
 
@@ -78,55 +133,6 @@ La instalación descarga ~500 MB; con una conexión lenta puede tardar.
 
 El primer arranque abre el asistente de configuración (ver *Primer arranque*
 más abajo). A partir de ahí solo necesitas los pasos 3 y 5.
-
-## Opción B — paquete pip
-
-```bash
-python3 -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install nightscribe
-nightscribe gui
-```
-
-## Opción C: instalador autónomo (sin Python)
-
-Los paquetes precompilados están en la
-[página de Releases](https://github.com/irydeo/nightscribe/releases): busca
-las pre-releases `preview-*`, regeneradas en cada push a la rama de
-desarrollo. Cada una trae un instalador de Windows (`NightScribeSetup-*.exe`,
-por usuario, sin permisos de administrador) y un zip portable
-(`NightScribe-*-windows-x64.zip`: descomprímelo y ejecuta
-`nightscribe.exe gui`). Los binarios no están firmados, así que Windows
-SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
-
-Reinstalar actualiza **limpiamente**: el instalador desinstala antes la versión
-anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
-datos se conservan: viven en `%APPDATA%`/`%LOCALAPPDATA%`, no en la carpeta de
-instalación.
-
-En Linux la misma página de Releases trae un **`.deb`** (Debian 13+ / Ubuntu
-25.10+) y un **`.rpm`** (Fedora 42+ / openSUSE Tumbleweed). Usan el Python del
-sistema y los paquetes Qt/científicos de la distro, así que pesan unos pocos MB
-y Find_Orb viaja dentro:
-
-```bash
-sudo apt install ./nightscribe_*_amd64.deb      # Debian / Ubuntu
-sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
-nightscribe gui
-```
-
-Ubuntu 24.04 LTS es demasiado antiguo (no tiene `python3-pyside6`): instala
-desde el código (Opción A).
-
-Para generar el tuyo:
-
-```bash
-.venv/bin/pip install -r requirements-dev.txt   # incluye pyinstaller
-.venv/bin/pyinstaller installer/nightscribe.spec
-# -> dist/nightscribe/ (binario Linux) ; en Windows lo mismo -> nightscribe.exe
-```
-
-El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm` y el estilo de
-matplotlib; detalles en los comentarios de `installer/nightscribe.spec`.
 
 ## Primer arranque
 

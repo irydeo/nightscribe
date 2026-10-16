@@ -170,6 +170,48 @@ def test_clear_returns_to_empty(state):
     assert seen == [True]
 
 
+def _wcs_with(cd):
+    from nightscribe.core import wcs as wcs_mod
+    return wcs_mod.Wcs(300.0, 60.0, 8.0, 8.0, cd, 16, 16)
+
+
+def _force_north_up(monkeypatch, on):
+    from nightscribe.config import config
+    monkeypatch.setattr(config, "get",
+                        lambda key, default=None:
+                        on if key == "ufe_north_up" else default)
+
+
+def test_north_up_leaves_a_normal_plate_alone(state, monkeypatch):
+    # The common case: the row axis already points north, so nothing turns.
+    _force_north_up(monkeypatch, True)
+    state.wcs = _wcs_with([[-3e-4, 0.0], [0.0, 3e-4]])
+    state._apply_north_up()
+    assert state.flip_v is False and state.flip_h is False
+
+
+def test_north_up_mirrors_an_upside_down_plate(state, monkeypatch):
+    # A plate whose row axis points SOUTH opens mirrored, so north lands up.
+    _force_north_up(monkeypatch, True)
+    state.wcs = _wcs_with([[-3e-4, 0.0], [0.0, -3e-4]])
+    state._apply_north_up()
+    assert state.flip_v is True
+
+
+def test_north_up_respects_the_setting(state, monkeypatch):
+    _force_north_up(monkeypatch, False)
+    state.wcs = _wcs_with([[-3e-4, 0.0], [0.0, -3e-4]])
+    state._apply_north_up()
+    assert state.flip_v is False
+
+
+def test_north_up_needs_a_wcs(state, monkeypatch):
+    _force_north_up(monkeypatch, True)
+    state.wcs = None
+    state._apply_north_up()
+    assert state.flip_v is False
+
+
 def test_keep_stretch_off_resets_on_load(state):
     state.load(MONO)
     state.set_stretch(black=3000.0, white=9000.0, gamma=0.7)

@@ -193,11 +193,11 @@ def test_the_host_hooks_take_frames_out_and_move_them_aside(qapp, tmp_path,
                                                             monkeypatch):
     # The panel never touches the registry: it asks the host (ADR-045). The
     # two actions are the safe ones: unlink (the file stays) and move into
-    # discarded/ (nothing is deleted).
+    # dscrd/ (nothing is deleted).
     import nightscribe.gui.main_window as mw
     from nightscribe.config import config
     from nightscribe.core import followup as fu
-    from nightscribe.core import project
+    from nightscribe.core import free_space, project
     orig = config.is_configured
     config.is_configured = lambda: False
     window = mw.MainWindow()
@@ -217,10 +217,10 @@ def test_the_host_hooks_take_frames_out_and_move_them_aside(qapp, tmp_path,
         assert all(os.path.exists(x) for x in paths)
         # moving one aside really moves it, and the registry follows it
         words = window._ufe_frames_discard(p["id"], sid, [paths[2]])
-        assert "discarded" in words
+        assert "dscrd" in words
         assert not os.path.exists(paths[2])
         storage = project.storage_dir(project.get(mw.db, p["id"]))
-        moved = os.path.join(storage, "descartados", os.path.basename(paths[2]))
+        moved = os.path.join(storage, free_space.DISCARDED_DIR, os.path.basename(paths[2]))
         assert os.path.exists(moved)
         rows = [f for f in project.files_for_session(mw.db, sid)]
         assert rows == [] or rows[0]["path"] == moved

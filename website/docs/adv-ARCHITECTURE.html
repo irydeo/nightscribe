@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe — Architecture · NightScribe</title>
+<meta name="description" content="NightScribe — Architecture">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="adv-ARCHITECTURE.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.html">
+      Advanced guide</a></p>
+    <p class="side-back"><a href="index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe — Architecture</h1><p><em><a href="adv-ARCHITECTURE.html">Versión en español</a></em></p><h2 id="overview">Overview</h2><p>Layered, boring-on-purpose architecture. The CLI and the GUI are thin shells over the same core; all expensive work (network, ephemerides) is cached in SQLite.</p><pre class="code"><code>            ┌──────────────┐   ┌──────────────┐
+            │  CLI         │   │  GUI (Qt6)   │
+            │ __main__.py  │   │ gui/ (.ui)   │
+            └──────┬───────┘   └──────┬───────┘
+                   │        same core │
+        ┌──────────▼──────────────────▼──────────┐
+         │  core: planner · suggest · orbits ·     │
+         │  solar · transits · enrich · narrative  │
+         │  · post · coords · ephem_minor · blink  │
+         │  · fits_io · wcs (own FITS/WCS, ADR-018)│
+        └──────────┬─────────────────────────────┘
+                   │ only sources/ talk to the net
+        ┌──────────▼──────────┐    ┌─────────────┐
+        │  core/sources/*     │───►│ core/db.py  │  SQLite:
+        │  neofixer, sbdb,    │    │ http cache  │  cache + targets +
+        │  horizons, cobs...  │    │ (TTL)       │  observations + settings
+        └─────────────────────┘    └─────────────┘
+                   │
+                   ▼
+             viz/  (matplotlib: one renderer, GUI canvas + PNG export)</code></pre><h2 id="modules">Modules</h2><div class="table-wrap"><table><thead><tr><th style="text-align:left">Module</th><th style="text-align:left">Responsibility</th></tr></thead><tbody><tr><td style="text-align:left"><code>nightscribe/__main__.py</code></td><td style="text-align:left">CLI entry: <code>tonight</code>, <code>explore</code>, <code>post</code>, <code>solar</code>, <code>blink</code>, <code>history</code>, <code>sequence</code>, <code>inject</code>, <code>project</code>, <code>gui</code></td></tr><tr><td style="text-align:left"><code>nightscribe/config.py</code></td><td style="text-align:left">Persistent settings (observatory, aperture, language, API keys); MPC code → coordinates resolution</td></tr><tr><td style="text-align:left"><code>nightscribe/paths.py</code></td><td style="text-align:left">Per-OS config/data dirs (platformdirs)</td></tr><tr><td style="text-align:left"><code>core/db.py</code></td><td style="text-align:left">SQLite: <code>http_cache</code> (TTL per source), <code>targets</code>, <code>observations</code>, <code>settings</code>. Single access point</td></tr><tr><td style="text-align:left"><code>core/coords.py</code></td><td style="text-align:left">Sidereal time, alt-az, twilight — pure math, no astropy</td></tr><tr><td style="text-align:left"><code>core/ephem_minor.py</code></td><td style="text-align:left">Sun/Moon/planets (Schlyter low-precision) + Kepler propagation for minor bodies</td></tr><tr><td style="text-align:left"><code>core/planner.py</code></td><td style="text-align:left">Builds the night's raw target list from sources</td></tr><tr><td style="text-align:left"><code>core/suggest.py</code></td><td style="text-align:left">Unified 0–100 score, Top N, "why tonight" phrases (see SCORING.md)</td></tr><tr><td style="text-align:left"><code>core/orbits.py</code></td><td style="text-align:left">Orbital families + parameter translation (see ORBITS.md)</td></tr><tr><td style="text-align:left"><code>core/solar.py</code></td><td style="text-align:left">Aggregated Sun state (SSN, regions, flares, Kp, wind)</td></tr><tr><td style="text-align:left"><code>core/transits.py</code></td><td style="text-align:left">Exoplanet transits: t0 + n·P, night matching, visibility</td></tr><tr><td style="text-align:left"><code>core/enrich.py</code></td><td style="text-align:left">Object type detection + raw data orchestration</td></tr><tr><td style="text-align:left"><code>core/narrative.py</code></td><td style="text-align:left">Bilingual ES/EN engaging prose</td></tr><tr><td style="text-align:left"><code>core/post.py</code></td><td style="text-align:left">Templates → post_ES / post_EN / tweet</td></tr><tr><td style="text-align:left"><code>core/fits_io.py</code></td><td style="text-align:left">Minimal FITS reader on numpy, no astropy (ADR-018)</td></tr><tr><td style="text-align:left"><code>core/wcs.py</code></td><td style="text-align:left">Minimal TAN WCS: pixel↔sky, scale, rotation (ADR-018)</td></tr><tr><td style="text-align:left"><code>core/blink.py</code></td><td style="text-align:left">Supernova blink orchestrator: name → coordinates, geometry-matched PanSTARRS DR1 g pair (ADR-018)</td></tr><tr><td style="text-align:left"><code>core/sources/*</code></td><td style="text-align:left">One module per external source (see DATA_SOURCES.md)</td></tr><tr><td style="text-align:left"><code>viz/*</code></td><td style="text-align:left">matplotlib renderers shared by GUI canvas and PNG export</td></tr><tr><td style="text-align:left"><code>gui/*</code></td><td style="text-align:left">PySide6 shell: <code>.ui</code> files (Qt Designer), QThread workers, wizard</td></tr></tbody></table></div><h2 id="data-flow-tonight">Data flow — "tonight"</h2><ol><li><p><code>planner</code> asks sources for raw lists: NEOfixer targets (site = MPC code), Rochester supernovae, COBS active comets, MPC PCCP page, ExoClock catalogue.</p></li><li><p>Each raw response is stored in <code>http_cache</code> with its TTL; repeat calls are free.</p></li><li><p>Visibility per target is sampled with our own alt-az math (<code>coords.py</code>) from each target's position; the site-specific NEOfixer <code>ephem</code> (Find_Orb, perturbed) is the position source for the fresh goto and the track &amp; stack when Horizons does not know an unconfirmed NEOCP/PCCP object; transits are computed locally (t0 + n·P) then alt-az.</p></li><li><p><code>suggest</code> scores everything 0–100, builds the Top N and the "why tonight" phrases.</p></li><li><p>Observed flags and post history come from SQLite and feed back into the score (recently published objects lose novelty; observed-but-unposted gain urgency).</p></li></ol><h2 id="data-flow-post">Data flow — "post"</h2><ol><li><p><code>enrich</code> detects the object type (regex + SBDB <code>kind</code>) and gathers raw data.</p></li><li><p><code>orbits</code> translates parameters; <code>narrative</code> writes ES/EN prose; <code>viz</code> renders PNGs.</p></li><li><p><code>post</code> fills templates → files + GUI preview. History recorded in SQLite.</p></li></ol><h2 id="threading">Threading</h2><p>Network and rendering never run on the GUI thread: <code>gui/workers.py</code> (QThread) with Qt signals back to the UI. The CLI is synchronous.</p><h2 id="internationalisation">Internationalisation</h2><p>Qt Linguist: every visible string through <code>self.tr()</code>; sources in <code>gui/i18n/nightscribe_{es,en}.ts</code>, compiled to <code>.qm</code> through <code>tools/i18n.py</code> (lupdate + lrelease, renamed atomically: a raw lrelease under a running app crashes it, ADR-079). UI language selectable in Settings (default: OS locale). Generated content (posts, phrases) is always produced in both languages independently of the UI language.</p><h2 id="persistence">Persistence</h2><p>SQLite file in the user data dir (see <code>paths.py</code>). Schema versioned with a simple <code>PRAGMA user_version</code> migration ladder. TTLs per source are defined in <code>core/db.py</code> (NOAA 1 h, NEOfixer/Horizons 12 h, Rochester/COBS/ESA/PCCP 6 h, ExoClock 24 h, SBDB/SIMBAD/CAD 7 d).</p><h2 id="errors">Errors</h2><p>Human-readable messages, no stack traces in the UI. Network failures degrade gracefully: a source that fails simply contributes no targets (logged as a warning); the app never crashes because a website is down.</p></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

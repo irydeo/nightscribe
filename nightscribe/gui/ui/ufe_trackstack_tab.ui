@@ -261,7 +261,7 @@
          <widget class="QCheckBox" name="chk_calibrate">
           <property name="text"><string>Apply the calibration</string></property>
           <property name="toolTip">
-           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking never needs calibrated copies on disk. A stack of uncalibrated frames keeps the train's dust and the sensor's vignetting, and the object and the comparisons do not sit in the same place: the smooth vignetting alone is worth a systematic error of a tenth of a magnitude. When the library has no flat for this filter, a VIGNETTING MODEL is built from the frames themselves (the sky sampled on a grid, with the tiles a star or a mote spoiled thrown away) and with the same dark/bias removed as the light so the pedestal does not compress it (the run says what it did); a real flat always wins, and it is a real flat that carries the dust. The recipe, the library and the model policy live in the Calibration tab</string>
+           <string>Applies the calibration recipe (the masters of the Calibration tab: dark/bias and flat) to each frame as it is read, so the stacking needs no calibrated copies on disk. Uncalibrated, the train's dust and the vignetting stay in, and the vignetting alone is a systematic of about a tenth of a magnitude. Without a flat for the filter, a model is built from the frames themselves (the run says what it did); a real flat always wins, and it is the flat that carries the dust. The recipe and the model policy live in the Calibration tab</string>
           </property>
          </widget>
         </item>
@@ -510,7 +510,7 @@
         <property name="minimumSize"><size><width>0</width><height>70</height></size></property>
         <property name="maximumSize"><size><width>16777215</width><height>130</height></size></property>
         <property name="readOnly"><bool>true</bool></property>
-        <property name="plainText"><string>The verdict of the check appears here after a run: whether our point fits the published observations or stands out from them.</string></property>
+        <property name="plainText"><string>After a run: whether our point fits the published observations or stands out from them.</string></property>
        </widget>
       </item>
       <item>
@@ -527,7 +527,7 @@
         <property name="visible"><bool>false</bool></property>
         <property name="text"><string>Published observations…</string></property>
         <property name="toolTip">
-         <string>Open the whole list of published observations the check compared us with, ours among them: the instant, the station, the observed direction and the residual in right ascension and declination, with our own rows highlighted</string>
+         <string>The whole list the check compared us with, our own rows highlighted: instant, station, observed direction and the residual in right ascension and declination</string>
         </property>
        </widget>
       </item>
@@ -537,14 +537,14 @@
          <widget class="QLabel" name="lbl_desig_check">
           <property name="text"><string>Check against:</string></property>
           <property name="toolTip">
-           <string>The designation the check asks the MPC for. It is prefilled with the object's name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</string>
+           <string>The designation the check asks the MPC for, prefilled with the object's name. Type it here when the automatic lookup comes up empty; if the object was confirmed under a new name, the app finds it on its own</string>
           </property>
          </widget>
         </item>
         <item>
          <widget class="QLineEdit" name="edt_desig_check">
           <property name="toolTip">
-           <string>The designation the check asks the MPC for. It is prefilled with the object's name; if the object has been confirmed under a new name since the visit, the app finds it on its own, and this is where you type it by hand when the automatic lookup comes up empty</string>
+           <string>The designation the check asks the MPC for, prefilled with the object's name. Type it here when the automatic lookup comes up empty; if the object was confirmed under a new name, the app finds it on its own</string>
           </property>
          </widget>
         </item>
@@ -552,7 +552,7 @@
          <widget class="QPushButton" name="btn_recheck">
           <property name="text"><string>Re-check</string></property>
           <property name="toolTip">
-           <string>Run the check again with the designation above, without stacking the frames again: it only asks the MPC for the published observations and compares our measured points with them</string>
+           <string>Check again with the designation above, without restacking: it asks the MPC for the published observations and compares our points with them</string>
           </property>
          </widget>
         </item>

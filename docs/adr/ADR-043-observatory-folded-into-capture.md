@@ -200,3 +200,38 @@ done/skipped steps); `test_projects_hub.py` (send plan to the current
 project, menu with "Follow-up"; no target combo),
 `test_campaigns_tab.py`, `test_sunsky_tab.py` and the functional boot
 test drop from 4 to 3 tabs.
+
+**Enmienda (2026-10-16, el bloque del observatorio es una consola).** El panel
+que este ADR plegó en Captura era una pila de cuatro filas de botones
+(Connect/Disconnect/Refresh, apuntar/goto astrométrico/refrescar posición/parar,
+filtro/enviar plan/empezar/seguir) construida en código, con el estado como una
+fila de cuatro pares «título/valor». Ahora es una **consola**: su estructura vive
+en `gui/ui/observatory_panel.ui` y la carga `gui/widgets/observatory_console.py`
+(ADR-005, que este panel incumplía). Arriba el **estado** (identidad con el LED,
+el **STOP** rojo siempre a mano, la banda de telemetría), abajo los **mandos**:
+tres verbos y dos casillas. El refresco manual desaparece (el sondeo de 1,5 s ya
+lo hace), el STOP absorbe el «Stop goto», y los dos pares que compartían destino
+pasan a casilla: **Astrometric goto** modifica «Point telescope» (misma meta, otro
+método) y **Follow the object** modifica «Start capture». La primera es una
+preferencia (su valor por defecto vive en Ajustes → Integraciones); la segunda se
+recuerda como última elección. La consola tiene **modos** (desconectada, reposo,
+moviéndose, capturando, siguiendo): enseña lo que puede hacer ahora, no una
+retícula de botones grises. La regla del ADR-081 no cambia: el STOP corre en su
+propio worker y nunca se encola tras lo que detiene.
+
+**Amendment (2026-10-16, the observatory block is a console).** The panel this ADR
+folded into Capture was a pile of four button rows (Connect/Disconnect/Refresh,
+point/astrometric goto/refresh position/stop, filter/send plan/start/follow) built
+in code, with the state as a row of four title/value pairs. It is a **console**
+now: its structure lives in `gui/ui/observatory_panel.ui` and
+`gui/widgets/observatory_console.py` loads it (ADR-005, which this panel broke).
+The **status** on top (identity with the LED, the red **STOP** always at hand, the
+telemetry band), the **commands** below: three verbs and two checkboxes. The manual
+refresh is gone (the 1.5 s poll does it), the STOP absorbs "Stop goto", and the two
+pairs that shared a destination became checkboxes: **Astrometric goto** modifies
+"Point telescope" (same destination, another method) and **Follow the object**
+modifies "Start capture". The first is a preference (its default lives in Settings
+> Integrations); the second is remembered as the last choice. The console has
+**modes** (off, idle, moving, capturing, following): it shows what it can do now,
+not a grid of greyed buttons. ADR-081's rule is unchanged: the STOP runs on its own
+worker and never queues behind the thing it stops.

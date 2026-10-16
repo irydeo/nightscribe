@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe — Orbital Explorer (&quot;Explora&quot;) · NightScribe</title>
+<meta name="description" content="NightScribe — Orbital Explorer (&quot;Explora&quot;)">
+<link rel="icon" href="../assets/appicon.svg">
+<link rel="stylesheet" href="../assets/style.css">
+</head>
+<body class="guide-page">
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="../index.html">
+      <img src="../assets/appicon.svg" alt="" width="26" height="26">
+      <span class="wordmark">NIGHT<b>SCRIBE</b></span>
+    </a>
+    <nav class="bar-nav"></nav>
+    <div class="bar-end">
+      <a class="ghost guide" href="../docs/index.html">User guide</a>
+      <a class="ghost report" href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a>
+      <a class="lang" href="adv-ORBITS.es.html">ES</a>
+      
+    </div>
+  </div>
+</header>
+<main id="main">
+<div class="doc">
+  <aside class="side">
+    <p class="side-back"><a href="advanced.html">
+      Advanced guide</a></p>
+    <p class="side-back"><a href="index.html">
+      Back to the start</a></p>
+  </aside>
+  <div class="doc-main">
+    <article class="paper"><h1>NightScribe — Orbital Explorer (&quot;Explora&quot;)</h1><p><em><a href="adv-ORBITS.html">Versión en español</a></em></p><p>The orbital explorer (<code>core/orbits.py</code>) translates raw orbital and physical parameters into explanations that are <strong>accurate, engaging and deep</strong> — the feature that sets NightScribe apart from raw ephemeris tables.</p><h2 id="orbital-families">Orbital families</h2><p>Classification from SBDB elements (a, q, e) and orbit class code. Each family ships with a short bilingual explanation (built by <code>core/orbits.py</code>):</p><div class="table-wrap"><table><thead><tr><th style="text-align:left">Family</th><th style="text-align:left">Rule of thumb</th><th style="text-align:left">One-liner</th></tr></thead><tbody><tr><td style="text-align:left">Atira</td><td style="text-align:left">a &lt; 1 AU, Q &lt; 0.983 AU</td><td style="text-align:left">lives entirely inside Earth's orbit</td></tr><tr><td style="text-align:left">Aten</td><td style="text-align:left">a &lt; 1 AU, Q &gt; 0.983 AU</td><td style="text-align:left">crosses Earth's orbit from inside</td></tr><tr><td style="text-align:left">Apollo</td><td style="text-align:left">a &gt; 1 AU, q &lt; 1.017 AU</td><td style="text-align:left">crosses Earth's orbit from outside</td></tr><tr><td style="text-align:left">Amor</td><td style="text-align:left">1.017 &lt; q &lt; 1.3 AU</td><td style="text-align:left">approaches but does not cross Earth</td></tr><tr><td style="text-align:left">Main belt</td><td style="text-align:left">2.06 &lt; a &lt; 3.28 AU (approx.)</td><td style="text-align:left">the rocky donut between Mars and Jupiter</td></tr><tr><td style="text-align:left">Hungaria, Hilda, ...</td><td style="text-align:left">resonances</td><td style="text-align:left">notable sub-families</td></tr><tr><td style="text-align:left">Trojan</td><td style="text-align:left">a ≈ 5.2 AU, near L4/L5</td><td style="text-align:left">shares Jupiter's orbit, leading or trailing</td></tr><tr><td style="text-align:left">Centaur</td><td style="text-align:left">5.5 &lt; a &lt; 30 AU</td><td style="text-align:left">wandering between the giant planets</td></tr><tr><td style="text-align:left">Trans-Neptunian</td><td style="text-align:left">a &gt; 30 AU</td><td style="text-align:left">the frozen outskirts</td></tr><tr><td style="text-align:left">Comets: JFc / HTc / CTc / LPC</td><td style="text-align:left">SBDB class</td><td style="text-align:left">Jupiter-family (returns every few years), Halley-type, long-period ("from the Oort cloud; will not return for millennia"), dynamically new</td></tr></tbody></table></div><h2 id="translated-parameters">Translated parameters</h2><p>Every parameter gets a value, an analogy and a "why it matters", in ES and EN, at two depth levels:</p><ul><li><p><strong>a (semi-major axis)</strong> → average distance; via Kepler's third law, "its year lasts X Earth years".</p></li><li><p><strong>e (eccentricity)</strong> → 0 = perfect circle; with e = 0.5 "it dives from beyond Mars to inside Venus' orbit" — crossing narratives from q and Q.</p></li><li><p><strong>i (inclination)</strong> → tilt over the solar system's "landing strip".</p></li><li><p><strong>q / Q (perihelion / aphelion)</strong> → closest and farthest points, with planetary context.</p></li><li><p><strong>MOID</strong> → minimum theoretical distance to Earth's orbit; honest risk scale: PHA = MOID &lt; 0.05 AU and H ≤ 22, explained without alarmism; Torino scale when known.</p></li><li><p><strong>H (absolute magnitude)</strong> → size estimate: diameter from H with an assumed albedo per spectral class (C≈0.057, S≈0.20, M≈0.14; cometary nuclei ≈0.04), compared to everyday objects (see narrative size ladder).</p></li><li><p><strong>U (orbit uncertainty 0–9)</strong> → "how well we know its orbit" — links to planning: <em>"that is why your observation tonight matters"</em>.</p></li><li><p><strong>period, perihelion velocity</strong> → human-scale comparisons.</p></li><li><p><strong>Next close approach</strong> (CAD) → date, distance in lunar distances, relative velocity.</p></li><li><p><strong>Comets: M1/K1</strong> → expected magnitude <code>m = M1 + 5·log10(Δ) + K1·log10(r)</code>; comparing with COBS observed magnitude detects outbursts.</p></li><li><p><strong>Supernovae</strong>: redshift/distance of the host → light travel time, typical peak luminosity by type (Ia ≈ "5 billion Suns").</p></li><li><p><strong>Exoplanets</strong>: planet class from radius/mass (hot Jupiter, Neptune-like...), "its year lasts X days", equilibrium temperature, transit depth in mmag → "it dims its star by Y%".</p></li></ul><h2 id="hooks-that-sell">"Hooks that sell"</h2><p><code>orbits.py</code> ranks the object's 2–3 most outreach-worthy facts; <code>suggest.py</code> and <code>post.py</code> consume them. Rules are explicit and tested (see SCORING.md).</p><h2 id="formulas-used-all-documented-in-code">Formulas used (all documented in code)</h2><ul><li><p>Visual magnitude estimate: <code>m ≈ H + 5·log10(r·Δ)</code> (phase neglected for outreach).</p></li><li><p>Comet magnitude: <code>m = M1 + 5·log10(Δ) + K1·log10(r)</code>.</p></li><li><p>Diameter from H: <code>D(km) = 1329 / sqrt(albedo) · 10^(-H/5)</code>.</p></li><li><p>Kinetic energy (only when PHA, always with a reassuring note): <code>E = ½·ρ(4/3)π(D/2)³·v²</code>, ρ per spectral class (C 1300, S 2700, M 5000 kg/m³).</p></li><li><p>Redshift → distance: <code>d ≈ z·c/H0</code>, H0 = 70 km/s/Mpc (small z).</p></li><li><p>Lunar distance: 384 400 km. 1 AU = 149 597 870.7 km.</p></li></ul></article>
+  </div>
+</div>
+
+</main>
+<footer class="foot">
+  <p><a href="https://github.com/irydeo/nightscribe/blob/main/LICENSE">GPL v3</a> · Francisco José Calvo Fernández, Observatorio Irydeo (MPC Z41)</p>
+  <p><a href="https://github.com/irydeo/nightscribe" rel="noopener">https://github.com/irydeo/nightscribe</a>
+     · <a href="https://github.com/irydeo/nightscribe/issues" rel="noopener">Report a bug</a></p>
+</footer>
+<script src="../assets/main.js"></script>
+</body>
+</html>

@@ -18,6 +18,8 @@ package), the way the site test loads build_site."""
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -133,6 +135,11 @@ def test_the_deb_payload_is_readable_by_whoever_installs_it(tmp_path):
     # 2026-10-17). The modes are set by the builder now, and this holds them.
     import os
     import shutil
+    # A .deb is a POSIX artifact and its modes are a POSIX idea: on Windows
+    # the mode bits do not describe who may read or run a file (the extension
+    # does), so there is nothing here to hold.
+    if os.name == "nt":
+        pytest.skip("mode bits are not what grants access on Windows")
     build_deb = _load("build_deb")
     payload = tmp_path / "findorb-payload"
     (payload / "bin").mkdir(parents=True)

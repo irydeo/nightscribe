@@ -142,8 +142,11 @@ def test_the_app_says_when_the_shipped_copy_cannot_be_read(no_auto, tmp_path,
     # already installed. The honest answer is that the copy IS there and this
     # user cannot read it.
     import os
-    if os.geteuid() == 0:
-        pytest.skip("root reads anything, so there is no unreadable folder")
+    # A folder the OWNER cannot read is a POSIX idea: on Windows the mode
+    # bits do not deny access and os.access says yes, so the case cannot be
+    # built there (and as root nothing is unreadable either).
+    if os.name == "nt" or os.geteuid() == 0:
+        pytest.skip("no unreadable folder to build here")
     from nightscribe import paths
     from nightscribe.core import findorb_install
     bundle = tmp_path / "findorb"

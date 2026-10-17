@@ -76,5 +76,8 @@ EOF
     if [ -d "$_findorb" ]; then
         install -d "$pkgdir/usr/lib/nightscribe"
         cp -a "$_findorb" "$pkgdir/usr/lib/nightscribe/findorb"
+        # `cp -a` keeps the payload's own modes: a root that arrived as 0700
+        # ships unreadable and the app cannot see Find_Orb at all (2026-10-17).
+        chmod -R a+rX "$pkgdir/usr/lib/nightscribe/findorb"
     fi
 }

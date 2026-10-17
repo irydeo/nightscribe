@@ -292,3 +292,30 @@ and no `share/findorb/data`, and `tools/fetch_findorb.sh` verifies the same at t
 (which also covers the `.rpm` and the PKGBUILD, both fed by that payload); the PyInstaller
 spec warns out loud when there is no payload, so a developer build knows why its bundle
 carries no orbit check.
+
+**Revisión (2026-10-17, el payload viajaba sin permisos)**: `tools/fetch_findorb.sh` arma el
+árbol de Find_Orb con `_tmp=$(mktemp -d)`, y **`mktemp -d` crea el directorio en 0700**;
+el `mv` conserva ese modo, `copytree` (`.deb`) y `cp -a` (`.rpm`, PKGBUILD) lo copian tal
+cual, y el paquete se instalaba como `drwx------ root root /usr/lib/nightscribe/findorb`.
+La app corre como el observador, así que **no podía ni entrar en la carpeta**: decía «Find_Orb
+is not configured» con los 63 ficheros en disco (reportado, y reproducible con `ls -l`: el
+`.deb` publicado lo grababa así). El payload se crea con `umask 022` y un `chmod -R a+rX`
+final, y **cada empaquetador normaliza los modos** al copiarlo (directorios 755, ficheros
+644, el `fo` de `bin/` ejecutable) y **falla** si el árbol quedaría ilegible: un paquete que
+no se puede leer no es un paquete. Un test del stage comprueba los modos uno a uno. Y la app
+deja de mentir en el otro sentido: si la copia empaquetada está pero no se puede leer, lo
+dice (y `find_fo` ya no lanza `PermissionError`).
+
+**Review (2026-10-17, the payload shipped without permissions)**: `tools/fetch_findorb.sh`
+builds Find_Orb's tree with `_tmp=$(mktemp -d)`, and **`mktemp -d` creates the directory as
+0700**; the `mv` keeps that mode, `copytree` (the `.deb`) and `cp -a` (the `.rpm`, the
+PKGBUILD) copy it as it is, and the package installed it as
+`drwx------ root root /usr/lib/nightscribe/findorb`. The app runs as the observer, so it
+**could not even enter the folder**: it said "Find_Orb is not configured" with the 63 files
+on disk (reported, and reproducible with `ls -l`: the published `.deb` recorded it that
+way). The payload is created with `umask 022` and a final `chmod -R a+rX`, and **every
+packager normalises the modes** when copying it (directories 755, files 644, the `fo` of
+`bin/` executable) and **fails** when the tree would end up unreadable: a package that
+cannot be read is not a package. A test walks the staged tree's modes one by one. And the
+app stops lying in the other direction: when the shipped copy is there but cannot be read,
+it says so (and `find_fo` no longer raises `PermissionError`).

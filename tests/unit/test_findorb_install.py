@@ -278,6 +278,26 @@ def test_the_settings_say_when_there_is_no_findorb_at_all(qapp, monkeypatch):
     dlg.deleteLater()
 
 
+def test_the_settings_say_when_the_shipped_copy_cannot_be_read(qapp,
+                                                               monkeypatch):
+    # The other half of the same report: the copy IS there and this user
+    # cannot read it. "No Find_Orb found" would send the observer to install
+    # what is already installed, so the field's help says what is wrong.
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
+    dlg = mw._load_ui("settings_dialog")
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    why = ("the copy that ships with NightScribe is at "
+           "/usr/lib/nightscribe/findorb but this user cannot read it: "
+           "check its permissions")
+    monkeypatch.setattr(findorb_mod, "auto_find", lambda: (None, why))
+    win._findorb_path_prefill(dlg)
+    assert dlg.edt_findorb_path.text() == ""
+    assert "cannot read it" in dlg.edt_findorb_path.toolTip()
+    assert "No Find_Orb found" not in dlg.edt_findorb_path.toolTip()
+    dlg.deleteLater()
+
+
 # --------------------------------------------- bundled copy and ephemeris
 
 def test_bundled_fo_finds_the_shipped_copy(tmp_path, monkeypatch):

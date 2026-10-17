@@ -2057,9 +2057,16 @@ class MainWindow(QMainWindow):
             return
         found, why = findorb.auto_find()
         if not found:
-            edt.setToolTip(self.tr(
-                "No Find_Orb found. Install it from here, or point this at "
-                "your own `fo` (fo64.exe on Windows)"))
+            if why:
+                # There is something to say beyond "nothing here": the copy
+                # that ships IS on disk and this user cannot read it, and
+                # sending the observer to install what they already have is
+                # the wrong answer (reported 2026-10-17).
+                edt.setToolTip(why)
+            else:
+                edt.setToolTip(self.tr(
+                    "No Find_Orb found. Install it from here, or point this "
+                    "at your own `fo` (fo64.exe on Windows)"))
             return
         edt.setText(found)
         edt.setToolTip(self.tr(

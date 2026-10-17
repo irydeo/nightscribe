@@ -110,9 +110,18 @@ def auto_find():
     # (reported 2026-10-17).
     from .. import paths
     from .findorb_install import bundled_fo, find_fo, find_on_path
+    bundle = paths.findorb_bundle_dir()
     found = bundled_fo()
     if found:
         return found, "bundled with NightScribe"
+    if bundle is not None and not os.access(bundle, os.R_OK | os.X_OK):
+        # There IS a copy and this user cannot read it: say THAT instead of
+        # "not configured", which sends the observer looking for what is
+        # already installed. Measured 2026-10-17: the Linux packages shipped
+        # the tree as drwx------ root root, so the app could not even enter
+        # the folder and Find_Orb "was not there" with its 63 files on disk.
+        return None, (f"the copy that ships with NightScribe is at {bundle} "
+                      f"but this user cannot read it: check its permissions")
     for folder, why in ((Path.home() / "findorb", "in your home folder"),
                         (paths.data_dir() / "findorb",
                          "in NightScribe's folder")):
@@ -146,13 +155,13 @@ def probe(findorb_path=None):
         if found:
             return found, (f"the configured Find_Orb is gone ({candidate}); "
                            f"using {found} ({why})")
-        return None, f"not found: {candidate}"
+        return None, (f"not found: {candidate}" + (f". {why}" if why else ""))
     # No configured path: the copy NightScribe SHIPS, then the folders the
     # app's own instructions use, then PATH.
     found, why = auto_find()
     if found:
         return found, f"Find_Orb at {found} ({why})"
-    return None, "Find_Orb is not configured (Settings > Measurement)"
+    return None, why or "Find_Orb is not configured (Settings > Measurement)"
 
 
 def _seed_findorb_home(home):

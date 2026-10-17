@@ -134,6 +134,36 @@ def test_the_bundled_copy_wins_over_the_home_folder(no_auto, tmp_path,
     assert "bundled" in why
 
 
+def test_the_app_says_when_the_shipped_copy_cannot_be_read(no_auto, tmp_path,
+                                                           monkeypatch):
+    # Reported 2026-10-17: the Linux packages shipped the tree as
+    # `drwx------ root root`, so the app could not even enter it and said
+    # "Find_Orb is not configured", sending the observer to look for what was
+    # already installed. The honest answer is that the copy IS there and this
+    # user cannot read it.
+    import os
+    if os.geteuid() == 0:
+        pytest.skip("root reads anything, so there is no unreadable folder")
+    from nightscribe import paths
+    from nightscribe.core import findorb_install
+    bundle = tmp_path / "findorb"
+    (bundle / "bin").mkdir(parents=True)
+    (bundle / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: bundle)
+    monkeypatch.setattr(findorb_install.shutil, "which", lambda name: None)
+    os.chmod(bundle, 0o000)
+    try:
+        found, why = findorb.auto_find()
+        assert found is None and "cannot read" in why
+        path, message = findorb.probe("")
+        assert path is None and "cannot read" in message
+        # and an unreadable folder never raises: a folder with no visible
+        # `fo` is simply a folder with no `fo`
+        assert findorb_install.find_fo(bundle) is None
+    finally:
+        os.chmod(bundle, 0o755)
+
+
 def test_a_configured_path_that_is_gone_falls_back(no_auto, tmp_path,
                                                    monkeypatch):
     # Filling the field (which the app now does) must not leave a stale path

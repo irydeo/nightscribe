@@ -124,6 +124,36 @@ def test_the_deb_stages_the_documentation():
         shutil.rmtree(stage, ignore_errors=True)
 
 
+def test_the_deb_payload_is_readable_by_whoever_installs_it(tmp_path):
+    # The tree is SHIPPED, so it has to be readable by the observer's user. A
+    # payload whose root travelled as 0700 (the umask of the build machine, or
+    # the `mktemp -d` that creates it) was installed as `drwx------ root root`:
+    # the app, running as the observer, could not even enter the folder and
+    # Find_Orb "was not there" with its 63 files on disk (reported
+    # 2026-10-17). The modes are set by the builder now, and this holds them.
+    import os
+    import shutil
+    build_deb = _load("build_deb")
+    payload = tmp_path / "findorb-payload"
+    (payload / "bin").mkdir(parents=True)
+    (payload / "share" / "findorb" / "data").mkdir(parents=True)
+    (payload / "bin" / "fo").write_bytes(b"x")
+    (payload / "share" / "findorb" / "data" / "ObsCodes.htm").write_text("x")
+    os.chmod(payload, 0o700)                 # the modes the broken build shipped
+    os.chmod(payload / "share", 0o700)
+    stage = build_deb._stage("1.2.3", str(payload), "amd64")
+    try:
+        root = stage / "usr" / "lib" / "nightscribe" / "findorb"
+        for path in [root, *root.rglob("*")]:
+            mode = path.stat().st_mode
+            assert mode & 0o044 == 0o044, f"{path} is not readable by all"
+            if path.is_dir():
+                assert mode & 0o011 == 0o011, f"{path} cannot be entered"
+        assert (root / "bin" / "fo").stat().st_mode & 0o111, "fo not executable"
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
 def test_the_deb_build_refuses_a_payload_that_is_not_one(tmp_path):
     # A package told to ship Find_Orb and handed nothing usable used to be
     # built anyway (a silent `is_dir()`), so the .deb could leave without the

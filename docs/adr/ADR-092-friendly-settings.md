@@ -237,3 +237,56 @@ the pages scrolled sideways. The width is capped to the screen, because a window
 the display is one whose right edge cannot be reached. A test injects a 1200 px row (a wide
 font, on any machine) and checks that the window widens and that **nothing is cut off**:
 that is what holds the chrome constant (rail, margins and scrollbar) honest.
+
+**Revisión (2026-10-17, la tarjeta se pregunta cuando se mira)**: la línea que dice qué
+tarjeta ve el backend elegido se respondía **al construir el diálogo**, y responderla no es
+barato: hay que importar pyopencl, abrir la plataforma y **compilar un kernel**. Medido en
+Linux, donde la compilación es la rápida: la primera apertura del diálogo tardaba 537 ms y
+165 ms eran este sondeo; en Windows la compilación del kernel tarda **segundos**, y el
+observador pagaba esa espera por una línea que vive en la página Medición, dentro de un grupo
+experto que arranca **plegado tras la puerta Advanced**, donde la mayoría no mira nunca.
+Ahora se pregunta **cuando la fila se ve de verdad** (la puerta abierta, la página en
+pantalla) y **fuera del hilo de la GUI**, con un «Comprobando la tarjeta…» mientras tanto; el
+coste medido después: el diálogo abre en 88 ms (61 ms la segunda vez) y abrir la puerta
+cuesta 12 ms en el hilo de la GUI, con el sondeo (198 ms aquí, más en Windows) en su propio
+hilo. Un `Show` de Qt **no** es prueba de estar en pantalla (al cambiar de página el subárbol
+recibe `Show` y `Hide` en el mismo ciclo y la fila nunca llegó a verse), así que la
+comprobación se aplaza al bucle de eventos y pregunta por `isVisible()`. La respuesta se
+recuerda por backend dentro del diálogo, así que reabrir la fila no vuelve a preguntar. Un
+test fija lo que importa: construir el diálogo no pregunta nada, cambiar de página tampoco, y
+abrir la puerta sí (y en un worker, no en el hilo de la GUI).
+
+**Review (2026-10-17, the card is asked about when it is looked at)**: the line that says
+which card the selected backend sees was answered **while the dialog was being built**, and
+answering it is not cheap: it imports pyopencl, opens the platform and **builds a kernel**.
+Measured on Linux, where the compile is the fast one: the dialog's first open took 537 ms
+and 165 ms of it were this probe; on Windows the kernel compile takes **seconds**, and the
+observer paid that wait for a line that lives on the Measurement page, inside an expert group
+that starts **folded behind the Advanced door**, where most people never look. It is now
+asked **when the row is really seen** (the door opened, the page on screen) and **off the GUI
+thread**, with a "Checking the card…" meanwhile; the cost afterwards: the dialog opens in
+88 ms (61 ms the second time) and opening the door costs 12 ms on the GUI thread, with the
+probe (198 ms here, more on Windows) in its own thread. A Qt `Show` is **not** proof of being
+on screen (a page switch delivers `Show` and `Hide` to the subtree in the same cycle and the
+row was never visible), so the check is deferred to the event loop and asks `isVisible()`.
+The answer is remembered per backend inside the dialog, so reopening the row does not ask
+again. A test holds what matters: building the dialog asks nothing, switching pages asks
+nothing either, and opening the door does ask (in a worker, not on the GUI thread).
+
+**Revisión (2026-10-17, una hoja de estilo por forma, no por grupo)**: dar su barra de
+título a los grupos costaba **96 ms** al abrir el diálogo, y el gasto estaba en la
+**hoja de estilo**: `make_titled` construía una cadena distinta por grupo (y dos
+idénticas por grupo), y Qt **parsea cada texto distinto**. El estilo del grupo y el de
+su rótulo no dependen del grupo (la barra lleva el nombre), así que ahora se construyen
+**una vez** y los veinte grupos comparten la misma cadena, que Qt parsea una sola vez
+(medido: 96 ms → 18 ms). El selector de la barra sí lleva el `objectName` del grupo, que
+es lo único que de verdad cambia de uno a otro.
+
+**Review (2026-10-17, one stylesheet per shape, not per group)**: giving the groups their
+title bar cost **96 ms** when the dialog opened, and the spending was in the
+**stylesheet**: `make_titled` built a different string per group (and two identical ones
+per group), and Qt **parses every distinct text**. The group's own style and its label's do
+not depend on the group (the bar carries the name), so they are now built **once** and the
+twenty groups share the same string, which Qt parses a single time (measured: 96 ms →
+18 ms). The bar's selector does carry the group's `objectName`, which is the only thing
+that really changes from one to the next.

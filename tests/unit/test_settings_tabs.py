@@ -78,6 +78,69 @@ def _page_of_group(dlg, group_name):
     return -1
 
 
+def test_the_settings_window_is_widened_for_a_page_that_needs_it(qapp,
+                                                                 monkeypatch):
+    # Measured 2026-10-17: the dialog's own sizeHint cannot see the expert
+    # rows (they are folded behind the door, ADR-092), so it opened at 900 px
+    # while the pages needed more: the Measurement page 767 against a 712 px
+    # viewport, and on Windows, where the default font is wider, EVERY page
+    # (the widest 975). The pages then scrolled sideways and the right-hand
+    # buttons of their rows (Find_Orb's Test and Install…) sat off screen.
+    # The app widens the window on its first show now, and this checks that
+    # the room it takes is really enough, on whatever font this machine has.
+    from nightscribe.gui import main_window as mw
+    from nightscribe.gui import settings_spec, settings_view
+    from PySide6.QtWidgets import QLabel, QScrollArea, QWidget
+    dlg = _dlg()
+    settings_view.build_rail(dlg, settings_spec.CATEGORIES, lambda s: s)
+    settings_view.title_groups(dlg)
+    doors = settings_view.make_advanced_doors(dlg, settings_spec.ADVANCED_GROUPS,
+                                              lambda s: s)
+    pages = _pages(dlg)
+    unique = list({id(d): d for d in doors.values()}.values())
+    # A row as wide as a wider font makes the real ones (the Windows case):
+    # 1200 px, comfortably more than the 900 px the window opens at. The row
+    # has to be a DIRECT child of a page: a group reports its own minimum but
+    # does not pass a runtime change up.
+    wide = QLabel("x" * 260)
+    wide.setMinimumWidth(1200)
+    pages[3].layout().addWidget(wide)
+    # a screen with room for it, whatever this machine's display is (the test
+    # is about the rule, not about the size of the CI's screen)
+    monkeypatch.setattr(mw, "_settings_room", lambda: 4000)
+    dlg.resize(900, 640)
+    dlg.show()
+    qapp.processEvents()
+    # what the app does on the first show: open the doors, measure, widen
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    win._settings_fit(dlg, unique)
+    for _ in range(3):                 # the two timer passes and the resize
+        qapp.processEvents()
+    want = 1200 + mw._SETTINGS_CHROME_PX
+    assert dlg.width() >= want, "no se ensanchó para la fila ancha"
+    # and with that room nothing is cut off: this is the check that the chrome
+    # constant is honest, whatever font the machine has
+    bad = []
+    for i, page in enumerate(pages):
+        door = page.findChild(QWidget, f"door_{page.objectName()}")
+        if door is not None:
+            door.set_open(True)
+        dlg.stk_pages.setCurrentIndex(i)
+        dlg.grab()                     # forces the layout of this page
+        area = page.parent()
+        while area is not None and not isinstance(area, QScrollArea):
+            area = area.parent()
+        have = area.viewport().width() if area is not None else 0
+        need = page.minimumSizeHint().width()
+        if need > have:
+            bad.append(f"{page.objectName()}: needs {need} px, has {have}")
+    dlg.deleteLater()
+    assert not bad, ("una página de Ajustes pide más ancho del que tiene, así "
+                     "que su contenido se corta por la derecha y los botones "
+                     "de las filas quedan fuera de la ventana:\n  "
+                     + "\n  ".join(bad))
+
+
 def test_pages_in_order(qapp):
     from nightscribe.gui import settings_spec, settings_view
     dlg = _dlg()

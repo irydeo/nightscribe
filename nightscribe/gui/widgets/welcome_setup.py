@@ -635,8 +635,32 @@ class WelcomeSetup(QWidget):
         from .. import wizard as wz
         if self._site_ok():
             wz._apply_site(self.ui)
+        # A code that did not resolve to a place leaves no site behind, and
+        # the new-project view would bounce straight back: a button that
+        # looks ready and does nothing. The same guard "Next" uses, said in
+        # the same line (2026-10-17).
+        if self._needs_resolve():
+            self.ui.lbl_site_status.setText(self.tr(
+                "That is not a place yet: check the MPC code, or type the "
+                "coordinates."))
+            return
+        # And the FIRST project needs the observatory, exactly like the
+        # funnel that creates it (main_window._setup_blocker): the same rule
+        # in the two places, so a disabled-looking button and a refusal can
+        # never disagree. With projects on record nothing is held back.
+        if not self._has_site() and not self._has_projects:
+            self.ui.lbl_site_status.setText(self.tr(
+                "Set your observatory in step 1 first: the night's targets "
+                "are computed from it."))
+            return
         wz._apply_kinds(self._boxes)
         self.create_project.emit()
+
+    def _has_site(self):
+        # @return: True when the settings know where the observatory is
+        #          (what the planner and the report are computed from)
+        from ...config import config
+        return config.is_configured()
 
     def ack_data(self):
         # The host calls this when the Data step is the acknowledged gate.

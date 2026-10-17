@@ -132,6 +132,21 @@ def test_links_are_rewritten_by_the_caller():
     assert 'href="02-tonight.html"' in html
 
 
+def test_an_absolute_url_is_left_alone():
+    # An absolute URL is somebody else's page: rewriting its extension turns a
+    # good link into a 404. The guide's own "install" link to the repository's
+    # INSTALL.md shipped as .../blob/main/INSTALL.html (reported 2026-10-17),
+    # and the landing's and the topic pages' rewriters had the same hole.
+    gen = _generator()
+    url = "https://github.com/irydeo/nightscribe/blob/main/INSTALL.md"
+    assert gen._guide_link(url, "en") == url
+    assert gen._guide_link(url, "es") == url
+    assert gen._adv_link(url, "en") == url
+    assert gen._landing_link(url, "en") == url
+    # and the guide's own chapters still become their page
+    assert gen._guide_link("02-tonight.md", "en").endswith(".html")
+
+
 # ------------------------------------------------------------------- build
 
 def test_the_committed_site_matches_the_sources(tmp_path):
@@ -190,6 +205,25 @@ def test_no_link_or_image_on_the_site_is_broken():
                 continue
             target = (page.parent / href.split("#")[0]).resolve()
             if not target.is_file():
+                broken.append(f"{page.relative_to(SITE)} -> {href}")
+    assert not broken, broken
+
+
+def test_no_link_to_our_own_repo_points_at_a_file_that_is_not_there():
+    # Every link to our repository has to name a file that EXISTS, with the
+    # extension it really has. The guide's install link pointed at
+    # .../blob/main/INSTALL.html (a 404: the file is INSTALL.md) and nothing
+    # caught it, because the broken-links test skips external URLs (reported
+    # 2026-10-17). This one reads them instead of skipping them.
+    blob = "https://github.com/irydeo/nightscribe/blob/main/"
+    broken = []
+    for page in SITE.rglob("*.html"):
+        for href in re.findall(r'href="([^"]+)"',
+                               page.read_text(encoding="utf-8")):
+            if not href.startswith(blob):
+                continue
+            target = href[len(blob):].split("#")[0]
+            if not (ROOT / target).is_file():
                 broken.append(f"{page.relative_to(SITE)} -> {href}")
     assert not broken, broken
 

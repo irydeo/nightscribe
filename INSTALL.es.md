@@ -44,6 +44,11 @@ sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
 nightscribe gui
 ```
 
+En Ubuntu, instalarlo desde tu carpeta de descargas puede imprimir una nota de
+apt sobre el usuario `_apt` y un permiso denegado. Es inofensiva (apt lee el
+fichero como root) y la instalación termina; el capítulo 14 de la guía lo
+explica y cuenta cómo silenciarla.
+
 Ubuntu 24.04 LTS es demasiado antiguo (no tiene `python3-pyside6`): instala
 desde el código (Opción C).
 
@@ -51,18 +56,34 @@ Para generar el tuyo:
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt   # incluye pyinstaller
+sh tools/fetch_findorb.sh findorb-payload       # para que el bundle lleve Find_Orb
 .venv/bin/pyinstaller installer/nightscribe.spec
 # -> dist/nightscribe/ (binario Linux) ; en Windows lo mismo -> nightscribe.exe
 ```
 
-El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm` y el estilo de
-matplotlib; detalles en los comentarios de `installer/nightscribe.spec`.
+El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm`, el estilo de
+matplotlib y, cuando está, `findorb-payload/` (el chequeo de órbita); detalles en
+los comentarios de `installer/nightscribe.spec`. **Sin ese payload el build no
+lleva Find_Orb** y la app buscará `fo` en tu `PATH` y en `~/findorb`, así que el
+chequeo sigue funcionando si tienes uno.
 
-## Opción B: paquete pip
+Para generar el paquete de Linux en vez del bundle:
+
+```bash
+sh tools/fetch_findorb.sh findorb-payload       # el .deb/.rpm lo LLEVAN
+.venv/bin/python tools/build_deb.py --version 0.0.0 \
+    --findorb findorb-payload --arch amd64 --out dist
+```
+
+## Opción B: desde el repositorio (pip)
+
+**No hay paquete en PyPI**: esto instala el propio repositorio, así que pip
+necesita `git` y se trae Qt y las bibliotecas científicas (una descarga
+grande). No lleva Find_Orb empaquetado.
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install nightscribe
+pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"
 nightscribe gui
 ```
 

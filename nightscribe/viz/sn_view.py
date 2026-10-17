@@ -66,32 +66,7 @@ def draw_sn_field(cutout_path, sn_name="", out=None, fmt="instagram",
     return fig
 
 
-def draw_sn_blink(reference_path, obs_path, sn_name="", out=None,
-                  watermark="NightScribe", lang="es"):
-    # Side-by-side: survey reference vs. the observatory's own image.
-    # @args: reference_path - cutout JPEG, obs_path - user's image,
-    #        sn_name - label, out - PNG path, watermark - footer,
-    #        lang - string language ("es"|"en")
-    # @return: matplotlib figure (and writes PNG if out is given)
-    fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(12, 6.3), dpi=100)
-    style.apply_style()
-    fig.patch.set_facecolor(style.BG)
-    titles = (style.pick(lang, "Antes (referencia)", "Before (reference)"),
-              style.pick(lang, "Después (Z41)", "After (Z41)"))
-    for ax, path, title in ((ax0, reference_path, titles[0]),
-                            (ax1, obs_path, titles[1])):
-        if path:
-            ax.imshow(plt.imread(str(path)))
-        else:
-            ax.text(0.5, 0.5, "—", ha="center", va="center",
-                    transform=ax.transAxes, color=style.MUTED)
-        ax.set_title(title, color=style.FG, fontsize=10, loc="left")
-        ax.set_xticks([])
-        ax.set_yticks([])
-    fig.suptitle(sn_name, color=style.FG, fontsize=13, fontweight="bold",
-                 x=0.02, ha="left")
-    style.watermark(fig, watermark)
-    if out:
-        style.save(fig, out)
-        logger.info("sn blink written to %s", out)
-    return fig
+# The "before / after" pair used to live here as draw_sn_blink(), with the
+# observatory's own code hardcoded in one of its titles ("After (Z41)") and no
+# caller left: the UFE's Blink tab (gui/ufe_blink_tab.py) is what pairs the
+# survey reference with the observer's image now. Removed 2026-10-17.

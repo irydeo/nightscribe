@@ -12,3 +12,8 @@ Terminal=false
 Categories=Science;Astronomy;
 Keywords=astronomy;astrophotography;astrometry;photometry;supernova;asteroid;comet;
 StartupNotify=true
+# The X11/XWayland window class (WM_CLASS), which is what the shell matches
+# against on a session that is not Wayland. On Wayland the app_id does it and
+# comes from QGuiApplication::setDesktopFileName (gui/app.py). Without either,
+# the dock showed the window as "python3" (the launcher execs python3).
+StartupWMClass=NightScribe

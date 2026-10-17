@@ -361,3 +361,32 @@ And with that figure in front, the **default changes**: the switch is now **on**
 and the backend is **`opencl`** (ADR-089, revision of 2026-10-15). OpenCL is the
 one that ships, so there is nothing to install, and a machine with no card runs
 the same. `auto` and `cuda` stay in the selector.
+
+**Revisión (2026-10-17, el backend no existía en los builds congelados)**: `core/gpu.py`
+pide sus backends **por nombre** en tiempo de ejecución
+(`importlib.import_module(f".gpu_{name}")`), un nombre dinámico que el grafo de imports de
+PyInstaller no puede seguir. El `.spec` nombraba `pyopencl` (precisamente por eso) pero
+**no** nuestros dos módulos, así que el instalador de Windows y el zip portable salían sin
+`nightscribe.core.gpu_opencl`: el acelerador, que está **encendido por defecto** y se
+anuncia en Ajustes, no existía y la app caía al procesador en silencio, con un `logger`
+de nivel informativo que solo aparecía en el registro («No module named
+'nightscribe.core.gpu_opencl'», reportado). El `.spec` los nombra ahora, un test de
+empaquetado mantiene la lista honesta (y comprueba que cada módulo nuestro que nombra
+existe), y el fallo ya no es mudo: si lo que falta es un módulo NUESTRO se registra como
+**warning** (es un fallo de build), mientras que la ausencia de CuPy o pyopencl sigue
+siendo una nota informativa (es una máquina normal). Los paquetes de Linux no estaban
+afectados: instalan el paquete como carpeta, donde el módulo está.
+
+**Review (2026-10-17, the backend did not exist in frozen builds)**: `core/gpu.py` asks for
+its backends **by name** at runtime (`importlib.import_module(f".gpu_{name}")`), a dynamic
+name PyInstaller's import graph cannot follow. The `.spec` named `pyopencl` (for exactly
+that reason) but **not** our own two modules, so the Windows installer and the portable zip
+shipped without `nightscribe.core.gpu_opencl`: the accelerator, which is **on by default**
+and advertised in Settings, did not exist and the app fell back to the processor in
+silence, with an info-level `logger` line only in the log ("No module named
+'nightscribe.core.gpu_opencl'", reported). The `.spec` names them now, a packaging test
+holds the list honest (and checks that every module of ours it names exists), and the
+failure is no longer mute: a missing module of OURS is logged as a **warning** (it is a
+build failure), while a missing CuPy or pyopencl stays an informational note (it is a
+normal machine). The Linux packages were not affected: they install the package as a
+folder, where the module is.

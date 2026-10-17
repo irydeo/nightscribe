@@ -827,3 +827,33 @@ visita apuntando a nada. La versión 23 del esquema renombra la carpeta en disco
 reescribe cada ruta guardada, componente a componente, una vez y de forma idempotente;
 una carpeta que no se puede renombrar conserva TANTO su nombre COMO sus rutas, porque
 una migración a medias es peor que un nombre viejo.
+
+**Revisión (2026-10-17, Find_Orb se busca donde la app dice, y el campo se rellena)**:
+el punto 9 mandaba instalar Find_Orb a mano y la búsqueda automática miraba solo la copia
+empaquetada y `PATH`, así que **seguir las instrucciones de la propia app no servía**:
+quien creaba `~/findorb` (el comando que imprime el diálogo) leía «Find_Orb is not
+configured» con el programa delante, y «Instalar…» le ofrecía micromamba teniéndolo ya.
+Ahora `findorb.auto_find()` busca, en este orden: la copia que **viaja con la app**, las
+dos carpetas que la propia app propone (`~/findorb` y `<data dir>/findorb`, esta última
+es donde la instalación guiada crea el entorno por defecto) y `PATH`; «Instalar…» usa esa
+misma búsqueda para decir «ya está instalado» y rellenar la ruta; y el campo de Ajustes
+se **rellena** con lo que se encuentre (vacío solo cuando no hay nada) diciendo de dónde
+salió, porque un campo vacío se lee como «sin configurar» y el observador acaba
+preguntando dónde está. Una ruta configurada que ya no existe no se queda en «not found»:
+se vuelve a resolver y se dice que la anterior se fue. El motivo de que la copia
+empaquetada mande sobre las demás es que es la versión con la que la app se probó.
+
+**Review (2026-10-17, Find_Orb is searched where the app says, and the field is filled)**:
+point 9 told the observer to install Find_Orb by hand while the automatic search only
+looked at the bundled copy and `PATH`, so **following the app's own instructions did not
+work**: whoever created `~/findorb` (the command the dialog prints) read "Find_Orb is not
+configured" with the program sitting right there, and "Install…" offered micromamba for
+something already installed. `findorb.auto_find()` now searches, in this order: the copy
+that **travels with the app**, the two folders the app itself proposes (`~/findorb` and
+`<data dir>/findorb`, the latter being where the guided install creates its environment by
+default) and `PATH`; "Install…" uses that same search to say "already installed" and fill
+the path; and the Settings field is **filled** with whatever is found (empty only when
+there is nothing) saying where it came from, because an empty field reads as "nothing
+configured" and the observer ends up asking where Find_Orb is. A configured path that no
+longer exists does not stay at "not found": the search runs again and says the old one is
+gone. The bundled copy wins because it is the version the app was built and tested with.

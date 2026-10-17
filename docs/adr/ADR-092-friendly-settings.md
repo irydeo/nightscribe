@@ -201,3 +201,39 @@ is removed: same dialog, same keys, same widgets; the hierarchy changes.
 change; the CCDciel/NINA backend gate does not change; the Welcome is
 untouched. A "what is left to configure" summary or a "only what I touched"
 mode are left out on purpose: the search already is that door.
+
+**Revisión (2026-10-17, una página más ancha que su ventana)**: las puertas dejan los
+grupos expertos PLEGADOS, así que el `sizeHint` del diálogo se calcula sin sus filas: al
+abrir la puerta de **Medida**, la página pedía **767 px** contra un viewport de **712** y
+aparecía scroll horizontal, con los botones de la derecha de varias filas (Probar,
+Instalar… de Find_Orb) fuera de la ventana hasta ensancharla. El culpable medido era
+`lbl_astro_gpu_status` (el nombre de la tarjeta, sin wrap) dentro de la fila de la GPU:
+esa fila exigía **749 px**. Ahora esa etiqueta va en su propia línea con `wordWrap`, y la
+casilla «decir lo que sabe la placa» (555 px) se acortó dejando la enumeración en su
+etiqueta de ayuda, que es el patrón de la casa. Además, el diálogo **se ensancha en su
+primer `show`** si una página necesita más sitio: un grupo PLEGADO no declara su ancho, así
+que la ventana no se puede dimensionar para sus filas antes de estar en pantalla (medido:
+la misma página da 467 px plegada y 767 desplegada), y en una máquina con la fuente por
+defecto más ancha (Windows: todas las páginas, la mayor 975) las páginas se desplazaban en
+horizontal. El ancho se corta al de la pantalla, porque una ventana más ancha que el
+monitor es una ventana a la que no se llega por la derecha. Un test inyecta una fila de
+1200 px (una fuente ancha, en cualquier máquina) y comprueba que la ventana se ensancha y
+que **nada queda cortado**: es lo que fija que la constante del cromo (raíl, márgenes y
+barra de desplazamiento) sea honesta.
+
+**Review (2026-10-17, a page wider than its window)**: the doors leave the expert groups
+FOLDED, so the dialog's `sizeHint` is computed without their rows: opening the
+**Measurement** door made the page ask for **767 px** against a 712 px viewport, the page
+scrolled sideways, and the right-hand buttons of several rows (Find_Orb's Test and
+Install…) sat off screen until the window was widened. The measured culprit was
+`lbl_astro_gpu_status` (the card's name, no wrap) inside the GPU row: that row demanded
+**749 px**. The label now sits on its own wrapped line, and the "say what the plate knows"
+checkbox (555 px) was shortened with its enumeration moved to its help label, which is the
+house pattern. On top of that, the dialog is **widened on its first `show`** when a page
+needs the room: a FOLDED group does not report its width, so the window cannot be sized for
+its rows before it is on screen (measured: the same page reads 467 px folded and 767
+unfolded), and on a machine with a wider default font (Windows: every page, the widest 975)
+the pages scrolled sideways. The width is capped to the screen, because a window wider than
+the display is one whose right edge cannot be reached. A test injects a 1200 px row (a wide
+font, on any machine) and checks that the window widens and that **nothing is cut off**:
+that is what holds the chrome constant (rail, margins and scrollbar) honest.

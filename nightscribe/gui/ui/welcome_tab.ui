@@ -278,7 +278,7 @@
               <item>
                <widget class="QLineEdit" name="edt_site_mpc">
                 <property name="maxLength"><number>3</number></property>
-                <property name="placeholderText"><string>e.g. Z41</string></property>
+                <property name="placeholderText"><string>3 characters</string></property>
                 <property name="maximumWidth"><number>80</number></property>
                </widget>
               </item>

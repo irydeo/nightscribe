@@ -315,6 +315,10 @@ jobs:
 
           The Windows binaries are unsigned, so SmartScreen will warn: choose *More info -> Run anyway*. Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY.
 
+          On Linux, installing the .deb from your Downloads folder can print an apt note about the sandbox user (permission denied, read as root instead): it is harmless and the install finishes.
+
+          The NINA/PINS integration is in test: it is there to be tried and to report what is missing, and the rest is planned for 0.2. CCDciel is the complete observatory backend today.
+
           Report issues at https://github.com/irydeo/nightscribe/issues"
 
           gh release create "$tag" --target "${GITHUB_SHA}" --prerelease \

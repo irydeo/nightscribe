@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 
 I18N_DIR = Path(__file__).parent / "i18n"
 
+# The reverse-DNS id the desktop entry, the AppStream metainfo and the
+# compositor's app_id all share. It is the .desktop file's basename without
+# the suffix (installer/io.github.irydeo.nightscribe.desktop) and it MUST be
+# the same in the three places, or the launcher and the window stop being the
+# same application: tests/unit/test_packaging.py holds them together.
+DESKTOP_ID = "io.github.irydeo.nightscribe"
+
 # App icon sits next to the other bundled assets (same pattern as theme.py):
 # a multi-size PNG set lives there and travels inside the frozen build.
 _ICONS = Path(__file__).resolve().parent.parent / "assets"
@@ -91,6 +98,16 @@ def run():
     app = QApplication(sys.argv)
     app.setApplicationName("NightScribe")
     app.setOrganizationName("NightScribe")
+    # Which LAUNCHER this window belongs to. On Wayland the compositor
+    # identifies a window by its app_id, and Qt takes that from here; with it
+    # empty there is nothing to match the window against, so GNOME falls back
+    # to the PROCESS name, which in the Linux packages is "python3" (the
+    # launcher is `exec python3 -m nightscribe`): the dock showed a Python
+    # entry with a generic icon (reported 2026-10-17). The value is the
+    # installed .desktop file's basename, which is also the AppStream id
+    # (tools/build_deb.py, installer/*.metainfo.xml), and a test holds the
+    # three together so they cannot drift.
+    app.setDesktopFileName(DESKTOP_ID)
     set_window_icon(app)
 
     # Dark identity for the whole app (ADR-026). Applied before any

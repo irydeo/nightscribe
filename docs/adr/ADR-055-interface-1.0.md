@@ -784,3 +784,29 @@ version comparison was meaningless. Changes:
 3. **Welcome is shown once.** Configuring the observatory (or acknowledging the
    report) remembers `welcome_seen`; a later launch with no projects opens on
    Home, with the entry under "ⓘ Welcome".
+
+**Amendment (2026-10-17, the first project needs the observatory too).** Step 1
+was required before **Tonight**, but the **first project** could still be
+created without it: the funnel every creation path goes through
+(`_create_project`: the new-project bar, the Explore dialog, the campaigns)
+checked nothing, so a first project was born with no site to plan, expose or
+report from. `_setup_blocker()` refuses that first project and says why, the
+refusal opens Welcome on step 1 instead of bouncing silently, the navigation
+that bounces for the same reason says it in the status line, and the setup's
+CTA no longer looks ready with a site that did not become a place (an MPC code
+that did not resolve). The lock is on the **first** project: with one already in
+the database nothing is held back, because the site is a global setting and this
+is not a jail.
+
+**Enmienda (2026-10-17, el primer proyecto también necesita el observatorio).**
+El paso 1 se exigía antes de **Tonight**, pero el **primer proyecto** se podía
+crear igualmente sin él: el embudo por el que pasan todos los caminos de
+creación (`_create_project`: la barra de nuevo proyecto, el diálogo Explore,
+las campañas) no comprobaba nada, así que nacía un primer proyecto sin sitio
+desde el que planificar, exponer o reportar. `_setup_blocker()` lo rechaza y
+dice por qué, el rechazo abre la Bienvenida en el paso 1 en vez de rebotar en
+silencio, la navegación que rebota por el mismo motivo lo dice en la barra de
+estado, y el CTA del asistente deja de parecer listo con un sitio que no llegó
+a serlo (un código MPC que no resolvió). El candado es al **primer** proyecto:
+con uno ya en la base de datos no se retiene nada, porque el sitio es un ajuste
+global y esto no es una cárcel.

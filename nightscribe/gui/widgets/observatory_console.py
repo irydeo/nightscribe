@@ -104,10 +104,16 @@ class ObservatoryConsole(QWidget):
         #        host/port - where the app will look, configured - whether
         #        Settings carries a backend at all
         # @return: None. The disconnected state says WHERE it will look, so
-        #          the observer can tell "not configured" from "not running".
+        #          the observer can tell "not configured" from "not running",
+        #          and for NINA/PINS it also says that integration is in test:
+        #          this is the screen where it is connected from, and the
+        #          status has to be read before the first click, not after
+        #          the first failure (2026-10-17).
         if configured:
             where = f"{host}:{port}"
         else:
             where = self.tr("no backend configured yet")
-        self._ui.lbl_where.setText(
-            f"{where} · " + self.tr("set it up in Settings → Integrations"))
+        line = f"{where} · " + self.tr("set it up in Settings → Integrations")
+        if "NINA" in (backend or ""):
+            line += " · " + self.tr("NINA/PINS is in test (the rest, in 0.2)")
+        self._ui.lbl_where.setText(line)

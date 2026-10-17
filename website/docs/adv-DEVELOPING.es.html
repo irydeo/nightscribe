@@ -33,7 +33,7 @@
       Volver al principio</a></p>
   </aside>
   <div class="doc-main">
-    <article class="paper"><h1>NightScribe: desarrollar</h1><p><em><a href="adv-DEVELOPING.es.html">English version</a></em></p><p>Este es el camino corto para quien mantiene el proyecto: cómo ejecutarlo y las tres recetas que más salen (una fuente de datos nueva, un tipo de objetivo nuevo, una pestaña nueva del editor). Las reglas están en <a href="https://github.com/irydeo/nightscribe/blob/main/docs/AGENTS.md"><code>AGENTS.md</code></a>; las decisiones, en <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="ejecutarlo">Ejecutarlo</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
+    <article class="paper"><h1>NightScribe: desarrollar</h1><p><em><a href="adv-DEVELOPING.es.html">English version</a></em></p><p>Este es el camino corto para quien mantiene el proyecto: cómo ejecutarlo y las tres recetas que más salen (una fuente de datos nueva, un tipo de objetivo nuevo, una pestaña nueva del editor). Las reglas están en <a href="https://github.com/irydeo/nightscribe/blob/main/AGENTS.md"><code>AGENTS.md</code></a>; las decisiones, en <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="ejecutarlo">Ejecutarlo</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m pytest tests/unit -n auto --dist loadfile   # rápido, sin red
 .venv/bin/python -m pytest tests/functional                     # con red

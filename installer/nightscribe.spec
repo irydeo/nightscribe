@@ -78,6 +78,14 @@ if os.path.isdir(_findorb):
             sub = os.path.join("findorb",
                                os.path.dirname(os.path.relpath(f, _findorb)))
             datas.append((f, sub))
+else:
+    # A bundle built without the payload has no orbit check, and the app will
+    # ask the observer to install Find_Orb by hand: say it HERE, loudly, so a
+    # developer build knows why (the CI always prepares it; the packages
+    # ship it, ADR-080).
+    print("nightscribe.spec: WARNING: no findorb-payload/ next to the repo, "
+          "so this build ships NO Find_Orb (run "
+          "tools/fetch_findorb.sh findorb-payload first)")
 
 a = Analysis(
     [os.path.join(ROOT, "launcher.py")],
@@ -105,7 +113,19 @@ a = Analysis(
                    # means the import graph does not reach it; naming it here
                    # bundles the portable GPU backend (ADR-091). CuPy is NOT
                    # named: the CUDA path stays manual.
-                   "pyopencl"],
+                   "pyopencl",
+                   # ...and the SAME reason applies to our own two backends,
+                   # which core/gpu.py asks for BY NAME at runtime
+                   # (importlib.import_module(f".gpu_{name}")): a dynamic name
+                   # the import graph cannot follow, so PyInstaller left them
+                   # out of the bundle and the accelerator did not exist in a
+                   # frozen build (the Windows installer reported "No module
+                   # named 'nightscribe.core.gpu_opencl'" and fell back to the
+                   # processor in silence, 2026-10-17). Naming them is what
+                   # makes the GPU path real in the .exe and the portable zip.
+                   # tests/unit/test_packaging.py holds this list honest.
+                   "nightscribe.core.gpu_cuda",
+                   "nightscribe.core.gpu_opencl"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["tkinter"],

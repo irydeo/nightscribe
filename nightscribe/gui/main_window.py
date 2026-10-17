@@ -171,6 +171,24 @@ _CAM_PRESET_SPINS = {
     "cam_max_exposure_s": "spn_cam_max_exp",
 }
 
+# What the Settings dialog spends on the rail, the margins and the scrollbar:
+# measured 2026-10-17 at 900 px wide, its page viewport is 712, so a page that
+# needs N px of content wants the window at about N + this. A little slack on
+# purpose: the check that matters is the one in tests/unit/test_settings_tabs.py,
+# which measures the real viewport on whatever font the machine has.
+_SETTINGS_CHROME_PX = 220
+
+
+def _settings_room():
+    # @return: how wide the Settings window may open: the screen's available
+    #          width with a margin for the window decorations. A window wider
+    #          than the display is one whose right edge cannot be reached, so
+    #          a screen narrower than the content means scrolling, and that is
+    #          the best any window can do there.
+    from PySide6.QtGui import QGuiApplication
+    screen = QGuiApplication.primaryScreen()
+    return (screen.availableGeometry().width() if screen else 1600) - 40
+
 
 def _master_num(value, fmt="{:.3g}"):
     # @args: value - a master's gain, temperature or exposure (maybe None),
@@ -620,6 +638,12 @@ class MainWindow(QMainWindow):
         # of a dead view, the observer lands on the setup step that unblocks
         # it. Other views stay reachable (the app is not a jail).
         if index == VIEW_TONIGHT and not config.is_configured():
+            # The bounce is SAID: landing on another screen with no reason
+            # reads as a broken button (the observer pressed "New project"
+            # and ended up in the setup).
+            self.statusBar().showMessage(self.tr(
+                "Set your observatory first: the night's targets are computed "
+                "from it."), 8000)
             self._ensure_welcome()
             self._sync_welcome()
             self._welcome.show_step("obs")
@@ -1834,17 +1858,24 @@ class MainWindow(QMainWindow):
         # and running a binary from the internet is the user's decision.
         # @args: dlg - the settings dialog
         # @return: None
+        from ..core import findorb as findorb_mod
         from ..core import findorb_install as fi
         worker = getattr(self, "_findorb_worker", None)
         if worker is not None and worker.isRunning():
             worker.cancel()
             return
-        found = fi.find_on_path()
+        # 1. Is there one already? The app SHIPS a copy, its own instructions
+        #    use ~/findorb and its guided install uses <data dir>/findorb, so
+        #    "already installed" has to mean all of those and not only PATH:
+        #    telling an observer to install what they already have is how the
+        #    micromamba dialog showed up with Find_Orb sitting right there
+        #    (reported 2026-10-17).
+        found, why = findorb_mod.auto_find()
         if found:
             dlg.edt_findorb_path.setText(found)
             QMessageBox.information(dlg, self.tr("Find_Orb"), self.tr(
-                "Find_Orb is already installed:\n%1\n\nThe path now points "
-                "at it.").replace("%1", found))
+                "Find_Orb is already installed (%1):\n%2\n\nThe path now "
+                "points at it.").replace("%1", why).replace("%2", found))
             return
         name, manager = fi.find_manager()
         if manager is None:
@@ -1876,10 +1907,16 @@ class MainWindow(QMainWindow):
         return self.tr(
             "NightScribe did not find micromamba, mamba or conda, and it "
             "does not download a package manager on its own.\n\n"
+            "The installed packages (the Windows installer and the Linux "
+            ".deb/.rpm) already bring a copy of Find_Orb and use it with no "
+            "path to set; this guide is for a copy run from the source tree "
+            "or from pip, which ship none.\n\n"
             "The easy road on Linux and macOS is the conda-forge package "
             "\"findorb\": it brings the precompiled binaries and the DE430t "
             "ephemerides the perturbations need, in one command:\n\n"
             "    micromamba create -p ~/findorb -c conda-forge findorb\n\n"
+            "That folder is one of the places NightScribe looks on its own, "
+            "so the check works as soon as the command finishes.\n\n"
             "On Windows, Project Pluto ships the binaries as zips: download "
             "the console version and the non-interactive fo, unpack both in "
             "the same folder (they share their configuration and the "
@@ -1974,6 +2011,60 @@ class MainWindow(QMainWindow):
             lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
             if btn is not None:
                 btn.setText(self.tr("Download (95 MB)…"))
+
+    def _settings_fit(self, dlg, doors):
+        # @args: dlg - the settings dialog (already on screen), doors - its
+        #        advanced doors (a list)
+        # @return: None. Opens every door, lets the layout settle, and widens
+        #          the window if a page needs more room than it has, up to
+        #          the screen. Two timer passes on purpose: the second one
+        #          runs with the doors already open, which is the only moment
+        #          a page reports the width of its expert rows.
+        for door in doors:
+            door.set_open(True)
+
+        def apply():
+            pages = [dlg.stk_pages.widget(i).widget()
+                     for i in range(dlg.stk_pages.count())]
+            widest = max((p.minimumSizeHint().width() for p in pages),
+                         default=0)
+            for door in doors:
+                door.set_open(False)
+            if not widest:
+                return
+            need = min(widest + _SETTINGS_CHROME_PX, _settings_room())
+            if need > dlg.width():
+                dlg.resize(need, dlg.height())
+        QTimer.singleShot(0, apply)
+
+    def _findorb_path_prefill(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. An empty path means "use the copy that ships", which
+        #          is right but reads as "nothing configured": the observer
+        #          opened Settings asking WHERE Find_Orb is (reported
+        #          2026-10-17). So the app fills the field with what it finds
+        #          on its own and says where it came from, and an observer who
+        #          already has a path keeps it (the field is only touched when
+        #          it is empty).
+        from ..core import findorb
+        edt = getattr(dlg, "edt_findorb_path", None)
+        if edt is None:
+            return
+        if edt.text().strip():
+            edt.setToolTip(self.tr(
+                "The Find_Orb you pointed at. Leave it empty to let the app "
+                "use the copy it ships, or the one it finds on its own"))
+            return
+        found, why = findorb.auto_find()
+        if not found:
+            edt.setToolTip(self.tr(
+                "No Find_Orb found. Install it from here, or point this at "
+                "your own `fo` (fo64.exe on Windows)"))
+            return
+        edt.setText(found)
+        edt.setToolTip(self.tr(
+            "Found for you (%1). Change it to use another copy").replace(
+                "%1", why))
 
     def _refresh_gpu_status(self, dlg):
         # @args: dlg - the settings dialog
@@ -2475,6 +2566,16 @@ class MainWindow(QMainWindow):
             lambda _i: apply_search())
         dlg.resize(max(900, dlg.sizeHint().width()),
                    max(640, dlg.sizeHint().height()))
+        # ... and then, once it is ON SCREEN, it is widened if a page needs
+        # more room than it has. A FOLDED group does not report its width, so
+        # the dialog cannot be sized for its expert rows before it is shown
+        # (measured: the same page reads 467 px folded and 767 unfolded). On
+        # a machine with a wider default font (a Windows box: every page
+        # needed more than the 712 px viewport, the widest 975) the pages
+        # then scrolled sideways and the right-hand buttons of their rows sat
+        # off screen.
+        unique = list({id(d): d for d in doors.values()}.values())
+        QTimer.singleShot(0, lambda: self._settings_fit(dlg, unique))
 
         # combos whose items are built here, before the table fills them
         dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
@@ -2546,6 +2647,10 @@ class MainWindow(QMainWindow):
         apply_search()
         # the DE430t state is not a config field: it is a fact about the disk
         self._findorb_eph_refresh(dlg)
+        # and neither is the Find_Orb binary: with nothing configured the app
+        # fills in the copy it ships (or the one it finds), so the field says
+        # WHERE it is instead of looking unconfigured (reported 2026-10-17)
+        self._findorb_path_prefill(dlg)
         # the card the selected backend sees right now, for the same reason
         self._refresh_gpu_status(dlg)
 
@@ -11881,11 +11986,44 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self.on_refresh_projects()
 
+    def _has_any_project(self):
+        # @return: True when the database already holds a project
+        from ..core import project as project_mod
+        try:
+            return bool(project_mod.list_projects(db))
+        except Exception as err:
+            logger.warning("the project list could not be read: %s", err)
+            return False
+
+    def _setup_blocker(self):
+        # @return: why the FIRST project cannot be created yet, or None.
+        #          A project is planned, exposed and reported FROM THE SITE:
+        #          the night's targets, the exposure times and the report's
+        #          COD all come from it, so a first project without an
+        #          observatory is a project with nothing to say. The app asks
+        #          for the observatory BEFORE it (reported 2026-10-17: it let
+        #          the first project be created with the setup unfinished).
+        #          It is not a jail: an observer who already has projects is
+        #          never held back, and the way out is one click away.
+        if config.is_configured() or self._has_any_project():
+            return None
+        return self.tr(
+            "Set your observatory first: the night's targets and the MPC "
+            "report are computed from it. It is step 1 of Welcome and takes "
+            "a minute.")
+
     def _create_project(self, target):
         # @args: target - a planner target dict (must carry name/id and kind)
         # @return: the created project dict (with "id"), or None if the kind
         #          is not a valid project kind or the name is missing; the
         #          Explore dialog uses this to decide whether to close
+        # The single funnel every creation path goes through (the new-project
+        # bar, the Explore dialog, the campaigns, the deep links), so the
+        # observatory check lives here and no caller can forget it.
+        blocked = self._setup_blocker()
+        if blocked:
+            self.statusBar().showMessage(blocked, 10000)
+            return None
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
         if kind not in project.VALID_KINDS:
@@ -11940,10 +12078,25 @@ class MainWindow(QMainWindow):
         # create the project and clear the bar on success (the creation
         # path itself navigates to the project).
         # @args: target - a planner-target dict from the bar
+        blocked = self._setup_blocker()
+        if blocked:
+            # Say it where the observer is looking AND open the step that
+            # unblocks it: a refusal with no door is a dead end.
+            self.statusBar().showMessage(blocked, 10000)
+            self._open_setup()
+            return None
         p = self._create_project(target)
         if p is not None and getattr(self, "_newbar", None) is not None:
             self._newbar.reset()
         return p
+
+    def _open_setup(self):
+        # @return: None. Welcome, on the step that unblocks the first
+        #          project. The screen says what is missing in its own words
+        #          (the CTA is disabled until step 1 has a site).
+        self.navigate(VIEW_WELCOME)
+        if self._welcome is not None:
+            self._welcome.show_step("obs")
 
     def _select_project_row(self, pid):
         # @args: pid - project id
@@ -12341,6 +12494,12 @@ class MainWindow(QMainWindow):
             # (UX, U0.2); on failure the reason is shown IN the dialog
             # (the main status bar is hidden behind this modal).
             from PySide6.QtWidgets import QMessageBox
+            blocked = self._setup_blocker()
+            if blocked:
+                # said IN the dialog on purpose: this one is modal, so the
+                # main status bar's message would be hidden behind it
+                QMessageBox.warning(dlg, self.tr("Create project"), blocked)
+                return
             if self._create_project(_target(nm, fb)) is not None:
                 dlg.accept()
             else:

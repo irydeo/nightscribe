@@ -57,7 +57,7 @@ S_OFFLINE = QT_TRANSLATE_NOOP("NSWizard",
 S_RESOLVED = QT_TRANSLATE_NOOP("NSWizard",
     "MPC code {code} resolved to {name} ({lat}, {lon}).")
 S_CODE_BAD = QT_TRANSLATE_NOOP("NSWizard",
-    "MPC codes are three characters, for example Z41.")
+    "MPC codes are three characters (letters and digits).")
 S_CODE_MISS = QT_TRANSLATE_NOOP("NSWizard",
     "Code {code} is not in the MPC list. Check it at "
     "minorplanetcenter.net, or type the coordinates by hand.")

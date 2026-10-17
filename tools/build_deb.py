@@ -270,8 +270,22 @@ def _stage(version, findorb_dir, arch):
             f"<irydeo@users.noreply.github.com>  "
             f"{time.strftime('%a, %d %b %Y %H:%M:%S %z')}\n")
     # Find_Orb, when the caller prepared one (bin/fo + share/findorb/data).
-    if findorb_dir and Path(findorb_dir).is_dir():
-        shutil.copytree(findorb_dir,
+    # The packages SHIP it (ADR-080), so a build TOLD to include it and handed
+    # nothing usable is a broken build, not a smaller package: until
+    # 2026-10-17 this was a silent `is_dir()` check, so a .deb could leave
+    # without the payload and the app then asked the observer to install what
+    # the package was supposed to bring (reported 2026-10-17).
+    if findorb_dir:
+        payload = Path(findorb_dir)
+        bins = payload / "bin"
+        data = payload / "share" / "findorb" / "data"
+        if not bins.is_dir() or not any(bins.glob("fo*")) or not data.is_dir():
+            raise SystemExit(
+                f"the Find_Orb payload is missing or incomplete: {payload} "
+                "(expected bin/fo + share/findorb/data). Run "
+                "tools/fetch_findorb.sh first, or omit --findorb for a local "
+                "build that knowingly ships none.")
+        shutil.copytree(payload,
                         stage / "usr" / "lib" / "nightscribe" / "findorb")
     # DEBIAN/control (Installed-Size in KiB, as the policy wants).
     size_kb = sum(f.stat().st_size for f in stage.rglob("*")

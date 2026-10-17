@@ -60,6 +60,49 @@ def test_the_deb_filename_carries_the_arch(tmp_path, monkeypatch):
     assert deb.name == "nightscribe_9.9.9_amd64.deb"
 
 
+def test_the_app_id_is_the_same_in_the_three_places_it_lives():
+    # The window and the launcher are the same application only if the id
+    # matches: the .desktop file's basename (what the shell looks for), the
+    # app_id Qt sends on Wayland (gui/app.py) and the AppStream <id> and
+    # <launchable> (which AppStream requires to agree). With them apart the
+    # dock showed the window as "python3" with a generic icon (reported
+    # 2026-10-17).
+    import xml.etree.ElementTree as ET
+    from nightscribe.gui import app as gui_app
+    desktop = ROOT / "installer" / "io.github.irydeo.nightscribe.desktop"
+    assert desktop.stem == gui_app.DESKTOP_ID
+    meta = ET.parse(ROOT / "installer"
+                    / "io.github.irydeo.nightscribe.metainfo.xml").getroot()
+    assert meta.findtext("id") == gui_app.DESKTOP_ID
+    launch = meta.find("launchable")
+    assert launch is not None and launch.get("type") == "desktop-id"
+    assert launch.text == desktop.name
+    # and the entry has to carry the X11 half of the same bargain
+    assert "StartupWMClass=NightScribe" in desktop.read_text(encoding="utf-8")
+
+
+def test_the_frozen_build_names_the_modules_the_code_imports_by_name():
+    # core/gpu.py asks for its backends BY NAME at runtime
+    # (importlib.import_module(f".gpu_{name}")), which PyInstaller's import
+    # graph cannot follow: it left both out of the bundle, so the accelerator
+    # (on by default, ADR-089/091) did not exist in the Windows build and the
+    # app fell back to the processor with "No module named
+    # 'nightscribe.core.gpu_opencl'" in the log (reported 2026-10-17). The
+    # spec has to name them, and this walks the list so a rename cannot leave
+    # an entry pointing at nothing.
+    import importlib
+    import re
+    src = (ROOT / "installer" / "nightscribe.spec").read_text(encoding="utf-8")
+    block = src[src.index("hiddenimports="):]
+    block = block[:block.index("]")]
+    named = re.findall(r'"([\w.]+)"', block)
+    assert "nightscribe.core.gpu_opencl" in named
+    assert "nightscribe.core.gpu_cuda" in named
+    # and every module of OURS the spec names has to exist
+    for module in (m for m in named if m.startswith("nightscribe.")):
+        importlib.import_module(module)
+
+
 def test_the_deb_stages_the_documentation():
     # Until 2026-10-15 the .deb, the .rpm, the PKGBUILD and the wheel shipped
     # WITHOUT docs/, so Help > Documentation, the UFE's "?" and the offline
@@ -79,6 +122,25 @@ def test_the_deb_stages_the_documentation():
                 / "findorb-notice.txt").is_file()
     finally:
         shutil.rmtree(stage, ignore_errors=True)
+
+
+def test_the_deb_build_refuses_a_payload_that_is_not_one(tmp_path):
+    # A package told to ship Find_Orb and handed nothing usable used to be
+    # built anyway (a silent `is_dir()`), so the .deb could leave without the
+    # payload and the app then asked the observer to install it (reported
+    # 2026-10-17). It is a build error now.
+    import pytest
+    build_deb = _load("build_deb")
+    empty = tmp_path / "findorb-payload"
+    empty.mkdir()
+    with pytest.raises(SystemExit):
+        build_deb._stage("1.2.3", str(empty), "amd64")
+    # half a payload (the binary but no data) is not a payload either: the
+    # shipped `fo` cannot run without share/findorb/data
+    (empty / "bin").mkdir()
+    (empty / "bin" / "fo").write_bytes(b"x")
+    with pytest.raises(SystemExit):
+        build_deb._stage("1.2.3", str(empty), "amd64")
 
 
 def test_the_wheel_data_files_cover_every_docs_directory():

@@ -43,6 +43,11 @@ sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
 nightscribe gui
 ```
 
+On Ubuntu, installing from your Downloads folder may print an apt note about
+the `_apt` user and a permission denied. It is harmless (apt reads the file as
+root instead) and the install finishes; chapter 14 of the guide explains it and
+how to silence it.
+
 Ubuntu 24.04 LTS is too old (it has no `python3-pyside6`): install from source
 (Option C).
 
@@ -50,18 +55,34 @@ To build your own instead:
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt   # includes pyinstaller
+sh tools/fetch_findorb.sh findorb-payload       # so the bundle carries Find_Orb
 .venv/bin/pyinstaller installer/nightscribe.spec
 # -> dist/nightscribe/ (Linux binary) ; on Windows run the same -> nightscribe.exe
 ```
 
-The PyInstaller spec bundles the `.ui` files, the `.qm` translations and the
-matplotlib style; details in `installer/nightscribe.spec` comments.
+The PyInstaller spec bundles the `.ui` files, the `.qm` translations, the
+matplotlib style and, when it is there, `findorb-payload/` (the orbit check);
+details in `installer/nightscribe.spec` comments. **Without that payload the
+build ships no Find_Orb** and the app looks for `fo` on your `PATH` and in
+`~/findorb` instead, so the check still works if you have one.
 
-## Option B: pip package
+To build the Linux package instead of the bundle:
+
+```bash
+sh tools/fetch_findorb.sh findorb-payload       # the .deb/.rpm SHIP it
+.venv/bin/python tools/build_deb.py --version 0.0.0 \
+    --findorb findorb-payload --arch amd64 --out dist
+```
+
+## Option B: from the repository (pip)
+
+There is **no package on PyPI**: this installs the repository itself, so pip
+needs `git` and it pulls Qt and the scientific libraries with it (a big
+download). It brings no bundled Find_Orb.
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install nightscribe
+pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"
 nightscribe gui
 ```
 

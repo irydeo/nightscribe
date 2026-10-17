@@ -50,3 +50,7 @@ reduce, y cuéntalo**.
 - Find_Orb viaja dentro del instalador de Windows y de los paquetes Linux;
   EXOTIC (la reducción de tránsitos) es la única herramienta externa que
   instalas a mano.
+- La integración con **NINA/PINS** **no está terminada**: está para probarla y
+  para que reportes qué falta o qué falla, y el resto está previsto para la
+  **0.2**. CCDciel es el que está completo hoy (el capítulo 05 lista lo que
+  NINA/PINS todavía no hace).

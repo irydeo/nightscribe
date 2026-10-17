@@ -171,6 +171,24 @@ _CAM_PRESET_SPINS = {
     "cam_max_exposure_s": "spn_cam_max_exp",
 }
 
+# What the Settings dialog spends on the rail, the margins and the scrollbar:
+# measured 2026-10-17 at 900 px wide, its page viewport is 712, so a page that
+# needs N px of content wants the window at about N + this. A little slack on
+# purpose: the check that matters is the one in tests/unit/test_settings_tabs.py,
+# which measures the real viewport on whatever font the machine has.
+_SETTINGS_CHROME_PX = 220
+
+
+def _settings_room():
+    # @return: how wide the Settings window may open: the screen's available
+    #          width with a margin for the window decorations. A window wider
+    #          than the display is one whose right edge cannot be reached, so
+    #          a screen narrower than the content means scrolling, and that is
+    #          the best any window can do there.
+    from PySide6.QtGui import QGuiApplication
+    screen = QGuiApplication.primaryScreen()
+    return (screen.availableGeometry().width() if screen else 1600) - 40
+
 
 def _master_num(value, fmt="{:.3g}"):
     # @args: value - a master's gain, temperature or exposure (maybe None),
@@ -1994,6 +2012,31 @@ class MainWindow(QMainWindow):
             if btn is not None:
                 btn.setText(self.tr("Download (95 MB)…"))
 
+    def _settings_fit(self, dlg, doors):
+        # @args: dlg - the settings dialog (already on screen), doors - its
+        #        advanced doors (a list)
+        # @return: None. Opens every door, lets the layout settle, and widens
+        #          the window if a page needs more room than it has, up to
+        #          the screen. Two timer passes on purpose: the second one
+        #          runs with the doors already open, which is the only moment
+        #          a page reports the width of its expert rows.
+        for door in doors:
+            door.set_open(True)
+
+        def apply():
+            pages = [dlg.stk_pages.widget(i).widget()
+                     for i in range(dlg.stk_pages.count())]
+            widest = max((p.minimumSizeHint().width() for p in pages),
+                         default=0)
+            for door in doors:
+                door.set_open(False)
+            if not widest:
+                return
+            need = min(widest + _SETTINGS_CHROME_PX, _settings_room())
+            if need > dlg.width():
+                dlg.resize(need, dlg.height())
+        QTimer.singleShot(0, apply)
+
     def _findorb_path_prefill(self, dlg):
         # @args: dlg - the settings dialog
         # @return: None. An empty path means "use the copy that ships", which
@@ -2523,6 +2566,16 @@ class MainWindow(QMainWindow):
             lambda _i: apply_search())
         dlg.resize(max(900, dlg.sizeHint().width()),
                    max(640, dlg.sizeHint().height()))
+        # ... and then, once it is ON SCREEN, it is widened if a page needs
+        # more room than it has. A FOLDED group does not report its width, so
+        # the dialog cannot be sized for its expert rows before it is shown
+        # (measured: the same page reads 467 px folded and 767 unfolded). On
+        # a machine with a wider default font (a Windows box: every page
+        # needed more than the 712 px viewport, the widest 975) the pages
+        # then scrolled sideways and the right-hand buttons of their rows sat
+        # off screen.
+        unique = list({id(d): d for d in doors.values()}.values())
+        QTimer.singleShot(0, lambda: self._settings_fit(dlg, unique))
 
         # combos whose items are built here, before the table fills them
         dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])

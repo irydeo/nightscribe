@@ -210,9 +210,16 @@ Instalar… de Find_Orb) fuera de la ventana hasta ensancharla. El culpable medi
 `lbl_astro_gpu_status` (el nombre de la tarjeta, sin wrap) dentro de la fila de la GPU:
 esa fila exigía **749 px**. Ahora esa etiqueta va en su propia línea con `wordWrap`, y la
 casilla «decir lo que sabe la placa» (555 px) se acortó dejando la enumeración en su
-etiqueta de ayuda, que es el patrón de la casa. Un test recorre las seis páginas **con sus
-puertas abiertas** y falla si alguna pide más ancho que su viewport: la regla es que
-ninguna fila se corte por la derecha, ni con lo avanzado desplegado.
+etiqueta de ayuda, que es el patrón de la casa. Además, el diálogo **se ensancha en su
+primer `show`** si una página necesita más sitio: un grupo PLEGADO no declara su ancho, así
+que la ventana no se puede dimensionar para sus filas antes de estar en pantalla (medido:
+la misma página da 467 px plegada y 767 desplegada), y en una máquina con la fuente por
+defecto más ancha (Windows: todas las páginas, la mayor 975) las páginas se desplazaban en
+horizontal. El ancho se corta al de la pantalla, porque una ventana más ancha que el
+monitor es una ventana a la que no se llega por la derecha. Un test inyecta una fila de
+1200 px (una fuente ancha, en cualquier máquina) y comprueba que la ventana se ensancha y
+que **nada queda cortado**: es lo que fija que la constante del cromo (raíl, márgenes y
+barra de desplazamiento) sea honesta.
 
 **Review (2026-10-17, a page wider than its window)**: the doors leave the expert groups
 FOLDED, so the dialog's `sizeHint` is computed without their rows: opening the
@@ -222,6 +229,11 @@ Install…) sat off screen until the window was widened. The measured culprit wa
 `lbl_astro_gpu_status` (the card's name, no wrap) inside the GPU row: that row demanded
 **749 px**. The label now sits on its own wrapped line, and the "say what the plate knows"
 checkbox (555 px) was shortened with its enumeration moved to its help label, which is the
-house pattern. A test walks the six pages **with their doors open** and fails if any asks
-for more width than its viewport: the rule is that no row may be cut off on the right, not
-even with the advanced groups unfolded.
+house pattern. On top of that, the dialog is **widened on its first `show`** when a page
+needs the room: a FOLDED group does not report its width, so the window cannot be sized for
+its rows before it is on screen (measured: the same page reads 467 px folded and 767
+unfolded), and on a machine with a wider default font (Windows: every page, the widest 975)
+the pages scrolled sideways. The width is capped to the screen, because a window wider than
+the display is one whose right edge cannot be reached. A test injects a 1200 px row (a wide
+font, on any machine) and checks that the window widens and that **nothing is cut off**:
+that is what holds the chrome constant (rail, margins and scrollbar) honest.

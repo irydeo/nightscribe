@@ -23,6 +23,69 @@ I18N = Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
 ROOT = Path(__file__).parents[2]
 
 
+def _i18n_sources():
+    # @return: the SOURCES list of tools/i18n.py (the files lupdate is given)
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "i18n_tool", ROOT / "tools" / "i18n.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.SOURCES
+
+
+def test_every_core_module_with_its_own_tr_is_scanned():
+    # The core modules that translate their own strings at runtime are listed
+    # in tools/i18n.py ONE BY ONE, and a module left out is not just
+    # untranslated: lupdate never extracts its strings, so they are missing
+    # from both catalogues and the completeness test above cannot see what is
+    # not there. That is how the whole sky strip (the Moon, the darkness
+    # window, the planets, the phases and the compass) shipped in English on a
+    # Spanish interface (reported 2026-10-17).
+    import fnmatch
+    sources = _i18n_sources()
+    bad = []
+    for path in sorted((ROOT / "nightscribe" / "core").rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        if "QT_TRANSLATE_NOOP" not in text and "def tr(" not in text:
+            continue
+        rel = path.relative_to(ROOT).as_posix()
+        if not any(fnmatch.fnmatch(rel, pattern) for pattern in sources):
+            bad.append(rel)
+    assert not bad, ("estos módulos traducen sus propias cadenas pero no están "
+                     "en los SOURCES de tools/i18n.py, así que lupdate nunca "
+                     "las extrae y faltan de los dos catálogos:\n  "
+                     + "\n  ".join(bad))
+
+
+def test_every_mark_of_a_runtime_module_is_in_the_catalogue():
+    # A mark built from a VARIABLE is invisible to lupdate even when its file
+    # IS scanned: the eight compass letters were written in a `for`, none of
+    # them reached the catalogues, and the Spanish interface said "W" for
+    # oeste (measured 2026-10-17). Every mark the module can return has to be
+    # a <source> entry of its context.
+    from nightscribe.core import night_brief
+    marks = set()
+    for name, value in vars(night_brief).items():
+        if not name.startswith("S_"):
+            continue
+        if isinstance(value, str):
+            marks.add(value)
+        elif isinstance(value, (tuple, list)):
+            marks.update(v for v in value if isinstance(v, str))
+    assert marks, "night_brief has no marks: the test is looking at nothing"
+    tree = ET.parse(I18N / "nightscribe_es.ts")
+    have = set()
+    for ctx in tree.getroot().findall("context"):
+        if ctx.findtext("name") != "NSNight":
+            continue
+        for msg in ctx.findall("message"):
+            have.add(msg.findtext("source"))
+    missing = sorted(marks - have)
+    assert not missing, ("estas cadenas de core/night_brief.py no están en el "
+                         "catálogo NSNight (lupdate no las ve):\n  "
+                         + "\n  ".join(missing))
+
+
 def test_ts_files_complete():
     # no source string may be left unfinished in either language (ADR-014)
     for lang in ("es", "en"):

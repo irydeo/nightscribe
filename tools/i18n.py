@@ -41,15 +41,26 @@ ROOT = Path(__file__).resolve().parent.parent
 I18N = ROOT / "nightscribe" / "gui" / "i18n"
 
 # The sources lupdate must see, exactly as CONTRIBUTING lists them: the GUI
-# modules, the widgets (their strings would go "vanished" otherwise), the two
-# core modules that carry runtime strings (NSKinds, NSMigrations) and every
+# modules, the widgets (their strings would go "vanished" otherwise), the core
+# modules that carry runtime strings (NSKinds, NSMigrations, NSNight) and every
 # Designer file. Globs, not a directory scan: lupdate silently skips .py files
 # when handed a folder.
+#
+# The core modules are listed ONE BY ONE on purpose: they are the few that
+# translate their own strings at runtime (QCoreApplication.translate) instead
+# of going through a widget's tr(), and a module that is left out is not just
+# untranslated, it is INVISIBLE: lupdate never extracts its strings, they are
+# missing from both catalogues, and the completeness test cannot see what is
+# not there. That is how the whole sky strip (the Moon, the darkness window,
+# the planets, the phase names and the compass letters) shipped in English on
+# a Spanish interface (reported 2026-10-17). tests/unit/test_i18n.py walks the
+# core package and fails when a module with its own tr() is not listed here.
 SOURCES = (
     "nightscribe/gui/*.py",
     "nightscribe/gui/widgets/*.py",
     "nightscribe/core/kinds.py",
     "nightscribe/core/db.py",
+    "nightscribe/core/night_brief.py",
     "nightscribe/gui/ui/*.ui",
 )
 

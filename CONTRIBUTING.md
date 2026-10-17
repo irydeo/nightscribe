@@ -27,14 +27,24 @@ pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # translate
 ```
 
 `tools/i18n.py` runs `lupdate` with the same source list as before (the `.py`
-files of `gui/` and `gui/widgets/`, `core/kinds.py`, `core/db.py` and the `.ui`
-files) and then compiles each `.qm` **atomically**: it writes a sibling temp file
+files of `gui/` and `gui/widgets/`, the core modules that translate their own
+strings at runtime: `core/kinds.py`, `core/db.py`, `core/night_brief.py`, and
+the `.ui` files) and then compiles each `.qm` **atomically**: it writes a
+sibling temp file
 and renames it over the target. Never use the raw `lrelease` command while the
 app is open: `QTranslator` **memory-maps the `.qm`**, and rewriting it in place
 invalidates an open session's mapping, which then crashes on the next
 translation (that was a real GUI core dump, 2026-10-10). The app also loads the
 `.qm` **from memory** (no mmap), so a rebuild can no longer take it down; the
 atomic rename protects any other app that has it mapped.
+
+**A string built from a variable is invisible to `lupdate`**:
+`QT_TRANSLATE_NOOP("NSNight", letter)` inside a `for` extracts **nothing**, and the
+string then misses both catalogues while the completeness test cannot see what is not
+there (that is how the whole sky strip shipped in English on a Spanish interface,
+2026-10-17). The marks are written out one by one, and `tests/unit/test_i18n.py` walks
+the core package and fails on both halves: a module with its own `tr()` that is not in
+the source list, and a mark of `core/night_brief.py` that is not in the catalogue.
 
 English is the base language in code; Spanish is a translation. Tests fail if any
 string is left `unfinished`.

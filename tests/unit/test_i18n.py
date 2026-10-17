@@ -33,24 +33,26 @@ def _i18n_sources():
     return module.SOURCES
 
 
-def test_every_core_module_with_its_own_tr_is_scanned():
-    # The core modules that translate their own strings at runtime are listed
-    # in tools/i18n.py ONE BY ONE, and a module left out is not just
+def test_every_module_with_its_own_tr_is_scanned():
+    # The modules that translate their own strings at runtime are listed in
+    # tools/i18n.py ONE BY ONE, and a module left out is not just
     # untranslated: lupdate never extracts its strings, so they are missing
     # from both catalogues and the completeness test above cannot see what is
     # not there. That is how the whole sky strip (the Moon, the darkness
     # window, the planets, the phases and the compass) shipped in English on a
     # Spanish interface (reported 2026-10-17).
-    import fnmatch
-    sources = _i18n_sources()
+    # The patterns are expanded with the SAME call the tool makes
+    # (ROOT.glob), so this holds the real coverage and not a lookalike.
+    covered = set()
+    for pattern in _i18n_sources():
+        covered.update(ROOT.glob(pattern))
     bad = []
-    for path in sorted((ROOT / "nightscribe" / "core").rglob("*.py")):
+    for path in sorted((ROOT / "nightscribe").rglob("*.py")):
         text = path.read_text(encoding="utf-8")
         if "QT_TRANSLATE_NOOP" not in text and "def tr(" not in text:
             continue
-        rel = path.relative_to(ROOT).as_posix()
-        if not any(fnmatch.fnmatch(rel, pattern) for pattern in sources):
-            bad.append(rel)
+        if path not in covered:
+            bad.append(path.relative_to(ROOT).as_posix())
     assert not bad, ("estos módulos traducen sus propias cadenas pero no están "
                      "en los SOURCES de tools/i18n.py, así que lupdate nunca "
                      "las extrae y faltan de los dos catálogos:\n  "

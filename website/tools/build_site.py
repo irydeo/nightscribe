@@ -91,7 +91,6 @@ NAV_SHORT = {
     "en": {"What is NightScribe?": "What it is",
            "Your first five minutes": "First five minutes",
            "A whole night (and the weeks after)": "A whole night",
-           "What you can do: in detail": "In detail",
            "Where the data comes from": "Data sources",
            "Optional integrations": "Integrations",
            "Your data stays with you": "Your data",
@@ -99,7 +98,6 @@ NAV_SHORT = {
     "es": {"¿Qué es NightScribe?": "Qué es",
            "Tus primeros cinco minutos": "Primeros cinco minutos",
            "Una noche completa (y las semanas siguientes)": "Una noche completa",
-           "Qué puedes hacer: en detalle": "En detalle",
            "De dónde salen los datos": "Fuentes de datos",
            "Integraciones opcionales": "Integraciones",
            "Tus datos se quedan contigo": "Tus datos",
@@ -112,10 +110,9 @@ NAV_SHORT = {
 README_KIND_ORDER = ("neo", "comet", "pccp", "sn", "transit", "alert",
                      "hads", "variable")
 
-# The README's sections that are dressed differently: the kinds become cards,
-# the "in detail" chapter becomes an accordion.
+# The README's section whose bullets become the target-kind cards: the
+# landing dresses it differently because the cards ARE the catalogue.
 KINDS_SECTION = ("What you can follow", "Qué puedes seguir")
-DETAIL_SECTION = ("What you can do: in detail", "Qué puedes hacer: en detalle")
 
 # The sections the top bar shows. It is a CURATED list, not every heading: a
 # bar that lists everything (or that needs a scroll) guides nobody and looks
@@ -817,23 +814,6 @@ def _kinds_cards(lang):
     return f'<div class="kinds">{"".join(cards)}</div>'
 
 
-def _accordion(section_html):
-    # @args: section_html - a section whose subsections are h3s
-    # @return: the same, with each h3 and its content folded into <details>,
-    #          so the landing stays scannable
-    parts = re.split(r'(<h3 id="[^"]+">)', section_html)
-    if len(parts) < 3:
-        return section_html
-    out = [parts[0]]
-    for k in range(1, len(parts), 2):
-        chunk = parts[k + 1]
-        title = chunk[:chunk.index("</h3>")]
-        rest = chunk[chunk.index("</h3>") + 5:]
-        out.append(f'<details class="detail"><summary>{title}</summary>'
-                   f'<div class="detail-body">{rest}</div></details>')
-    return "".join(out)
-
-
 def _landing_link(href, lang):
     # @args: href - a link found in the README, lang - the page's language
     # @return: where that link goes on the site: the guide's pages stay in
@@ -880,8 +860,6 @@ def build_landing(lang):
             cut = sec["html"].find("<ul>")
             lead = sec["html"][:cut] if cut >= 0 else ""
             sec["html"] = lead + _kinds_cards(lang)
-        if sec["text"] in DETAIL_SECTION:
-            sec["html"] = _accordion(sec["html"])
         sections.append(sec)
     # the bar shows the curated sections and the guide block the page adds
     wanted = NAV_MAIN[lang]
@@ -976,6 +954,12 @@ def _guide_link(href, lang):
     #          friends, which the site does NOT publish) points at the
     #          repository, where it is readable as it is; anything else
     #          (http, anchors) is left alone
+    # An ABSOLUTE url is left alone: it is somebody else's page, and rewriting
+    # its extension turns a good link into a 404. The guide's "install" link
+    # to the repository's INSTALL.md shipped as .../blob/main/INSTALL.html
+    # (reported 2026-10-17).
+    if href.startswith(("http://", "https://", "#", "mailto:", "data:")):
+        return href
     if href.startswith("../") and href.endswith(".md"):
         twin = href.endswith(".es.md")
         base = href[:-len(".es.md")] if twin else href[:-len(".md")]
@@ -1127,6 +1111,10 @@ def _adv_link(href, lang):
     #          page; a link to the manual becomes the guide's page; the ADRs
     #          and the plans point at the repository, where they are
     #          readable; anything else (http, anchors) is left alone
+    # An absolute URL is somebody else's page: never rewrite it (the same
+    # hole the guide's rewriter had, 2026-10-17).
+    if href.startswith(("http://", "https://", "mailto:", "data:")):
+        return href
     anchor = ""
     if "#" in href:
         href, _, anchor = href.partition("#")
@@ -1138,8 +1126,12 @@ def _adv_link(href, lang):
         return _page_name(stem, lang) + anchor
     if href.endswith(".md"):
         stem = href[:-len(".md")]
+        # A "../" link points at the REPOSITORY ROOT: the topic documents live
+        # in docs/ and link AGENTS.md and friends from there. Prepending docs/
+        # again shipped .../blob/main/docs/AGENTS.md, a 404 that the guard in
+        # tests/unit/test_site_build.py found (2026-10-17).
         if stem.startswith("../"):
-            stem = stem[3:]
+            return f"{REPO_URL}/blob/main/{stem[3:]}.md{anchor}"
         if stem.endswith(".es"):
             stem = stem[:-len(".es")]
         if stem in _ADVANCED_STEMS:

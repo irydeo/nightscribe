@@ -33,7 +33,7 @@
       Back to the start</a></p>
   </aside>
   <div class="doc-main">
-    <article class="paper"><h1>NightScribe: developing</h1><p><em><a href="adv-DEVELOPING.html">Versión en español</a></em></p><p>This is the short path for a maintainer: how to run things and the three recipes that come up most (a new data source, a new target kind, a new editor tab). The rules live in <a href="https://github.com/irydeo/nightscribe/blob/main/docs/AGENTS.md"><code>AGENTS.md</code></a>; the decisions live in <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="running-it">Running it</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
+    <article class="paper"><h1>NightScribe: developing</h1><p><em><a href="adv-DEVELOPING.html">Versión en español</a></em></p><p>This is the short path for a maintainer: how to run things and the three recipes that come up most (a new data source, a new target kind, a new editor tab). The rules live in <a href="https://github.com/irydeo/nightscribe/blob/main/AGENTS.md"><code>AGENTS.md</code></a>; the decisions live in <a href="https://github.com/irydeo/nightscribe/blob/main/docs/adr/README.md"><code>docs/adr/</code></a>.</p><h2 id="running-it">Running it</h2><pre class="code"><code>python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m pytest tests/unit -n auto --dist loadfile   # fast, offline
 .venv/bin/python -m pytest tests/functional                     # hits the network

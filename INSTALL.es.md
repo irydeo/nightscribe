@@ -75,11 +75,15 @@ sh tools/fetch_findorb.sh findorb-payload       # el .deb/.rpm lo LLEVAN
     --findorb findorb-payload --arch amd64 --out dist
 ```
 
-## Opción B: paquete pip
+## Opción B: desde el repositorio (pip)
+
+**No hay paquete en PyPI**: esto instala el propio repositorio, así que pip
+necesita `git` y se trae Qt y las bibliotecas científicas (una descarga
+grande). No lleva Find_Orb empaquetado.
 
 ```bash
 python3 -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install nightscribe
+pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"
 nightscribe gui
 ```
 

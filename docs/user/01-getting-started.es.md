@@ -13,10 +13,15 @@ Tres caminos, según lo cómodo que te sientas con un terminal:
   openSUSE: `sudo dnf install ./nightscribe-*.x86_64.rpm`), y luego ejecuta
   `nightscribe gui`. Windows SmartScreen avisará porque el binario no está
   firmado: *Más información → Ejecutar de todas formas*.
-- **pip**: `pip install nightscribe` dentro de un entorno virtual, y luego
-  `nightscribe gui`.
-- **Desde el código fuente** (si piensas contribuir): clona el repositorio,
-  crea el entorno y ejecuta `.venv/bin/python -m nightscribe gui`.
+- **Desde el repositorio** (sin descargar ningún instalador, y sin paquete
+  publicado en PyPI): en un entorno virtual,
+  `pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"`,
+  y luego `nightscribe gui`. Necesita Python 3.11+ y se trae sus propias
+  bibliotecas de Qt y científicas, así que es una descarga grande, y **no
+  lleva Find_Orb empaquetado** (la app busca `fo` en `~/findorb` y en tu
+  `PATH`).
+- **Desde un clon** (si piensas contribuir): clona el repositorio, crea el
+  entorno y ejecuta `.venv/bin/python -m nightscribe gui`.
 
 Los pasos detallados, sistema por sistema, están en [INSTALL.es.md](https://github.com/irydeo/nightscribe/blob/main/INSTALL.es.md).
 

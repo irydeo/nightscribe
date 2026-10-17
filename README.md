@@ -18,84 +18,46 @@ Four missions, one loop:
 2. **Understand every object**: orbital and physical parameters translated
    into accurate, engaging explanations, in Spanish and English.
 3. **Capture and reduce**: it drives your mount and camera through CCDciel or
-   NINA/PINS,
-   and it calibrates, stacks and measures your own frames: photometry
-   (variables, exoplanets, supernovae) and MPC-ready astrometry of minor
-   bodies, without leaving the window.
+   NINA/PINS, and it calibrates, stacks and measures your own frames:
+   photometry (variables, exoplanets, supernovae) and MPC-ready astrometry of
+   minor bodies, without leaving the window.
 4. **Tell it**: a bilingual (ES/EN) draft and the night's charts, written
    with the real data of your session.
 
-And the piece that ties them together: every chosen target becomes a
-**project**, a persistent entity with its own folder, that guides you through
-**Card → Capture → Analysis → Publishing** without re-asking you anything it
-already knows (coordinates, window, magnitude, exposure plan). And the app
-does not stop at the plan: it drives your mount and camera, and it calibrates,
-stacks and measures your own frames (astrometry, photometry, periods) without
-leaving the window. Weeks later, the project is still there: follow-up visits,
-light curve, final outcome.
+Every chosen target becomes a **project**: a persistent entity with its own
+folder that walks you through **Card → Capture → Analysis → Publishing**
+without asking again what it already knows (coordinates, window, magnitude,
+exposure plan). Weeks later the project is still there: follow-up visits, the
+light curve, the final outcome.
 
 ## What you can follow
 
 Eight kinds of targets share the same list every night, with the Sun and the
-sky as context. This is what you get from each one:
+sky as context. Each one has its own chapter in the
+[user guide](docs/user/README.md): what it is, why it matters tonight and how
+it is measured.
 
-- **NEOs, confirmed and unconfirmed.** NEOfixer's *site-specific* list with
-  score, priority and cost in minutes of telescope time; apparent rate and
-  sky uncertainty; flags for NEOCP, impact-risk, radar or NHATS interest. For
-  the still unconfirmed NEOCP candidates, preliminary orbital elements with
-  their sigmas, computed from the MPC astrometry. The app knows your camera
-  and tells you the maximum trail-free exposure; you export the ephemeris to
-  your planetarium and the sequence to your capture software, and then the
-  frames are **stacked and measured in the app** (the track & stack: solve the
-  reference, register, stack following the object, detect, sweep the velocity,
-  measure each observation), or you paste the astrometry your own tool
-  produced and the validator reviews it line by line. The MPC report is
-  generated in ADES or 80 columns and checked against the observations other
-  stations have published. The motion animation, your frames star-aligned with
-  a marker riding the object, is the smoking gun.
-- **Comets.** Live observed magnitudes from COBS, perihelion dates and
-  activity flags, so you know how each comet is doing tonight, not last
-  month.
-- **Comet candidates (PCCP).** The MPC's Possible Comet Confirmation Page:
-  objects reported as asteroids that might be comets, with their comet-score.
-  Getting there first matters.
-- **Supernovae.** The recent discoveries list from Rochester Astronomy and a
-  complete flow: a confirmation blink of your FITS against a PanSTARRS
-  reference requested with the exact geometry of your image, multi-night
-  follow-up with your photometry drawn against the typical templates of each
-  type (Ia, II-P/L, Ib/c, SLSN, kilonova), an indicative campaign analysis,
-  an evolution animation, CSV or AAVSO EFF export, and cadence reminders when
-  it is time to go back.
-- **Exoplanet transits.** Tonight's transits from ExoClock (the ESA Ariel
-  mission's ephemeris-refinement programme), with priority and O-C drift: how
-  much the observed transit time is drifting from the prediction, which is
-  the scientific point of re-observing. The card tells you whether the whole
-  transit fits in your night, whether it is detectable with your aperture and
-  when to start capturing, with a visual timeline, a pre-flight checklist and
-  the EXOTIC handoff: the app writes the `inits.json`, runs EXOTIC for you and
-  imports its light curve and parameters back into the project.
-- **Close approaches.** ESA NEOCC upcoming flybys: miss distance, estimated
-  size and peak magnitude, to catch the week's fast visitor.
-- **HADS stars.** High-amplitude δ Scuti variables: they pulse so fast
-  (periods of 1–5 h) and so strongly (≥ 0.3 mag) that you watch them vary in
-  a single session. From the living catalogue maintained by P. Wils, with
-  color-coded priorities: found or possible period changes, never-observed
-  stars and this month's coverage gaps. Your run folds by phase into the
-  classic saw-tooth.
-- **Variable stars and duties.** Members of your campaigns that are due by
-  cadence, stars with an event in progress, stars nearing a predicted VSX
-  extremum, your standing vigils (the T CrB eruption, the R CrB fade) checked
-  daily against ZTF and the AAVSO community photometry, and the AAVSO
-  editorial channel with its alerts and active campaigns. Whenever the star
-  is up tonight. The frames are measured in the app (the photometric series:
-  a calibrated point per frame, the zero point anchored by a comparison star
-  every frame, the ensemble of comparisons with its outlier veto) and the
-  period is searched there too (Lomb-Scargle and PDM, with the false-alarm
-  probability and the folded curve by night).
-- **The Sun and the sky.** The state of the Sun with the latest NASA SDO
-  channels and the NOAA indices, transits and shadows of Jupiter's moons
-  filtered for your site, and a 60-day sky calendar computed locally: phases,
-  conjunctions, oppositions, probable eclipses and meteor showers.
+- **NEOs, confirmed and unconfirmed**: a site-specific list with score,
+  priority and cost in minutes of telescope time, the trail-free exposure your
+  camera allows, the track & stack in the app and the MPC report checked
+  against what other stations published.
+- **Comets**: live observed magnitudes, perihelion dates and activity.
+- **Comet candidates (PCCP)**: objects reported as asteroids that might be
+  comets. Getting there first matters.
+- **Supernovae**: the recent discoveries, a confirmation blink against a
+  survey reference, multi-night follow-up against the typical templates of
+  each type, and the export.
+- **Exoplanet transits**: tonight's transits with their O-C drift, whether the
+  whole transit fits in your night, and the EXOTIC handoff.
+- **Close approaches**: ESA NEOCC flybys with miss distance, size and peak
+  magnitude.
+- **HADS stars**: high-amplitude δ Scuti variables that vary within a single
+  session, with colour-coded priorities and the phase-folded curve.
+- **Variable stars and duties**: your campaigns by cadence, the stars nearing
+  a predicted extremum, your vigils checked daily against ZTF and the AAVSO
+  community photometry, and the period search.
+- **The Sun and the sky**: the state of the Sun, Jupiter's moon events for
+  your site and a 60-day sky calendar computed locally.
 
 ## What you need
 
@@ -150,380 +112,45 @@ python3 -m venv --system-site-packages .venv
 
 ## A whole night (and the weeks after)
 
-What using NightScribe actually feels like, in five scenes:
+The guide walks
+[a real night](docs/user/03-projects.md) from the first click to the report.
+The short version:
 
-1. **Late afternoon.** You open the app and the night panel greets you; one click on **+ NEW PROJECT** and the night is already computed: a list
-   of wide rows, best target first. A chip in the header warns you the Moon is
-   87 % lit; another announces a shadow transit on Jupiter at 23:12. The top
-   row is an unconfirmed NEO with *"safe start until 23:41; 2.5 h over your
-   horizon"* and a one-line reason: *"only seen for 2 days: every night
-   counts"*.
-2. **You click it.** The object card tells you what it is in plain words, how
-   big it probably is, which family its (preliminary) orbit belongs to, how
-   fast it moves (5″/min) and, because it knows your camera, that your longest
-   trail-free exposure is 45 s. You press **Create project**.
-3. **Plan and capture.** You size the session: 40 frames × 45 s, Clear filter.
-   The app confirms it fits inside the safe window. You export the ephemeris
-   for Cartes du Ciel and the sequence for your capture software; or, with
-   CCDciel connected, you send the plan and start the run without leaving the
+1. **Late afternoon.** One click on **+ NEW PROJECT** computes the night: the
+   best target first, a chip saying how lit the Moon is and another announcing
+   a shadow transit on Jupiter, and a one-line reason for the top row.
+2. **You click it.** The card says what the object is, how fast it moves and,
+   because it knows your camera, your longest trail-free exposure. You press
+   **Create project**.
+3. **Plan and capture.** Size the session; the app confirms it fits inside the
+   safe window. Export the ephemeris and the sequence, or, with CCDciel or
+   NINA/PINS connected, send the plan and start the run without leaving the
    app.
-4. **Analysis.** Back home you open the visit in the editor. The app solves
-   the reference frame, registers the sequence and **stacks it following the
-   object**; it looks for the dot, sweeps the velocity, measures every
-   observation twice (on its stack and per frame) and checks the result
-   against what the other stations have published. The MPC report comes out
-   in ADES or 80 columns with the middle-of-exposure instants and the
-   propagated uncertainties, ready to send. (You can also measure in Tycho
-   Tracker or another tool and **paste** the lines: NightScribe validates them
-   one by one before they leave.)
-5. **The weeks after.** The journal remembers that night by itself. The
-   supernova you confirmed keeps its own light curve, and the dashboard nudges
-   you when three nights have passed without a revisit. If you feel like
-   telling it, the bilingual draft is already written with the real session
-   data. One evening a chip appears in the Tonight view: *"R CrB is fading: your
-   vigil"*.
-
-## What you can do: in detail
-
-### Plan the night (the Tonight view)
-
-One ranked answer to *"what can I do tonight?"*, with the eight kinds of
-targets from the previous section mixed into a single ranking.
-
-Every target gets a **unified 0–100 score** built from four weighted families:
-**scientific priority** (0–35), **observability from your site** (0–30),
-**urgency** (0–20) and **outreach hook** (0–15); plus feedback from your own
-history: observed-but-never-posted gets a nudge, recently posted loses
-novelty. The ranking guarantees **kind diversity**: a night with a NEO, a
-comet and a transit beats three NEOs; and the best target of each kind gets a
-discreet highlight. Each pick carries a one-line **"why tonight"** reason, in
-Spanish and English.
-
-The planner respects your real constraints, and tells you when one bites:
-
-- **Limiting magnitude**: a hybrid policy: hard cut for supernovae, comets and
-  transits; a soft `⚠ mag>N` flag for NEOs and PCCPs (their magnitude
-  predictions are often wrong: flagged and dimmed, never silently dropped).
-- **Local horizon**: your TheSkyX `.hrz` file (or `az alt` pairs) plus a
-  safety margin; a flat minimum altitude as fallback. When a valid horizon
-  file exists, it wins.
-- **Moon**: warning and score penalty by separation and illumination, never a
-  hard filter. A real phase icon, drawn from geometry, sits in the header.
-- **Session feasibility**: the dark window over your horizon must cover the
-  whole session; the card tells you *"safe start until HH:MM"*.
-- **Plate scale**: your camera's pixel size and focal length set the maximum
-  trail-free exposure for fast movers, computed per target.
-
-A filter in the header narrows the night to one kind ("only supernovas
-today"), Settings holds a permanent whitelist of kinds, and a per-kind cap
-keeps one busy source from flooding the view. Up to three **sky-event chips**
-(full moon, an opposition, a Jupiter shadow transit…) sit in the header and
-jump straight to the sky calendar.
-
-### Chase NEOs and comet candidates
-
-The flow that turns a moving dot into a reported observation:
-
-- The card shows apparent rate (″/min), your **maximum trail-free exposure**,
-  the safe window and, for unconfirmed objects, the full preliminary orbit
-  with sigmas, drawn as a chart.
-- Export **ephemerides** at a configurable step in the formats your planetarium
-  software imports (TheSkyX, Cartes du Ciel, CSV), validated with real
-  imports, and the **capture sequence** for NINA (JSON), CCDciel (`.targets`,
-  validated against a real CCDciel export, calibration frames included) or a
-  generic CSV.
-- With CCDciel connected: **Point telescope** slews to the *freshly computed*
-  position (Horizons interpolated to the minute, not the stale plan), and
-  **Astrometric Goto** adds a plate-solve-and-correct cycle that absorbs
-  ephemeris error: the reliable route to NEOCPs with large uncertainties.
-- The frames come home and the app does the astrometry: it solves the
-  reference frame, registers the sequence, stacks it following the object,
-  finds the dot, sweeps the velocity and measures every observation twice (on
-  its stack and per frame), flagging any disagreement. The result is checked
-  against the observations other stations have published and the **MPC
-  report** is generated in ADES PSV or 80 columns, with your camera's
-  instrument type, ready to send.
-- You can also measure in your usual tool (Tycho Tracker or another) and
-  **paste the astrometry** into the visit: NightScribe validates every line
-  (80-column or ADES PSV, your MPC code, the designation) before it leaves.
-- The **motion animation** is the smoking gun, now played in the editor: the
-  observation stacks centred on the object, the stars crawling while the
-  asteroid stands still. If it stands still in every panel, the detection is
-  solid.
-
-### Confirm and follow supernovae
-
-- **Confirmation blink**: import your result FITS (target and coordinates are
-  already in the project context) and blink it against a PanSTARRS DR1 g
-  reference requested with the *exact* center, pixel scale and rotation of your
-  image: aligned by construction (DSS2-red takes over south of −30°). If your
-  FITS has no astrometric solution, Astrometry.net solves it (free key).
-  Exports: animated GIF, H.264 MP4 and a before/after PNG, with your
-  observatory watermark and an optional zoom on the transient.
-- **Multi-night follow-up**: a supernova project lives for weeks or months.
-  Each visit registers the stacked result per filter and your photometry with
-  minimal friction: quick entry (just the magnitude), tolerant paste
-  (AstroImageJ, Tycho, CSV) or file import. The **light curve** draws your
-  points against the typical templates of each type (Ia, II-P/L, Ib/c, SLSN,
-  kilonova), the app computes an indicative campaign analysis and verdict, an
-  **evolution animation** shows the fade, an annotated FITS copy carries the
-  metadata, and a cadence reminder ("3 nights since your last visit") surfaces
-  in the Tonight view when it's time to go back.
-- Reference context on request: ZTF points via ALeRCE appear as grey reference
-  points under yours, never mixed with your own measurements.
-- Export your photometry as **CSV** or **AAVSO EFF** (the AAVSO's extended
-  format), with the heliocentric Julian date computed in-app.
-
-### Catch exoplanet transits
-
-Designed so that *anyone dares* to capture their first transit:
-
-- Selection leads with the two real decisions: *"the whole transit fits in
-  your night, baselines included"* and *"detectable with your aperture"*
-  (ExoClock's minimum-telescope estimate versus yours, as a plain verdict).
-- The card tells you **"start capturing at HH:MM UTC"**, the transit plus the
-  out-of-transit baseline on both edges, and a **visual timeline** shows
-  night, horizon, capture window and milestones at a glance.
-- Suggested exposure and maximum cadence (so the ingress is resolved), with
-  the readout overhead made explicit, and a warning when the baseline doesn't
-  fit. A persistent five-step **pre-flight checklist** walks the capture.
-- The reduction is 100 % external: NightScribe exports a **pre-filled
-  `inits.json` for EXOTIC** (the NASA/JPL citizen-science pipeline) and guides
-  the final submission to ExoClock or the AAVSO Exoplanet Database.
-
-### Variable stars, HADS, campaigns and vigils
-
-- **HADS sessions**: there is no known phase to aim at; the recommendation is
-  a continuous capture of 2× the period (cadence ≤ P/12), and the listing gate
-  requires a full cycle to fit over your horizon. The catalogue is hybrid:
-  P. Wils' Google Sheet (updated daily) merged with a packaged snapshot that
-  also works offline. The sheet's color legend feeds the score: stars with
-  found or possible period changes, never-observed stars and this month's
-  coverage gaps get urgency bonuses. Your run folds by phase into the classic
-  saw-tooth, on screen and in PNG.
-- **Campaigns**: a campaign is the shared commitment of a group: science
-  goal, protocol (cadence, filters, comparison stars), report and data URLs.
-  One campaign, many attached projects (deleting the campaign frees them,
-  never deletes them). A member is *due* when its last session is
-  `cadence_nights` old and lands in the Tonight view automatically; it also lands when
-  an **event** is detected or a predicted **extremum** is imminent. The
-  Campaigns view is the war room: "Happening now" with ⚡ events, ⏳ upcoming
-  extrema and 👁 vigils, per-campaign health cards (members × cadence ×
-  events), and full sentences in plain language.
-- **Vigils**: your standing watch list, *T CrB eruption watch*, *R CrB fade
-  watch*, one star per line, editable in Settings. Each vigil is checked
-  against the latest ZTF magnitude versus its baseline (own 12 h cache); for
-  stars brighter than ZTF's saturation, it reads the AAVSO community
-  photometry with your token.
-- **AAVSO channel**: editorial alerts from the AAVSO forum and the active
-  observing campaigns, with the star name validated against VSX before it is
-  shown. A signal about a star that already is a project merges into that
-  project's reasons, never a duplicate row.
-- **The variables engine**: VSX extrema predictions with heliocentric Julian
-  dates, an event advisor on magnitude jumps (configurable threshold), and
-  fold-by-epoch views for periodic stars.
-
-### The Sun and the sky calendar
-
-From the **Tools** menu:
-
-- **The Sun now**: the latest NASA SDO channels (corona at 193/304/171 Å,
-  sunspots, magnetogram), the NOAA active-regions map and the indices (sunspot
-  number, F10.7 radio flux, Kp, the week's strongest flare), with a
-  watermarked PNG panel and a bilingual "the sky today" draft. An "impact on
-  your night" line connects it to observing: a bright Moon hurts faint
-  targets, a high Kp may mean auroras.
-- **Sky calendar**: today + 60 days, computed **100 % locally** (no network):
-  true lunar phases, perigee and apogee, Moon–planet and planet–planet
-  conjunctions, oppositions and greatest elongations (as ecliptic-longitude
-  crossings), **probable eclipses** from shadow-cone geometry, honestly
-  labelled as probable, and meteor showers. Validated against astropy and
-  published almanacs.
-- **Jupiter's moons this week**: Galilean satellite **and shadow** transits
-  across the disc, filtered for your site (Jupiter up, at night), at planning
-  grade with the "±10 min" label always visible (validated against 22 JPL
-  Horizons windows; worst case 9.6 min).
-
-### Drive your observatory (CCDciel or NINA/PINS)
-
-The **Capture** step of each project talks to your observatory software, only
-while it is actually running. You pick one under **Tools → Settings →
-Integrations**: **CCDciel** over JSON-RPC, or **NINA** (Windows) / **PINS**
-(Linux) over the Advanced API v2 plugin. Both give you status at a glance
-(version, CCD temperature, tracking, slewing), **Point telescope** (quick slew
-to a moving target's freshly computed position), **Astrometric Goto** (slew,
-capture, plate-solve and correction), a **Stop goto** safety button, and
-**live capture** (stage the project's saved plan, read back to show what is
-really held, and start the run).
-
-The plan's filter list is the one your wheel really has, read from the program
-on connect. NINA's snapshot takes one exposure at a time, so there its frame
-count is information only; CCDciel honours the count. And the last frame the
-run wrote shows up right there as a thumbnail, with a click to open it in the
-editor. **Capture options** propose the dithering and autofocus your object
-wants, with the reason a hover away. See chapter 05 of the guide for the exact
-limits.
-
-### Reduce and measure in the app (the editor)
-
-Everything the night produced opens in one workbench, the **unified FITS
-editor**: the plate with its histogram and stretch, a band that says what the
-plate itself knows (position, magnitude, date, exposure, kit, station, scale)
-and, hanging from each visit, the frames that came home. The work happens in
-tabs, and every figure it shows is explained where it appears.
-
-- **Photometry.** The comparison stars are proposed next to the target (never
-  the brightest of the field: they saturate), and the plate is measured with a
-  calibrated recipe (aperture or matched filter, sky, colour term, the
-  catalogue the zero point stands on). On a whole sequence the **series**
-  engine measures one point per frame, with the zero point anchored by a
-  comparison every frame, the ensemble of comparisons vetoing an outlier, the
-  optimum aperture per night and an honest multi-night detrend; the light
-  curve is drawn from it, and it exports as CSV or AAVSO EFF, or straight to
-  ExoClock.
-- **Period and phase.** Lomb-Scargle (with a floating mean) and PDM, the
-  spectral window, the false-alarm probability by bootstrap, how many cycles
-  the data really cover, and the folded curve night by night: a period is
-  claimed with its evidence, not as a bare number.
-- **Calibration.** A library of masters (dark/bias and flat) indexed by
-  camera, gain, temperature, exposure and filter, and a declarative recipe:
-  the flat is normalised, a dark already carries the bias, and a dark without
-  an exact exposure match is not scaled. When the library has no flat for the
-  filter, one is built from the dithered frames themselves and the run says
-  so. A star that touches the saturation or the linearity does not enter the
-  zero point.
-- **Astrometry (track & stack).** The sequence becomes MPC observations: the
-  reference frame is solved, the frames are registered (small rotation
-  included), the sequence is stacked **following the object** so its light is
-  concentrated while the stars trail, the dot is detected and the velocity
-  swept; each observation is stacked on its own and measured twice (on its
-  stack and per frame, the disagreement flagged). The result is checked
-  against the observations other stations published (Find_Orb, leave-one-out)
-  and the report is generated in ADES PSV or 80 columns, with the
-  middle-of-exposure instants, the propagated uncertainties and your camera's
-  instrument type. Below the detection gate there is a **manual mode** (mark
-  the object by eye on the whole-sequence stack) and the **animation** plays
-  the observations in the editor to see the asteroid stand still while the
-  stars crawl. The two heaviest stages, the **registration** and the
-  **stacking**, can run on a **graphics card** when one is there (on by
-  default, through OpenCL, with CUDA by hand, and the result is the same).
-- **Blink and annotate.** Your FITS blinked against a PanSTARRS DR1 g
-  reference requested with the exact geometry of your image (animated GIF,
-  H.264 MP4, before/after PNG), and an AIJ-compatible annotated copy of the
-  plate with the object's position written into the header.
-
-The external tools keep their place: what the app produces is standard FITS,
-ADES and AAVSO files, so Tycho Tracker, AstroImageJ, EXOTIC or your own
-scripts pick up exactly where it leaves off.
-
-### Remember everything: journal and attention
-
-- **Observing journal** (Tools menu): your diary writes itself: projects
-  created and closed, sessions logged, files produced, photometry points,
-  campaign activity; grouped by **observing night** (noon-to-noon local, the
-  astronomer's day), filterable by kind and searchable. Double-click jumps
-  back to the project.
-- **Needs your attention**: the app speaks first. The Projects home lists the
-  3–5 things asking for action: a campaign member due tonight, a supernova
-  overdue for a revisit, an observation never posted; each with its reason in
-  plain words and one button that lands exactly where you act. Computed
-  locally, no network.
-- Your activity feeds back into the planner: the suggestion engine knows what
-  you already observed or posted, and the Tonight list reflects it.
-
-### Understand any object
-
-**The "Explore an object…" box in the top bar** (type a name, press Enter) or
-**Tools → Explore object…** (or click any target): identity and physical data
-cross-matched from JPL SBDB, Horizons and CAD, SIMBAD, TNS and the NASA
-Exoplanet Archive, rendered as a calling card:
-
-- A **hook line** and outreach bullets, in Spanish and English.
-- A **parameter table where every row is explained** in plain language:
-  orbital family, MOID (the minimum distance the orbit ever gets to Earth's),
-  size estimated from the absolute magnitude, next close approach, discovery
-  date… Multiline, nothing truncated.
-- **Charts**: the orbit (animated by date, with hover readouts), the night sky
-  with *your* horizon silhouette and the safe window shaded, the survey field,
-  the light curve. In the app they are live vector graphics (zoom, pan,
-  hover); the same engines render the PNGs.
-- **Capture chips**: current magnitude, apparent rate, max trail-free
-  exposure, window and hours above the horizon; plus copyable coordinates
-  (decimal and sexagesimal) with their epoch.
-
-### Tell the world
-
-The last step of every project is telling it, if you feel like it: bilingual
-drafts (ES/EN) and a tweet written with the real session data (date, N×t,
-filter), plus the chart inventory already generated: orbit view, night sky
-with your horizon, survey field, light curve against templates, transit
-timeline, Sun panel, supernova blink and before/after, NEO motion trail.
-Copy, paste, done.
+4. **Analysis.** Back home you open the visit in the editor: it solves the
+   reference frame, registers the sequence and **stacks it following the
+   object**, measures every observation and checks the result against the
+   other stations. The MPC report comes out ready to send.
+5. **The weeks after.** The journal remembers that night by itself, the light
+   curve grows, the dashboard nudges you when a revisit is due and the
+   bilingual draft is already written with the real session data.
 
 ## Where the data comes from
 
-Every external source, what it gives you, how fresh it is, and whether it
-needs a key. All network access goes through an **SQLite cache with per-source
-TTLs** (the refresh column): repeat queries are instant and free for the
-service. If a source is down, the rest of the app never breaks; the sources
-are listed under **Help → About NightScribe** (the main ones; the full list is in
-`docs/DATA_SOURCES.md`).
+Tonight's list and the object cards are fed by public services, each with its
+own refresh: **NEOfixer**, the **MPC** (PCCP, observatory codes, published
+observations), **COBS**, **Rochester Astronomy**, **ExoClock**, **ESA NEOCC**,
+the **HADS** catalogue, **AAVSO** (VSX, forum, campaigns and photometry),
+**ALeRCE/ZTF**, **JPL** (SBDB, Horizons, CAD), **SIMBAD**, **TNS**, the
+**NASA Exoplanet Archive**, **VizieR**, **NOAA SWPC**, **SILSO**, **NASA SDO**
+and the **DESI Legacy Survey**.
 
-**Planning sources (feed Tonight):**
-
-| Source | What it gives you | Refresh | Key? |
-|---|---|---|---|
-| NEOfixer (U. Arizona) | Site-specific NEO list: score, priority, cost, magnitude, rate, uncertainty, NEOCP/impact/radar/NHATS flags; preliminary orbits with sigmas for unconfirmed objects | 12 h (orbits 1.5 h) | No (only for the optional community report) |
-| MPC (PCCP) | Possible comets awaiting confirmation, with comet-score | 6 h | No |
-| COBS | Live comet magnitudes, perihelion, activity | 6 h | No |
-| Rochester Astronomy | Recent supernova discoveries | 6 h | No |
-| ExoClock (ESA Ariel) | ~776 exoplanet transit ephemerides: depth, duration, priority, O-C drift, minimum telescope | 24 h | No |
-| ESA NEOCC | Upcoming close approaches: miss distance, size, peak magnitude | 6 h | No |
-| HADS sheet (P. Wils / VVS) | The living high-amplitude δ Scuti catalogue with color-coded priorities and monthly coverage (packaged snapshot as offline fallback) | 12 h | No |
-| AAVSO VSX | Variable star identity: type, period, epoch, extrema | 7 d | No |
-| AAVSO forum & campaigns | Editorial alerts and active observing campaigns | 12 h | No |
-| ALeRCE / ZTF | Latest magnitude for your vigils | 12 h | No |
-| AAVSO photometry | Community measurements for bright vigils | 12 h | Yes (free token) |
-
-**Object data (feed the cards):**
-
-| Source | What it gives you | Refresh | Key? |
-|---|---|---|---|
-| JPL SBDB | Identity, orbital class, elements, MOID, physical parameters (H, size, rotation, albedo, spectral class) | 7 d | No |
-| JPL Horizons | Precise ephemerides topocentric to *your* MPC code | 12 h | No |
-| JPL CAD | Next close approaches | 7 d | No |
-| SIMBAD (CDS) | Transients and host galaxies (Harvard mirror as fallback) | 7 d | No |
-| TNS | Fresh transient positions, days before SIMBAD ingests them | 6 h | No (only for discovery images) |
-| NASA Exoplanet Archive | Planet period, radius, mass, host star | 7 d | No |
-| VizieR (CDS) | Star fields for the comparison sequences and the astrometric references (Gaia EDR3, APASS DR9, VSX) | 30 d | No |
-| MPC Observations API | What other stations have published about the object, for the check before sending | 6 h | No |
-| ALeRCE / ZTF | Reference light-curve context | 30 d | No |
-
-**Sun and environment:**
-
-| Source | What it gives you | Refresh | Key? |
-|---|---|---|---|
-| NOAA SWPC | Sunspot number, F10.7, Kp, active regions, X-ray flux | 1 h | No |
-| SILSO | Sunspot series and cycle context | 24 h | No |
-| NASA SDO | Latest corona and magnetogram images (public domain) | 1 h | No |
-
-**Images:**
-
-| Source | What it gives you | Refresh | Key? |
-|---|---|---|---|
-| DESI Legacy Survey / CDS hips2fits | Color cutouts and PanSTARRS DR1 g / DSS2 reference fields, requested with your image's exact geometry | 30 d | No |
-| Astrometry.net | Blind plate-solve when your FITS has no WCS | 30 d per file | Yes (free key) |
-
-**Computed locally, no network at all:** Sun, Moon and planet positions
-(Schlyter's algorithms, arcminute precision), minor-body propagation (Kepler
-from the SBDB elements), transit instants, heliocentric Julian dates, the
-whole 60-day sky calendar and Jupiter's moon events. And the **reduction
-itself**: the registration, the stack, the astrometric and photometric
-measurement, the series, the period search and the light curve are arithmetic
-on your own pixels (on the processor, or on your graphics card when one is
-there), with no service involved. Images are credited (NASA/SDO,
-PanSTARRS, DSS); external websites (SolarMonitor, ETD, NEOfixer, TNS…) open in
-your browser, never embedded.
+All network access goes through an **SQLite cache with per-source TTLs**:
+repeat queries are instant and free for the service, and a source that is down
+never breaks the rest of the app. Sun, Moon and planet positions, the sky
+calendar and the whole **reduction** (registration, stack, measurement,
+periods) are computed locally, with no service involved. The full table, with
+what each source gives you and whether it needs a key, is in
+[docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).
 
 ## Optional integrations
 
@@ -556,34 +183,22 @@ nothing remains anywhere else.
 ## Quickstart and CLI
 
 Install first (see *Your first five minutes*). Then everything the GUI does
-for **planning and publishing** has a command-line counterpart (`--help` on
-each for details):
+for **planning and publishing** has a command-line counterpart:
 
 ```bash
 nightscribe gui        # desktop app
 nightscribe tonight    # best targets tonight (CLI)
 ```
 
-The **reduction** (the FITS
-editor: calibration, track & stack, astrometry, photometry, periods) lives in
-the GUI:
-
-| Command | What it does |
-|---|---|
-| `gui` | desktop application |
-| `tonight` | best targets tonight (`--fecha YYYY-MM-DD`, `--top N`) |
-| `explore <object>` | explained object card in the terminal |
-| `post <object>` | bilingual drafts + tweet (`--png` adds the charts) |
-| `solar` | Sun state (`--png` renders the panel) |
-| `blink <name> <fits>` | supernova blink vs PanSTARRS (`--video`, `--post`, `--zoom`, `--efecto blink/fade`…) |
-| `sequence <object>` | photometric sequence + finder chart (`--mag`, `--fov`, `--comps`, `--catalog gaia/apass`, `--fits` as background) |
-| `history` | the observing journal in the terminal |
-| `project …` | minimal project management: `list`, `create`, `advance`, `show`, `close`, `reopen`, `files` |
-| `inject <folder>` | injection and recovery: synthetic sources of a known brightness are added to a copy of your frames and measured back, to say how deep the pipeline really reaches |
+`tonight`, `explore`, `post`, `solar`, `blink`, `sequence`, `history`,
+`project` and `inject` are the rest (`--help` on each for the details), and
+chapter [09. The command line](docs/user/09-cli.md) has the whole list. The
+**reduction** (calibration, track & stack, astrometry, photometry, periods)
+lives in the GUI.
 
 See [INSTALL.md](INSTALL.md) for the full per-OS instructions (the standalone
-installer and the Linux packages first, then the pip package and running from
-source), and [CONTRIBUTING.md](CONTRIBUTING.md) to hack on it.
+installer and the Linux packages first), and
+[CONTRIBUTING.md](CONTRIBUTING.md) to hack on it.
 
 ## Documentation
 

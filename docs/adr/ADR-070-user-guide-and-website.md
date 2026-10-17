@@ -238,3 +238,34 @@ la web: una sección nueva **Guía avanzada** (`build_advanced`) publica una pá
 documento de tema, agrupadas en «Cómo está construido» y «Cómo se hace la ciencia», más
 un índice de los ADRs enlazados al repositorio, donde se leen tal cual; los planes se
 quedan en el repositorio. El lateral de la guía y la landing enlazan con ella.
+
+**Revisión (2026-10-17, la landing es más corta y los enlaces externos no se tocan)**: el
+README **es** la landing, así que todo lo que engorda al README engorda a la portada. Tenía
+606 líneas y la mitad (277) eran «What you can do: in detail», que es justo lo que la guía
+cuenta capítulo a capítulo; ahora son **220** líneas: el detalle vive en la guía (con
+enlaces a los capítulos), las fuentes de datos en una lista corta que enlaza
+`docs/DATA_SOURCES.md`, y la noche completa y la CLI se resumen en unas pocas líneas con su
+enlace. Con eso desaparece el acordeón de la portada (`DETAIL_SECTION` y `_accordion` se
+retiran de `build_site.py`). Y dos arreglos en el generador: **una URL absoluta nunca se
+reescribe** (el enlace de la guía a `INSTALL.md` salía como `.../blob/main/INSTALL.html`,
+un 404, porque el reescritor trataba una URL de GitHub como si fuera un capítulo; el
+mismo agujero estaba en los tres reescritores) y un enlace `../` apunta a la **raíz del
+repositorio**, no a `docs/` (el enlace a `AGENTS.md` de los documentos de tema salía como
+`docs/AGENTS.md`, otro 404). Los guardianes: una URL absoluta no se toca, y **ningún enlace
+a nuestro propio repositorio puede apuntar a un fichero que no exista con esa extensión**
+(el test de enlaces roto saltaba los `http`, que es por lo que los dos pasaron).
+
+**Review (2026-10-17, the landing is shorter and external links are left alone)**: the
+README **is** the landing, so everything that fattens the README fattens the front page. It
+had 606 lines and half of them (277) were "What you can do: in detail", which is exactly
+what the guide tells chapter by chapter; it is **220** now: the detail lives in the guide
+(with links to the chapters), the data sources are a short list linking
+`docs/DATA_SOURCES.md`, and the whole night and the CLI are a few lines with their link.
+The landing's accordion goes with it (`DETAIL_SECTION` and `_accordion` are removed from
+`build_site.py`). And two fixes in the generator: **an absolute URL is never rewritten**
+(the guide's link to `INSTALL.md` shipped as `.../blob/main/INSTALL.html`, a 404, because
+the rewriter treated a GitHub URL as a chapter; the same hole was in all three rewriters)
+and a `../` link points at the **repository root**, not at `docs/` (the topic documents'
+link to `AGENTS.md` shipped as `docs/AGENTS.md`, another 404). The guards: an absolute URL
+is left alone, and **no link to our own repository may point at a file that does not exist
+with that extension** (the broken-links test skipped `http`, which is why both passed).

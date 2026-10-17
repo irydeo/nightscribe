@@ -13,10 +13,14 @@ Three paths, depending on how comfortable you are with a terminal:
   openSUSE: `sudo dnf install ./nightscribe-*.x86_64.rpm`), then run
   `nightscribe gui`. Windows SmartScreen will warn because the binary is
   unsigned: *More info → Run anyway*.
-- **pip**: `pip install nightscribe` inside a virtual environment, then
-  `nightscribe gui`.
-- **From source** (if you plan to contribute): clone the repository, create
-  the environment and run `.venv/bin/python -m nightscribe gui`.
+- **From the repository** (no installer to download, and no package published
+  on PyPI): in a virtual environment,
+  `pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"`,
+  then `nightscribe gui`. It needs Python 3.11+ and pulls its own Qt and
+  scientific libraries, so it is a big download, and it brings **no bundled
+  Find_Orb** (the app looks for `fo` in `~/findorb` and on your `PATH`).
+- **From a checkout** (if you plan to contribute): clone the repository,
+  create the environment and run `.venv/bin/python -m nightscribe gui`.
 
 The detailed, per-system steps are in [INSTALL.md](https://github.com/irydeo/nightscribe/blob/main/INSTALL.md).
 

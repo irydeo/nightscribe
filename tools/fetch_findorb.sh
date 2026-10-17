@@ -46,5 +46,16 @@ rm -rf "$TARGET"
 mv "$_tmp" "$TARGET"
 
 echo "== payload ready =="
-ls "$TARGET/bin" 2>/dev/null || true
+# The payload is what the packages SHIP, so an empty one is a failed run and
+# not a smaller package: it used to be reported with a tolerant `ls`, which is
+# how a build could carry no Find_Orb and say nothing (2026-10-17).
+test -x "$TARGET/bin/fo" || {
+    echo "no $TARGET/bin/fo: the findorb package did not land" >&2
+    exit 1
+}
+test -d "$TARGET/share/findorb/data" || {
+    echo "no $TARGET/share/findorb/data: fo cannot run without it" >&2
+    exit 1
+}
+ls "$TARGET/bin"
 du -sh "$TARGET"

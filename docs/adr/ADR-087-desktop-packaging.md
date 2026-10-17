@@ -270,3 +270,25 @@ it (`Invalid version`) and aborts the whole build with
 it as a separator) and PEP 440 requires it; only the label used in file names
 drops the `+`. Measured: the same tree with `0.1.0a2.dev53+g242f1b98e` builds the
 `.rpm` and the generator emits `python3dist(nightscribe) = 0.1~a2`.
+
+**Revisión (2026-10-17, un paquete sin Find_Orb no puede salir en silencio)**:
+`build_deb._stage` copiaba el payload con `if findorb_dir and Path(findorb_dir).is_dir()`,
+así que un build al que se le pasaba `--findorb` con una carpeta vacía (o a medias)
+construía el `.deb` **sin Find_Orb** y sin decir nada; el observador acababa leyendo en
+Ajustes que Find_Orb no está y viendo la guía de instalación de lo que el paquete debía
+traer (reportado). Ahora el build **falla** si el payload no trae `bin/fo*` y
+`share/findorb/data`, y `tools/fetch_findorb.sh` verifica lo mismo al terminar (cubre
+también el `.rpm` y el PKGBUILD, que consumen ese payload); el `.spec` de PyInstaller avisa
+en alto cuando no hay payload, para que un build de desarrollo sepa por qué su bundle no
+lleva el chequeo de órbita.
+
+**Review (2026-10-17, a package without Find_Orb cannot leave in silence)**:
+`build_deb._stage` copied the payload behind `if findorb_dir and
+Path(findorb_dir).is_dir()`, so a build handed `--findorb` with an empty (or half)
+folder built the `.deb` **without Find_Orb** and said nothing; the observer then read in
+Settings that Find_Orb was missing and got the install guide for what the package was
+supposed to bring (reported). The build now **fails** when the payload has no `bin/fo*`
+and no `share/findorb/data`, and `tools/fetch_findorb.sh` verifies the same at the end
+(which also covers the `.rpm` and the PKGBUILD, both fed by that payload); the PyInstaller
+spec warns out loud when there is no payload, so a developer build knows why its bundle
+carries no orbit check.

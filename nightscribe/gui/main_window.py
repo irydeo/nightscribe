@@ -1840,17 +1840,24 @@ class MainWindow(QMainWindow):
         # and running a binary from the internet is the user's decision.
         # @args: dlg - the settings dialog
         # @return: None
+        from ..core import findorb as findorb_mod
         from ..core import findorb_install as fi
         worker = getattr(self, "_findorb_worker", None)
         if worker is not None and worker.isRunning():
             worker.cancel()
             return
-        found = fi.find_on_path()
+        # 1. Is there one already? The app SHIPS a copy, its own instructions
+        #    use ~/findorb and its guided install uses <data dir>/findorb, so
+        #    "already installed" has to mean all of those and not only PATH:
+        #    telling an observer to install what they already have is how the
+        #    micromamba dialog showed up with Find_Orb sitting right there
+        #    (reported 2026-10-17).
+        found, why = findorb_mod.auto_find()
         if found:
             dlg.edt_findorb_path.setText(found)
             QMessageBox.information(dlg, self.tr("Find_Orb"), self.tr(
-                "Find_Orb is already installed:\n%1\n\nThe path now points "
-                "at it.").replace("%1", found))
+                "Find_Orb is already installed (%1):\n%2\n\nThe path now "
+                "points at it.").replace("%1", why).replace("%2", found))
             return
         name, manager = fi.find_manager()
         if manager is None:
@@ -1882,10 +1889,16 @@ class MainWindow(QMainWindow):
         return self.tr(
             "NightScribe did not find micromamba, mamba or conda, and it "
             "does not download a package manager on its own.\n\n"
+            "The installed packages (the Windows installer and the Linux "
+            ".deb/.rpm) already bring a copy of Find_Orb and use it with no "
+            "path to set; this guide is for a copy run from the source tree "
+            "or from pip, which ship none.\n\n"
             "The easy road on Linux and macOS is the conda-forge package "
             "\"findorb\": it brings the precompiled binaries and the DE430t "
             "ephemerides the perturbations need, in one command:\n\n"
             "    micromamba create -p ~/findorb -c conda-forge findorb\n\n"
+            "That folder is one of the places NightScribe looks on its own, "
+            "so the check works as soon as the command finishes.\n\n"
             "On Windows, Project Pluto ships the binaries as zips: download "
             "the console version and the non-interactive fo, unpack both in "
             "the same folder (they share their configuration and the "
@@ -1980,6 +1993,35 @@ class MainWindow(QMainWindow):
             lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
             if btn is not None:
                 btn.setText(self.tr("Download (95 MB)…"))
+
+    def _findorb_path_prefill(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. An empty path means "use the copy that ships", which
+        #          is right but reads as "nothing configured": the observer
+        #          opened Settings asking WHERE Find_Orb is (reported
+        #          2026-10-17). So the app fills the field with what it finds
+        #          on its own and says where it came from, and an observer who
+        #          already has a path keeps it (the field is only touched when
+        #          it is empty).
+        from ..core import findorb
+        edt = getattr(dlg, "edt_findorb_path", None)
+        if edt is None:
+            return
+        if edt.text().strip():
+            edt.setToolTip(self.tr(
+                "The Find_Orb you pointed at. Leave it empty to let the app "
+                "use the copy it ships, or the one it finds on its own"))
+            return
+        found, why = findorb.auto_find()
+        if not found:
+            edt.setToolTip(self.tr(
+                "No Find_Orb found. Install it from here, or point this at "
+                "your own `fo` (fo64.exe on Windows)"))
+            return
+        edt.setText(found)
+        edt.setToolTip(self.tr(
+            "Found for you (%1). Change it to use another copy").replace(
+                "%1", why))
 
     def _refresh_gpu_status(self, dlg):
         # @args: dlg - the settings dialog
@@ -2552,6 +2594,10 @@ class MainWindow(QMainWindow):
         apply_search()
         # the DE430t state is not a config field: it is a fact about the disk
         self._findorb_eph_refresh(dlg)
+        # and neither is the Find_Orb binary: with nothing configured the app
+        # fills in the copy it ships (or the one it finds), so the field says
+        # WHERE it is instead of looking unconfigured (reported 2026-10-17)
+        self._findorb_path_prefill(dlg)
         # the card the selected backend sees right now, for the same reason
         self._refresh_gpu_status(dlg)
 

@@ -185,9 +185,12 @@ def test_with_no_manager_the_app_gives_the_guide(qapp, monkeypatch):
     # The app does not download a package manager on its own: it says what
     # to install and what to type, and stops there.
     from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
     from PySide6.QtWidgets import QMessageBox
     monkeypatch.setattr(mw, "db", object())
-    monkeypatch.setattr(fi, "find_on_path", lambda: None)
+    # nothing anywhere: no bundled copy, no ~/findorb, no PATH (hermetic: the
+    # machine running the suite may well have one)
+    monkeypatch.setattr(findorb_mod, "auto_find", lambda: (None, ""))
     monkeypatch.setattr(fi, "find_manager", lambda: (None, None))
     dlg = mw._load_ui("settings_dialog")
     win = mw.MainWindow.__new__(mw.MainWindow)
@@ -204,14 +207,74 @@ def test_with_no_manager_the_app_gives_the_guide(qapp, monkeypatch):
 def test_an_already_installed_fo_is_just_pointed_at(qapp, monkeypatch):
     # The common case: the program is installed and the app was never told.
     from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
     from PySide6.QtWidgets import QMessageBox
-    monkeypatch.setattr(fi, "find_on_path", lambda: "/opt/fo/bin/fo")
+    monkeypatch.setattr(findorb_mod, "auto_find",
+                        lambda: ("/opt/fo/bin/fo", "on your PATH"))
     dlg = mw._load_ui("settings_dialog")
     win = mw.MainWindow.__new__(mw.MainWindow)
+    shown = []
     monkeypatch.setattr(QMessageBox, "information",
-                        staticmethod(lambda *a, **k: None))
+                        staticmethod(lambda *a, **k: shown.append(a[2])))
     win._install_findorb(dlg)
     assert dlg.edt_findorb_path.text() == "/opt/fo/bin/fo"
+    assert shown and "already installed" in shown[0]
+    assert "/opt/fo/bin/fo" in shown[0]
+    dlg.deleteLater()
+
+
+def test_the_shipped_copy_is_not_something_to_install(qapp, monkeypatch):
+    # Reported 2026-10-17: with Find_Orb right there (the copy the app ships,
+    # or the ~/findorb its own dialog prints) "Install…" sent the observer to
+    # micromamba. It says "already installed" and fills the path instead.
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(
+        findorb_mod, "auto_find",
+        lambda: ("/usr/lib/nightscribe/findorb/bin/fo",
+                 "bundled with NightScribe"))
+    dlg = mw._load_ui("settings_dialog")
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    shown = []
+    monkeypatch.setattr(QMessageBox, "information",
+                        staticmethod(lambda *a, **k: shown.append(a[2])))
+    win._install_findorb(dlg)
+    assert dlg.edt_findorb_path.text().endswith("/findorb/bin/fo")
+    assert shown and "bundled with NightScribe" in shown[0]
+    dlg.deleteLater()
+
+
+def test_the_settings_fill_the_field_with_what_the_app_found(qapp,
+                                                             monkeypatch):
+    # Reported 2026-10-17: an empty field reads as "nothing configured", so
+    # the observer asks where Find_Orb is. The app fills it with the copy it
+    # found and says where it came from; a path the observer set is never
+    # touched.
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
+    dlg = mw._load_ui("settings_dialog")
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    monkeypatch.setattr(findorb_mod, "auto_find",
+                        lambda: ("/opt/fo/bin/fo", "in your home folder"))
+    win._findorb_path_prefill(dlg)
+    assert dlg.edt_findorb_path.text() == "/opt/fo/bin/fo"
+    assert "in your home folder" in dlg.edt_findorb_path.toolTip()
+    dlg.edt_findorb_path.setText("/mine/fo")
+    win._findorb_path_prefill(dlg)
+    assert dlg.edt_findorb_path.text() == "/mine/fo"
+    dlg.deleteLater()
+
+
+def test_the_settings_say_when_there_is_no_findorb_at_all(qapp, monkeypatch):
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import findorb as findorb_mod
+    dlg = mw._load_ui("settings_dialog")
+    win = mw.MainWindow.__new__(mw.MainWindow)
+    monkeypatch.setattr(findorb_mod, "auto_find", lambda: (None, ""))
+    win._findorb_path_prefill(dlg)
+    assert dlg.edt_findorb_path.text() == ""
+    assert "No Find_Orb found" in dlg.edt_findorb_path.toolTip()
     dlg.deleteLater()
 
 

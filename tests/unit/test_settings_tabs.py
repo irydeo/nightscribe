@@ -78,6 +78,43 @@ def _page_of_group(dlg, group_name):
     return -1
 
 
+def test_no_page_needs_more_width_than_the_dialog_has(qapp):
+    # Measured 2026-10-17: the Measurement page's minimum was 767 px against
+    # the 712 px viewport of the default 900 px dialog, so the page scrolled
+    # sideways and the right-hand buttons of its rows (Find_Orb's Test and
+    # Install…) sat off screen until the observer widened the window. The
+    # expert groups COUNT: they hold the widest rows and they are folded away
+    # by default, which is why the dialog's own sizeHint did not see them.
+    from nightscribe.gui import settings_spec, settings_view
+    from PySide6.QtWidgets import QScrollArea, QWidget
+    dlg = _dlg()
+    settings_view.make_advanced_doors(dlg, settings_spec.ADVANCED_GROUPS,
+                                      lambda s: s)
+    dlg.resize(max(900, dlg.sizeHint().width()),
+               max(640, dlg.sizeHint().height()))
+    dlg.show()
+    qapp.processEvents()
+    bad = []
+    for i, page in enumerate(_pages(dlg)):
+        door = page.findChild(QWidget, f"door_{page.objectName()}")
+        if door is not None:
+            door.set_open(True)
+        dlg.stk_pages.setCurrentIndex(i)
+        dlg.grab()                     # forces the layout of this page
+        area = page.parent()
+        while area is not None and not isinstance(area, QScrollArea):
+            area = area.parent()
+        room = area.viewport().width() if area is not None else 0
+        need = page.minimumSizeHint().width()
+        if need > room:
+            bad.append(f"{page.objectName()}: needs {need} px, has {room}")
+    dlg.deleteLater()
+    assert not bad, ("una página de Ajustes pide más ancho del que tiene, así "
+                     "que su contenido se corta por la derecha y los botones "
+                     "de las filas quedan fuera de la ventana:\n  "
+                     + "\n  ".join(bad))
+
+
 def test_pages_in_order(qapp):
     from nightscribe.gui import settings_spec, settings_view
     dlg = _dlg()

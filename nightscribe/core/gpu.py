@@ -67,7 +67,17 @@ def _module(name):
     try:
         return importlib.import_module(f".gpu_{name}", __package__)
     except Exception as err:                                   # noqa: BLE001
-        logger.info("GPU backend %s is not importable: %s", name, err)
+        # WHICH module is missing decides how loud this is. Our own missing
+        # is a BUILD problem: the frozen bundle did not carry it, so the
+        # accelerator (on by default) does not exist and the app falls back
+        # to the processor (the Windows installer said "No module named
+        # 'nightscribe.core.gpu_opencl'", reported 2026-10-17). The
+        # third-party package missing is a normal machine without CuPy or
+        # pyopencl, and a note is enough.
+        missing = getattr(err, "name", "") or ""
+        level = (logger.warning if missing.startswith("nightscribe.")
+                 else logger.info)
+        level("GPU backend %s is not importable: %s", name, err)
         return None
 
 

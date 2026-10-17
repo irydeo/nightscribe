@@ -90,6 +90,41 @@ class CheckReport:
     n_obs: int = 0
 
 
+def auto_find():
+    # @return: (path or None, why) the `fo` the app finds on its own and a
+    #          short plain-language reason, for the Settings screen to fill
+    #          the field with and for the check to use. Nothing configured:
+    #          this is what "out of the box" means.
+    #
+    # The order answers the most work first: the copy the app SHIPS (the
+    # packaged installs), then the two folders the APP ITSELF tells the
+    # observer to use, then PATH.
+    #
+    # Those two folders are here because following the app's own instructions
+    # has to work: `~/findorb` is the command the install dialog prints, and
+    # `<data dir>/findorb` is where the guided install puts its private
+    # environment by default. Until 2026-10-17 only the bundled copy and PATH
+    # were searched, so an observer who did exactly what the dialog said (or
+    # who runs from a source tree or a pip install, which ship no copy) read
+    # "Find_Orb is not configured" with the program sitting right there
+    # (reported 2026-10-17).
+    from .. import paths
+    from .findorb_install import bundled_fo, find_fo, find_on_path
+    found = bundled_fo()
+    if found:
+        return found, "bundled with NightScribe"
+    for folder, why in ((Path.home() / "findorb", "in your home folder"),
+                        (paths.data_dir() / "findorb",
+                         "in NightScribe's folder")):
+        found = find_fo(folder)
+        if found:
+            return found, why
+    found = find_on_path()
+    if found:
+        return found, "on your PATH"
+    return None, ""
+
+
 def probe(findorb_path=None):
     # @args: findorb_path - the configured path (cfg "findorb_path")
     # @return: (path or None, message)
@@ -103,21 +138,20 @@ def probe(findorb_path=None):
                           "needs the non-interactive `fo` (fo64.exe)")
         if Path(candidate).exists():
             return candidate, f"Find_Orb at {candidate}"
+        # A configured path that is GONE is not the end of it: the copy the
+        # app ships (or the one it can find on its own) is still a Find_Orb,
+        # and saying "not found" while one sits there is the same lie as
+        # before. It is said that the old one moved.
+        found, why = auto_find()
+        if found:
+            return found, (f"the configured Find_Orb is gone ({candidate}); "
+                           f"using {found} ({why})")
         return None, f"not found: {candidate}"
-    # No configured path: use the copy NightScribe SHIPS before looking at
-    # PATH. Installing the app brings Find_Orb with it, so the check works
-    # out of the box and there is no path to set.
-    from .. import paths
-    bundle = paths.findorb_bundle_dir()
-    if bundle is not None:
-        from .findorb_install import find_fo
-        found = find_fo(bundle)
-        if found:
-            return found, f"Find_Orb at {found} (bundled with NightScribe)"
-    for name in FO_NAMES:
-        found = shutil.which(name)
-        if found:
-            return found, f"Find_Orb at {found}"
+    # No configured path: the copy NightScribe SHIPS, then the folders the
+    # app's own instructions use, then PATH.
+    found, why = auto_find()
+    if found:
+        return found, f"Find_Orb at {found} ({why})"
     return None, "Find_Orb is not configured (Settings > Measurement)"
 
 

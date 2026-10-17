@@ -56,12 +56,24 @@ Para generar el tuyo:
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt   # incluye pyinstaller
+sh tools/fetch_findorb.sh findorb-payload       # para que el bundle lleve Find_Orb
 .venv/bin/pyinstaller installer/nightscribe.spec
 # -> dist/nightscribe/ (binario Linux) ; en Windows lo mismo -> nightscribe.exe
 ```
 
-El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm` y el estilo de
-matplotlib; detalles en los comentarios de `installer/nightscribe.spec`.
+El spec de PyInstaller empaqueta los `.ui`, las traducciones `.qm`, el estilo de
+matplotlib y, cuando está, `findorb-payload/` (el chequeo de órbita); detalles en
+los comentarios de `installer/nightscribe.spec`. **Sin ese payload el build no
+lleva Find_Orb** y la app buscará `fo` en tu `PATH` y en `~/findorb`, así que el
+chequeo sigue funcionando si tienes uno.
+
+Para generar el paquete de Linux en vez del bundle:
+
+```bash
+sh tools/fetch_findorb.sh findorb-payload       # el .deb/.rpm lo LLEVAN
+.venv/bin/python tools/build_deb.py --version 0.0.0 \
+    --findorb findorb-payload --arch amd64 --out dist
+```
 
 ## Opción B: paquete pip
 

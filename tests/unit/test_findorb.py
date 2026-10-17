@@ -25,6 +25,33 @@ import pytest
 from nightscribe.core import findorb
 
 
+def _home_at(tmp):
+    # @args: tmp - the folder that stands in for the observer's home
+    # @return: a Path subclass whose home() is that folder. The search is
+    #          hermetic: a test must not find the `~/findorb` of whoever runs
+    #          the suite (this machine has one).
+    from pathlib import Path
+
+    class _Home(Path):
+        @classmethod
+        def home(cls):
+            return tmp
+
+    return _Home
+
+
+@pytest.fixture
+def no_auto(monkeypatch, tmp_path):
+    # @return: None. Nothing is found on its own: no bundled copy, no
+    #          ~/findorb, no environment in the data dir and no `fo` on PATH.
+    from nightscribe import paths
+    from nightscribe.core import findorb_install
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
+    monkeypatch.setattr(findorb, "Path", _home_at(tmp_path / "home"))
+    monkeypatch.setattr(findorb_install.shutil, "which", lambda name: None)
+
+
 # ------------------------------------------------------------------ probe
 
 def test_probe_refuses_the_interactive_binary(tmp_path):
@@ -34,22 +61,93 @@ def test_probe_refuses_the_interactive_binary(tmp_path):
     assert path is None and "interactive" in message
 
 
-def test_probe_reports_a_missing_path():
+def test_probe_reports_a_missing_path(no_auto):
     path, message = findorb.probe("/no/such/fo")
     assert path is None and "not found" in message
 
 
-def test_probe_finds_fo_on_the_path(monkeypatch):
-    monkeypatch.setattr(findorb.shutil, "which",
+def test_probe_finds_fo_on_the_path(no_auto, monkeypatch):
+    from nightscribe.core import findorb_install
+    monkeypatch.setattr(findorb_install.shutil, "which",
                         lambda name: "/usr/bin/fo" if name == "fo" else None)
     path, _message = findorb.probe()
     assert path == "/usr/bin/fo"
 
 
-def test_probe_says_when_nothing_is_configured(monkeypatch):
-    monkeypatch.setattr(findorb.shutil, "which", lambda name: None)
+def test_probe_says_when_nothing_is_configured(no_auto):
     path, message = findorb.probe()
     assert path is None and "not configured" in message
+
+
+def test_the_app_finds_what_its_own_instructions_install(no_auto, tmp_path,
+                                                         monkeypatch):
+    # The install dialog tells the observer to create ~/findorb; following it
+    # has to work. Until 2026-10-17 it did not: the app only looked at the
+    # bundled copy and PATH, so it said "not configured" with Find_Orb right
+    # there (reported).
+    from nightscribe import paths
+    from nightscribe.core import findorb_install
+    home = tmp_path / "home"
+    (home / "findorb" / "bin").mkdir(parents=True)
+    (home / "findorb" / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    monkeypatch.setattr(findorb, "Path", _home_at(home))
+    monkeypatch.setattr(findorb_install.shutil, "which", lambda name: None)
+    found, why = findorb.auto_find()
+    assert found == str(home / "findorb" / "bin" / "fo")
+    assert "home" in why
+    path, message = findorb.probe("")
+    assert path == found and "home" in message
+
+
+def test_the_guided_installs_folder_is_searched_too(no_auto, tmp_path,
+                                                    monkeypatch):
+    # The guided install puts its private environment in <data dir>/findorb
+    # by default; clearing the path must not lose it.
+    from nightscribe import paths
+    from nightscribe.core import findorb_install
+    env = tmp_path / "data" / "findorb"
+    (env / "bin").mkdir(parents=True)
+    (env / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "data_dir", lambda: tmp_path / "data")
+    monkeypatch.setattr(findorb_install.shutil, "which", lambda name: None)
+    found, why = findorb.auto_find()
+    assert found == str(env / "bin" / "fo")
+    assert "NightScribe" in why
+
+
+def test_the_bundled_copy_wins_over_the_home_folder(no_auto, tmp_path,
+                                                    monkeypatch):
+    # The copy that travels with the app is the one to use: it is the same
+    # version the app was built and tested with.
+    from nightscribe import paths
+    bundle = tmp_path / "bundle"
+    (bundle / "bin").mkdir(parents=True)
+    (bundle / "bin" / "fo").write_bytes(b"x")
+    home = tmp_path / "home"
+    (home / "findorb" / "bin").mkdir(parents=True)
+    (home / "findorb" / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: bundle)
+    monkeypatch.setattr(findorb, "Path", _home_at(home))
+    found, why = findorb.auto_find()
+    assert found == str(bundle / "bin" / "fo")
+    assert "bundled" in why
+
+
+def test_a_configured_path_that_is_gone_falls_back(no_auto, tmp_path,
+                                                   monkeypatch):
+    # Filling the field (which the app now does) must not leave a stale path
+    # behind for ever: a package update can move it, and then the app finds
+    # the copy it has and says what happened.
+    from nightscribe import paths
+    home = tmp_path / "home"
+    (home / "findorb" / "bin").mkdir(parents=True)
+    (home / "findorb" / "bin" / "fo").write_bytes(b"x")
+    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
+    monkeypatch.setattr(findorb, "Path", _home_at(home))
+    path, message = findorb.probe("/gone/away/fo")
+    assert path == str(home / "findorb" / "bin" / "fo")
+    assert "gone" in message and "/gone/away/fo" in message
 
 
 # ------------------------------------------------------------------ input
@@ -125,8 +223,7 @@ def test_decide_without_a_reference_does_not_block():
     assert report.no_reference and not report.blocked
 
 
-def test_check_says_it_is_unavailable_without_findorb(monkeypatch):
-    monkeypatch.setattr(findorb.shutil, "which", lambda name: None)
+def test_check_says_it_is_unavailable_without_findorb(no_auto):
     report = findorb.check("OUR LINE", "2025 UR", cfg=None)
     assert report.available is False and not report.blocked
     assert "not configured" in report.note
@@ -367,10 +464,9 @@ def test_probe_uses_the_bundled_copy(tmp_path, monkeypatch):
     assert path == str(fo) and "bundled" in message
 
 
-def test_probe_falls_back_to_path_without_a_bundle(monkeypatch):
-    from nightscribe import paths
-    monkeypatch.setattr(paths, "findorb_bundle_dir", lambda: None)
-    monkeypatch.setattr(findorb.shutil, "which",
+def test_probe_falls_back_to_path_without_a_bundle(no_auto, monkeypatch):
+    from nightscribe.core import findorb_install
+    monkeypatch.setattr(findorb_install.shutil, "which",
                         lambda name: "/usr/bin/fo" if name == "fo" else None)
     path, _message = findorb.probe()
     assert path == "/usr/bin/fo"

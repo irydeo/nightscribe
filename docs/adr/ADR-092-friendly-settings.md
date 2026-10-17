@@ -201,3 +201,27 @@ is removed: same dialog, same keys, same widgets; the hierarchy changes.
 change; the CCDciel/NINA backend gate does not change; the Welcome is
 untouched. A "what is left to configure" summary or a "only what I touched"
 mode are left out on purpose: the search already is that door.
+
+**Revisión (2026-10-17, una página más ancha que su ventana)**: las puertas dejan los
+grupos expertos PLEGADOS, así que el `sizeHint` del diálogo se calcula sin sus filas: al
+abrir la puerta de **Medida**, la página pedía **767 px** contra un viewport de **712** y
+aparecía scroll horizontal, con los botones de la derecha de varias filas (Probar,
+Instalar… de Find_Orb) fuera de la ventana hasta ensancharla. El culpable medido era
+`lbl_astro_gpu_status` (el nombre de la tarjeta, sin wrap) dentro de la fila de la GPU:
+esa fila exigía **749 px**. Ahora esa etiqueta va en su propia línea con `wordWrap`, y la
+casilla «decir lo que sabe la placa» (555 px) se acortó dejando la enumeración en su
+etiqueta de ayuda, que es el patrón de la casa. Un test recorre las seis páginas **con sus
+puertas abiertas** y falla si alguna pide más ancho que su viewport: la regla es que
+ninguna fila se corte por la derecha, ni con lo avanzado desplegado.
+
+**Review (2026-10-17, a page wider than its window)**: the doors leave the expert groups
+FOLDED, so the dialog's `sizeHint` is computed without their rows: opening the
+**Measurement** door made the page ask for **767 px** against a 712 px viewport, the page
+scrolled sideways, and the right-hand buttons of several rows (Find_Orb's Test and
+Install…) sat off screen until the window was widened. The measured culprit was
+`lbl_astro_gpu_status` (the card's name, no wrap) inside the GPU row: that row demanded
+**749 px**. The label now sits on its own wrapped line, and the "say what the plate knows"
+checkbox (555 px) was shortened with its enumeration moved to its help label, which is the
+house pattern. A test walks the six pages **with their doors open** and fails if any asks
+for more width than its viewport: the rule is that no row may be cut off on the right, not
+even with the advanced groups unfolded.

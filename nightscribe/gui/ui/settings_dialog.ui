@@ -924,7 +924,6 @@
                <item><widget class="QCheckBox" name="chk_astro_gpu"><property name="text"><string>Warp and combine on the GPU</string></property><property name="toolTip"><string>Use the graphics card for the two heaviest stages of a track &amp; stack: the registration (the source image and the stars) and the stacking (the warp and the combination). It is on by default and uses OpenCL, which ships with the app and runs on NVIDIA, AMD and Intel; a machine with no card runs on the CPU exactly as before, and the result is the same to a fraction of an ADU</string></property></widget></item>
                <item><widget class="QLabel" name="lbl_astro_gpu_backend"><property name="text"><string>Backend:</string></property></widget></item>
                <item><widget class="QComboBox" name="cmb_astro_gpu_backend"><property name="toolTip"><string>Which backend does the work. OpenCL runs on NVIDIA, AMD and Intel and needs nothing installed by hand; CUDA is NVIDIA only and is installed by hand; Auto tries CUDA first and falls back to OpenCL</string></property></widget></item>
-               <item><widget class="QLabel" name="lbl_astro_gpu_status"><property name="text"><string/></property><property name="toolTip"><string>Which card the selected backend sees right now, or that none was found and the processor will do the work</string></property></widget></item>
                <item>
                 <spacer name="hsp_astro_gpu">
                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -933,6 +932,7 @@
                </item>
               </layout>
              </item>
+             <item><widget class="QLabel" name="lbl_astro_gpu_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="toolTip"><string>Which card the selected backend sees right now, or that none was found and the processor will do the work</string></property></widget></item>
              <item><widget class="QLabel" name="lblH_astro_gpu"><property name="text"><string>The registration and the stacking read and write whole frames, and that is where a graphics card is much faster than the processor. It is on by default; on a machine with no supported card it is simply ignored and the processor does the work</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
             </layout>
            </widget>
@@ -1400,7 +1400,7 @@
              <item>
               <layout class="QHBoxLayout" name="row_chart_data">
                <item><widget class="QLabel" name="lbl_chart_data"><property name="text"><string>Plate band:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-               <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows (position, magnitude, date, exposure, kit, station, scale, field)</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. Ink for what this plate's own solution places, dimmed for the catalogue's, and for the magnitude a scale of its own: GREEN clean (error up to 0.05), ORANGE usable but not clean (up to 0.15 or a light caveat), RED not worth reporting without looking, WHITE for a catalogue value. Off, the band keeps the object's name only</string></property></widget></item>
+               <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. Ink for what this plate's own solution places, dimmed for the catalogue's, and for the magnitude a scale of its own: GREEN clean (error up to 0.05), ORANGE usable but not clean (up to 0.15 or a light caveat), RED not worth reporting without looking, WHITE for a catalogue value. Off, the band keeps the object's name only</string></property></widget></item>
                <item>
                 <spacer name="hsp_chart_data">
                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -1409,6 +1409,7 @@
                </item>
               </layout>
              </item>
+             <item><widget class="QLabel" name="lblH_chart_data"><property name="text"><string>Position, magnitude, date, exposure, equipment, station, scale and field, over the image and in the exported PNG, GIF or video; each datum's colour says where it comes from, and the box's own tooltip explains the colours. Off, the band keeps the object's name only</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_chart_boxes">
                <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Other charts:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

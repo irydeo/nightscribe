@@ -116,6 +116,12 @@ done
 if [ -d findorb-payload ]; then
     install -d %{buildroot}%{_prefix}/lib/nightscribe
     cp -a findorb-payload %{buildroot}%{_prefix}/lib/nightscribe/findorb
+    # `cp -a` keeps the payload's own modes, and a root that arrived as 0700
+    # (the umask of the build machine, or the mktemp that creates it) ships
+    # unreadable: the app, running as the observer, cannot even enter the
+    # folder and Find_Orb "is not there" with its files on disk (reported
+    # 2026-10-17).
+    chmod -R a+rX %{buildroot}%{_prefix}/lib/nightscribe/findorb
 fi
 
 %files

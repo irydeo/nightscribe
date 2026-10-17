@@ -2057,29 +2057,141 @@ class MainWindow(QMainWindow):
             return
         found, why = findorb.auto_find()
         if not found:
-            edt.setToolTip(self.tr(
-                "No Find_Orb found. Install it from here, or point this at "
-                "your own `fo` (fo64.exe on Windows)"))
+            if why:
+                # There is something to say beyond "nothing here": the copy
+                # that ships IS on disk and this user cannot read it, and
+                # sending the observer to install what they already have is
+                # the wrong answer (reported 2026-10-17).
+                edt.setToolTip(why)
+            else:
+                edt.setToolTip(self.tr(
+                    "No Find_Orb found. Install it from here, or point this "
+                    "at your own `fo` (fo64.exe on Windows)"))
             return
         edt.setText(found)
         edt.setToolTip(self.tr(
             "Found for you (%1). Change it to use another copy").replace(
                 "%1", why))
 
-    def _refresh_gpu_status(self, dlg):
+    def _arm_gpu_status(self, dlg):
         # @args: dlg - the settings dialog
-        # @return: None. The card the SELECTED backend sees RIGHT NOW, or that
-        #          none was found. It is a fact about the machine and not a
-        #          setting: the switch comes on by default, so "does my card
-        #          work?" is the first question an observer asks, and the
-        #          answer is here instead of a guess.
-        from ..core import gpu
+        # @return: None. Wires the status line that says which card the
+        #          SELECTED backend sees right now (or that none was found and
+        #          the processor does the work). It is a fact about the machine
+        #          and not a setting: the switch comes on by default, so "does
+        #          my card work?" is the first question an observer asks.
+        #
+        #          The answer is NOT asked for here. Finding it out imports
+        #          pyopencl, opens the platform and BUILDS a kernel, which is
+        #          seconds of driver work on Windows, and this used to happen
+        #          while the dialog was being built: the window appeared late
+        #          for a line that lives on the Measurement page, inside an
+        #          expert group that starts folded behind the Advanced door,
+        #          where most observers never look (measured 2026-10-17: the
+        #          dialog's first open was 537 ms, 165 ms of it this probe,
+        #          and the kernel compile is much slower on Windows).
+        #          So it is asked when the row is FIRST SEEN, off the GUI
+        #          thread, and the line says "checking…" meanwhile.
+        from PySide6.QtCore import QEvent, QObject, QTimer
+        lbl = getattr(dlg, "lbl_astro_gpu_status", None)
+        if lbl is None:
+            return
+        dlg._ns_gpu_seen = {}       # backend -> the answer already shown
+        dlg._ns_gpu_worker = None
+        lbl.setText(self.tr("Checking the card…"))
+        lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        window = self
+
+        class _OnFirstShow(QObject):
+            def eventFilter(self, obj, ev):
+                if ev.type() == QEvent.Type.Show:
+                    # A Show is NOT proof of being on screen: switching to
+                    # the page shows the whole subtree and hides it again in
+                    # the same cycle when a group is folded behind its door
+                    # (measured: the row got Show and Hide and was never
+                    # visible). The deferred check reads the truth, so a page
+                    # switch that only walks past costs nothing.
+                    QTimer.singleShot(
+                        0, lambda: window._gpu_status_maybe(dlg))
+                return False
+
+        dlg._ns_gpu_filter = _OnFirstShow(dlg)
+        lbl.installEventFilter(dlg._ns_gpu_filter)
+        cmb = getattr(dlg, "cmb_astro_gpu_backend", None)
+        if cmb is not None:
+            # and it follows the backend the observer picks
+            cmb.currentIndexChanged.connect(
+                lambda _i: self._gpu_status_probe(dlg))
+
+    def _gpu_status_maybe(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. The deferred half of the Show filter: the row is
+        #          asked about only when it really came on screen (the door
+        #          was opened, or the observer scrolled to it).
+        if not Shiboken.isValid(dlg):
+            return
+        lbl = getattr(dlg, "lbl_astro_gpu_status", None)
+        if lbl is None or not lbl.isVisible():
+            return
+        self._gpu_status_probe(dlg)
+
+    def _gpu_status_probe(self, dlg):
+        # @args: dlg - the settings dialog
+        # @return: None. Kicks the probe, unless that backend was already
+        #          answered or one is on its way: the row is shown twice (the
+        #          page becomes current, then the Advanced door opens), and
+        #          asking twice would build the kernel twice.
+        from .workers import GpuProbeWorker
+        if not Shiboken.isValid(dlg):
+            return
         lbl = getattr(dlg, "lbl_astro_gpu_status", None)
         if lbl is None:
             return
         cmb = getattr(dlg, "cmb_astro_gpu_backend", None)
         backend = cmb.currentData() if cmb is not None else "opencl"
-        name = gpu.probe(backend)
+        seen = getattr(dlg, "_ns_gpu_seen", None)
+        if seen is None:
+            seen = dlg._ns_gpu_seen = {}
+        if backend in seen:
+            self._gpu_status_show(dlg, seen[backend])
+            return
+        running = getattr(dlg, "_ns_gpu_worker", None)
+        if running is not None and running.isRunning():
+            return
+        lbl.setText(self.tr("Checking the card…"))
+        lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        worker = GpuProbeWorker(backend)
+        dlg._ns_gpu_worker = worker
+        worker.finished.connect(
+            lambda asked, name: self._gpu_status_done(dlg, asked, name))
+        self._keep(worker)
+        worker.start()
+
+    def _gpu_status_done(self, dlg, backend, name):
+        # @args: dlg - the settings dialog (maybe already destroyed), backend
+        #        - the one that was asked, name - the card it sees ("" = none)
+        # @return: None. The answer is remembered per backend so reopening the
+        #          row does not ask again (the kernel build is cached per
+        #          process, but the line should not blink back to "checking…"
+        #          either).
+        if not Shiboken.isValid(dlg):
+            return
+        seen = getattr(dlg, "_ns_gpu_seen", None)
+        if seen is not None:
+            seen[backend] = name
+        cmb = getattr(dlg, "cmb_astro_gpu_backend", None)
+        current = cmb.currentData() if cmb is not None else "opencl"
+        if current != backend:
+            return                  # the observer moved on: do not overwrite
+        self._gpu_status_show(dlg, name)
+
+    def _gpu_status_show(self, dlg, name):
+        # @args: dlg - the settings dialog, name - the card the selected
+        #        backend sees, or "" when there is none
+        # @return: None
+        lbl = getattr(dlg, "lbl_astro_gpu_status", None)
+        if lbl is None:
+            return
         if name:
             lbl.setText(self.tr("Card: {0}").format(name))
             lbl.setStyleSheet(f"color: {theme.C_OK};")
@@ -2604,10 +2716,10 @@ class MainWindow(QMainWindow):
         for code, name in mpc_astrometry.catalog_choices():
             dlg.cmb_astro_astcat.addItem(name, code)
         # "which card does it see?" is the first thing an observer wants to
-        # know when a switch comes on by default, so the answer is shown and
-        # it follows the backend the observer picks
-        dlg.cmb_astro_gpu_backend.currentIndexChanged.connect(
-            lambda _i: self._refresh_gpu_status(dlg))
+        # know when a switch comes on by default, so the answer is shown when
+        # the row is first seen and it follows the backend the observer picks
+        # (the wiring, and why it is lazy, live in _arm_gpu_status)
+        self._arm_gpu_status(dlg)
         dlg.cmb_cam_preset.addItem(self.tr("None"), "")
         for text, key, is_header in cameras.combo_entries():
             dlg.cmb_cam_preset.addItem(text, key)
@@ -2651,8 +2763,6 @@ class MainWindow(QMainWindow):
         # fills in the copy it ships (or the one it finds), so the field says
         # WHERE it is instead of looking unconfigured (reported 2026-10-17)
         self._findorb_path_prefill(dlg)
-        # the card the selected backend sees right now, for the same reason
-        self._refresh_gpu_status(dlg)
 
         # combos with an index or a data mapping of their own
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))

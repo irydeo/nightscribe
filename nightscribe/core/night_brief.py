@@ -82,9 +82,22 @@ S_JUPITER = QT_TRANSLATE_NOOP("NSNight", "Jupiter")
 S_SATURN = QT_TRANSLATE_NOOP("NSNight", "Saturn")
 
 # Compass letters, one by one on purpose: west is W in English and O in
-# Spanish, and a wrong letter sends the telescope the wrong way.
-S_COMPASS = tuple(QT_TRANSLATE_NOOP("NSNight", letter)
-                  for letter in ("N", "NE", "E", "SE", "S", "SW", "W", "NW"))
+# Spanish, and a wrong letter sends the telescope the wrong way. They are
+# WRITTEN OUT and not built in a loop: lupdate cannot extract a string whose
+# argument is a variable, so a `for` here leaves all eight out of the
+# catalogues and the Spanish interface shows W for oeste (measured
+# 2026-10-17: the eight were the only marks of this module missing from the
+# .ts, and tests/unit/test_i18n.py now fails when a mark is not there).
+S_COMPASS = (
+    QT_TRANSLATE_NOOP("NSNight", "N"),
+    QT_TRANSLATE_NOOP("NSNight", "NE"),
+    QT_TRANSLATE_NOOP("NSNight", "E"),
+    QT_TRANSLATE_NOOP("NSNight", "SE"),
+    QT_TRANSLATE_NOOP("NSNight", "S"),
+    QT_TRANSLATE_NOOP("NSNight", "SW"),
+    QT_TRANSLATE_NOOP("NSNight", "W"),
+    QT_TRANSLATE_NOOP("NSNight", "NW"),
+)
 
 # A planet below this is behind the trees and the haze: saying it anyway
 # would be noise.

@@ -18,6 +18,8 @@ package), the way the site test loads build_site."""
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -120,6 +122,41 @@ def test_the_deb_stages_the_documentation():
         # Find_Orb's licence notice travels with the package
         assert (stage / "usr" / "share" / "doc" / "nightscribe"
                 / "findorb-notice.txt").is_file()
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def test_the_deb_payload_is_readable_by_whoever_installs_it(tmp_path):
+    # The tree is SHIPPED, so it has to be readable by the observer's user. A
+    # payload whose root travelled as 0700 (the umask of the build machine, or
+    # the `mktemp -d` that creates it) was installed as `drwx------ root root`:
+    # the app, running as the observer, could not even enter the folder and
+    # Find_Orb "was not there" with its 63 files on disk (reported
+    # 2026-10-17). The modes are set by the builder now, and this holds them.
+    import os
+    import shutil
+    # A .deb is a POSIX artifact and its modes are a POSIX idea: on Windows
+    # the mode bits do not describe who may read or run a file (the extension
+    # does), so there is nothing here to hold.
+    if os.name == "nt":
+        pytest.skip("mode bits are not what grants access on Windows")
+    build_deb = _load("build_deb")
+    payload = tmp_path / "findorb-payload"
+    (payload / "bin").mkdir(parents=True)
+    (payload / "share" / "findorb" / "data").mkdir(parents=True)
+    (payload / "bin" / "fo").write_bytes(b"x")
+    (payload / "share" / "findorb" / "data" / "ObsCodes.htm").write_text("x")
+    os.chmod(payload, 0o700)                 # the modes the broken build shipped
+    os.chmod(payload / "share", 0o700)
+    stage = build_deb._stage("1.2.3", str(payload), "amd64")
+    try:
+        root = stage / "usr" / "lib" / "nightscribe" / "findorb"
+        for path in [root, *root.rglob("*")]:
+            mode = path.stat().st_mode
+            assert mode & 0o044 == 0o044, f"{path} is not readable by all"
+            if path.is_dir():
+                assert mode & 0o011 == 0o011, f"{path} cannot be entered"
+        assert (root / "bin" / "fo").stat().st_mode & 0o111, "fo not executable"
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 

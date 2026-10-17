@@ -17,6 +17,14 @@
 # Usage:  sh tools/fetch_findorb.sh [target_dir]
 set -eu
 
+# The payload is SHIPPED, so it has to be readable by whoever installs the
+# package. Without this, the umask of the build machine (or the 0700 that
+# `mktemp -d` below creates) travelled into the .deb: the tree was installed
+# as drwx------ root root and the app, running as the observer, could not even
+# enter it, so Find_Orb "was not there" with its 63 files sitting on disk
+# (reported 2026-10-17).
+umask 022
+
 TARGET="${1:-findorb-payload}"
 ARCH="${NIGHTSCRIBE_ARCH:-linux-64}"
 
@@ -44,6 +52,9 @@ mv "$TARGET/bin/fo" "$_tmp/bin/"
 mv "$TARGET/share/findorb/data" "$_tmp/share/findorb/"
 rm -rf "$TARGET"
 mv "$_tmp" "$TARGET"
+# `mktemp -d` creates 0700 and `mv` keeps it: without this the payload's ROOT
+# travels unreadable into every package (the bug above).
+chmod -R a+rX "$TARGET"
 
 echo "== payload ready =="
 # The payload is what the packages SHIP, so an empty one is a failed run and

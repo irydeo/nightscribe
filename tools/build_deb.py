@@ -285,13 +285,42 @@ def _stage(version, findorb_dir, arch):
                 "(expected bin/fo + share/findorb/data). Run "
                 "tools/fetch_findorb.sh first, or omit --findorb for a local "
                 "build that knowingly ships none.")
-        shutil.copytree(payload,
-                        stage / "usr" / "lib" / "nightscribe" / "findorb")
+        dest = _mk(stage / "usr" / "lib" / "nightscribe" / "findorb")
+        shutil.copytree(payload, dest)
+        _payload_modes(dest)
     # DEBIAN/control (Installed-Size in KiB, as the policy wants).
     size_kb = sum(f.stat().st_size for f in stage.rglob("*")
                   if f.is_file()) // 1024
     _write(stage / "DEBIAN" / "control", _control(version, arch, size_kb))
     return stage
+
+
+def _payload_modes(root):
+    # @args: root - the copied Find_Orb tree in the staging area
+    # @return: None. The tree is SHIPPED, so it has to be readable by whoever
+    #          installs the package, and the modes are SET here instead of
+    #          trusted: a payload whose root travelled as 0700 (the umask of
+    #          the build machine, or the `mktemp -d` that creates it) was
+    #          installed as `drwx------ root root`, the app running as the
+    #          observer could not even enter it, and Find_Orb "was not there"
+    #          with its 63 files sitting on disk (reported 2026-10-17).
+    #          Directories 755, every file readable by all, and the `fo` of
+    #          bin/ executable by definition (it is the only thing the app
+    #          runs from here; a copy that arrived without its exec bit, say
+    #          from a zip, would ship unusable).
+    for path in [root, *sorted(root.rglob("*"))]:
+        runnable = path.is_file() and path.parent.name == "bin" \
+            and path.name.startswith("fo")
+        mode = 0o755 if (path.is_dir() or runnable) else 0o644
+        os.chmod(path, mode)
+    # ... and it is VERIFIED, because a package that cannot be read is not a
+    # package: a payload that ends up unreadable is a build error.
+    bad = [str(p) for p in [root, *sorted(root.rglob("*"))]
+           if (p.stat().st_mode & 0o044) != 0o044
+           or (p.is_dir() and (p.stat().st_mode & 0o011) != 0o011)]
+    if bad:
+        raise SystemExit("the Find_Orb payload would ship unreadable: "
+                         + ", ".join(bad[:3]))
 
 
 def _mk(path):

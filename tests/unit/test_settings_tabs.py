@@ -831,13 +831,11 @@ def test_selecting_a_preset_loads_its_template(qapp, monkeypatch):
     dlg.deleteLater()
 
 
-def test_the_gpu_status_names_the_card_the_backend_sees(qapp, monkeypatch):
-    # The switch comes ON by default (ADR-089 rev), so "does my card work?"
-    # is the first question an observer asks. The row answers it for the
-    # SELECTED backend, and the answer follows the combo; a machine with no
-    # card is not an error, it says the processor will do the work.
-    from PySide6.QtWidgets import QComboBox, QDialog
-    from nightscribe.core import gpu
+def _fake_settings_window():
+    # @return: (a MainWindow with just what on_open_settings touches, a fake
+    #          Config class). The GPU probe runs in a worker now, so the
+    #          window also needs the holder _keep() fills.
+    from PySide6.QtWidgets import QComboBox
     from nightscribe.gui import main_window as mw
 
     class _Cfg:
@@ -861,26 +859,116 @@ def test_the_gpu_status_names_the_card_the_backend_sees(qapp, monkeypatch):
     win.tonight = type("T", (), {"cmb_filter": QComboBox()})()
     win._apply_kind_filter = lambda: None
     win._build_suggestion_grid = lambda: None
+    win._workers = []
+    win._keep = lambda worker: win._workers.append(worker)
+    return win, _Cfg
 
+
+def _show_gpu_row(dlg, qapp):
+    # @args: dlg - the settings dialog, qapp - the application
+    # @return: None. Opens the Measurement page and its Advanced door, so the
+    #          GPU status row really comes on screen. That is what arms the
+    #          probe: Qt sends Show to a widget only when it is visible, and a
+    #          row nobody looks at costs nothing.
+    from PySide6.QtWidgets import QWidget
+    dlg.show()
+    dlg.stk_pages.setCurrentIndex(_page_names(dlg).index("page_measurement"))
+    dlg.findChild(QWidget, "door_page_measurement").set_open(True, by_user=True)
+    qapp.processEvents()
+
+
+def _probe_settled(dlg, qapp):
+    # @args: dlg - the settings dialog, qapp - the application
+    # @return: None. Waits for the probe worker (when one was started) and
+    #          lets its queued signal land, so the label holds the answer.
+    worker = getattr(dlg, "_ns_gpu_worker", None)
+    if worker is not None:
+        worker.wait(5000)
+    qapp.processEvents()
+
+
+def test_the_gpu_probe_waits_until_the_row_is_seen(qapp, monkeypatch):
+    # Finding the card out means importing pyopencl, opening the platform and
+    # BUILDING a kernel: seconds of driver work on Windows. It used to run
+    # while the Settings dialog was being built, so the window appeared late
+    # for a status line that lives on the Measurement page, inside an expert
+    # group folded behind the Advanced door, where most observers never look
+    # (measured 2026-10-17: the dialog's first open was 537 ms and this probe
+    # was 165 ms of it on Linux, where the compile is fast).
+    from PySide6.QtWidgets import QDialog
+    from nightscribe.core import gpu
+    from nightscribe.gui import main_window as mw
+
+    win, cfg_cls = _fake_settings_window()
     asked = []
-    name = {"v": "Fake Card"}
     monkeypatch.setattr(
-        gpu, "probe", lambda backend: asked.append(backend) or name["v"])
+        gpu, "probe", lambda backend: asked.append(backend) or "Fake Card")
     dlg = _dlg()
     monkeypatch.setattr(dlg, "exec", lambda: QDialog.Rejected)
     monkeypatch.setattr(mw, "_load_ui", lambda name, parent=None: dlg)
-    monkeypatch.setattr(mw, "config", _Cfg())
+    monkeypatch.setattr(mw, "config", cfg_cls())
+    mw.MainWindow.on_open_settings(win)
+
+    # building the dialog asks NOTHING, and the line says what it is doing
+    assert asked == []
+    assert "checking" in dlg.lbl_astro_gpu_status.text().lower()
+    # and landing on the Measurement page is not enough either: the row is
+    # still folded behind the door
+    dlg.show()
+    dlg.stk_pages.setCurrentIndex(_page_names(dlg).index("page_measurement"))
+    qapp.processEvents()
+    assert asked == []
+    # the door is what puts the row on screen, and that is when it is asked
+    _show_gpu_row(dlg, qapp)
+    assert dlg._ns_gpu_worker is not None       # off the GUI thread
+    _probe_settled(dlg, qapp)
+    assert asked[-1] == "opencl"
+    assert "Fake Card" in dlg.lbl_astro_gpu_status.text()
+    # the answer is remembered: showing the row again does not ask twice
+    dlg.lbl_astro_gpu_status.hide()
+    qapp.processEvents()
+    dlg.lbl_astro_gpu_status.show()
+    qapp.processEvents()
+    _probe_settled(dlg, qapp)
+    assert asked.count("opencl") == 1
+    assert "Fake Card" in dlg.lbl_astro_gpu_status.text()
+    dlg.close()
+    dlg.deleteLater()
+
+
+def test_the_gpu_status_names_the_card_the_backend_sees(qapp, monkeypatch):
+    # The switch comes ON by default (ADR-089 rev), so "does my card work?"
+    # is the first question an observer asks. The row answers it for the
+    # SELECTED backend, and the answer follows the combo; a machine with no
+    # card is not an error, it says the processor will do the work.
+    from PySide6.QtWidgets import QDialog
+    from nightscribe.core import gpu
+    from nightscribe.gui import main_window as mw
+
+    win, cfg_cls = _fake_settings_window()
+    asked = []
+    card = {"v": "Fake Card"}
+    monkeypatch.setattr(
+        gpu, "probe", lambda backend: asked.append(backend) or card["v"])
+    dlg = _dlg()
+    monkeypatch.setattr(dlg, "exec", lambda: QDialog.Rejected)
+    monkeypatch.setattr(mw, "_load_ui", lambda name, parent=None: dlg)
+    monkeypatch.setattr(mw, "config", cfg_cls())
     mw.MainWindow.on_open_settings(win)
 
     # OpenCL is the default backend, and it is the one probed first
     assert dlg.cmb_astro_gpu_backend.currentData() == "opencl"
+    _show_gpu_row(dlg, qapp)
+    _probe_settled(dlg, qapp)
     assert asked and asked[-1] == "opencl"
     assert "Fake Card" in dlg.lbl_astro_gpu_status.text()
     # a machine with no card is not an error: the label says who does the work
-    name["v"] = ""
+    card["v"] = ""
     dlg.cmb_astro_gpu_backend.setCurrentIndex(
         dlg.cmb_astro_gpu_backend.findData("cuda"))
     qapp.processEvents()
+    _probe_settled(dlg, qapp)
     assert asked[-1] == "cuda"
     assert "processor" in dlg.lbl_astro_gpu_status.text().lower()
+    dlg.close()
     dlg.deleteLater()

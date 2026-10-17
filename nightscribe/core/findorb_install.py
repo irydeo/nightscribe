@@ -102,17 +102,27 @@ def find_fo(root):
     # @args: root - a folder to search (an environment, or a plain folder
     #        where the Windows zips were unpacked)
     # @return: the path to the non-interactive binary, or None
+    # A folder the process cannot READ is not an error here: it is a folder
+    # with no `fo` we can see. Without this, a package that shipped its tree
+    # as 0700 (reported 2026-10-17) made the probe raise PermissionError
+    # instead of saying that the copy is there and unreadable, which is the
+    # useful answer.
     root = Path(root).expanduser()
-    if not root.exists():
+    try:
+        if not root.exists():
+            return None
+        for name in _BIN_NAMES:
+            direct = root / name
+            if direct.is_file():
+                return str(direct)
+        for name in _BIN_NAMES:
+            for hit in sorted(root.rglob(name)):
+                if hit.is_file():
+                    return str(hit)
+    except OSError as err:
+        logger.warning("the Find_Orb folder could not be read (%s): %s",
+                       root, err)
         return None
-    for name in _BIN_NAMES:
-        direct = root / name
-        if direct.is_file():
-            return str(direct)
-    for name in _BIN_NAMES:
-        for hit in sorted(root.rglob(name)):
-            if hit.is_file():
-                return str(hit)
     return None
 
 

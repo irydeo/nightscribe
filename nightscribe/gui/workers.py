@@ -436,6 +436,31 @@ class FindOrbRecheckWorker(QThread):
         self.finished.emit(report)
 
 
+class GpuProbeWorker(QThread):
+    # Asks which card the selected backend sees, OFF the GUI thread.
+    # Answering that question means importing pyopencl, opening the platform
+    # and BUILDING a kernel: on Windows that is seconds of driver work, and it
+    # used to run while the Settings dialog was being built, so the window
+    # appeared late for a status line that lives behind the Advanced door
+    # (measured 2026-10-17: the probe was 165 ms of the dialog's first 537 ms
+    # on Linux, where the kernel compile is fast; the compile is the slow part
+    # and it is per process, not per dialog).
+    finished = Signal(str, str)     # the backend asked, the card it sees ("")
+
+    def __init__(self, backend):
+        super().__init__()
+        self._backend = backend
+
+    def run(self):
+        from ..core import gpu
+        try:
+            name = gpu.probe(self._backend)
+        except Exception as err:      # a driver never crashes the GUI
+            logger.warning("the GPU probe failed: %s", err)
+            name = ""
+        self.finished.emit(self._backend, name)
+
+
 class MpcAliasWorker(QThread):
     # Looks up whether a NEOCP object was CONFIRMED under a new name since
     # the visit (A11HPKO -> 2026 TQ8), off the GUI thread. It is cached by

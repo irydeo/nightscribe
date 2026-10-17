@@ -234,6 +234,31 @@ the version is the real one. ADR-033 (versioning) and ADR-055 (the first run is
 no longer confused with an update) are revised too. Arch's `PKGBUILD` already
 used a wheel and was not affected.
 
+**Revision (2026-10-17): the window must be the launcher's own.** The dock
+showed the app as **"python3"** with a generic icon (reported). Cause: on
+Wayland the compositor identifies a window by its app_id, and Qt takes that from
+`QGuiApplication::setDesktopFileName()`, which the app never called; with it
+empty nothing matches the window against the launcher, and the shell falls back
+to the process name, which in the Linux packages is literally `python3` (the
+launcher is `exec python3 -m nightscribe`). Fix: `DESKTOP_ID` in `gui/app.py`
+(fed to `setDesktopFileName`) is now the `.desktop` file's basename, and the
+entry carries `StartupWMClass=NightScribe` for the X11/XWayland half of the same
+bargain. `tests/unit/test_packaging.py` holds the app id, the file name and the
+AppStream `<id>`/`<launchable>` together, so the three cannot drift.
+
+**Revisión (2026-10-17): la ventana tiene que ser la del lanzador.** La barra de
+tareas mostraba la app como **«python3»** con un icono genérico (reportado).
+Causa: en Wayland el compositor identifica una ventana por su app_id, y Qt lo
+toma de `QGuiApplication::setDesktopFileName()`, que la app nunca llamaba; al
+estar vacío no hay con qué casar la ventana con el lanzador, y el shell cae al
+nombre del proceso, que en los paquetes Linux es literalmente `python3` (el
+lanzador es `exec python3 -m nightscribe`). Arreglo: `DESKTOP_ID` en
+`gui/app.py` (lo que recibe `setDesktopFileName`) es ahora el nombre base del
+fichero `.desktop`, y la entrada lleva `StartupWMClass=NightScribe` para la
+mitad X11/XWayland del mismo trato. `tests/unit/test_packaging.py` mantiene
+juntos el id de la app, el nombre del fichero y el `<id>`/`<launchable>` de
+AppStream, para que los tres no se separen.
+
 **Revision (2026-10-15): the `METADATA` version must be PEP 440.** The `.rpm`
 stopped building: the workflow turned the `+` of the version's local segment
 into `-` (for file names) and the RPM job then turned it into `.`, so the

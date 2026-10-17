@@ -17,6 +17,13 @@ switching the choice disconnects the other. One condition either way: the
 program must be **open** (and, for NINA/PINS, its Advanced API plugin
 installed and enabled); NightScribe talks to its API, not to the drivers.
 
+> **Status: in test.** The **NINA/PINS integration is not finished**: what is
+> here is meant to be tried and to hear back from you (what is missing, what
+> does not add up), and the rest is planned for **0.2**. The list of what it
+> does not do yet is right below; CCDciel is the one that is complete today.
+> If something fails, [open an issue](https://github.com/irydeo/nightscribe/issues)
+> with the log (**Help → Open the log**).
+
 From a project's **Capture** step the **Observatory** console drives it. Its
 status sits on top (who answers, the mount's state, the temperature, the
 version) with the red **STOP** always at hand, and its commands are three verbs
@@ -190,6 +197,8 @@ capture takes one) unless you load the native sequence; with CCDciel the frame
 count is honoured.
 
 ### What NINA / PINS does not do (yet)
+
+This is the list the **0.2** release is meant to close:
 
 - Its snapshot capture takes **one exposure**, so **Start capture fires one
   frame**, not the plan's whole count: the panel says the frame count is

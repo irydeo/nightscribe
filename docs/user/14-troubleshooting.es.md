@@ -82,6 +82,28 @@ es siempre tuyo.
 - Un home de solo lectura o un disco lleno pueden impedir que la app escriba
   su base de datos. El mensaje dice cuál.
 
+## El paquete se instaló pero apt dijo «Permiso denegado»
+
+Instalar el `.deb` desde tu carpeta de descargas puede imprimir una línea así:
+
+> La descarga se realiza sin aislamiento como root dado que el archivo «...»
+> no pudo accederlo el usuario «_apt». - pkgAcquire::Run (13: Permiso denegado)
+
+Es una nota del propio apt, **no un error**: apt lee un paquete local a través
+de su usuario sin privilegios `_apt`, y cuando ese usuario no alcanza el
+fichero (la carpeta o el fichero no son legibles por cualquiera) lo lee como
+**root y sin aislamiento**, y lo dice. La instalación termina bien.
+
+Si prefieres no verlo, copia antes el fichero a un sitio que cualquiera pueda
+leer:
+
+```bash
+cp ~/Descargas/nightscribe_*.deb /tmp/ && sudo apt install /tmp/nightscribe_*.deb
+```
+
+El paquete no tiene nada malo: la nota es sobre **dónde está el fichero**, no
+sobre lo que lleva dentro.
+
 ## Reportar un problema
 
 El gestor de incidencias del repositorio es el sitio. Incluye: qué estabas

@@ -43,6 +43,11 @@ sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
 nightscribe gui
 ```
 
+On Ubuntu, installing from your Downloads folder may print an apt note about
+the `_apt` user and a permission denied. It is harmless (apt reads the file as
+root instead) and the install finishes; chapter 14 of the guide explains it and
+how to silence it.
+
 Ubuntu 24.04 LTS is too old (it has no `python3-pyside6`): install from source
 (Option C).
 

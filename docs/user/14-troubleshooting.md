@@ -79,6 +79,28 @@ always yours.
 - A read-only home or a full disk can stop the app from writing its database.
   The message says which.
 
+## The package installed but apt said "Permiso denegado"
+
+Installing the `.deb` from your Downloads folder can print a line like:
+
+> Download is performed unsandboxed as root as file '...' couldn't be accessed
+> by user '_apt'. - pkgAcquire::Run (13: Permission denied)
+
+It is apt's own note, **not an error**: apt reads a local package through its
+unprivileged `_apt` user, and when that user cannot reach the file (the folder
+or the file itself is not readable by everyone) it reads it as **root without
+the sandbox** instead, and says so. The install finishes normally.
+
+If you would rather not see it, copy the file somewhere every user can read
+first:
+
+```bash
+cp ~/Downloads/nightscribe_*.deb /tmp/ && sudo apt install /tmp/nightscribe_*.deb
+```
+
+Nothing is wrong with the package: the note is about **where the file is**,
+not about what is inside it.
+
 ## Reporting a problem
 
 The repository's issue tracker is the place. Include: what you were doing,

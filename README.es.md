@@ -105,7 +105,7 @@ cielo ponen el contexto. Esto es lo que obtienes de cada uno:
 | | |
 |---|---|
 | **Obligatorio** | Linux o Windows · Python 3.11+ (recomendado 3.12) *o* el instalador autónomo (sin Python) · ~500 MB de disco · conexión a internet para los datos en vivo (todo lo demás funciona offline) |
-| **Recomendado** | Tu **código de observatorio MPC** (p. ej. `Z41`): el asistente inicial resuelve tus coordenadas automáticamente y desbloquea la lista de NEOs específica de tu sitio · tu **fichero de horizonte local** (`.hrz` de TheSkyX o simples pares «az alt») · la apertura de tu telescopio y el píxel/focal de tu cámara |
+| **Recomendado** | Tu **código de observatorio MPC** (tres caracteres, los que tenga asignados tu estación): el asistente inicial resuelve tus coordenadas automáticamente y desbloquea la lista de NEOs específica de tu sitio · tu **fichero de horizonte local** (`.hrz` de TheSkyX o simples pares «az alt») · la apertura de tu telescopio y el píxel/focal de tu cámara |
 | **Opcional** | **CCDciel o NINA/PINS** en ejecución local, si quieres que la app maneje montura y cámara (la integración con el observatorio; un backend a la vez) · cinco claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, atlas de contaminación lumínica, bot de TNS, token AAVSO) · el **asistente** opcional (un modelo que configures) · **EXOTIC** (la reducción de tránsitos), la única herramienta externa que instalas a mano: **Find_Orb** viaja dentro de los instaladores y de los paquetes Linux; ver *Integraciones opcionales* |
 
 Sin cuentas, sin registros, sin telemetría: NightScribe corre en tu ordenador

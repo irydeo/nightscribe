@@ -620,6 +620,12 @@ class MainWindow(QMainWindow):
         # of a dead view, the observer lands on the setup step that unblocks
         # it. Other views stay reachable (the app is not a jail).
         if index == VIEW_TONIGHT and not config.is_configured():
+            # The bounce is SAID: landing on another screen with no reason
+            # reads as a broken button (the observer pressed "New project"
+            # and ended up in the setup).
+            self.statusBar().showMessage(self.tr(
+                "Set your observatory first: the night's targets are computed "
+                "from it."), 8000)
             self._ensure_welcome()
             self._sync_welcome()
             self._welcome.show_step("obs")
@@ -11881,11 +11887,44 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self.on_refresh_projects()
 
+    def _has_any_project(self):
+        # @return: True when the database already holds a project
+        from ..core import project as project_mod
+        try:
+            return bool(project_mod.list_projects(db))
+        except Exception as err:
+            logger.warning("the project list could not be read: %s", err)
+            return False
+
+    def _setup_blocker(self):
+        # @return: why the FIRST project cannot be created yet, or None.
+        #          A project is planned, exposed and reported FROM THE SITE:
+        #          the night's targets, the exposure times and the report's
+        #          COD all come from it, so a first project without an
+        #          observatory is a project with nothing to say. The app asks
+        #          for the observatory BEFORE it (reported 2026-10-17: it let
+        #          the first project be created with the setup unfinished).
+        #          It is not a jail: an observer who already has projects is
+        #          never held back, and the way out is one click away.
+        if config.is_configured() or self._has_any_project():
+            return None
+        return self.tr(
+            "Set your observatory first: the night's targets and the MPC "
+            "report are computed from it. It is step 1 of Welcome and takes "
+            "a minute.")
+
     def _create_project(self, target):
         # @args: target - a planner target dict (must carry name/id and kind)
         # @return: the created project dict (with "id"), or None if the kind
         #          is not a valid project kind or the name is missing; the
         #          Explore dialog uses this to decide whether to close
+        # The single funnel every creation path goes through (the new-project
+        # bar, the Explore dialog, the campaigns, the deep links), so the
+        # observatory check lives here and no caller can forget it.
+        blocked = self._setup_blocker()
+        if blocked:
+            self.statusBar().showMessage(blocked, 10000)
+            return None
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
         if kind not in project.VALID_KINDS:
@@ -11940,10 +11979,25 @@ class MainWindow(QMainWindow):
         # create the project and clear the bar on success (the creation
         # path itself navigates to the project).
         # @args: target - a planner-target dict from the bar
+        blocked = self._setup_blocker()
+        if blocked:
+            # Say it where the observer is looking AND open the step that
+            # unblocks it: a refusal with no door is a dead end.
+            self.statusBar().showMessage(blocked, 10000)
+            self._open_setup()
+            return None
         p = self._create_project(target)
         if p is not None and getattr(self, "_newbar", None) is not None:
             self._newbar.reset()
         return p
+
+    def _open_setup(self):
+        # @return: None. Welcome, on the step that unblocks the first
+        #          project. The screen says what is missing in its own words
+        #          (the CTA is disabled until step 1 has a site).
+        self.navigate(VIEW_WELCOME)
+        if self._welcome is not None:
+            self._welcome.show_step("obs")
 
     def _select_project_row(self, pid):
         # @args: pid - project id
@@ -12341,6 +12395,12 @@ class MainWindow(QMainWindow):
             # (UX, U0.2); on failure the reason is shown IN the dialog
             # (the main status bar is hidden behind this modal).
             from PySide6.QtWidgets import QMessageBox
+            blocked = self._setup_blocker()
+            if blocked:
+                # said IN the dialog on purpose: this one is modal, so the
+                # main status bar's message would be hidden behind it
+                QMessageBox.warning(dlg, self.tr("Create project"), blocked)
+                return
             if self._create_project(_target(nm, fb)) is not None:
                 dlg.accept()
             else:

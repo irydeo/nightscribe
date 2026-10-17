@@ -102,7 +102,7 @@ sky as context. This is what you get from each one:
 | | |
 |---|---|
 | **Required** | Linux or Windows · Python 3.11+ (3.12 recommended) *or* the standalone installer (no Python needed) · ~500 MB of disk · an internet connection for the live data (everything else works offline) |
-| **Recommended** | Your **MPC observatory code** (e.g. `Z41`): the first-run wizard resolves your coordinates automatically and it unlocks the site-specific NEO list · your **local horizon file** (TheSkyX `.hrz` or simple `az alt` pairs) · your telescope aperture and camera pixel/focal length |
+| **Recommended** | Your **MPC observatory code** (three characters, the ones assigned to your station): the first-run wizard resolves your coordinates automatically and it unlocks the site-specific NEO list · your **local horizon file** (TheSkyX `.hrz` or simple `az alt` pairs) · your telescope aperture and camera pixel/focal length |
 | **Optional** | **CCDciel or NINA/PINS** running locally, if you want the app to drive the mount and camera (the observatory integration; one backend at a time) · five free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, light-pollution atlas, TNS bot, AAVSO token) · the optional **assistant** (a model you configure) · **EXOTIC** (the transit reduction), the one external tool you install by hand: **Find_Orb** travels inside the installers and the Linux packages; see *Optional integrations* |
 
 No account, no registration, no telemetry: NightScribe runs on your computer

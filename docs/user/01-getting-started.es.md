@@ -34,10 +34,10 @@ trabajar. Todo lo que respondas aquí se puede cambiar después en
 
 Tres formas de decirle dónde estás; elige una:
 
-1. **Tu código MPC** (por ejemplo `Z41`): las coordenadas se resuelven solas
-   desde la lista oficial del Minor Planet Center. Es la opción más precisa si
-   vas a enviar astrometría, porque usa exactamente el mismo punto que verá el
-   MPC en tus reportes.
+1. **Tu código MPC** (tres caracteres, los que tenga asignados tu estación):
+   las coordenadas se resuelven solas desde la lista oficial del Minor Planet
+   Center. Es la opción más precisa si vas a enviar astrometría, porque usa
+   exactamente el mismo punto que verá el MPC en tus reportes.
 2. **«Buscar mi ubicación»**: resuelve tu ciudad a partir de la IP pública.
    Bien para empezar, pero revisa las coordenadas: una IP no sabe en qué
    azotea está tu telescopio.

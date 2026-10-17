@@ -1054,7 +1054,7 @@
                </item>
               </layout>
              </item>
-             <item><widget class="QLabel" name="lblH_obs_backend"><property name="text"><string>Only the fields of the program you pick here are shown. NINA (Windows) and PINS (Linux) share the same Advanced API v2 plugin, so they use the same settings.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QLabel" name="lblH_obs_backend"><property name="text"><string>Only the fields of the program you pick here are shown. NINA (Windows) and PINS (Linux) share the same Advanced API v2 plugin, so they use the same settings. The NINA/PINS integration is still in test (the rest is planned for 0.2): it is there to be tried, and what you find is welcome at the issue tracker.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
              <item>
               <layout class="QHBoxLayout" name="row_obs_goto">
                <item><widget class="QLabel" name="lbl_obs_goto"><property name="text"><string>Astrometric goto by default:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

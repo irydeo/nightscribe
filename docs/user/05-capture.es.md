@@ -17,6 +17,13 @@ elección desconecta el otro. En ambos casos, una condición: el programa tiene
 que estar **abierto** (y, para NINA/PINS, su plugin Advanced API instalado y
 activo); NightScribe habla con su API, no con los drivers.
 
+> **Estado: en pruebas.** La integración con **NINA/PINS no está terminada**:
+> lo que hay es para probarlo y para que nos cuentes qué falta o qué no
+> cuadra, y el resto está previsto para la **0.2**. La lista de lo que
+> todavía no hace está justo abajo; CCDciel es el que está completo hoy. Si
+> algo falla, [abre una incidencia](https://github.com/irydeo/nightscribe/issues)
+> con el registro (**Ayuda → Abrir el registro**).
+
 Desde el paso **Captura** de un proyecto lo lleva la consola **Observatory**. Su
 estado va arriba (quién responde, el estado de la montura, la temperatura, la
 versión) con el **STOP** rojo siempre a mano, y sus mandos son tres verbos y dos
@@ -189,6 +196,8 @@ captura es un snapshot de una toma) salvo que cargues la secuencia nativa; con
 CCDciel se respeta el recuento.
 
 ### Lo que NINA / PINS todavía no hace
+
+Esta es la lista que la **0.2** tiene que cerrar:
 
 - Su captura de tipo snapshot toma **una exposición**, así que **Iniciar
   captura dispara una toma**, no todo el número de frames del plan: el panel

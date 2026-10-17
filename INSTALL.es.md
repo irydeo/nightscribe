@@ -44,6 +44,11 @@ sudo dnf install ./nightscribe-*.x86_64.rpm     # Fedora / openSUSE
 nightscribe gui
 ```
 
+En Ubuntu, instalarlo desde tu carpeta de descargas puede imprimir una nota de
+apt sobre el usuario `_apt` y un permiso denegado. Es inofensiva (apt lee el
+fichero como root) y la instalación termina; el capítulo 14 de la guía lo
+explica y cuenta cómo silenciarla.
+
 Ubuntu 24.04 LTS es demasiado antiguo (no tiene `python3-pyside6`): instala
 desde el código (Opción C).
 

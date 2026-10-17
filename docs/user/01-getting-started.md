@@ -34,10 +34,10 @@ work. Everything you answer here can be changed later under
 
 Three ways to tell it where you are; pick one:
 
-1. **Your MPC code** (e.g. `Z41`): the coordinates resolve automatically from
-   the official Minor Planet Center list. This is the most accurate option if
-   you plan to submit astrometry, because it uses exactly the same point the
-   MPC will see in your reports.
+1. **Your MPC code** (three characters, the ones assigned to your station):
+   the coordinates resolve automatically from the official Minor Planet Center
+   list. This is the most accurate option if you plan to submit astrometry,
+   because it uses exactly the same point the MPC will see in your reports.
 2. **"Find my location"**: resolves your city from your public IP. Fine to
    get started, but check the coordinates: an IP does not know on which
    rooftop your telescope sits.

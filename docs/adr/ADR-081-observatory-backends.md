@@ -252,3 +252,23 @@ lo dice.
 **Review (2026-10-13, the wheel filter cannot lose the plan)**: "Send plan" moved the wheel in the GUI BEFORE `push_plan`, so a refused slot (`Wheel_setfilter: Failed!`, seen in the log) raised and the whole plan was lost: CCDciel received neither the object nor the exposure nor the count ("Send plan receives nothing"). The filter is now a **best-effort setter inside `push_plan`** (`filter_index`), like binning/gain/offset/dither, and the GUI does **not** invent a slot: if the plan's filter is not in the wheel, the filter is left as it is and the read-back says so. NINA applies the filter in `start_capture`, also best-effort.
 
 **Revisión (2026-10-13, el filtro de la rueda no puede perder el plan)**: «Send plan» movía la rueda en la GUI ANTES de `push_plan`, así que una ranura rechazada (`Wheel_setfilter: Failed!`, visto en el log) lanzaba y se perdía el plan entero: CCDciel no recibía ni el objeto ni la exposición ni el recuento («Send plan no recibe nada»). El filtro es ahora un **setter best-effort dentro de `push_plan`** (`filter_index`), como binning/gain/offset/dither, y la GUI **no** inventa una ranura: si el filtro del plan no está en la rueda, el filtro se deja como está y la lectura de vuelta lo dice. NINA aplica el filtro en `start_capture`, también best-effort.
+
+**Revisión (2026-10-17, NINA/PINS se dice que está en pruebas)**: CCDciel es
+hoy el backend **completo**; el de NINA/PINS funciona pero le quedan cosas (la
+lista está en el capítulo 05 de la guía: snapshot de una exposición, sin
+staging persistente, goto astrométrico que exige un solver en NINA). El
+observador tiene que leerlo **antes** de elegir, no después del primer fallo:
+lo dice la ayuda del ajuste (**Ajustes → Integraciones**), la línea de la
+consola del observatorio cuando ese backend está seleccionado, la guía (con la
+**0.2** como horizonte y el gestor de incidencias para lo que falte) y las
+notas de la versión. El resto está previsto para la **0.2**.
+
+**Review (2026-10-17, NINA/PINS is said to be in test)**: CCDciel is the
+**complete** backend today; NINA/PINS works but still has gaps (the list is in
+chapter 05 of the guide: a one-exposure snapshot, no persistent staging, an
+astrometric goto that needs a solver configured in NINA). The observer has to
+read it **before** choosing, not after the first failure: the setting's own help
+(**Tools → Settings → Integrations**), the observatory console's line when that
+backend is selected, the guide (with **0.2** as the horizon and the issue
+tracker for whatever is missing) and the release notes all say it. The rest is
+planned for **0.2**.

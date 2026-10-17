@@ -48,3 +48,7 @@ reduce, and tell it**.
   log (**Help → Open the log**).
 - Find_Orb travels inside the Windows installer and the Linux packages;
   EXOTIC (the transit reduction) is the one external tool you install by hand.
+- The **NINA/PINS** integration is **not finished**: it is there to be tried
+  and to report what is missing or broken, and the rest is planned for
+  **0.2**. CCDciel is the complete one today (chapter 05 lists what NINA/PINS
+  does not do yet).

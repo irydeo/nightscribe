@@ -37,8 +37,9 @@ software que las haya generado.
 1. **Entrada por pegado**: el usuario pega la salida de su software (formato MPC de 80
    columnas o ADES PSV) en el paso «Procesado» del proyecto NEO.
 2. **Validación**: formato correcto por línea, código de observatorio igual al
-   configurado (p. ej. Z41), designación del objeto consistente con el contexto del
-   proyecto, fechas y coordenadas en rango. Errores en lenguaje humano, línea a línea.
+   configurado (el del propio observador), designación del objeto consistente con el
+   contexto del proyecto, fechas y coordenadas en rango. Errores en lenguaje humano,
+   línea a línea.
 3. **Empaquetado**: fichero listo para enviar por email al MPC, guardado en la carpeta
    del proyecto y registrado en `project_files`. **El envío lo hace el usuario** —
    igual que los posts: copiar y pegar, por decisión de diseño (DESIGN.md).
@@ -59,9 +60,9 @@ produced them.
 
 1. **Paste input**: the user pastes their software output (MPC 80-column format or ADES
    PSV) in the "Process" step of the NEO project.
-2. **Validation**: per-line format, observatory code matching the configured one (e.g.
-   Z41), object designation consistent with the project context, dates and coordinates
-   in range. Human-readable errors, line by line.
+2. **Validation**: per-line format, observatory code matching the configured one (the
+   observer's own), object designation consistent with the project context, dates and
+   coordinates in range. Human-readable errors, line by line.
 3. **Packaging**: a file ready to email to the MPC, saved in the project folder and
    registered in `project_files`. **Sending is done by the user** — same as posts:
    copy & paste, by design (DESIGN.md).

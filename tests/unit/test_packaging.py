@@ -60,6 +60,27 @@ def test_the_deb_filename_carries_the_arch(tmp_path, monkeypatch):
     assert deb.name == "nightscribe_9.9.9_amd64.deb"
 
 
+def test_the_app_id_is_the_same_in_the_three_places_it_lives():
+    # The window and the launcher are the same application only if the id
+    # matches: the .desktop file's basename (what the shell looks for), the
+    # app_id Qt sends on Wayland (gui/app.py) and the AppStream <id> and
+    # <launchable> (which AppStream requires to agree). With them apart the
+    # dock showed the window as "python3" with a generic icon (reported
+    # 2026-10-17).
+    import xml.etree.ElementTree as ET
+    from nightscribe.gui import app as gui_app
+    desktop = ROOT / "installer" / "io.github.irydeo.nightscribe.desktop"
+    assert desktop.stem == gui_app.DESKTOP_ID
+    meta = ET.parse(ROOT / "installer"
+                    / "io.github.irydeo.nightscribe.metainfo.xml").getroot()
+    assert meta.findtext("id") == gui_app.DESKTOP_ID
+    launch = meta.find("launchable")
+    assert launch is not None and launch.get("type") == "desktop-id"
+    assert launch.text == desktop.name
+    # and the entry has to carry the X11 half of the same bargain
+    assert "StartupWMClass=NightScribe" in desktop.read_text(encoding="utf-8")
+
+
 def test_the_deb_stages_the_documentation():
     # Until 2026-10-15 the .deb, the .rpm, the PKGBUILD and the wheel shipped
     # WITHOUT docs/, so Help > Documentation, the UFE's "?" and the offline

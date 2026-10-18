@@ -469,7 +469,15 @@ def _quote_html(lines, link):
     # @return: the quote as HTML. A quote that opens with a bold question is
     #          one of the project's "Why ...?" boxes: it gets its own class
     #          so the site dresses it as a callout, the way the app does.
-    body = " ".join(inline(line, link) for line in lines if line.strip())
+    #
+    # The lines are JOINED before the inline pass on purpose. Inlining each
+    # line and joining the results afterwards loses every span that crosses a
+    # line break, and prose is wrapped: `> **On Windows, ... and only one has a
+    # / way through.**` came out with the asterisks literal, because neither
+    # line held a complete `**...**` on its own (measured 2026-10-18). Joining
+    # first is what a reader does, and it also lets the "why" test above see a
+    # question whose `?` sits on the next line.
+    body = inline(" ".join(line for line in lines if line.strip()), link)
     why = bool(re.match(r"^<strong>[^<]*\?</strong>", body))
     return f'<blockquote class="{"why" if why else "quote"}">{body}</blockquote>'
 

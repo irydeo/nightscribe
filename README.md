@@ -76,9 +76,14 @@ and talks only to the public data services listed below.
    [Releases page](https://github.com/irydeo/nightscribe/releases). Pick your
    system:
    - **Windows**: run the `NightScribeSetup-*.exe` installer (per-user, no
-     admin rights). SmartScreen warns because the binary is unsigned, so
-     choose *More info → Run anyway*. Prefer not to install anything? Unzip
-     the portable `NightScribe-*-windows-x64.zip` and run `nightscribe.exe gui`.
+     admin rights). It is not code signed, so Windows has two ways to stop it:
+     SmartScreen warns and lets you through with *More info → Run anyway*,
+     while **Smart App Control** (Windows 11, on by default on new
+     installations) blocks it with no way through at all. Prefer not to
+     install anything? Unzip the portable `NightScribe-*-windows-x64.zip` and
+     run `nightscribe.exe gui` (the same two gates apply to it). What to do
+     about Smart App Control is in
+     [the guide](docs/user/01-getting-started.md).
    - **Linux**: install the `.deb` (Debian, Ubuntu, Mint) with
      `sudo apt install ./nightscribe_*_amd64.deb`, or the `.rpm` (Fedora,
      openSUSE) with `sudo dnf install ./nightscribe-*.x86_64.rpm`, then run

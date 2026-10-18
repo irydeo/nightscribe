@@ -78,10 +78,15 @@ y solo habla con los servicios públicos de datos listados más abajo.
    [página de Releases](https://github.com/irydeo/nightscribe/releases). Elige
    tu sistema:
    - **Windows**: ejecuta el instalador `NightScribeSetup-*.exe` (por usuario,
-     sin permisos de administrador). SmartScreen avisará porque el binario no
-     está firmado: elige *Más información → Ejecutar de todas formas*.
-     ¿Prefieres no instalar nada? Descomprime el zip portable
-     `NightScribe-*-windows-x64.zip` y ejecuta `nightscribe.exe gui`.
+     sin permisos de administrador). No está firmado, así que Windows tiene dos
+     formas de pararlo: SmartScreen avisa y te deja seguir con *Más información
+     → Ejecutar de todas formas*, mientras que el **Control inteligente de
+     aplicaciones** (Windows 11, activado por defecto en instalaciones nuevas)
+     lo bloquea sin salida. ¿Prefieres no instalar nada? Descomprime el zip
+     portable `NightScribe-*-windows-x64.zip` y ejecuta `nightscribe.exe gui`
+     (las mismas dos barreras valen para él). Qué hacer con el Control
+     inteligente de aplicaciones está en
+     [la guía](docs/user/01-getting-started.es.md).
    - **Linux**: instala el `.deb` (Debian, Ubuntu, Mint) con
      `sudo apt install ./nightscribe_*_amd64.deb`, o el `.rpm` (Fedora,
      openSUSE) con `sudo dnf install ./nightscribe-*.x86_64.rpm`, y luego

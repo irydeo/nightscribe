@@ -30,6 +30,24 @@ DefaultGroupName=NightScribe
 PrivilegesRequired=lowest
 OutputDir=..\dist
 OutputBaseFilename=NightScribeSetup-{#AppVersion}{#AppSuffix}
+; Code signing, OPTIONAL and inert by default (ADR-087). The workflow passes
+; /DSignToolName=<name> and /S<name>=<command> when a certificate is
+; configured, and passes nothing when there is none, so this recipe builds
+; unsigned exactly as before.
+;
+; It is here, wired and unused, because of Windows Smart App Control: it
+; BLOCKS unsigned installers outright, with no "run anyway" (that is
+; SmartScreen, a different gate, and it does have one). Nothing else fixes it:
+; SAC evaluates at run time, so the Mark of the Internet, unzipping or a
+; self-signed certificate change nothing, and the signature has to come from a
+; certificate authority Windows trusts.
+#ifdef SignToolName
+SignTool={#SignToolName}
+; The uninstaller is compiled INTO the setup, so this is the only moment it can
+; be signed. Without it, uninstalling is unsigned code too, and SAC can block
+; the uninstall as well.
+SignedUninstaller=yes
+#endif
 LicenseFile=..\LICENSE
 ; Find_Orb travels inside the app folder (dist\nightscribe\findorb). This
 ; note tells the observer what it is, its licence and where its source is:

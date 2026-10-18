@@ -11,8 +11,7 @@ Tres caminos, según lo cómodo que te sientas con un terminal:
   `.deb` (Debian, Ubuntu, Mint:
   `sudo apt install ./nightscribe_*_amd64.deb`) o el `.rpm` (Fedora,
   openSUSE: `sudo dnf install ./nightscribe-*.x86_64.rpm`), y luego ejecuta
-  `nightscribe gui`. Windows SmartScreen avisará porque el binario no está
-  firmado: *Más información → Ejecutar de todas formas*.
+  `nightscribe gui`.
 - **Desde el repositorio** (sin descargar ningún instalador, y sin paquete
   publicado en PyPI): en un entorno virtual,
   `pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"`,
@@ -24,6 +23,19 @@ Tres caminos, según lo cómodo que te sientas con un terminal:
   entorno y ejecuta `.venv/bin/python -m nightscribe gui`.
 
 Los pasos detallados, sistema por sistema, están en [INSTALL.es.md](https://github.com/irydeo/nightscribe/blob/main/INSTALL.es.md).
+
+> **En Windows, dos barreras distintas pueden parar el instalador, y solo una
+> tiene salida.** SmartScreen muestra *Windows protegió tu PC* y ofrece *Más
+> información → Ejecutar de todas formas*: si lo eliges, la instalación sigue.
+> El **Control inteligente de aplicaciones** (Windows 11, activado por defecto
+> en instalaciones nuevas) no ofrece nada parecido: bloquea el instalador sin
+> más. Solo deja pasar código firmado con un certificado de una autoridad en la
+> que Windows confía, y NightScribe es software libre sin certificado, así que
+> un equipo con esa función activada no lo ejecutará. Puedes ver si la tienes
+> en **Seguridad de Windows → Control de aplicaciones y navegador → Control
+> inteligente de aplicaciones**. Si está activada, la decisión es tuya:
+> desactivarla, sabiendo que pierdes esa protección, o usar NightScribe en otro
+> equipo. Nada más de esta guía depende de ello.
 
 En cualquier caso necesitas conexión a internet: las efemérides y catálogos se
 descargan al vuelo (y se guardan en caché local, así que la segunda consulta

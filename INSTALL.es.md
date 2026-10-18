@@ -18,9 +18,9 @@
 La vía más sencilla: sin Python, sin terminal, nada que configurar.
 
 Los paquetes precompilados están en la
-[página de Releases](https://github.com/irydeo/nightscribe/releases): busca
-las pre-releases `preview-*`, regeneradas en cada push a la rama de
-desarrollo.
+[página de Releases](https://github.com/irydeo/nightscribe/releases): elige la
+última release estable (`0.1.0` en adelante). Las pre-releases `preview-*` son
+builds de desarrollo, regeneradas en cada push a `main`.
 
 **Windows.** Cada release trae un instalador de Windows
 (`NightScribeSetup-*.exe`, por usuario, sin permisos de administrador) y un

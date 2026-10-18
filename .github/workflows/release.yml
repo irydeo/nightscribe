@@ -1,0 +1,413 @@
+# NightScribe - Stable release builds (Windows + Linux)
+#
+# One workflow, one release, triggered by a version TAG (v*). It runs the same
+# unit-test gate as the preview, builds the SAME four artifacts (Windows
+# portable zip + Inno Setup installer, .deb + .rpm) but WITHOUT the
+# "-preview.<sha>" suffix, and publishes them as a STABLE GitHub release marked
+# as the latest, with the notes taken from that version's section of
+# CHANGELOG.md. The rolling preview (preview.yml) stays for everyday work.
+#
+# Why a separate workflow instead of a tag trigger on preview.yml: the two
+# publish DIFFERENT things (a rolling pre-release with a suffixed name vs a
+# stable release with a clean name and curated notes), and keeping them apart
+# means a mistake in one cannot touch the other. The build jobs ARE duplicated
+# on purpose: when you change one of them (a new dependency, a new package
+# step), change it in preview.yml too. tests/unit/test_windows_signing.py holds
+# the signing half of that promise in both files.
+#
+# The version comes from the tag (setuptools-scm): the test job FAILS when the
+# built version does not match the tag, so a release can never carry the wrong
+# number.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write   # needed to publish the release
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  # A release is never cancelled midway: better a stale run than a half
+  # published release.
+  cancel-in-progress: false
+
+jobs:
+  # ------------------------------------------------------------------ gate
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      label: ${{ steps.ver.outputs.label }}
+    steps:
+      - name: Checkout (full history for setuptools-scm)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Qt runtime libraries
+        # PySide6's wheel links a few system libraries the headless runner
+        # does not carry (libEGL/libGL and the xcb set). Without them the GUI
+        # test modules fail to import at all ("libEGL.so.1: cannot open
+        # shared object file").
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libegl1 libgl1 libxkbcommon0 libxkbcommon-x11-0 libdbus-1-3 \
+            libfontconfig1 libglib2.0-0 libxcb-cursor0 libxcb-icccm4 \
+            libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0 libxcb-xkb1
+
+      - name: OpenCL (so the GPU path's tests actually run)
+        # The OpenCL backend is ON by default and ships with the app, but its
+        # 32 tests used to SKIP on every runner (no ICD loader), so the
+        # hand-written kernels were only ever exercised on the author's card.
+        # pocl is a CPU OpenCL implementation: with it installed the tests run
+        # in CI too, on the same kernels the observers get.
+        run: |
+          sudo apt-get install -y --no-install-recommends \
+            ocl-icd-libopencl1 pocl-opencl-icd
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests (a red suite publishes nothing)
+        timeout-minutes: 45
+        run: |
+          python -m pytest tests/unit -n auto --dist loadfile -q 2>&1 | tee pytest.log
+          code=${PIPESTATUS[0]}
+          # The raw log is not readable without admin rights; surface the
+          # failure as annotations, which ARE readable from outside.
+          grep -E "^(FAILED|ERROR) " pytest.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          grep -aE "ImportError|ModuleNotFoundError|cannot open shared object|No module named|libGL|libEGL|libxkb" pytest.log | sort -u | head -25 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
+          exit $code
+
+      - name: Resolve and check the package version
+        id: ver
+        run: |
+          # `version` stays the PEP 440 string setuptools-scm produced. At a
+          # clean tag it is exactly the tag without the leading "v"; if it is
+          # not, the build is somehow off the tag (a dirty tree adds a local
+          # segment), and a release whose number disagrees with its tag is worse
+          # than no release, so the job stops here.
+          v=$(python -c "from importlib.metadata import version; print(version('nightscribe'))")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$v" != "$tag" ]; then
+            echo "::error::the built version ($v) does not match the tag (${GITHUB_REF_NAME}); refusing to publish"
+            exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "label=$v" >> "$GITHUB_OUTPUT"
+          echo "version: $v (tag ${GITHUB_REF_NAME})"
+
+  # ------------------------------------------------------------- windows
+  windows:
+    name: Build Windows release
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (full history for setuptools-scm)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests on Windows (a red suite publishes nothing)
+        timeout-minutes: 45
+        run: python -m pytest tests/unit -n auto --dist loadfile -v
+
+      - name: Fetch Find_Orb (bundled with the app, ADR-080)
+        shell: pwsh
+        run: |
+          # The non-interactive `fo64.exe` plus the interactive console and
+          # its data files, into findorb-payload/. The PyInstaller spec picks
+          # the folder up and ships it as findorb/ inside the bundle, so the
+          # orbit check works with no path to set. NightScribe does not
+          # redistribute it outside this build (GPLv2 + a no-commercial
+          # clause; the installer shows the notice).
+          New-Item -ItemType Directory -Force -Path findorb-payload | Out-Null
+          Invoke-WebRequest -Uri https://www.projectpluto.com/find_c64.zip `
+            -OutFile find_c64.zip
+          Expand-Archive find_c64.zip -DestinationPath findorb-payload -Force
+          Invoke-WebRequest -Uri https://www.projectpluto.com/devel/fo64.exe `
+            -OutFile findorb-payload\fo64.exe
+          Get-ChildItem findorb-payload | Select-Object -ExpandProperty Name
+
+      - name: Build with PyInstaller
+        run: pyinstaller installer/nightscribe.spec --clean --noconfirm
+
+      - name: Smoke test the frozen binary
+        run: dist\nightscribe\nightscribe.exe --help
+
+      # Code signing, OPTIONAL and inert without a certificate (ADR-087).
+      # Windows Smart App Control BLOCKS unsigned binaries outright, with no
+      # "run anyway" (SmartScreen, a different gate, does offer one), and it
+      # evaluates at run time: only a signature from a certificate authority
+      # Windows trusts gets through. So the day the project has one, it is this
+      # secret and nothing else. Without it the step says so out loud and the
+      # build carries on unsigned, exactly as it did before.
+      #
+      # It runs BEFORE the portable zip and BEFORE Inno Setup on purpose: both
+      # package the files this signs, so signing first is what makes the zip and
+      # the installed app carry signed binaries.
+      - name: Sign the Windows binaries (skipped without a certificate)
+        shell: pwsh
+        env:
+          SIGN_CMD: ${{ secrets.WINDOWS_SIGN_CMD }}
+        run: |
+          if (-not $env:SIGN_CMD) {
+            Write-Host "::notice::the Windows binaries are unsigned (WINDOWS_SIGN_CMD is not set): Smart App Control blocks them on a machine that has it on, and SmartScreen warns until reputation builds. See ADR-087."
+            exit 0
+          }
+          # The secret is a command with Inno Setup's own `$f` placeholder, so
+          # the same text serves this loop and the [Setup] SignTool below (the
+          # quote around $f matters: a path may carry spaces).
+          $files = Get-ChildItem -Path dist\nightscribe -Recurse -File |
+                   Where-Object { $_.Extension -in '.exe', '.dll', '.pyd' }
+          foreach ($f in $files) {
+            $cmd = $env:SIGN_CMD.Replace('$f', "`"$($f.FullName)`"")
+            Write-Host "signing $($f.Name)"
+            Invoke-Expression $cmd
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          # And the result is CHECKED, not trusted: a signing tool that fails
+          # quietly reports success (it happens with the cloud ones when the
+          # wrong .NET runtime is on PATH), and a build that says "signed"
+          # while shipping unsigned binaries is worse than no signing at all.
+          $bad = $files | Where-Object {
+            (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
+          if ($bad) {
+            $bad | ForEach-Object { Write-Host "::error::$($_.Name) is not validly signed" }
+            exit 1
+          }
+          Write-Host "signed and verified $($files.Count) file(s)"
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: |
+          $zip = "dist\NightScribe-${{ needs.test.outputs.label }}-windows-x64.zip"
+          Compress-Archive -Path dist\nightscribe -DestinationPath $zip
+          echo "zip: $zip"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile the installer
+        shell: pwsh
+        env:
+          SIGN_CMD: ${{ secrets.WINDOWS_SIGN_CMD }}
+        run: |
+          # With a certificate, the same command signs the setup AND the
+          # uninstaller it compiles in (SignedUninstaller, ADR-087): the
+          # placeholder inside the secret is Inno Setup's own `$f`, and
+          # PowerShell does not re-expand it, so it survives untouched.
+          #
+          # No /DAppSuffix here: a stable release's installer is named after the
+          # version alone (NightScribeSetup-0.1.0.exe), unlike the preview's.
+          $sign = @()
+          if ($env:SIGN_CMD) {
+            $sign = @("/DSignToolName=nssign", "/Snssign=$env:SIGN_CMD")
+          }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ needs.test.outputs.version }} @sign installer\nightscribe.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload the Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/NightScribe-*-windows-x64.zip
+            dist/NightScribeSetup-*.exe
+
+  # ------------------------------------------------------------------ .deb
+  deb:
+    name: Build .deb (amd64)
+    needs: test
+    runs-on: ubuntu-latest
+    container: debian:trixie
+    steps:
+      - name: Install build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git ca-certificates curl bzip2 tar dpkg-dev python3 appstream
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare the Find_Orb payload (amd64)
+        run: sh tools/fetch_findorb.sh findorb-payload
+
+      - name: Build the .deb
+        run: |
+          python3 tools/build_deb.py \
+            --version "${{ needs.test.outputs.version }}" \
+            --findorb findorb-payload --arch amd64 --out dist
+          ls -la dist
+
+      - name: Validate the AppStream metainfo
+        # A package whose software centre shows no licence, no developer and
+        # no icon is what the observer reported on Ubuntu; this gate keeps it
+        # from shipping again (ADR-087 rev).
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
+
+      - name: Upload the .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb
+          path: dist/*.deb
+
+  # ------------------------------------------------------------------ .rpm
+  rpm:
+    name: Build .rpm (x86_64)
+    needs: test
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - name: Install build tools
+        run: |
+          dnf install -y git ca-certificates curl bzip2 tar gzip rpm-build \
+            python3-devel appstream
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare the Find_Orb payload (linux-64)
+        run: sh tools/fetch_findorb.sh findorb-payload
+
+      - name: Validate the AppStream metainfo
+        run: appstreamcli validate installer/io.github.irydeo.nightscribe.metainfo.xml
+
+      - name: Build the .rpm
+        run: |
+          ver="${{ needs.test.outputs.version }}"
+          # The version feeds BOTH the spec's Version: and the dist-info
+          # METADATA. RPM takes the '+' of a PEP 440 local segment (rpmvercmp
+          # treats it as a separator) and PEP 440 needs it, so it is left as it
+          # is; a '-' would be illegal in RPM, but PEP 440 never emits one.
+          top="$PWD/rpmbuild"
+          mkdir -p "$top"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          tar czf "$top/SOURCES/nightscribe-$ver.tar.gz" \
+            --exclude=.venv --exclude=.git --exclude=dist --exclude=rpmbuild \
+            --transform "s,^\.,nightscribe-$ver," .
+          set +e
+          rpmbuild -bb --define "_version $ver" \
+            --define "_topdir $top" installer/rpm/nightscribe.spec > rpm.log 2>&1
+          code=$?
+          if [ $code -ne 0 ]; then
+            tail -12 rpm.log | while IFS= read -r line; do echo "::error::${line}"; done
+            exit $code
+          fi
+          mkdir -p dist
+          find "$top/RPMS" -name '*.rpm' -exec cp {} dist/ \;
+          ls -la dist
+
+      - name: Upload the .rpm
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm
+          path: dist/*.rpm
+
+  # -------------------------------------------------------------- publish
+  # Tolerant on purpose: publish whatever built, so a broken Windows build does
+  # not throw away a good .deb (and vice versa). The gate is the unit suite.
+  publish:
+    name: Publish the stable release
+    needs: [test, windows, deb, rpm]
+    if: always() && needs.test.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect the artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la dist || true
+          files=$(ls dist/* 2>/dev/null || true)
+          if [ -z "$files" ]; then
+            echo "nothing was built; nothing to publish"
+            exit 0
+          fi
+          ver="${{ needs.test.outputs.version }}"
+          tag="${GITHUB_REF_NAME}"
+
+          # The notes are the CHANGELOG's own section for this version, so the
+          # release page and the repository can never tell different stories.
+          # Everything between "## [<version>]" and the next "## [" is the body.
+          awk -v ver="$ver" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; next }
+            /^## \[/ { if (flag) exit }
+            flag { print }
+          ' CHANGELOG.md > changelog-section.md
+
+          {
+            if [ -s changelog-section.md ]; then
+              cat changelog-section.md
+            else
+              echo "NightScribe $ver."
+            fi
+            echo
+            echo "---"
+            echo
+            echo "**Downloads**"
+            echo
+            echo "- **NightScribeSetup-$ver.exe**: Windows installer (per-user, no admin rights needed)."
+            echo "- **NightScribe-$ver-windows-x64.zip**: Windows portable build; unzip and run \`nightscribe.exe gui\`."
+            echo "- **nightscribe_${ver}_amd64.deb**: Debian 13+ / Ubuntu 25.10+ (system Python; includes Find_Orb)."
+            echo "- **nightscribe-*.x86_64.rpm**: Fedora 42+ / openSUSE Tumbleweed (system Python; includes Find_Orb)."
+            echo
+            echo "**Windows can stop the installer in two different ways, and only one has a way through.** SmartScreen shows *Windows protected your PC* and offers *More info -> Run anyway*. **Smart App Control** (Windows 11, on by default on new installations) blocks unsigned code outright, with no such option: either turn it off under *Windows Security > App & browser control > Smart App Control*, or run NightScribe on another machine. The binaries are unsigned because NightScribe is free software and has no code signing certificate; the details are in docs/user/01-getting-started. Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY."
+            echo
+            echo "On Linux, installing the .deb from your Downloads folder can print an apt note about the sandbox user (permission denied, read as root instead): it is harmless and the install finishes."
+            echo
+            echo "The NINA/PINS integration is in test: it is there to be tried and to report what is missing, and the rest is planned for 0.2. CCDciel is the complete observatory backend today."
+            echo
+            echo "Report issues at https://github.com/irydeo/nightscribe/issues"
+          } > release-notes.md
+
+          # A re-run must not fail on the release the first run created. The
+          # release is deleted WITHOUT --cleanup-tag on purpose: the tag is the
+          # version's anchor for setuptools-scm, and it must survive.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release delete "$tag" --yes
+          fi
+
+          gh release create "$tag" --verify-tag --latest \
+            --title "NightScribe $ver" \
+            --notes-file release-notes.md $files

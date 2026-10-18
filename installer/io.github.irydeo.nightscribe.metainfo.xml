@@ -76,6 +76,10 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
-    <release version="0.1.0" date="2026-10-14"/>
+    <!-- The date has to be the tag's own (setuptools-scm reads the tag), or
+         the software centre shows a release that never happened that day. -->
+    <release version="0.1.0" date="2026-10-18">
+      <url>https://github.com/irydeo/nightscribe/releases/tag/v0.1.0</url>
+    </release>
   </releases>
 </component>

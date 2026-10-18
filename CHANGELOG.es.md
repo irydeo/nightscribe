@@ -6,41 +6,86 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
-## [0.1.0] - 2026-10-15
+## [0.1.0] - 2026-10-18
 
-La primera versión pública. NightScribe cubre todo el ciclo de vida de un
-proyecto de observatorio: **planifica la noche, entiende el objeto, captura y
-reduce, y cuéntalo**.
+La primera versión pública. NightScribe acompaña a un proyecto de observatorio
+durante todo su ciclo de vida: **planifica la noche, entiende el objeto, captura
+y reduce, y cuéntalo**. Es una beta: cuenta con aristas.
 
 ### Añadido
 
-- **Planificar la noche**: una lista ordenada y explicada de lo que merece la
-  pena observar esta noche desde tu sitio y con tu equipo, entre ocho tipos de
-  objetivos (NEOs y candidatos NEOCP, supernovas, cometas, candidatos PCCP,
-  tránsitos de exoplanetas, estrellas HADS, variables y deberes, y
-  aproximaciones cercanas y alertas), con una puntuación de 0 a 100, una frase
-  de «por qué esta noche», el calendario del cielo y el contexto de Sol y Luna.
-- **Entender el objeto**: una ficha que traduce los parámetros orbitales y
-  físicos a lenguaje claro, con gráficos (órbita, cielo, campo del survey,
-  curva de luz) y chips de captura (magnitud, ritmo, exposición máxima sin
-  estela, ventana, coordenadas copiables).
-- **Capturar y reducir**: maneja CCDciel o NINA/PINS, y su editor FITS
-  unificado calibra (biblioteca de masters), apila (track & stack, con
-  registro y el modo manual del objeto débil), mide fotometría (secuencias de
-  comparación, series, períodos, ajuste de tránsito) y astrometría (centroides
-  subpíxel, informes listos para el MPC en ADES o 80 columnas, el chequeo
-  contra otras estaciones con Find_Orb, el handoff a ExoClock).
-- **Contarlo**: borradores bilingües (ES/EN) de post y tuit con los gráficos
-  de la noche.
-- **Proyectos, visitas y campañas**: cada objetivo se convierte en un proyecto
-  con su propia carpeta y un flujo Ficha, Captura, Análisis, Publicación; cada
-  noche es una visita; las campañas y las vigilias de variables llevan su
-  propia cadencia.
-- **Una interfaz de línea de comandos** para planificar y publicar, bilingüe.
-- **El asistente** (opcional, apagado por defecto): responde desde la propia
-  guía y los ADRs de la app, offline, a través de un modelo que configures.
-- **Una ruta GPU por OpenCL** (encendida por defecto, cae al procesador) para
-  el warp y el combine.
+**Planificar la noche**
+- Una lista ordenada y explicada de lo que merece la pena observar esta noche
+  desde tu sitio y con tu equipo, entre ocho tipos de objetivos: NEOs
+  (confirmados y candidatos NEOCP), cometas, candidatos a cometa (PCCP),
+  supernovas, tránsitos de exoplanetas, aproximaciones cercanas, estrellas HADS,
+  y variables y deberes.
+- Una puntuación de 0 a 100 con su frase de «por qué esta noche», el horizonte
+  local y la magnitud límite, la interferencia de la Luna, la viabilidad de la
+  sesión y el coste en minutos de telescopio.
+- El Sol y la Luna, un calendario del cielo de 60 días calculado sin red, y los
+  eventos de las lunas de Júpiter (tránsitos y sombras) para tu sitio.
+
+**Entender cada objeto**
+- Una ficha que traduce los parámetros orbitales y físicos a lenguaje claro, con
+  gráficos (órbita, cielo, campo del survey, curva de luz) y chips de captura
+  (magnitud, ritmo, exposición máxima sin estela, ventana, coordenadas
+  copiables).
+
+**Capturar**
+- Maneja CCDciel (completo) o NINA/PINS (en pruebas) y apunta el telescopio:
+  envía el plan, arranca y para la captura, y síguela con la última toma
+  previsualizada en la ventana.
+- Exporta la efeméride (elementos MPC o informe de órbita) y la secuencia de
+  captura.
+
+**Reducir, en el editor FITS unificado**
+- Calibración: una biblioteca indexada de masters por cámara, ganancia,
+  temperatura, exposición y filtro, con receta declarativa y flats
+  normalizados.
+- Track & stack: resuelve, registra y combina, con la posición por toma, aviso
+  de dithering, la secuencia centrada (GIF o montaje) y un modo manual para un
+  objeto débil.
+- Fotometría: medidas sueltas con guardas, secuencias de comparación con el
+  selector de la carta, series con veto de ensemble y puertas de calidad, la
+  búsqueda de período (Lomb-Scargle, PDM, FAP por bootstrap) y el ajuste de
+  tránsito con el handoff a EXOTIC.
+- Astrometría: centroides subpíxel, combinación por toma y del apilado, el
+  informe MPC (ADES XML/PSV y 80 columnas), el envío, el chequeo contra otras
+  estaciones con Find_Orb y la exportación a ExoClock.
+- Liberar espacio: archiva los originales de una visita dentro del proyecto y
+  tráelos de vuelta, sin pisar nunca una toma recapturada.
+
+**Proyectos, visitas y campañas**
+- Cada objetivo se convierte en un proyecto con su propia carpeta y un flujo
+  Ficha, Captura, Análisis, Publicación; cada noche es una visita; las campañas
+  y las vigilias de variables llevan su propia cadencia.
+- El diario de observación, el panel «necesita tu atención» y el chequeo diario
+  de las vigilias contra ZTF y la fotometría de la comunidad AAVSO.
+
+**Contarlo**
+- Borradores bilingües (ES/EN) de post y tuit con los gráficos de la noche, a
+  partir de los datos reales de la sesión, con un pase de IA opcional.
+
+**Interfaz e idiomas**
+- Tres pestañas (Esta noche, Proyectos, Campañas), el editor FITS unificado, la
+  interfaz en español e inglés y la guía de usuario sin conexión.
+
+**Línea de comandos**
+- Planifica y publica desde la terminal: `tonight`, `explore`, `post`, `solar`,
+  `blink`, `history`, `sequence`, `inject`, `project` y `gui`.
+
+**Asistente opcional**
+- Apagado por defecto: responde desde la propia guía y los ADRs de la app, sin
+  conexión, a través de un modelo que configures.
+
+**Distribución**
+- Instalador de Windows (por usuario, sin permisos de administrador) y zip
+  portable, un `.deb` para Debian 13+ y Ubuntu 25.10+, un `.rpm` para Fedora 42+
+  y openSUSE Tumbleweed y un PKGBUILD para Arch. Find_Orb viaja dentro y la
+  documentación viaja con la app.
+- Una ruta GPU por OpenCL para el registro y el combine, encendida por defecto,
+  que cae al procesador.
 
 ### Notas
 
@@ -54,3 +99,8 @@ reduce, y cuéntalo**.
   para que reportes qué falta o qué falla, y el resto está previsto para la
   **0.2**. CCDciel es el que está completo hoy (el capítulo 05 lista lo que
   NINA/PINS todavía no hace).
+- Los binarios de Windows **no están firmados**: el Control inteligente de
+  aplicaciones los bloquea sin salida y SmartScreen avisa hasta que se labra
+  reputación, así que el instalador puede pedir un *Ejecutar de todas formas*
+  explícito o una máquina con el Control inteligente de aplicaciones apagado.
+  Los detalles están en docs/user/01-getting-started.

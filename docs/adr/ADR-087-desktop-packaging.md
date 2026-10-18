@@ -387,3 +387,32 @@ Signing does **not** remove the SmartScreen warning: reputation builds with inst
 2024, signing does not grant it instantly (Microsoft's own engineers say so), so warnings are
 expected for days or weeks; for SAC, on the other hand, a valid signature from a trusted CA
 **is** enough, which is the reason for all of this.
+
+**Revisión (2026-10-18, el tag publica la release estable)**: hasta aquí el único
+workflow de empaquetado era `preview.yml`, que en cada push a `main` construye los
+cuatro artefactos y los publica como una **pre-release rodante** con el sufijo
+`-preview.<sha>`. Para probar es lo correcto, pero una primera versión pública no
+puede salir como pre-release ni con el sufijo en el nombre: quien llega a la página
+de Releases tiene que ver la estable y descargarla sin dudar. Se añade
+`.github/workflows/release.yml`, disparado por un **tag `v*`**: corre la misma
+puerta de tests unitarios, construye los mismos cuatro artefactos **sin sufijo**
+(el instalador sale `NightScribeSetup-0.1.0.exe`) y publica una release estable
+marcada como la última, con las notas tomadas de la sección de esa versión en
+`CHANGELOG.md`. La versión sigue saliendo del tag (setuptools-scm), así que el
+`METADATA`, el `.deb`, el `.rpm` y `--version` dicen `0.1.0`; la fecha del
+`metainfo.xml` se alinea con la del tag. La preview rodante se queda como está,
+para el día a día.
+
+**Review (2026-10-18, the tag publishes the stable release)**: until now the only
+packaging workflow was `preview.yml`, which on every push to `main` builds the four
+artifacts and publishes them as a **rolling pre-release** with the `-preview.<sha>`
+suffix. That is right for testing, but a first public version cannot ship as a
+pre-release or with the suffix in the name: whoever reaches the Releases page has to
+see the stable one and download it without hesitating. `.github/workflows/release.yml`
+is added, triggered by a **`v*` tag**: it runs the same unit-test gate, builds the
+same four artifacts **without the suffix** (the installer comes out as
+`NightScribeSetup-0.1.0.exe`) and publishes a stable release marked as the latest,
+with the notes taken from that version's section of `CHANGELOG.md`. The version still
+comes from the tag (setuptools-scm), so the `METADATA`, the `.deb`, the `.rpm` and
+`--version` all say `0.1.0`; the `metainfo.xml` date is aligned with the tag's. The
+rolling preview stays as it is, for everyday work.

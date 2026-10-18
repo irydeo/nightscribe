@@ -27,6 +27,11 @@ software), so what the observer can really do has to be said out loud. The
 signing is wired anyway, and inert: the day there is a certificate it is a
 secret and nothing else.
 
+There are TWO packaging workflows and both build Windows, so both are held
+here: preview.yml (the rolling pre-release) and release.yml (a tagged stable
+release). They are separate on purpose, and the signing half is the part that
+must never drift between them.
+
 What these tests hold:
 
   * the workflow signs only when the certificate secret is configured, and says
@@ -41,9 +46,14 @@ What these tests hold:
 
 from pathlib import Path
 
+import pytest
+
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-WORKFLOW = ROOT / ".github" / "workflows" / "preview.yml"
+WORKFLOWS = [
+    ROOT / ".github" / "workflows" / "preview.yml",
+    ROOT / ".github" / "workflows" / "release.yml",
+]
 
 # The step that does the signing, by its name (the anchor the rest hangs from).
 SIGN_STEP = "name: Sign the Windows binaries (skipped without a certificate)"
@@ -55,9 +65,10 @@ INSTALLER_STEP = "name: Compile the installer"
 SAC_NAMES = ("Smart App Control", "Control inteligente de aplicaciones")
 
 
-def _workflow():
-    # @return: the preview workflow as text
-    return WORKFLOW.read_text(encoding="utf-8")
+def _workflow(path):
+    # @args: path - a packaging workflow file
+    # @return: the workflow as text
+    return path.read_text(encoding="utf-8")
 
 
 def _step(text, name):
@@ -78,52 +89,57 @@ def _user_facing_files():
     return files
 
 
-def test_the_signing_step_is_optional_and_says_when_it_is_skipped():
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.name)
+def test_the_signing_step_is_optional_and_says_when_it_is_skipped(workflow):
     # A build must never depend on a secret being there: without a certificate
     # the step reports that the binaries are unsigned and lets the build go on
     # exactly as before (that is how every build runs today).
-    block = _step(_workflow(), SIGN_STEP)
+    block = _step(_workflow(workflow), SIGN_STEP)
     assert "${{ secrets.WINDOWS_SIGN_CMD }}" in block
     assert "::notice::" in block
     assert "exit 0" in block
 
 
-def test_the_signature_covers_every_binary_windows_runs():
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.name)
+def test_the_signature_covers_every_binary_windows_runs(workflow):
     # Windows runs the app executable AND the libraries it loads, so signing
     # only the main exe would still leave the app blocked: the whole
     # PyInstaller tree goes through the signer (.exe, .dll and .pyd are the
     # three shapes a PE file takes in it).
-    block = _step(_workflow(), SIGN_STEP)
+    block = _step(_workflow(workflow), SIGN_STEP)
     assert r"dist\nightscribe" in block
     for shape in (".exe", ".dll", ".pyd"):
         assert shape in block, shape
 
 
-def test_the_signed_files_are_verified_and_a_bad_signature_fails_the_build():
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.name)
+def test_the_signed_files_are_verified_and_a_bad_signature_fails_the_build(workflow):
     # A signing tool can report success and sign nothing (it happens with the
     # cloud ones when the wrong .NET runtime is on PATH), so the step asks
     # Windows itself: every file has to come back with a valid signature, and
     # one that does not fails the build. A build that says "signed" while
     # shipping unsigned binaries is worse than no signing at all.
-    block = _step(_workflow(), SIGN_STEP)
+    block = _step(_workflow(workflow), SIGN_STEP)
     assert "Get-AuthenticodeSignature" in block
     assert "'Valid'" in block
     assert "exit 1" in block
 
 
-def test_the_signing_happens_before_anything_is_packaged():
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.name)
+def test_the_signing_happens_before_anything_is_packaged(workflow):
     # The portable zip and the installer both carry the files: signing after
     # packaging would sign nothing that the observer runs (ADR-087).
-    text = _workflow()
+    text = _workflow(workflow)
     assert (text.index(SIGN_STEP) < text.index(ZIP_STEP)
             < text.index(INSTALLER_STEP))
 
 
-def test_the_installer_is_signed_through_the_tool_the_recipe_defines():
+@pytest.mark.parametrize("workflow", WORKFLOWS, ids=lambda p: p.name)
+def test_the_installer_is_signed_through_the_tool_the_recipe_defines(workflow):
     # The setup and the uninstaller Inno Setup compiles INTO it can only be
     # signed while compiling, so the workflow hands it the same command it used
     # for the tree, under the name the .iss expects (ADR-087).
-    block = _step(_workflow(), INSTALLER_STEP)
+    block = _step(_workflow(workflow), INSTALLER_STEP)
     assert "/DSignToolName=" in block
     assert "$env:SIGN_CMD" in block
     # ... and only when there is a certificate: the ISCC call itself is

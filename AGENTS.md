@@ -336,6 +336,10 @@ installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
                      #   zip portable + instalador Inno, .deb y .rpm) y un solo
                      #   pre-release rodante preview-<rama> con los cuatro
                      #   artefactos; push a main o manual (ADR-087)
+                     # release.yml: el build de release, disparado por un tag
+                     #   v*: los mismos cuatro artefactos sin sufijo y una
+                     #   release estable (la última), con las notas de la
+                     #   sección del CHANGELOG de esa versión (ADR-087)
                      # windows-tests.yml: la suite unitaria en Windows, en cada PR
                      # pages.yml: construye la web y la publica en GitHub Pages
                      #   (push a main o release/v0.1, y manual)

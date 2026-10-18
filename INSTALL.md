@@ -24,8 +24,17 @@ Prebuilt packages live on the
 **Windows.** Each release carries a Windows installer
 (`NightScribeSetup-*.exe`, per-user, no admin rights needed) and a portable zip
 (`NightScribe-*-windows-x64.zip`: unzip and run `nightscribe.exe gui`). The
-binaries are unsigned, so Windows SmartScreen will warn: choose
-*More info → Run anyway*.
+binaries are unsigned, and Windows has **two different gates** that can stop
+them:
+
+- **SmartScreen** shows *Windows protected your PC* and offers a way through:
+  *More info → Run anyway*.
+- **Smart App Control** (Windows 11, on by default on new installations) blocks
+  unsigned code outright, with no such option. It only lets through code signed
+  by an authority Windows trusts, and NightScribe has no certificate, so a
+  machine with it on will not run the installer or the portable build. Check it
+  under *Windows Security → App & browser control → Smart App Control*; turning
+  it off is the observer's call and costs that protection.
 
 Reinstalling upgrades **cleanly**: the installer uninstalls the previous
 version first, so no file from an older build is left behind. Your settings and
@@ -197,6 +206,10 @@ No key is required: every optional integration degrades gracefully.
   *Download ZIP* route instead (step 2 above).
 - **Windows: SmartScreen warns about the standalone exe** → *More info → Run
   anyway* (the installer is built from this same source tree).
+- **Windows: Smart App Control blocks the installer, with no *Run anyway*** →
+  it only lets through signed code, and these binaries are not signed. Check it
+  under *Windows Security → App & browser control → Smart App Control*; if it
+  is on, turn it off (you lose that protection) or use another machine.
 - **A source fails** (e.g. NEOfixer down) → the app keeps working with the rest;
   check *Help → About NightScribe* for the list of the main sources (the full list
   is in `docs/DATA_SOURCES.md`).

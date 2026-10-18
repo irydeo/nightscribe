@@ -11,8 +11,7 @@ Three paths, depending on how comfortable you are with a terminal:
   `.deb` (Debian, Ubuntu, Mint:
   `sudo apt install ./nightscribe_*_amd64.deb`) or the `.rpm` (Fedora,
   openSUSE: `sudo dnf install ./nightscribe-*.x86_64.rpm`), then run
-  `nightscribe gui`. Windows SmartScreen will warn because the binary is
-  unsigned: *More info → Run anyway*.
+  `nightscribe gui`.
 - **From the repository** (no installer to download, and no package published
   on PyPI): in a virtual environment,
   `pip install "nightscribe @ git+https://github.com/irydeo/nightscribe"`,
@@ -23,6 +22,18 @@ Three paths, depending on how comfortable you are with a terminal:
   create the environment and run `.venv/bin/python -m nightscribe gui`.
 
 The detailed, per-system steps are in [INSTALL.md](https://github.com/irydeo/nightscribe/blob/main/INSTALL.md).
+
+> **On Windows, two different gates can stop the installer, and only one has a
+> way through.** SmartScreen shows *Windows protected your PC* and offers
+> *More info → Run anyway*: click it and the install goes ahead.
+> **Smart App Control** (Windows 11, on by default on new installations) shows
+> no such option: it blocks the installer outright. It only lets through code
+> signed with a certificate from an authority Windows trusts, and NightScribe
+> is free software with no certificate, so a machine with Smart App Control on
+> will not run it. You can see whether it is on under **Windows Security → App
+> & browser control → Smart App Control**. If it is, the choice is yours: turn
+> it off, knowing you lose that protection, or run NightScribe on another
+> machine. Nothing else in this guide depends on it.
 
 Either way you need an internet connection: ephemerides and catalogues are
 downloaded on the fly (and cached locally, so the second query for the same

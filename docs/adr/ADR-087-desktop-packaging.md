@@ -319,3 +319,71 @@ packager normalises the modes** when copying it (directories 755, files 644, the
 cannot be read is not a package. A test walks the staged tree's modes one by one. And the
 app stops lying in the other direction: when the shipped copy is there but cannot be read,
 it says so (and `find_fo` no longer raises `PermissionError`).
+
+**Revisión (2026-10-18, la firma de Windows: lo único que desbloquea SAC)**: en Windows 11,
+SmartScreen y el **Control inteligente de aplicaciones (Smart App Control, SAC)** son dos
+barreras distintas y solo una tiene salida. SmartScreen avisa y ofrece *Más información →
+Ejecutar de todas formas*; SAC **bloquea** el código sin firmar y no ofrece nada parecido.
+Solo deja pasar código firmado por una autoridad del programa raíz de confianza de Microsoft
+o reconocido por su servicio de inteligencia, y **no hay excepción por aplicación ni forma de
+saltarlo**: evalúa en tiempo de ejecución, así que la marca de Internet, descomprimir el zip,
+una carpeta de red o un certificado propio no cambian nada (Microsoft lo dice así en su guía
+de firma de código y en su FAQ de SAC). Los binarios del proyecto no están firmados, así que
+en un equipo con SAC activado ni el instalador ni el zip portable se ejecutan.
+
+**Decisión**: no se compra certificado (es software libre), pero la firma queda **cableada y
+inerte**: `installer/nightscribe.iss` lleva `SignTool` y `SignedUninstaller=yes` bajo
+`#ifdef SignToolName`, y el workflow de preview pasa `/DSignToolName` y `/Snssign` **solo** si
+existe el secreto `WINDOWS_SIGN_CMD` (una orden con el `$f` de Inno Setup, que sirve a la vez
+para firmar todo el árbol de PyInstaller, el instalador y el desinstalador que Inno compila
+dentro). Sin el secreto, el paso lo dice en el log y el build sigue sin firmar, exactamente
+como antes. El camino **gratuito** para un proyecto GPLv3 es la **SignPath Foundation**, que
+la propia Microsoft lista en su guía de firma de código para proyectos de código abierto:
+certificado OV y firma en la nube (sin token físico) con una acción de GitHub, a cambio de
+firmar solo tu código, MFA, builds reproducibles desde el fuente y **aprobación manual en cada
+release** (y dos peticiones por release: el árbol antes de empaquetarlo y el instalador
+después, porque lo que va dentro hay que firmarlo antes de que Inno lo meta en el setup).
+Mientras no haya firma, lo que sí se hace es **decir la verdad**: la guía de usuario, los
+README, INSTALL y la nota del release explican las dos barreras por separado (antes daban un
+«Run anyway» que con SAC no existe) y un test lo fija.
+
+**Consecuencias**: el bloqueo de SAC sigue ahí hasta que haya certificado, pero ya no se
+promete una salida que no existe y el día que haya firma es un secreto y nada más. La firma
+**no** quita el aviso de SmartScreen: la reputación se construye con instalaciones y, desde
+2024, firmar no la da al instante (los propios ingenieros de Microsoft lo dicen), así que se
+esperan avisos unos días o semanas; para SAC, en cambio, una firma válida de una CA de
+confianza **sí** basta, que es la razón de todo esto.
+
+**Review (2026-10-18, Windows signing: the only thing that unblocks SAC)**: on Windows 11,
+SmartScreen and **Smart App Control (SAC)** are two different gates and only one has a way
+through. SmartScreen warns and offers *More info → Run anyway*; SAC **blocks** unsigned code
+and offers nothing of the sort. It only lets through code signed by an authority in
+Microsoft's trusted root program, or code its intelligence service recognises, and there is
+**no per-application exception and no way around it**: it evaluates at run time, so the Mark
+of the Internet, unzipping the zip, a network folder or a self-signed certificate change
+nothing (Microsoft says so in its code signing guide and in the SAC FAQ). This project's
+binaries are unsigned, so on a machine with SAC on, neither the installer nor the portable
+build runs.
+
+**Decision**: no certificate is bought (this is free software), but the signing is **wired and
+inert**: `installer/nightscribe.iss` carries `SignTool` and `SignedUninstaller=yes` under
+`#ifdef SignToolName`, and the preview workflow passes `/DSignToolName` and `/Snssign` **only**
+when the `WINDOWS_SIGN_CMD` secret exists (a command with Inno Setup's `$f`, which serves both
+to sign the whole PyInstaller tree and the installer and the uninstaller Inno compiles inside
+it). Without the secret, the step says so in the log and the build carries on unsigned, exactly
+as before. The **free** path for a GPLv3 project is the **SignPath Foundation**, which Microsoft
+itself lists in its code signing guide for open-source projects: an OV certificate and cloud
+signing (no hardware token) through a GitHub action, in exchange for signing only your own
+code, MFA, builds reproducible from source and **manual approval on every release** (and two
+requests per release: the tree before it is packaged and the installer after, because what goes
+inside has to be signed before Inno puts it in the setup). While there is no signature, what
+does get done is **telling the truth**: the user guide, the READMEs, INSTALL and the release
+note explain the two gates separately (they used to give a "Run anyway" that does not exist
+with SAC) and a test holds it.
+
+**Consequences**: SAC keeps blocking until there is a certificate, but a way out that does not
+exist is no longer promised, and the day there is a signature it is a secret and nothing else.
+Signing does **not** remove the SmartScreen warning: reputation builds with installs and, since
+2024, signing does not grant it instantly (Microsoft's own engineers say so), so warnings are
+expected for days or weeks; for SAC, on the other hand, a valid signature from a trusted CA
+**is** enough, which is the reason for all of this.

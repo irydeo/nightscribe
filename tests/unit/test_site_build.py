@@ -111,6 +111,22 @@ def test_a_why_box_is_a_callout_and_a_plain_quote_is_not():
     assert 'class="quote"' in plain
 
 
+def test_a_bold_run_spanning_a_line_break_inside_a_quote_is_bold():
+    # The same trap as above, one level in: a quote's lines were inlined
+    # separately and then joined, so a `**...**` split by the wrap (prose is
+    # wrapped) matched on neither line and reached the page with its asterisks
+    # (measured 2026-10-18, on the guide's Windows note). The lines are joined
+    # first now, which is also what lets a "Why ...?" whose question mark sits
+    # on the next line be dressed as a callout.
+    gen = _generator()
+    html, _heads = gen.md_to_html(
+        "> **On Windows, two gates can stop it, and only one has a\n"
+        "> way through.** SmartScreen warns and lets you through.\n")
+    assert "<strong>On Windows, two gates can stop it, and only one has a" \
+           " way through.</strong>" in html
+    assert "**" not in html
+
+
 def test_inline_code_protects_its_asterisks():
     gen = _generator()
     assert gen.inline("use `a**b` here") == "use <code>a**b</code> here"

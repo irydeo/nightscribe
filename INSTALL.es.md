@@ -25,8 +25,19 @@ desarrollo.
 **Windows.** Cada release trae un instalador de Windows
 (`NightScribeSetup-*.exe`, por usuario, sin permisos de administrador) y un
 zip portable (`NightScribe-*-windows-x64.zip`: descomprímelo y ejecuta
-`nightscribe.exe gui`). Los binarios no están firmados, así que Windows
-SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
+`nightscribe.exe gui`). Los binarios no están firmados, y Windows tiene **dos
+barreras distintas** que pueden pararlos:
+
+- **SmartScreen** muestra *Windows protegió tu PC* y ofrece salida: *Más
+  información → Ejecutar de todas formas*.
+- El **Control inteligente de aplicaciones** (Windows 11, activado por defecto
+  en instalaciones nuevas) bloquea el código sin firmar sin ofrecer nada
+  parecido. Solo deja pasar código firmado por una autoridad en la que Windows
+  confía, y NightScribe no tiene certificado, así que un equipo con esa función
+  activada no ejecutará ni el instalador ni el zip portable. Compruébalo en
+  *Seguridad de Windows → Control de aplicaciones y navegador → Control
+  inteligente de aplicaciones*; desactivarlo es decisión del observador y
+  cuesta esa protección.
 
 Reinstalar actualiza **limpiamente**: el instalador desinstala antes la versión
 anterior, así que no queda ningún fichero de un build viejo. Tus ajustes y tus
@@ -201,6 +212,11 @@ Ninguna clave es obligatoria: cada integración opcional degrada con elegancia.
 - **Windows: SmartScreen avisa sobre el exe autónomo** → *Más información →
   Ejecutar de todas formas* (el instalador se construye desde este mismo
   código).
+- **Windows: el Control inteligente de aplicaciones bloquea el instalador, sin
+  *Ejecutar de todas formas*** → solo deja pasar código firmado, y estos
+  binarios no lo están. Compruébalo en *Seguridad de Windows → Control de
+  aplicaciones y navegador → Control inteligente de aplicaciones*; si está
+  activado, desactívalo (pierdes esa protección) o usa otro equipo.
 - **Una fuente falla** (p. ej. NEOfixer caído) → la app sigue funcionando con el
   resto; revisa *Ayuda → Acerca de NightScribe* para la lista de las principales
   (la completa está en `docs/DATA_SOURCES.md`).

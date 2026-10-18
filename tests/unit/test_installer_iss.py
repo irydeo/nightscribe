@@ -66,3 +66,24 @@ def test_the_old_uninstaller_runs_silently():
         assert flag in text, flag
     # the app has to be closed or the uninstaller cannot delete its own exe
     assert "taskkill.exe" in text
+
+
+def test_signing_is_wired_but_inert_without_a_certificate():
+    # Windows Smart App Control BLOCKS unsigned installers outright, with no
+    # "run anyway" (that is SmartScreen, a different gate, and it does have
+    # one), and nothing but a signature from a trusted authority gets through.
+    # The recipe therefore carries the wiring, but it must NOT require a
+    # signing tool: every build today has no certificate, and the workflow
+    # passes /DSignToolName only when there is one (ADR-087).
+    text = _script()
+    assert "#ifdef SignToolName" in text
+    assert text.count("SignTool={#SignToolName}") == 1
+    assert text.count("SignedUninstaller=yes") == 1
+    # both inside the guard: SignedUninstaller is only valid with a SignTool,
+    # and an unguarded directive would break every unsigned build
+    block = text.split("#ifdef SignToolName", 1)[1].split("#endif", 1)[0]
+    assert "SignTool={#SignToolName}" in block
+    assert "SignedUninstaller=yes" in block
+    # the uninstaller is compiled INTO the setup, so this is the only moment it
+    # can be signed, and without it uninstalling is unsigned code too
+    assert "uninstaller" in block.lower()

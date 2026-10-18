@@ -158,6 +158,49 @@ jobs:
       - name: Smoke test the frozen binary
         run: dist\nightscribe\nightscribe.exe --help
 
+      # Code signing, OPTIONAL and inert without a certificate (ADR-087).
+      # Windows Smart App Control BLOCKS unsigned binaries outright, with no
+      # "run anyway" (SmartScreen, a different gate, does offer one), and it
+      # evaluates at run time: only a signature from a certificate authority
+      # Windows trusts gets through. So the day the project has one, it is this
+      # secret and nothing else. Without it the step says so out loud and the
+      # build carries on unsigned, exactly as it did before.
+      #
+      # It runs BEFORE the portable zip and BEFORE Inno Setup on purpose: both
+      # package the files this signs, so signing first is what makes the zip and
+      # the installed app carry signed binaries.
+      - name: Sign the Windows binaries (skipped without a certificate)
+        shell: pwsh
+        env:
+          SIGN_CMD: ${{ secrets.WINDOWS_SIGN_CMD }}
+        run: |
+          if (-not $env:SIGN_CMD) {
+            Write-Host "::notice::the Windows binaries are unsigned (WINDOWS_SIGN_CMD is not set): Smart App Control blocks them on a machine that has it on, and SmartScreen warns until reputation builds. See ADR-087."
+            exit 0
+          }
+          # The secret is a command with Inno Setup's own `$f` placeholder, so
+          # the same text serves this loop and the [Setup] SignTool below (the
+          # quote around $f matters: a path may carry spaces).
+          $files = Get-ChildItem -Path dist\nightscribe -Recurse -File |
+                   Where-Object { $_.Extension -in '.exe', '.dll', '.pyd' }
+          foreach ($f in $files) {
+            $cmd = $env:SIGN_CMD.Replace('$f', "`"$($f.FullName)`"")
+            Write-Host "signing $($f.Name)"
+            Invoke-Expression $cmd
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          # And the result is CHECKED, not trusted: a signing tool that fails
+          # quietly reports success (it happens with the cloud ones when the
+          # wrong .NET runtime is on PATH), and a build that says "signed"
+          # while shipping unsigned binaries is worse than no signing at all.
+          $bad = $files | Where-Object {
+            (Get-AuthenticodeSignature $_.FullName).Status -ne 'Valid' }
+          if ($bad) {
+            $bad | ForEach-Object { Write-Host "::error::$($_.Name) is not validly signed" }
+            exit 1
+          }
+          Write-Host "signed and verified $($files.Count) file(s)"
+
       - name: Zip the portable build
         shell: pwsh
         run: |
@@ -170,8 +213,18 @@ jobs:
 
       - name: Compile the installer
         shell: pwsh
+        env:
+          SIGN_CMD: ${{ secrets.WINDOWS_SIGN_CMD }}
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ needs.test.outputs.version }} "/DAppSuffix=${{ needs.test.outputs.suffix }}" installer\nightscribe.iss
+          # With a certificate, the same command signs the setup AND the
+          # uninstaller it compiles in (SignedUninstaller, ADR-087): the
+          # placeholder inside the secret is Inno Setup's own `$f`, and
+          # PowerShell does not re-expand it, so it survives untouched.
+          $sign = @()
+          if ($env:SIGN_CMD) {
+            $sign = @("/DSignToolName=nssign", "/Snssign=$env:SIGN_CMD")
+          }
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ needs.test.outputs.version }} "/DAppSuffix=${{ needs.test.outputs.suffix }}" @sign installer\nightscribe.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload the Windows artifacts
@@ -313,7 +366,7 @@ jobs:
           - **nightscribe_${ver}_amd64.deb**: Debian 13+ / Ubuntu 25.10+ (system Python; includes Find_Orb).
           - **nightscribe-*.x86_64.rpm**: Fedora 42+ / openSUSE Tumbleweed (system Python; includes Find_Orb).
 
-          The Windows binaries are unsigned, so SmartScreen will warn: choose *More info -> Run anyway*. Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY.
+          **Windows can stop the installer in two different ways, and only one has a way through.** SmartScreen shows *Windows protected your PC* and offers *More info -> Run anyway*. **Smart App Control** (Windows 11, on by default on new installations) blocks unsigned code outright, with no such option: either turn it off under *Windows Security > App & browser control > Smart App Control*, or run NightScribe on another machine. The binaries are unsigned because NightScribe is free software and has no code signing certificate; the details are in docs/user/01-getting-started. Other distros (Ubuntu 24.04 LTS, ...) install manually: see docs/ASTROMETRY.
 
           On Linux, installing the .deb from your Downloads folder can print an apt note about the sandbox user (permission denied, read as root instead): it is harmless and the install finishes.
 

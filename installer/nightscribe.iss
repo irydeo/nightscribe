@@ -1,10 +1,12 @@
 ; NightScribe - Inno Setup script (Windows installer)
 ;
-; Built by the "Windows preview" GitHub Actions workflow:
+; Built by the GitHub Actions workflows (preview.yml for the rolling
+; pre-release, release.yml for a tagged stable release):
 ;   ISCC.exe /DAppVersion=<version> /DAppSuffix=-preview.<sha> installer\nightscribe.iss
 ; Input:  ..\dist\nightscribe\  (PyInstaller onedir output)
 ; Output: ..\dist\NightScribeSetup-<version><suffix>.exe
-;         (suffix is empty for manual builds, "-preview.<sha>" in CI)
+;         (the suffix is "-preview.<sha>" in the preview workflow, and empty in
+;          the release workflow and in manual builds)
 ;
 ; Per-user install under %LOCALAPPDATA%\Programs: no admin rights needed.
 

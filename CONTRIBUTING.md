@@ -111,10 +111,12 @@ Nothing to edit by hand.
    installer and portable zip, `.deb`, `.rpm`) and publishes them as the rolling
    pre-release, after the unit suite passes.
 4. Tag and push: `git tag -a v0.1.0 -m "NightScribe 0.1.0"` then
-   `git push origin v0.1.0`.
-5. Create the GitHub release from the tag, with the artifacts from step 3 and
-   the notes from the CHANGELOG. Mark it as the latest release, not a
-   pre-release.
+   `git push origin v0.1.0`. The tag triggers `release.yml`, which builds the
+   same four artifacts **without** the `-preview` suffix and publishes them as a
+   **stable** GitHub release, marked as the latest, with the notes taken from the
+   `[0.1.0]` section of `CHANGELOG.md`.
+5. Verify it: `gh release view v0.1.0` lists the four files, and the rolling
+   `preview-*` pre-release stays as the development one.
 
 ## Pull requests
 

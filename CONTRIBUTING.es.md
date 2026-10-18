@@ -104,9 +104,12 @@ digan `0.1.0`. No hay nada que editar a mano.
    (instalador y zip portable de Windows, `.deb`, `.rpm`) y los publica como la
    pre-release rodante, después de que pase la suite unitaria.
 4. Etiqueta y sube: `git tag -a v0.1.0 -m "NightScribe 0.1.0"` y luego
-   `git push origin v0.1.0`.
-5. Crea la release de GitHub desde el tag, con los artefactos del paso 3 y las
-   notas del CHANGELOG. Márcala como la última release, no como pre-release.
+   `git push origin v0.1.0`. El tag dispara `release.yml`, que construye los
+   mismos cuatro artefactos **sin** el sufijo `-preview` y los publica como una
+   release **estable** de GitHub, marcada como la última, con las notas tomadas
+   de la sección `[0.1.0]` de `CHANGELOG.md`.
+5. Verifícalo: `gh release view v0.1.0` lista los cuatro ficheros, y la
+   pre-release rodante `preview-*` se queda como la de desarrollo.
 
 ## Pull requests
 

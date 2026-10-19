@@ -1179,12 +1179,19 @@ class UfeCompareTab(QWidget):
         scale = state.wcs.pixel_scale() or 1.0
         margin_px = compstars.COMP_MARGIN_ARCSEC / scale
         shape = state.data.shape
+        # How many ADU one unit of THIS plate is worth, ONCE for the whole
+        # proposal: a normalised master (PixInsight, Siril: float 0..1) is not
+        # in ADU, and both the ceilings and the CCD noise term live there. It
+        # used to be assumed, and on a normalised plate every candidate was
+        # refused as noise (ADR-066).
+        adu_scale = photometry.plate_adu_scale(state.data, state.header,
+                                              config)
 
         def validator(star, _role="comp"):
             return compstars.validate_on_plate(
                 star, state.data, state.wcs, radii=radii, sat_adu=sat,
                 linear_adu=lin, gain=gain, ron=ron, shape=shape,
-                margin_px=margin_px)
+                margin_px=margin_px, scale=adu_scale)
         return validator
 
     def _on_propose(self):

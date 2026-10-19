@@ -118,6 +118,31 @@ Nothing to edit by hand.
 5. Verify it: `gh release view v0.1.0` lists the four files, and the rolling
    `preview-*` pre-release stays as the development one.
 
+### Patching an already published version
+
+When the bug is in the version people have installed, the maintenance branch is
+in charge (ADR-093): the order is reversed, because what gets built is the
+published line and not `main`.
+
+1. Create the branch from the tag of the release you are maintaining (or from
+   `main`, which is the same commit at that moment):
+   `git switch -c release/v0.1.x v0.1.0`. It is born once per version line and
+   lives while that line is the published one.
+2. Make the fix **on the branch**, with its test, and add the
+   `## [0.1.1] - <date>` section to both `CHANGELOG`s (above `[0.1.0]`, below
+   `[Unreleased]`).
+3. Check that the new test **fails without the fix** and passes with it, and
+   that the whole suite stays green.
+4. Tag from the branch: `git tag -a v0.1.1 -m "NightScribe 0.1.1"` and
+   `git push origin v0.1.1`. `release.yml` builds and publishes the stable
+   release, exactly as in the normal path.
+5. **Forward the fix to `main` the same day** (`git cherry-pick <commit>`), so
+   the trunk does not keep the bug. The only file that conflicts is the
+   `CHANGELOG`, so do it early: while `main`'s `[Unreleased]` is untouched, it
+   applies cleanly.
+6. The branch stays for the next patch of the same line, and is frozen or
+   deleted when the next minor comes out.
+
 ## Pull requests
 
 One concern per PR, tests green, docs updated (both languages).

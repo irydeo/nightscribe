@@ -2090,6 +2090,10 @@ class TrackStackWorker(QThread):
                                       or 10.0) * 0.0254,
                 site_height_m=float(self._cfg_get("height", 0) or 0.0),
                 site_dark=self._cfg_get("cam_dark_current_e_s", None),
+                # the plate's own unit, read off the stack being measured: a
+                # normalised master is not in ADU (ADR-066)
+                adu_scale=photometry.plate_adu_scale(stack, ref.header,
+                                                      self._cfg),
                 stack_scale=self._stack_scale(groups[index]))
             res = photometry.measure_plate(stack, cfg)
             if not res.ok or res.mag is None:
@@ -3168,9 +3172,10 @@ class StackRemeasureWorker(QThread):
         except Exception:
             return default
 
-    def _config_for(self, header, target_xy, fwhm):
+    def _config_for(self, header, target_xy, fwhm, image=None):
         # @args: header - the object stack's header, target_xy - the object's
-        #        (x, y) on it, fwhm - the seeing (px) or None
+        #        (x, y) on it, fwhm - the seeing (px) or None, image - the
+        #        stack itself, so the plate's own unit can be resolved
         # @return: the PlateConfig the plate recipe needs
         from ..core import photometry, wcs as wcs_mod
         recipe = self._recipe
@@ -3202,7 +3207,11 @@ class StackRemeasureWorker(QThread):
             site_aperture_m=float(self._get("aperture_inches", 10.0)
                                   or 10.0) * 0.0254,
             site_height_m=float(self._get("height", 0) or 0.0),
-            site_dark=self._get("cam_dark_current_e_s", None))
+            site_dark=self._get("cam_dark_current_e_s", None),
+            # the plate's own unit: the stacks this worker re-measures can be
+            # normalised masters, and the error would be meaningless (ADR-066)
+            adu_scale=(photometry.plate_adu_scale(image, header, self._cfg)
+                       if image is not None else 1.0))
 
     def _one(self, ob):
         # @args: ob - one observation {"index", "stack", "star", "target_xy",
@@ -3215,7 +3224,8 @@ class StackRemeasureWorker(QThread):
             star = None
             if ob.get("star"):
                 _sh, star = fits_io.read_fits(ob["star"])
-            cfg = self._config_for(header, ob["target_xy"], ob.get("fwhm"))
+            cfg = self._config_for(header, ob["target_xy"], ob.get("fwhm"),
+                                   image=image)
             cfg.comp_image = star
             res = photometry.measure_plate(image, cfg)
             if not res.ok or res.mag is None:

@@ -6,6 +6,43 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+## [0.1.1] - 2026-10-19
+
+Arregla la fotometría en las placas **normalizadas** (los masters de 32 bits en
+coma flotante con valores de 0 a 1 que exportan PixInsight y Siril por defecto)
+y una corrida de track & stack que moría sin decir por qué.
+
+### Corregido
+
+- **Las comparsas ya se encuentran en una placa normalizada.** La validación de
+  cada candidata mezclaba unidades: la señal la leía de la placa (0 a 1) y el
+  ruido lo calculaba con la ecuación CCD, anclada en electrones por ADU. El
+  término del ruido de lectura, que no escala con la placa, aplastaba la señal y
+  **todas** las candidatas caían por «SNR 0 en la apertura», así que la
+  propuesta devolvía cero estrellas. Medido en una placa real (un NEO de
+  magnitud 20,5 con tomas de 10 s): 0 comparsas antes, 8 más la de control
+  después.
+- **La barra de error vuelve a ser la correcta en esas placas.** El mismo
+  desajuste hacía que el error en magnitud de una estrella real saliera de **52
+  magnitudes** donde la respuesta honesta es 0,012. Y al medir una **serie**
+  sobre las pilas de 2020 de un transitorio, los puntos guardados llevaban
+  errores de **228 a 384 magnitudes**: el mismo punto, con el arreglo, sale con
+  0,09.
+- **Los dos techos vuelven a vigilar en esas placas.** La saturación y el límite
+  de linealidad se comparan en ADU, así que en una placa de 0 a 1 nunca se
+  disparaban: un pico de 0,9 pasaba por delante de un límite de 53 000 ADU sin
+  decir nada.
+- **Un objetivo que no se puede medir ya no tumba la corrida del track &
+  stack.** La ruta que mide el objetivo en su apilado y las comparsas en otro
+  multiplicaba el centroide del objetivo por la escala de la placa, y cuando el
+  objetivo no se puede medir ese centroide es `None`: la corrida moría con un
+  `TypeError` en vez de decir el motivo, que ya llevaba dentro. Visto con dos
+  objetos reales, uno de ellos a cuarenta píxeles del borde del campo.
+
+**Si sigues en la 0.1.0 y das con esto**, la salida provisional es medir sobre
+una placa en ADU: los fotogramas individuales, o un master multiplicado por
+65 535 para devolverle la escala. La 0.1.1 ya no lo necesita.
+
 ## [0.1.0] - 2026-10-18
 
 La primera versión pública. NightScribe acompaña a un proyecto de observatorio

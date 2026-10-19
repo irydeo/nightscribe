@@ -6,6 +6,40 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-19
+
+Fixes photometry on **normalised** plates (the 32-bit float masters with values
+from 0 to 1 that PixInsight and Siril write by default) and a track & stack run
+that died without saying why.
+
+### Fixed
+
+- **Comparison stars are found again on a normalised plate.** The validation of
+  each candidate mixed units: it read the signal from the plate (0 to 1) and
+  computed the noise with the CCD equation, anchored in electrons per ADU. The
+  read-noise term, which does not scale with the plate, drowned the signal and
+  **every** candidate was refused as "SNR 0 in the aperture", so the proposal
+  came back empty. Measured on a real plate (a magnitude 20.5 NEO, 10 s frames):
+  0 comparisons before, 8 plus the check star after.
+- **The error bar is the right one again on those plates.** The same mismatch
+  made the magnitude error of a real star come out as **52 magnitudes** where
+  the honest answer is 0.012. And when measuring a **series** on a 2020
+  transient's stacks, the stored points carried errors of **228 to 384
+  magnitudes**: the same point, with the fix, comes out at 0.09.
+- **Both ceilings guard again on those plates.** Saturation and the linearity
+  limit are compared in ADU, so on a 0..1 plate they never fired: a peak of 0.9
+  sailed past a 53 000 ADU limit without a word.
+- **A target the plate cannot measure no longer kills the track & stack run.**
+  The path that measures the target on its own stack and the comps on another
+  multiplied the target's centroid by the plate scale, and a target that cannot
+  be measured comes back with a `None` centroid: the run died with a `TypeError`
+  instead of reporting the reason it already carried. Seen with two real
+  objects, one of them forty pixels from the field's edge.
+
+**If you are still on 0.1.0 and hit this**, the provisional way out is to
+measure on a plate in ADU: the individual frames, or a master multiplied by
+65 535 to give it its scale back. 0.1.1 no longer needs it.
+
 ## [0.1.0] - 2026-10-18
 
 The first public release. NightScribe follows an observatory project through its

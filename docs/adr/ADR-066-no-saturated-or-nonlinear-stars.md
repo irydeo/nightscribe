@@ -94,3 +94,65 @@ star; a candidate comparison that touches either ceiling is dropped with its
 reason; and the observer sees a warning when the linearity is missing, instead
 of a zero point they cannot judge. Tests: one per path (plate, series, T3
 tuning, proposal) and one for the warning.
+
+**Nota (2026-10-19): los dos techos, y la ecuación CCD, necesitan saber en qué
+unidad está la placa.** Los dos están en ADU y el término del ruido de lectura
+está en electrones, pero **no toda placa cuenta en ADU**: PixInsight y Siril
+escriben masters de 32 bits en coma flotante **normalizados a 0..1**, donde 1,0
+es el pozo lleno. En una de esas, el término del ruido (que no escala con la
+placa) aplastaba una señal unas 10^5 veces más pequeña, y pasaban dos cosas a la
+vez: la propuesta de comparsas devolvía **cero** estrellas (65 candidatas de un
+campo real rechazadas por «SNR 0 en la apertura») y el error en magnitud de una
+estrella real salía de **52 magnitudes** donde la respuesta honesta es 0,012.
+Peor: los dos techos de este ADR quedaban **ciegos**, porque comparaban un pico
+de 0,9 contra un límite de 53 000 ADU.
+
+La decisión: `photometry.plate_adu_scale(plate, header, cfg)` dice cuántos ADU
+vale una unidad de la placa (1,0 si ya está en ADU; la saturación del detector
+si es un master normalizado, porque ahí 1,0 **es** el pozo lleno; y el pozo de
+16 bits cuando nadie declaró el techo). Se calcula **una vez por placa** y se
+pasa a cada candidata, nunca por candidata: leer el máximo de un frame de
+2048² cuesta milisegundos. Lo consumen `ccd_flux_error` (que devuelve el sigma
+en las unidades de la placa, escalando la señal al entrar y el resultado al
+salir) y `validate_on_plate` (los techos y el SNR del flujo; el del pico es un
+cociente y no lo necesita), y la llevan a la práctica los tres caminos que
+aplican la ecuación: **la medida de una placa** (`PlateConfig.adu_scale`, lo que
+ve la pestaña Medir), **la serie** (que la resuelve una vez por corrida con
+`_resolve_adu_scale`, y de ahí baja al `PlateConfig` que construye por frame y a
+los dos errores que calcula ella misma) y **la propuesta de comparsas**. Sin ese
+tercer camino, la misma medición sobre las pilas de 2020 del autor guardaba
+puntos con errores de **228 a 384 magnitudes**; con él, el mismo punto sale con
+0,09. Lo clava `tests/unit/test_plate_units.py`, con un master normalizado
+**real** como fixture: hasta hoy todos los FITS de la suite estaban en ADU, que
+es exactamente por lo que esto sobrevivió.
+
+**Note (2026-10-19): the two ceilings, and the CCD equation, need to know what
+unit the plate is in.** Both are in ADU and the read-noise term is in electrons,
+but **not every plate counts in ADU**: PixInsight and Siril write 32-bit float
+masters **normalised to 0..1**, where 1.0 is the full well. On one of those the
+noise term (which does not scale with the plate) drowned a signal about 10^5
+times smaller, and two things broke at once: the comparison-star proposal
+returned **zero** stars (65 candidates of a real field refused as "SNR 0 in the
+aperture") and the magnitude error of a real star came out as **52 magnitudes**
+where the honest answer is 0.012. Worse: the two ceilings of this ADR went
+**blind**, because they compared a peak of 0.9 against a 53 000 ADU limit.
+
+The decision: `photometry.plate_adu_scale(plate, header, cfg)` says how many ADU
+one unit of the plate is worth (1.0 when it already counts in ADU; the
+detector's saturation for a normalised master, because there 1.0 **is** the full
+well; and the 16-bit full well when nobody declared the ceiling). It is computed
+**once per plate** and handed to every candidate, never per candidate: reading
+the maximum of a 2048² frame costs milliseconds. It is consumed by
+`ccd_flux_error` (which returns the sigma in the plate's units, scaling the
+signal on the way in and the result on the way out) and by `validate_on_plate`
+(the ceilings and the flux SNR; the peak one is a ratio and needs nothing).
+`tests/unit/test_plate_units.py` pins it, with a **real** normalised master as
+the fixture: until today every FITS in the suite was in ADU, which is exactly
+why this survived. It is put to work by the three paths that apply the equation:
+**the measurement of a plate** (`PlateConfig.adu_scale`, what the Measure tab
+sees), **the series** (which resolves it once per run with `_resolve_adu_scale`,
+and from there it goes down to the `PlateConfig` it builds per frame and to the
+two errors it computes itself) and **the comparison-star proposal**. Without
+that third path, the same measurement on the author's 2020 stacks stored points
+with errors of **228 to 384 magnitudes**; with it, the same point comes out at
+0.09.

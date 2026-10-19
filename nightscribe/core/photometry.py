@@ -857,7 +857,7 @@ def quality_grid(points, shape, n=4):
 
 
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
-                   dark_e_s=None, n_sky=None):
+                   dark_e_s=None, n_sky=None, scale=1.0):
     # Honest CCD equation for the net flux (Merline & Howell, Handbook of
     # CCD Astronomy), everything anchored in gain:
     #   sigma^2 (ADU^2) = flux/g + n*(1 + n/n_sky)*(sky/g + ron^2/g^2
@@ -870,11 +870,23 @@ def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
     #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in
     #        e-, exptime - exposure in s (for the dark), dark_e_s - dark
     #        current in e-/pixel/s (camera profile), n_sky - annulus
-    #        pixels (all optional but the first three)
-    # @return: sigma of the flux in ADU, or None when there is no usable
-    #          gain: the caller then falls back to the comps' scatter
+    #        pixels (all optional but the first three), scale - how many
+    #        ADU one unit of the plate is worth (plate_adu_scale); 1.0 for
+    #        a plate already in ADU, and nothing changes
+    # @return: sigma of the flux in the PLATE's own units, or None when
+    #          there is no usable gain: the caller then falls back to the
+    #          comps' scatter
+    # The equation is anchored in ADU, so a normalised plate (0..1) is scaled
+    # on the way in and the sigma scaled back on the way out: without that,
+    # the read-noise term (in electrons) is compared against a signal ~10^5
+    # times smaller and the error comes out absurd (measured on a real master:
+    # 52 magnitudes of error where the right answer was 0.012). See ADR-066.
+    k = float(scale) if scale else 1.0
     if gain is None or gain <= 0.0 or flux is None or flux < 0.0:
         return None
+    flux = float(flux) * k
+    if sky_pp is not None:
+        sky_pp = float(sky_pp) * k
     var = flux / gain
     # n_pix is the EFFECTIVE aperture area (a float when the aperture used
     # fractional pixel coverage), so it stays a float here: rounding it
@@ -890,7 +902,9 @@ def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
     if dark_e_s is not None and dark_e_s >= 0.0 and exptime and n > 0:
         var += sky_factor * n * float(dark_e_s) * float(exptime) \
             / (gain ** 2)
-    return math.sqrt(var)
+    # back to the plate's own units: the caller measures in those, and on an
+    # ADU plate k is 1.0, so this is the same number it always returned
+    return math.sqrt(var) / k
 
 
 def mag_error(flux, flux_err):
@@ -1355,6 +1369,48 @@ def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
     sat = saturation_ceiling(header, cfg_like)
     lin = linear_adu if linear_adu is not None else linearity_ceiling(cfg)
     return sat, lin
+
+
+# A plate whose unit is NOT the ADU. PixInsight and Siril write 32-bit float
+# masters NORMALISED to 0..1, where 1.0 is the full well; the CCD equation is
+# anchored in e-/ADU, so on one of those plates the read-noise term (fixed in
+# electrons) drowns a signal that is ~10^5 times smaller and every star comes
+# out as noise. Measured on a real one (AT2025qtt, 10 s, QHY42PRO): a
+# comparison candidate of G = 16 gave a flux of 0.63 against a variance of
+# 413 e^2, an SNR of 0.03 where the gate asks for 30, and the proposal
+# returned zero stars. See ADR-066.
+NORMALISED_PLATE_TOP = 1.5     # a float plate whose maximum is below this is
+                               # normalised; above it, it carries real ADU
+FULL_WELL_FALLBACK = 65535.0   # a 16-bit detector: the common case, and the
+                               # one normalised masters are written from
+
+
+def plate_adu_scale(plate, header=None, cfg=None):
+    # @args: plate - the 2D array as read from the FITS, header - its header
+    #        dict (or None), cfg - a config-like object with .get (or None)
+    # @return: how many ADU one unit of the plate is worth, so that whoever
+    #          applies the CCD equation can work in ADU. 1.0 when the plate
+    #          already counts in ADU (integer data, or a float plate carrying
+    #          real ADU values); the detector's saturation for a normalised
+    #          float plate (there 1.0 IS the full well); and the 16-bit full
+    #          well when nobody knows the ceiling.
+    #
+    # The whole array is read ONCE here (a nanmax over 2048^2 is a few ms), so
+    # this is called once per plate and the value handed to every candidate:
+    # asking it per candidate would cost seconds on a real sequence.
+    data = np.asarray(plate)
+    if data.size == 0 or not np.issubdtype(data.dtype, np.floating):
+        return 1.0
+    try:
+        top = float(np.nanmax(data))
+    except (ValueError, TypeError):
+        return 1.0
+    if not np.isfinite(top) or top > NORMALISED_PLATE_TOP:
+        return 1.0
+    sat = saturation_ceiling(header, cfg)
+    if sat is not None and float(sat) > 0.0:
+        return float(sat)
+    return FULL_WELL_FALLBACK
 
 
 def ceiling_warning(header, cfg=None, linear_adu=None, saturate=None):
@@ -2199,6 +2255,14 @@ class PlateConfig:
                                     # linearity, so every comparison star was
                                     # rejected and the run reported no
                                     # magnitude at all.
+    adu_scale: float = 1.0          # how many ADU one unit of the plate is
+                                    # worth (plate_adu_scale). The ceilings and
+                                    # the noise of the CCD equation are in ADU,
+                                    # so a plate that is NOT in ADU (a
+                                    # normalised master, 0..1) has to say so or
+                                    # both go blind. Measured on a real one: the
+                                    # same star's magnitude error came out as
+                                    # 135 where the honest answer is 0.07.
     # THE WORKING GAIN, resolved by the caller when it can (2026-10-08):
     # Ajustes -> the gain measured on the very frames -> the header. The
     # callers that walk that chain (the series engine, the Measure tab)
@@ -2418,7 +2482,16 @@ def measure_plate(image, cfg):
                 robust=cfg.robust_centroid)
         mx, my = target["x"], target["y"]
         if cfg.comp_image is not None:
-            mx, my = mx * scale, my * scale
+            # H2b (the track & stack): the target on the object's stack, the
+            # comps on the star stack. A target the plate could NOT measure
+            # comes back with a None centroid (photometry._fail), and
+            # multiplying that by the scale raised "unsupported operand
+            # type(s) for *: 'NoneType' and 'float'": the whole run died
+            # instead of reporting the reason it already carries. Seen with
+            # two real objects (ZTF10Gh on 2026-10-13, A11HPKO on 2026-10-19).
+            # The None travels on: `ok` below is False and the run says why.
+            if mx is not None and my is not None:
+                mx, my = mx * scale, my * scale
         # A MEASUREMENT IS A POSITIVE FLUX, whatever the engine says. The
         # matched filter used to report ok=True with a negative one (see
         # _matched_fail), and everything below assumes the opposite: the
@@ -2552,7 +2625,8 @@ def measure_plate(image, cfg):
                                   target["n_pix"], gain=gain, ron=ron,
                                   exptime=inst_header["exptime"],
                                   dark_e_s=cfg.site_dark,
-                                  n_sky=target.get("n_sky"))
+                                  n_sky=target.get("n_sky"),
+                                  scale=cfg.adu_scale)
         m["err_internal"] = mag_error(target["flux"], flux_err)
         m["scint"] = _plate_scintillation(cfg, m["col"], m["row"],
                                           inst_header["exptime"])

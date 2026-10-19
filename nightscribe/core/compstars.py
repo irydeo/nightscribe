@@ -476,7 +476,7 @@ def local_sky_sigma(plate, x, y, r_ap):
 
 def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
                       linear_adu=None, gain=None, ron=None, shape=None,
-                      margin_px=0.0, centroid_mode="raw"):
+                      margin_px=0.0, centroid_mode="raw", scale=1.0):
     # Measures ONE candidate on the observer's own plate and says whether
     # it is usable (quality plan, C1). The catalogue cannot know this: it
     # does not see a saturated core, a sensor that stops being linear at
@@ -499,9 +499,15 @@ def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
     #        the fourteen and cannot change a yes/no about saturation, so
     #        the cheap centring is the honest default for a validation
     #        (measured: 13.8 ms -> 4.2 ms per candidate).
+    #    scale - how many ADU one unit of the plate is worth
+    #        (photometry.plate_adu_scale). The two ceilings are in ADU and
+    #        the noise term of the CCD equation is in electrons, so a plate
+    #        that is NOT in ADU (a normalised master, 0..1) needs this or
+    #        both guards go blind and every candidate is refused as noise.
     # @return: None when the star is fine, else {"key", "es", "en"}
     if plate is None or wcs is None:
         return None
+    k = float(scale) if scale else 1.0
     try:
         x, y = wcs.sky_to_pixel(star["ra"], star["dec"])
     except Exception:
@@ -528,21 +534,28 @@ def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
                 "es": "no se puede medir en esta placa",
                 "en": "it cannot be measured on this plate"}
     peak = r.get("peak")
-    if sat_adu and peak is not None and peak >= float(sat_adu):
+    # the ceilings are in ADU: on a normalised plate the peak has to be
+    # brought there or neither guard can ever fire (measured on a real
+    # master: the saturation ceiling came back blind and a 0.9 peak passed
+    # a 53000 ADU linearity limit without a word)
+    peak_adu = peak * k if peak is not None else None
+    if sat_adu and peak_adu is not None and peak_adu >= float(sat_adu):
         return {"key": "saturated",
                 "es": "satura ({0:.0f} de {1:.0f} ADU)".format(
-                    peak, float(sat_adu)),
+                    peak_adu, float(sat_adu)),
                 "en": "saturated ({0:.0f} of {1:.0f} ADU)".format(
-                    peak, float(sat_adu))}
-    if linear_adu and peak is not None and peak >= float(linear_adu):
+                    peak_adu, float(sat_adu))}
+    if linear_adu and peak_adu is not None and peak_adu >= float(linear_adu):
         return {"key": "nonlinear",
                 "es": "por encima de la linealidad ({0:.0f} de {1:.0f} "
-                      "ADU)".format(peak, float(linear_adu)),
+                      "ADU)".format(peak_adu, float(linear_adu)),
                 "en": "above the linearity limit ({0:.0f} of {1:.0f} "
-                      "ADU)".format(peak, float(linear_adu))}
+                      "ADU)".format(peak_adu, float(linear_adu))}
     sky_pp = r.get("sky_pp")
     noise = local_sky_sigma(plate, x, y, r_ap)
     if noise and peak is not None and sky_pp is not None:
+        # a RATIO of two plate values: the scale cancels, so this one needs
+        # no correction
         snr_peak = (float(peak) - float(sky_pp)) / noise
         if snr_peak < MIN_COMP_PEAK_SNR:
             return {"key": "faint",
@@ -554,11 +567,17 @@ def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
     if flux is not None and flux > 0 and noise:
         n = max(1, int(r.get("n_pix") or 1))
         n_sky = max(1, int(r.get("n_sky") or 1))
-        var = n * noise ** 2 * (1.0 + n / float(n_sky))
+        # Everything in ADU, like ccd_flux_error (the sibling this duplicates
+        # on purpose: a validation wants the sky's own measured noise, which
+        # the measure path gets from the annulus, and unifying the two is a
+        # science change, not a units fix). Without the scale, a normalised
+        # plate fails here for every star: 65 candidates of a real field came
+        # out as "SNR 0 in the aperture".
+        var = n * (noise * k) ** 2 * (1.0 + n / float(n_sky))
         if gain and ron is not None:
-            var += float(sky_pp or 0.0) * n / float(gain)
+            var += float(sky_pp or 0.0) * k * n / float(gain)
             var += n * (float(ron) ** 2) / (float(gain) ** 2)
-        snr_flux = float(flux) / math.sqrt(max(var, 1e-9))
+        snr_flux = (float(flux) * k) / math.sqrt(max(var, 1e-9))
         if snr_flux < MIN_COMP_FLUX_SNR:
             return {"key": "faint",
                     "es": "SNR {0:.0f} en la apertura: no calibra".format(

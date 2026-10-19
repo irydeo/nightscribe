@@ -8,8 +8,9 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [0.1.1] - 2026-10-19
 
-Arregla la fotometría en las placas **normalizadas**: los masters de 32 bits en
-coma flotante con valores de 0 a 1 que exportan PixInsight y Siril por defecto.
+Arregla la fotometría en las placas **normalizadas** (los masters de 32 bits en
+coma flotante con valores de 0 a 1 que exportan PixInsight y Siril por defecto)
+y una corrida de track & stack que moría sin decir por qué.
 
 ### Corregido
 
@@ -31,6 +32,12 @@ coma flotante con valores de 0 a 1 que exportan PixInsight y Siril por defecto.
   de linealidad se comparan en ADU, así que en una placa de 0 a 1 nunca se
   disparaban: un pico de 0,9 pasaba por delante de un límite de 53 000 ADU sin
   decir nada.
+- **Un objetivo que no se puede medir ya no tumba la corrida del track &
+  stack.** La ruta que mide el objetivo en su apilado y las comparsas en otro
+  multiplicaba el centroide del objetivo por la escala de la placa, y cuando el
+  objetivo no se puede medir ese centroide es `None`: la corrida moría con un
+  `TypeError` en vez de decir el motivo, que ya llevaba dentro. Visto con dos
+  objetos reales, uno de ellos a cuarenta píxeles del borde del campo.
 
 **Si sigues en la 0.1.0 y das con esto**, la salida provisional es medir sobre
 una placa en ADU: los fotogramas individuales, o un master multiplicado por

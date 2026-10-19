@@ -869,6 +869,29 @@ def test_measure_plate_frozen_reference():
     assert res.check["delta"] == pytest.approx(0.0, abs=1e-9)
 
 
+def test_a_target_the_plate_cannot_measure_does_not_crash_the_run():
+    # H2b is the track & stack: the target on the object's stack and the comps
+    # on the star stack. That path scaled the target's centroid by the plate
+    # scale, and a target the plate could NOT measure comes back with a None
+    # centroid (photometry._fail), so the whole run died with "unsupported
+    # operand type(s) for *: 'NoneType' and 'float'" instead of reporting the
+    # reason it already carries. Seen with two real objects: ZTF10Gh
+    # (2026-10-13) and A11HPKO (2026-10-19).
+    data = _plate(80, 80, [(40, 40, 5000.0)])
+    star_stack = _plate(80, 80, [(20, 20, 3000.0)])
+    cfg = phot.PlateConfig(
+        target_xy=(500.0, 500.0),          # off the frame: nothing to measure
+        entries=[], comp_image=star_stack,
+        site_gain=2.0, site_ron=5.0, site_flat=0.007,
+        site_lat=40.0, site_lon=-3.0, site_aperture_m=0.254,
+        site_height_m=650.0)
+    res = phot.measure_plate(data, cfg)     # it must NOT raise
+    assert not res.ok
+    assert res.reason is not None, "the run has to be able to say why"
+    assert res.col is None and res.row is None
+    assert res.targets and res.targets[0]["ok"] is False
+
+
 def test_measure_plate_uses_the_resolved_gain_over_the_header():
     # The working gain the caller resolved (Ajustes -> measured on the
     # frames -> header) wins over the header's own card, because the card

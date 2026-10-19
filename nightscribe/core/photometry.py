@@ -2482,7 +2482,16 @@ def measure_plate(image, cfg):
                 robust=cfg.robust_centroid)
         mx, my = target["x"], target["y"]
         if cfg.comp_image is not None:
-            mx, my = mx * scale, my * scale
+            # H2b (the track & stack): the target on the object's stack, the
+            # comps on the star stack. A target the plate could NOT measure
+            # comes back with a None centroid (photometry._fail), and
+            # multiplying that by the scale raised "unsupported operand
+            # type(s) for *: 'NoneType' and 'float'": the whole run died
+            # instead of reporting the reason it already carries. Seen with
+            # two real objects (ZTF10Gh on 2026-10-13, A11HPKO on 2026-10-19).
+            # The None travels on: `ok` below is False and the run says why.
+            if mx is not None and my is not None:
+                mx, my = mx * scale, my * scale
         # A MEASUREMENT IS A POSITIVE FLUX, whatever the engine says. The
         # matched filter used to report ok=True with a negative one (see
         # _matched_fail), and everything below assumes the opposite: the

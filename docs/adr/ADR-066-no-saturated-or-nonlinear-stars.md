@@ -115,9 +115,16 @@ pasa a cada candidata, nunca por candidata: leer el máximo de un frame de
 2048² cuesta milisegundos. Lo consumen `ccd_flux_error` (que devuelve el sigma
 en las unidades de la placa, escalando la señal al entrar y el resultado al
 salir) y `validate_on_plate` (los techos y el SNR del flujo; el del pico es un
-cociente y no lo necesita). Lo clava `tests/unit/test_plate_units.py`, con un
-master normalizado **real** como fixture: hasta hoy todos los FITS de la suite
-estaban en ADU, que es exactamente por lo que esto sobrevivió.
+cociente y no lo necesita), y la llevan a la práctica los tres caminos que
+aplican la ecuación: **la medida de una placa** (`PlateConfig.adu_scale`, lo que
+ve la pestaña Medir), **la serie** (que la resuelve una vez por corrida con
+`_resolve_adu_scale`, y de ahí baja al `PlateConfig` que construye por frame y a
+los dos errores que calcula ella misma) y **la propuesta de comparsas**. Sin ese
+tercer camino, la misma medición sobre las pilas de 2020 del autor guardaba
+puntos con errores de **228 a 384 magnitudes**; con él, el mismo punto sale con
+0,09. Lo clava `tests/unit/test_plate_units.py`, con un master normalizado
+**real** como fixture: hasta hoy todos los FITS de la suite estaban en ADU, que
+es exactamente por lo que esto sobrevivió.
 
 **Note (2026-10-19): the two ceilings, and the CCD equation, need to know what
 unit the plate is in.** Both are in ADU and the read-noise term is in electrons,
@@ -141,4 +148,11 @@ signal on the way in and the result on the way out) and by `validate_on_plate`
 (the ceilings and the flux SNR; the peak one is a ratio and needs nothing).
 `tests/unit/test_plate_units.py` pins it, with a **real** normalised master as
 the fixture: until today every FITS in the suite was in ADU, which is exactly
-why this survived.
+why this survived. It is put to work by the three paths that apply the equation:
+**the measurement of a plate** (`PlateConfig.adu_scale`, what the Measure tab
+sees), **the series** (which resolves it once per run with `_resolve_adu_scale`,
+and from there it goes down to the `PlateConfig` it builds per frame and to the
+two errors it computes itself) and **the comparison-star proposal**. Without
+that third path, the same measurement on the author's 2020 stacks stored points
+with errors of **228 to 384 magnitudes**; with it, the same point comes out at
+0.09.

@@ -23,7 +23,10 @@ coma flotante con valores de 0 a 1 que exportan PixInsight y Siril por defecto.
   después.
 - **La barra de error vuelve a ser la correcta en esas placas.** El mismo
   desajuste hacía que el error en magnitud de una estrella real saliera de **52
-  magnitudes** donde la respuesta honesta es 0,012.
+  magnitudes** donde la respuesta honesta es 0,012. Y al medir una **serie**
+  sobre las pilas de 2020 de un transitorio, los puntos guardados llevaban
+  errores de **228 a 384 magnitudes**: el mismo punto, con el arreglo, sale con
+  0,09.
 - **Los dos techos vuelven a vigilar en esas placas.** La saturación y el límite
   de linealidad se comparan en ADU, así que en una placa de 0 a 1 nunca se
   disparaban: un pico de 0,9 pasaba por delante de un límite de 53 000 ADU sin

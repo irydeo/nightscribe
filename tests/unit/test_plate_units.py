@@ -195,6 +195,84 @@ def test_plate_adu_scale_knows_adu_from_normalised():
     assert photometry.plate_adu_scale(np.zeros(0, dtype=np.float32)) == 1.0
 
 
+TARGET_SKY = (292.77505, 54.10103)     # the object, on the fixture's WCS
+
+
+def _sequence(plate, field):
+    # @return: the sequence the app itself proposes on this plate, in the
+    #          shape measure_plate and the series engine want
+    _header, data, wcs = plate
+    res = compstars.propose_comps(
+        field, TARGET_MAG, check=True,
+        validator=_validator(data, wcs, photometry.plate_adu_scale(data)))
+    return res["comps"] + ([res["check"]] if res["check"] else [])
+
+
+def test_the_plate_measure_error_does_not_depend_on_the_scale(plate, field):
+    # The path the Measure tab walks: the single-plate recipe, whose
+    # err_internal comes from the CCD equation. On the author's own AT2020sum
+    # stacks this reported 228 to 384 magnitudes.
+    _header, data, wcs = plate
+    entries = _sequence(plate, field)
+    assert len(entries) >= 7, "no sequence to measure with"
+    x, y = wcs.sky_to_pixel(*TARGET_SKY)
+    scale = photometry.plate_adu_scale(data)
+    got = {}
+    for label, factor, adu in (("normalised", 1.0, scale),
+                               ("adu", scale, 1.0)):
+        cfg = photometry.PlateConfig(
+            target_xy=(x, y), entries=entries, wcs=wcs, band="G",
+            radii=None, fwhm=None, matched=False, site_gain=GAIN,
+            site_ron=RON, site_flat=0.007, site_lat=40.0, site_lon=-3.0,
+            site_aperture_m=0.254, site_height_m=650.0, adu_scale=adu)
+        res = photometry.measure_plate(data * factor, cfg)
+        assert res.ok, (label, res.reason)
+        got[label] = res
+    assert got["normalised"].mag == pytest.approx(got["adu"].mag, abs=1e-6)
+    assert got["normalised"].err_internal == pytest.approx(
+        got["adu"].err_internal, rel=1e-6)
+    assert got["normalised"].err_internal < 0.5, (
+        f"an error of {got['normalised'].err_internal} magnitudes")
+
+
+def test_the_series_error_does_not_depend_on_the_plate_scale(tmp_path, plate,
+                                                             field):
+    # THE PATH THAT REPORTED 228 TO 384 MAGNITUDES in a real project. The
+    # engine resolves the plate's own unit from the first frame, once, and
+    # every error of the run is computed with it.
+    from astropy.io import fits as pyfits
+    from nightscribe.core import series_measure
+
+    header, data, wcs = plate
+    entries = _sequence(plate, field)
+    assert len(entries) >= 7, "no sequence to measure with"
+    x, y = wcs.sky_to_pixel(*TARGET_SKY)
+    scale = photometry.plate_adu_scale(data)
+    # the app's reader hands the header back as a plain dict; writing needs a
+    # real astropy Header, so it is read again for that
+    with pyfits.open(PLATE) as hdul:
+        writable_header = hdul[0].header.copy()
+    got = {}
+    for label, factor in (("normalised", 1.0), ("adu", scale)):
+        path = tmp_path / f"{label}.fit"
+        pyfits.writeto(path, (data * factor).astype("float32"),
+                       writable_header, overwrite=True)
+        cfg = series_measure.SeriesConfig(
+            wcs=wcs, target_xy=(x, y), comp_set=tuple(entries), band="G",
+            site_gain=GAIN, site_ron=RON, site_flat=0.007, site_lat=40.0,
+            site_lon=-3.0, site_aperture_m=0.254, site_height_m=650.0,
+            matched=False)
+        got[label] = series_measure.measure_series([str(path)], cfg)
+    normal = got["normalised"].points
+    adu = got["adu"].points
+    assert len(normal) == len(adu) == 1, (got["normalised"].status,
+                                          got["adu"].status)
+    assert normal[0].mag == pytest.approx(adu[0].mag, abs=1e-3)
+    assert normal[0].err == pytest.approx(adu[0].err, rel=1e-3)
+    assert normal[0].err is not None and normal[0].err < 0.5, (
+        f"an error of {normal[0].err} magnitudes on a real star")
+
+
 def test_the_ceilings_fire_on_a_normalised_plate():
     # The other symptom of the same missing scale: a peak of 0.9 sailed past
     # a 53000 ADU linearity limit because 0.9 < 53000. In ADU it is 58981.

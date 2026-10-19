@@ -144,6 +144,12 @@ class SeriesConfig:
     site_height_m: float = 0.0
     site_linear: float = None       # camera profile linearity limit (ADU)
     site_dark: float = None         # camera profile dark current (e-/px/s)
+    site_adu_scale: float = 1.0     # how many ADU one unit of the plate is
+                                    # worth (photometry.plate_adu_scale):
+                                    # resolved once per run from the first
+                                    # frame, because a normalised master
+                                    # (0..1) is not in ADU and the CCD
+                                    # equation is. See ADR-066.
     group_n: int = 1
     auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
     seeing_aperture: bool = False   # size the aperture from each frame's
@@ -639,6 +645,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         site_height_m=cfg.site_height_m,
         linear_adu=cfg.site_linear,
         site_dark=cfg.site_dark,
+        adu_scale=cfg.site_adu_scale,
         require_catalog=(cfg.zp_mode == "catalog"))
     res = photometry.measure_plate(data, pcfg)
     # the seeing is measured here, on the very frame the recipe ran on
@@ -695,7 +702,8 @@ def _frame_flux(frame, cfg):
     err = photometry.ccd_flux_error(
         target.get("flux"), target.get("sky_pp"), target.get("n_pix"),
         gain=res.gain, ron=cfg.site_ron, exptime=frame.get("exptime"),
-        dark_e_s=cfg.site_dark, n_sky=target.get("n_sky"))
+        dark_e_s=cfg.site_dark, n_sky=target.get("n_sky"),
+        scale=cfg.site_adu_scale)
     return target.get("flux"), err
 
 
@@ -713,7 +721,7 @@ def _group_comp(group, star, cfg):
                         r["flux"], r.get("sky_pp"), r.get("n_pix"),
                         gain=f["res"].gain, ron=cfg.site_ron,
                         exptime=f.get("exptime"), dark_e_s=cfg.site_dark,
-                        n_sky=r.get("n_sky")))
+                        n_sky=r.get("n_sky"), scale=cfg.site_adu_scale))
                 value = photometry.band_of(star, cfg.band
                                            or cfg.fallback_band)[0]
                 if value is not None:
@@ -1470,6 +1478,36 @@ def _resolve_gain(cfg, paths):
     return cfg, report
 
 
+def _resolve_adu_scale(cfg, paths):
+    # The plate's own unit, resolved ONCE per run (ADR-066). The CCD equation
+    # is anchored in ADU and so are the ceilings, but not every plate counts
+    # in ADU: PixInsight and Siril write 32-bit float masters normalised to
+    # 0..1, where 1.0 is the full well. Without this, the read-noise term (in
+    # electrons) is compared against a signal ~10^5 times smaller and every
+    # error of the run comes out in the hundreds of magnitudes: measured on
+    # the author's own AT2020sum stacks, 135 magnitudes where the honest
+    # answer is 0.07.
+    #
+    # One frame is read for it, the same read the gain resolution already
+    # pays for, and nothing against the hundreds the series is about to make.
+    # @args: cfg - the SeriesConfig, paths - the series in observing order
+    # @return: cfg with site_adu_scale resolved
+    if cfg.site_adu_scale and cfg.site_adu_scale != 1.0:
+        return cfg                       # the caller already said it
+    for path in list(paths)[:2]:
+        try:
+            header, data = fits_io.read_fits(path)
+        except fits_io.FitsError:
+            continue
+        # the camera's own ceiling wins over the 16-bit fallback, and it
+        # travels as the cfg-like dict saturation_ceiling() understands
+        ceiling = ({"ccd_saturate": cfg.site_saturate}
+                   if cfg.site_saturate else None)
+        return replace(cfg, site_adu_scale=photometry.plate_adu_scale(
+            data, header, ceiling))
+    return cfg
+
+
 def seeing_messages(report, aper=None, lang="es"):
     # The focus excursions and the seeing-scaled aperture in plain
     # language (quality plan, B1/B2): what was flagged and what the
@@ -1719,6 +1757,7 @@ def _measure_frames(paths, cfg, targets, progress=None, cancel=None):
     paths = list(paths)
     total = len(paths)
     cfg, gain_report = _resolve_gain(cfg, paths)
+    cfg = _resolve_adu_scale(cfg, paths)
     apertures = {}
     if cfg.auto_aperture and cfg.radii is None:
         apertures = sweep_aperture(paths, cfg)

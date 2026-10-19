@@ -22,7 +22,9 @@ from 0 to 1 that PixInsight and Siril write by default.
   0 comparisons before, 8 plus the check star after.
 - **The error bar is the right one again on those plates.** The same mismatch
   made the magnitude error of a real star come out as **52 magnitudes** where
-  the honest answer is 0.012.
+  the honest answer is 0.012. And when measuring a **series** on a 2020
+  transient's stacks, the stored points carried errors of **228 to 384
+  magnitudes**: the same point, with the fix, comes out at 0.09.
 - **Both ceilings guard again on those plates.** Saturation and the linearity
   limit are compared in ADU, so on a 0..1 plate they never fired: a peak of 0.9
   sailed past a 53 000 ADU limit without a word.

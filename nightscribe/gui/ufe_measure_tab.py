@@ -1540,6 +1540,11 @@ class UfeMeasureTab(QWidget):
             site_height_m=float(config.get("height", 0) or 0.0),
             linear_adu=config.get("cam_linearity_adu"),
             site_dark=config.get("cam_dark_current_e_s"),
+            # the plate's own unit, from the very image being measured: a
+            # normalised master (0..1) is not in ADU and the error would come
+            # out in the hundreds of magnitudes (ADR-066)
+            adu_scale=photometry.plate_adu_scale(image, self._state.header,
+                                                  config),
             comp_image=comp_image, comp_scale=comp_scale)
         res = photometry.measure_plate(image, cfg)
         if not res.ok:

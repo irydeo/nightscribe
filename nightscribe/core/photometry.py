@@ -2255,6 +2255,14 @@ class PlateConfig:
                                     # linearity, so every comparison star was
                                     # rejected and the run reported no
                                     # magnitude at all.
+    adu_scale: float = 1.0          # how many ADU one unit of the plate is
+                                    # worth (plate_adu_scale). The ceilings and
+                                    # the noise of the CCD equation are in ADU,
+                                    # so a plate that is NOT in ADU (a
+                                    # normalised master, 0..1) has to say so or
+                                    # both go blind. Measured on a real one: the
+                                    # same star's magnitude error came out as
+                                    # 135 where the honest answer is 0.07.
     # THE WORKING GAIN, resolved by the caller when it can (2026-10-08):
     # Ajustes -> the gain measured on the very frames -> the header. The
     # callers that walk that chain (the series engine, the Measure tab)
@@ -2608,7 +2616,8 @@ def measure_plate(image, cfg):
                                   target["n_pix"], gain=gain, ron=ron,
                                   exptime=inst_header["exptime"],
                                   dark_e_s=cfg.site_dark,
-                                  n_sky=target.get("n_sky"))
+                                  n_sky=target.get("n_sky"),
+                                  scale=cfg.adu_scale)
         m["err_internal"] = mag_error(target["flux"], flux_err)
         m["scint"] = _plate_scintillation(cfg, m["col"], m["row"],
                                           inst_header["exptime"])

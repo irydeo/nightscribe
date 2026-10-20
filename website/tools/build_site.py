@@ -90,6 +90,7 @@ def _page_name(stem, lang):
 NAV_SHORT = {
     "en": {"What is NightScribe?": "What it is",
            "Your first five minutes": "First five minutes",
+           "Video tutorials": "Videos",
            "A whole night (and the weeks after)": "A whole night",
            "Where the data comes from": "Data sources",
            "Optional integrations": "Integrations",
@@ -97,6 +98,7 @@ NAV_SHORT = {
            "Quickstart and CLI": "Quickstart & CLI"},
     "es": {"¿Qué es NightScribe?": "Qué es",
            "Tus primeros cinco minutos": "Primeros cinco minutos",
+           "Tutoriales en vídeo": "Vídeos",
            "Una noche completa (y las semanas siguientes)": "Una noche completa",
            "De dónde salen los datos": "Fuentes de datos",
            "Integraciones opcionales": "Integraciones",
@@ -121,9 +123,9 @@ KINDS_SECTION = ("What you can follow", "Qué puedes seguir")
 # has to exist in the README, and the site's test says so.
 NAV_MAIN = {
     "en": ("What is NightScribe?", "What you can follow", "What you need",
-           "Your first five minutes"),
+           "Your first five minutes", "Video tutorials"),
     "es": ("¿Qué es NightScribe?", "Qué puedes seguir", "Qué necesitas",
-           "Tus primeros cinco minutos"),
+           "Tus primeros cinco minutos", "Tutoriales en vídeo"),
 }
 
 # The screenshots the site shows. They are REAL captures of the application,

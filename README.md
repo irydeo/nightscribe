@@ -115,6 +115,13 @@ python3 -m venv --system-site-packages .venv
 .venv/bin/python -m nightscribe gui
 ```
 
+## Video tutorials
+
+The [tutorial playlist on YouTube](https://www.youtube.com/playlist?list=PLASv2NZqn7zU)
+collects the walkthroughs of the project. The narration is in Spanish and the
+interface in English; the [user guide](docs/user/README.md) is the written
+reference.
+
 ## A whole night (and the weeks after)
 
 The guide walks

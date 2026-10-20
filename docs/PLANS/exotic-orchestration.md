@@ -397,6 +397,100 @@ la GUI queda sin `unfinished`. El plan de orquestación queda completo
 
 ---
 
+## 9 bis. Fase H · El entorno deja de romperse y deja de mentir (2026-10-20)
+
+**El caso reportado**: el observador tenía un entorno EXOTIC funcionando (corrió
+EXOTIC el 2026-09-30 y el 2026-10-01 sobre HAT-P-32 b, con resultado) y un día
+abrió Ajustes y el campo del intérprete apuntaba a un venv que ya no existía. La
+app decía «no se encontró un intérprete de Python ≤3.10» con un `python3.11`
+instalado en la máquina, y el observador leyó, con razón, que se había perdido
+una configuración.
+
+**Diagnóstico**: `exotic_env.prepare` hacía `shutil.rmtree(install_dir)` **antes**
+de construir, y `detect_python` devolvía `None` en cuanto la ruta configurada no
+existía (no buscaba otra). La combinación es destructiva: la app ofrece como
+intérprete base el venv que ella misma construyó, el borrado se lleva por delante
+ese intérprete a mitad de la construcción, y el siguiente comando ya no puede ni
+ejecutarse. Cualquier fallo posterior (sin red, sin disco, cancelación) dejaba
+además el mismo hueco. Y `detect_python` remataba el cuadro diciendo que no había
+Python.
+
+**La prueba que decide qué Python lleva el entorno (medida 2026-10-20)**: venv
+con `python3.11 -m venv --without-pip` (la rareza de `ensurepip` de este sistema,
+el mismo camino que usa la app), pip arrancado por el intérprete base y
+`pip install exotic`: **rc=0**, queda **EXOTIC 4.3.1** importable en **3.11.2**
+con todos sus pines (numpy 1.26.4, astropy 6.1.7, numba 0.59.1, scipy 1.14.1,
+matplotlib 3.9.4, pandas 2.2.3, photutils 2.0.2, ultranest 3.6.5) y **1,2 GB** de
+entorno. El 3.12 no se pudo probar en esta máquina (no está instalado), pero
+EXOTIC declara `requires_python >= 3.10` y toda su pila tiene ruedas para 3.12;
+el 3.13 queda fuera porque numpy 1.26 no tiene ruedas para él.
+
+**Decisión**:
+
+1. **La regla de versión es 3.10 a 3.12** (`_MIN_VERSION`/`_MAX_VERSION`,
+   `_CANDIDATES = ("python3.11", "python3.12", "python3.10")`, de la verificada a
+   la heredada, con 3.10 al final porque llegó a su fin de vida en octubre de
+   2026). Se caen 3.9 y 3.8: EXOTIC 4.x no las soporta y `pip` instalaría una
+   versión vieja de EXOTIC sin avisar.
+2. **`prepare` construye al lado y hace el cambio al final** (carpeta hermana
+   `<dir>.new` y renombrado atómico, con vuelta atrás si el segundo renombrado
+   falla): un fallo o una cancelación dejan intacto el entorno que ya había. Y
+   **rechaza** un intérprete base que viva dentro de la carpeta que va a
+   sustituir, con el motivo escrito.
+3. **`detect_python` busca otro cuando el configurado no está** y
+   `configured_problem` dice cuál de los dos casos es («no está» o «no sirve»),
+   para que la app no vuelva a decir «no hay Python» cuando sí lo hay.
+4. **El resultado de `prepare` se escribe en el registro**, siempre (antes un
+   fallo destructivo podía no dejar rastro).
+
+**El entorno listo para descomprimir**: la vía principal para el observador es un
+**zip por plataforma** (`linux-x86_64` y `windows-x64`, porque un entorno Python
+lleva binarios compilados y no se puede compartir entre sistemas), con su propio
+Python dentro y EXOTIC ya instalado. Se descarga, se descomprime donde se quiera y
+se apunta el campo del intérprete a su Python. **La app no descarga nada**: no hay
+worker, ni URL, ni suma de comprobación en NightScribe; el cambio en la app es la
+regla de versión, los arreglos de arriba y el texto de ayuda. La vía «Preparar
+entorno» se queda como alternativa para quien prefiera construirlo con su Python.
+
+**Y no se reconstruye en cada release.** El entorno solo cambia cuando cambia
+EXOTIC o la versión de Python, así que publicarlo dentro de cada release sería
+trabajo tirado y, peor, un agujero de reproducibilidad: dos observadores que
+descargaran la misma versión de la app con meses de diferencia tendrían dentro
+numpy distinto. Por eso vive en una **release propia con el tag fijo `exotic-env`**
+(la URL estable que enlazan la guía y la ayuda) y se reconstruye solo cuando cambia
+su fichero de versiones fijadas o cuando un mantenedor lanza el workflow a mano.
+La release de la app se queda con sus cuatro artefactos de siempre.
+
+**Medido (2026-10-20, simulación completa del job de Linux en esta máquina)**:
+
+- El CPython portátil de python-build-standalone (`install_only`, tag `20261009`,
+  3.11.17, 49 MB) se descomprime con `--strip-components=1` y deja el intérprete en
+  `exotic-env/bin/python`; trae pip 26.2.1. Es `install_only` y **no** la variante
+  `_stripped` a propósito: la rueda de `ultranest` hay que compilarla y para eso
+  hacen falta las cabeceras y la biblioteca estática que `_stripped` recorta.
+- **`ultranest` no tiene rueda y se compila en el sitio** (extensiones Cython), y el
+  CPython portátil **recuerda el compilador con el que se construyó** (`clang`, el
+  de la máquina que lo generó): en una máquina sin clang la instalación muere con
+  `[Errno 2] No such file or directory: 'clang'`. El workflow exporta `CC` con el
+  compilador del runner (`gcc` en Linux; en Windows setuptools encuentra MSVC solo).
+- El zip sale de **374,7 MB** con el árbol podado (230,6 MB liberados: cachés de
+  bytecode, que además llevan la fecha del build dentro y romperían la
+  reproducibilidad, y la suite de tests de la biblioteca estándar), se descomprime
+  en **`exotic-env/`** con los permisos de ejecución intactos, y **su intérprete
+  importa EXOTIC 4.3.1** sobre 3.11.17. Descomprimido ocupa 1,1 GB.
+- `pack.py` fija la fecha de todas las entradas del zip: dos pasadas sobre el mismo
+  árbol dan **el mismo sha256** (comprobado), así que el número que publica la
+  release significa algo.
+- El lock de Linux, instalado desde cero en un venv limpio, da EXOTIC 4.3.1 con
+  **exactamente** las versiones fijadas, sin nada de más ni de menos.
+
+**Lo que no se hace**: empaquetar el entorno dentro del instalador (pesa ~1,2 GB
+descomprimido y no todo el mundo reduce tránsitos), ni un descargador dentro de
+la app, ni tocar EXOTIC.
+
+---
+
+
 ## 10. Riesgos y mitigaciones
 
 - **EXOTIC interactivo**: es el mayor riesgo. Mitigación: fase 0 lo fija; si no
@@ -409,8 +503,8 @@ la GUI queda sin `unfinished`. El plan de orquestación queda completo
 - **Licencia**: no se copia código; se ejecuta EXOTIC y se lee su salida.
 - **Formato de salida de EXOTIC cambiante**: parser tolerante + test con fixture
   y `importorskip`/skip si no está.
-- **Windows sin python3.10**: la orquestación es opcional; sin entorno, el flujo
-  numpy sigue.
+- **Windows sin Python 3.10 a 3.12**: la orquestación es opcional; sin entorno, el
+  flujo numpy sigue, y el entorno listo para descomprimir (fase H) cubre el caso.
 
 ---
 

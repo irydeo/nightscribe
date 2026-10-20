@@ -170,6 +170,24 @@ Settings), runs EXOTIC in its own environment if you configured it, imports
 its curve and parameters, and exports the 3-column file for **ExoClock**
 with the `ExoClock_info.txt` filled in.
 
+Getting that environment is the one thing that is not automatic. EXOTIC
+needs a Python of its own (3.10 to 3.12, never the one the app runs on) and
+a heavy stack, and it must live outside NightScribe. The easy path: the
+project publishes the environment **ready to unzip** in its own release,
+[`exotic-env`](https://github.com/irydeo/nightscribe/releases/tag/exotic-env),
+one zip per platform with its own Python inside, so you download it, unzip it
+anywhere and point **Settings → Measurement → Advanced → EXOTIC** at the
+interpreter inside. The other path is **Prepare environment** in the same
+place, which builds one for you with the Python you already have (it needs
+network the first time and about a gigabyte). Both end in the same place, and
+neither touches the rest of the app.
+
+> **Why so much fuss?** Because EXOTIC pins its own versions of numpy, astropy
+> and numba, and those pins are the physics: they are what makes its fit
+> reproducible. Sharing them with the app would break one or the other, so
+> the environment is separate and disposable: if it gets damaged, you build
+> it again and nothing else is lost.
+
 > **Why ExoClock?** Because ESA's Ariel mission needs to know *when* each
 > planet transits years from now, and transits drift. Your curve, even from
 > a 20 cm telescope, updates the ephemeris of a planet a space telescope

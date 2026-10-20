@@ -6,6 +6,49 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-20
+
+Fixes the one thing that could take a working EXOTIC environment away, and stops
+the app from claiming there is no Python when there is.
+
+### Fixed
+
+- **"Prepare environment" can no longer destroy the environment you already had.**
+  It used to wipe the target folder *before* building, so any failure after that
+  (no network, no disk space, a cancel) left nothing behind; and one case did it
+  every single time: the app offers the environment it already built as the base
+  interpreter, the wipe took that interpreter away halfway through the build, and
+  the next command could not even run. It now builds in a sibling folder and swaps
+  it in only once the new environment works, so a failed rebuild is harmless.
+- **A base interpreter that lives inside the environment folder is refused**, with
+  the reason written out, instead of being deleted mid-build.
+- **The app no longer says "no Python found" when the configured interpreter is
+  gone.** That message, on a machine with a perfectly good Python installed, is
+  what made a deleted environment look like a lost configuration. It now tells the
+  two cases apart ("the interpreter you pointed at is not there any more" and "it
+  is not one EXOTIC can use") and goes looking for another interpreter on its own.
+- The outcome of "Prepare environment" always reaches the log, so a failure leaves
+  a trace instead of a silence.
+
+### Added
+
+- **The EXOTIC environment is published ready to unzip.** It is now built and
+  published by the project, in its own release (tag `exotic-env`), as one zip per
+  platform with a portable CPython 3.11 and EXOTIC 4.3.1 already installed inside:
+  unzip it anywhere and point Settings at the interpreter it carries. Nothing to
+  install, no Python to hunt for. The versions inside are pinned in a lock file
+  committed in the repository, so the same zip is always the same stack, and the
+  release is only rebuilt when that lock changes.
+
+### Changed
+
+- **EXOTIC accepts Python 3.10 to 3.12**, not only 3.10 and older. 3.10 reached end
+  of life in October 2026, and refusing 3.11 and 3.12 forced people to hunt for an
+  interpreter the app could already have used. 3.11 is verified end to end: a full
+  `pip install exotic` on 3.11.2 leaves EXOTIC 4.3.1 importable with every version
+  it pins (numpy 1.26.4, astropy 6.1.7, numba 0.59.1). 3.13 stays out, because
+  numpy 1.26 has no wheels for it.
+
 ## [0.1.1] - 2026-10-19
 
 Fixes photometry on **normalised** plates (the 32-bit float masters with values

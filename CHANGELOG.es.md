@@ -6,6 +6,50 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+## [0.1.2] - 2026-10-20
+
+Arregla lo único que podía llevarse por delante un entorno EXOTIC que funcionaba,
+y deja de decir que no hay Python cuando sí lo hay.
+
+### Corregido
+
+- **«Preparar entorno» ya no puede destruir el entorno que ya tenías.** Borraba la
+  carpeta de destino *antes* de construir, así que cualquier fallo posterior (sin
+  red, sin disco, una cancelación) no dejaba nada; y un caso lo hacía **siempre**:
+  la app ofrece como intérprete base el entorno que ella misma construyó, el
+  borrado se llevaba ese intérprete a mitad de la construcción y el siguiente
+  comando ya no podía ni ejecutarse. Ahora construye en una carpeta hermana y solo
+  la pone en su sitio cuando el entorno nuevo funciona, así que una reconstrucción
+  fallida es inofensiva.
+- **Un intérprete base que vive dentro de la carpeta del entorno se rechaza**, con
+  el motivo escrito, en vez de borrarse a mitad de la construcción.
+- **La app ya no dice «no se ha encontrado Python» cuando el intérprete
+  configurado no está.** Ese mensaje, con un Python perfectamente instalado en la
+  máquina, es lo que hacía que un entorno borrado pareciera una configuración
+  perdida. Ahora distingue los dos casos («el intérprete que apuntaste ya no está»
+  y «no sirve para EXOTIC») y busca otro intérprete por su cuenta.
+- El resultado de «Preparar entorno» llega siempre al registro, así que un fallo
+  deja rastro en vez de silencio.
+
+### Añadido
+
+- **El entorno de EXOTIC se publica listo para descomprimir.** Ahora lo construye y
+  lo publica el proyecto, en su propia release (tag `exotic-env`), como un zip por
+  plataforma con un CPython portátil 3.11 y EXOTIC 4.3.1 ya instalado dentro: lo
+  descomprimes donde quieras y apuntas Ajustes al intérprete que lleva. Nada que
+  instalar, ningún Python que buscar. Las versiones de dentro están fijadas en un
+  fichero de bloqueo comprometido en el repositorio, así que el mismo zip es
+  siempre la misma pila, y la release solo se reconstruye cuando cambia ese fichero.
+
+### Cambiado
+
+- **EXOTIC acepta Python 3.10 a 3.12**, no solo 3.10 y anteriores. El 3.10 llegó a
+  su fin de vida en octubre de 2026, y rechazar el 3.11 y el 3.12 obligaba a buscar
+  un intérprete que la app ya podía haber usado. El 3.11 está verificado de punta a
+  punta: un `pip install exotic` completo sobre 3.11.2 deja EXOTIC 4.3.1 importable
+  con todas las versiones que fija (numpy 1.26.4, astropy 6.1.7, numba 0.59.1). El
+  3.13 queda fuera, porque numpy 1.26 no tiene ruedas para él.
+
 ## [0.1.1] - 2026-10-19
 
 Arregla la fotometría en las placas **normalizadas** (los masters de 32 bits en

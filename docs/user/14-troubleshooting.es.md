@@ -67,10 +67,26 @@ de astrometría (07) recorre todo el camino.
 ## EXOTIC no está configurado
 
 La reducción de tránsitos corre en **EXOTIC**, un programa externo que
-necesita Python 3.10 o anterior. El bloque de tránsito del editor dice si
-encontró uno; sin él aún puedes exportar el handoff (`inits.json`), ejecutar
-EXOTIC tú mismo e importar su salida de vuelta. No se pierde nada: el handoff
-es siempre tuyo.
+necesita un Python propio (3.10 a 3.12). El bloque de tránsito del editor
+dice si encontró uno; sin él aún puedes exportar el handoff (`inits.json`),
+ejecutar EXOTIC tú mismo e importar su salida de vuelta. No se pierde nada:
+el handoff es siempre tuyo.
+
+La salida más corta es el entorno **ya preparado para descomprimir** que el
+proyecto publica en su propia release,
+[`exotic-env`](https://github.com/irydeo/nightscribe/releases/tag/exotic-env)
+(capítulo 06): descarga el zip de tu plataforma, descomprímelo donde quieras y
+apunta **Configuración → Medida → Avanzado → EXOTIC** al intérprete que lleva
+dentro.
+
+Dos cosas que ahorran tiempo cuando algo va mal:
+
+- Si la app dice que el intérprete que apuntaste **ya no está**, ese campo
+  guardaba la ruta de algo que se borró o que está en un disco sin montar.
+  Vacíalo: la app busca otro y te dice cuál encontró.
+- El intérprete tiene que estar **fuera** de la carpeta del entorno. Apuntar
+  a un Python que vive dentro se rechaza, con el motivo: reconstruir el
+  entorno borraría el intérprete a mitad de la construcción.
 
 ## La app no arranca
 

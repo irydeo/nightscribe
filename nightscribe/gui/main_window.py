@@ -2280,10 +2280,11 @@ class MainWindow(QMainWindow):
                 self.tr("The download failed:") + f" {message}")
 
     def _pick_exotic_python(self, dlg):
-        # Browse for the Python <=3.10 interpreter that will host EXOTIC.
+        # Browse for the Python interpreter that will host EXOTIC (3.10 to
+        # 3.12, or the one inside the ready-made environment).
         from PySide6.QtWidgets import QFileDialog
         path, _sel = QFileDialog.getOpenFileName(
-            dlg, self.tr("Select the Python 3.10 interpreter"), "",
+            dlg, self.tr("Select the Python interpreter (3.10 to 3.12)"), "",
             self.tr("Executables (*)"))
         if path:
             dlg.edt_exotic_python.setText(path)
@@ -2574,9 +2575,28 @@ class MainWindow(QMainWindow):
         from .workers import PrepareExoticWorker
         python = self._exotic_python(dlg)
         if not python:
-            QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
-                "No Python 3.10 interpreter found: install it or point to "
-                "one above."))
+            # WHICH failure it is, because they are different sentences: a
+            # configured interpreter that is gone is not "there is no Python
+            # on this machine" (the app used to say that with a working 3.11 on
+            # the PATH, and it read as a lost configuration).
+            problem = exotic_env.configured_problem(
+                dlg.edt_exotic_python.text().strip())
+            if problem == "missing":
+                msg = self.tr(
+                    "The interpreter you pointed at is not there any more. "
+                    "Point at another one, clear the field so the app finds "
+                    "one, or unzip the ready-made environment and point at "
+                    "that.")
+            elif problem == "version":
+                msg = self.tr(
+                    "The interpreter you pointed at is not one EXOTIC can use: "
+                    "it needs Python 3.10 to 3.12.")
+            else:
+                msg = self.tr(
+                    "No Python 3.10 to 3.12 interpreter found: install one, "
+                    "unzip the ready-made environment and point at it, or "
+                    "point to one above.")
+            QMessageBox.warning(dlg, self.tr("EXOTIC"), msg)
             return
         install = dlg.edt_exotic_install.text().strip() or str(
             paths.data_dir() / "exotic-venv")
@@ -2603,6 +2623,16 @@ class MainWindow(QMainWindow):
         from ..core import exotic_env
         self._exotic_worker = None
         self.statusBar().clearMessage()
+        # THE OUTCOME IS LOGGED, always. A build that fails leaves the previous
+        # environment alone (prepare builds aside and swaps), but a destructive
+        # failure with no trace in the log is what made a lost environment look
+        # like a lost configuration (2026-10-20).
+        if ok:
+            logger.info("EXOTIC environment ready at %s", install)
+        else:
+            tail = [ln for ln in (log or "").splitlines() if ln.strip()]
+            logger.warning("could not prepare the EXOTIC environment at %s: %s",
+                           install, tail[-1] if tail else "(no output)")
         if not Shiboken.isValid(dlg):
             lines = [ln for ln in (log or "").splitlines() if ln.strip()]
             self.statusBar().showMessage(
@@ -9180,7 +9210,7 @@ class MainWindow(QMainWindow):
         # @args: layout - the Analysis column, pid - the project id
         layout.addWidget(QLabel(self.tr(
             "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
-            "Python ≤3.10 environment.")))
+            "Python 3.10 to 3.12 environment.")))
         btn_reduce = QPushButton(
             self.tr("Open the visit in the editor (reduce with EXOTIC)…"))
         btn_reduce.setToolTip(self.tr(
@@ -10290,8 +10320,8 @@ class MainWindow(QMainWindow):
         project.add_file_once(db, pid, path, "exotic_inits")
         self._populate_project_files(pid)
         self.statusBar().showMessage(
-            self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
-                    "environment"), 10000)
+            self.tr("inits.json written: run EXOTIC in your Python 3.10 to "
+                    "3.12 environment"), 10000)
 
     def _transit_reduce_exotic(self, pid=None):
         # Gather the planet data (worker), then run the orchestration.
@@ -10372,8 +10402,8 @@ class MainWindow(QMainWindow):
                 "the connection and retry.").format(
                     (p or {}).get("object_name") or ""))
             return
-        # the interpreter that has EXOTIC: the user's own Python 3.10 (the
-        # cleanest on Windows) or the venv the app prepared
+        # the interpreter that has EXOTIC: the venv the app prepared, the one
+        # inside the ready-made environment, or the user's own Python 3.10-3.12
         from .workers import ProbeExoticWorker
         QApplication.setOverrideCursor(Qt.WaitCursor)
         self.statusBar().showMessage(
@@ -10398,9 +10428,10 @@ class MainWindow(QMainWindow):
         python = rep.get("python") or ""
         if not python:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "No Python 3.10 found. Install it (python.org, ticking the "
-                "py launcher) and run «pip install exotic» in it, or use "
-                "«Prepare environment» in Settings → EXOTIC."))
+                "No Python 3.10 to 3.12 found. Install one (python.org, "
+                "ticking the py launcher) and run «pip install exotic» in it, "
+                "unzip the ready-made environment and point at it in "
+                "Settings, or use «Prepare environment» there."))
             return
         if not rep.get("ok"):
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(

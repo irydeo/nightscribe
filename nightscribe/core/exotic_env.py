@@ -13,7 +13,7 @@
 
 """Prepare and probe the external EXOTIC environment (plan phase A).
 
-EXOTIC needs Python <= 3.10 and its own heavy stack (astropy, scipy,
+EXOTIC needs Python >= 3.10 and its own heavy stack (astropy, scipy,
 pylightcurve, ultranest, astroalign, LDTk...), which is why it runs as an
 EXTERNAL tool and never inside the app (ADR-004). This module finds a
 suitable interpreter, checks whether EXOTIC imports, and builds a private
@@ -34,9 +34,29 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# EXOTIC only supports Python <= 3.10.
-_CANDIDATES = ("python3.10", "python3.9", "python3.8")
-_PY_VERSIONS = ("3.10", "3.9", "3.8")
+# WHICH PYTHONS EXOTIC CAN LIVE IN. The rule used to be "3.10 or older", from
+# EXOTIC 3.x, and it had two problems: it refused interpreters that work, and
+# it offered ones EXOTIC 4.x does not support.
+#
+# What is true today (EXOTIC 4.3.1, measured 2026-10-20):
+# * its metadata says `requires_python >= 3.10`, and every pin of its own stack
+#   (numpy 1.26.4, astropy 6.1, numba 0.59.1, scipy 1.14.1, matplotlib 3.9.2,
+#   photutils 2.0) has wheels for 3.10, 3.11 and 3.12;
+# * a full `pip install exotic` on **3.11.2** leaves EXOTIC 4.3.1 importable
+#   with every pinned version, so 3.11 is VERIFIED, and 3.10 was already
+#   verified by the author's own environment;
+# * 3.12 is allowed by the metadata and has wheels for the whole stack, but it
+#   has not been installed here (no 3.12 on this machine);
+# * 3.13 is OUT: numpy 1.26 has no wheels for it, so EXOTIC's own pins cannot
+#   be satisfied there;
+# * and 3.10 reached end of life in October 2026, which is why it is LAST: it
+#   works, but nothing should be started on it any more.
+#
+# Newest first, so a machine that has several uses the best one it has.
+_CANDIDATES = ("python3.11", "python3.12", "python3.10")
+_PY_VERSIONS = ("3.11", "3.12", "3.10")
+_MIN_VERSION = (3, 10)
+_MAX_VERSION = (3, 12)
 _TIMEOUT_S = 1800.0
 
 
@@ -75,9 +95,10 @@ def _version_of(python):
 
 
 def version_ok(python):
-    # @return: True when the interpreter is Python <= 3.10
+    # @return: True when the interpreter is one EXOTIC can live in (3.10 to
+    #          3.12: see the note at the top for why those and not others)
     v = _version_of(python)
-    return v is not None and v <= (3, 10)
+    return v is not None and _MIN_VERSION <= v <= _MAX_VERSION
 
 
 def _py_launcher(version):
@@ -103,15 +124,39 @@ def _py_launcher(version):
     return None
 
 
+def configured_problem(preferred):
+    # @args: preferred - the interpreter path from Settings (may be empty)
+    # @return: None when nothing is configured or it is fine, else "missing"
+    #          (the file is gone) or "version" (it is not one EXOTIC can use).
+    #
+    # This exists because "the interpreter you pointed at is gone" and "there
+    # is no Python on this machine" are different sentences, and the app used
+    # to say the second one while a working 3.11 sat on the PATH: a venv the
+    # observer had built was deleted, the configured path stayed, and the
+    # panel announced that no Python existed. It looked like a lost
+    # configuration (reported 2026-10-20).
+    if not preferred:
+        return None
+    if not Path(preferred).is_file():
+        return "missing"
+    if not version_ok(preferred):
+        return "version"
+    return None
+
+
 def detect_python(preferred=None):
     # @args: preferred - a configured interpreter path or None
-    # @return: the path of a Python <= 3.10 interpreter, or None
+    # @return: the path of a Python EXOTIC can live in, or None
     if preferred:
         p = Path(preferred)
         # a venv python the app prepared, or the user's own with EXOTIC
         if p.is_file() and version_ok(p):
             return str(p)
-        return None
+        # A configured interpreter that is gone or of the wrong version does
+        # NOT mean there is no Python: fall through and look for one (the
+        # caller can ask configured_problem to say what happened to the old
+        # one). Refusing to look is what turned a deleted venv into "no Python
+        # 3.10 interpreter found" with 3.10 installed.
     if os.name == "nt":       # the py launcher first (Windows)
         for v in _PY_VERSIONS:
             exe = _py_launcher(v)
@@ -134,7 +179,7 @@ def probe(python_path):
     # @return: {"ok", "version", "message"}
     if not python_path:
         return {"ok": False, "version": None,
-                "message": "no Python <=3.10 found"}
+                "message": "no Python 3.10 to 3.12 found"}
     try:
         out = subprocess.run(
             [str(python_path), "-c",
@@ -162,29 +207,82 @@ def _run(cmd, log, cancel):
     return proc.returncode
 
 
+def _inside(path, folder):
+    # @args: path - a file, folder - a directory
+    # @return: True when path lives inside folder
+    try:
+        Path(path).resolve().relative_to(Path(folder).resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def _swap_in(staging, install_dir, log):
+    # @args: staging - the freshly built environment, install_dir - where it
+    #        has to end up, log - the build log (the swap is written there)
+    # @return: None. The old environment is renamed out of the way, the new
+    #          one takes its place and the old one is removed.
+    #
+    # The rename is atomic on one filesystem, so there is no window where the
+    # configured path points at nothing; and if the second rename fails (on
+    # Windows a file of the old environment may still be open), the old one
+    # goes BACK instead of leaving the observer with neither.
+    backup = install_dir.with_name(install_dir.name + ".old")
+    shutil.rmtree(backup, ignore_errors=True)
+    try:
+        if install_dir.exists():
+            install_dir.rename(backup)
+        staging.rename(install_dir)
+    except OSError:
+        if backup.exists() and not install_dir.exists():
+            backup.rename(install_dir)
+        raise
+    shutil.rmtree(backup, ignore_errors=True)
+    log.append(f"environment installed at {install_dir}")
+
+
 def prepare(install_dir, base_python, progress=None, cancel=None):
     # Creates the venv (without pip, then bootstrapped) and installs EXOTIC.
-    # @args: install_dir - where the venv lives, base_python - the <=3.10
+    #
+    # IT BUILDS ASIDE AND SWAPS AT THE END, and that is not a detail: the
+    # environment the observer already has is only replaced once the new one
+    # works. The first version wiped the target FIRST, so any failure after
+    # that (no network, no disk, a cancel) left nothing behind, and one case
+    # destroyed a working environment every single time: the app offers the
+    # venv it already built as the base interpreter, and the wipe took that
+    # interpreter away halfway through the build, so the next command could
+    # not even run. Reported 2026-10-20.
+    # @args: install_dir - where the venv lives, base_python - the suitable
     #        interpreter, progress - callable(stage_key),
     #        cancel - callable() -> bool
     # @return: (ok, log_text)
     log = []
     install_dir = Path(install_dir)
+    staging = install_dir.with_name(install_dir.name + ".new")
+    ok = False
+    # a base interpreter INSIDE the folder we are about to replace would be
+    # deleted halfway through the build: refuse it, with the reason
+    if _inside(base_python, install_dir):
+        log.append(
+            f"the base interpreter ({base_python}) lives inside the folder "
+            f"being built ({install_dir}): point at a Python outside it")
+        return False, "\n".join(log)
     try:
+        shutil.rmtree(staging, ignore_errors=True)
         if progress:
             progress("venv")
         # a normal venv first (Windows ships pip with it); only if pip is
         # missing (the Linux ensurepip quirk) redo without pip and
         # bootstrap it through the base interpreter
-        rc = _run([base_python, "-m", "venv", str(install_dir)], log, cancel)
-        py = venv_python(install_dir)
-        pip = bin_dir(install_dir) / ("pip.exe" if os.name == "nt" else "pip")
+        rc = _run([base_python, "-m", "venv", str(staging)], log, cancel)
+        py = venv_python(staging)
+        pip = bin_dir(staging) / ("pip.exe" if os.name == "nt" else "pip")
         if rc != 0 or not pip.is_file():
-            shutil.rmtree(install_dir, ignore_errors=True)
+            shutil.rmtree(staging, ignore_errors=True)
             if progress:
                 progress("venv")
             rc = _run([base_python, "-m", "venv", "--without-pip",
-                       str(install_dir)], log, cancel)
+                       str(staging)], log, cancel)
             if rc != 0:
                 return False, "\n".join(log)
             if progress:
@@ -198,6 +296,9 @@ def prepare(install_dir, base_python, progress=None, cancel=None):
         rc = _run([str(py), "-m", "pip", "install", "exotic"], log, cancel)
         if rc != 0:
             return False, "\n".join(log)
+        # the new environment works: only now does the old one go
+        _swap_in(staging, install_dir, log)
+        ok = True
         if progress:
             progress("done")
         return True, "\n".join(log)
@@ -207,3 +308,9 @@ def prepare(install_dir, base_python, progress=None, cancel=None):
     except (OSError, subprocess.SubprocessError) as err:
         log.append(str(err))
         return False, "\n".join(log)
+    finally:
+        # A build that did not deliver leaves no half-built folder behind, and
+        # the environment that was already there is untouched: the swap is the
+        # only thing in here that writes to it.
+        if not ok:
+            shutil.rmtree(staging, ignore_errors=True)

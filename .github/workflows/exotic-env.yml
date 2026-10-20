@@ -68,7 +68,7 @@ concurrency:
 env:
   # python-build-standalone (astral-sh), pinned by release tag. The tag decides
   # the exact CPython patch version too, which is why both are written down: a
-  # URL that says "latest" would make the published zip unreproducible.
+  # URL that says "latest" would let the interpreter drift under the lock.
   PBS_RELEASE: "20261009"
   PBS_PYTHON: "3.11.17"
 

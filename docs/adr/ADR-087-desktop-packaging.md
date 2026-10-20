@@ -447,6 +447,17 @@ versión de la app con meses de diferencia tendrían dentro numpy distinto. El C
 construye el zip desde ese lock y lo **prueba** (`import exotic`) en las dos
 plataformas, así que un zip que no funciona no llega a publicarse.
 
+**Reproducible aquí significa las mismas VERSIONES, que es lo que decide la
+física, no los mismos bytes.** Tres dependencias de EXOTIC llegan como código
+fuente y se compilan en el runner (`imreg_dft`, `pylightcurve`, `ultranest`), y
+ni setuptools ni el compilador producen lo mismo dos veces: medido el
+2026-10-20, dos builds del mismo lock dieron hashes de rueda distintos para las
+tres (la de `ultranest` incluso cambia de tamaño, porque su extensión compilada
+guarda el directorio de compilación en la información de depuración). El sha256
+que publica la release es, por tanto, la huella de ese artefacto concreto, no la
+promesa de que un rebuild dé el mismo fichero; lo que sí es idéntico siempre es
+la lista de versiones.
+
 **Review (2026-10-20, the EXOTIC environment ships as a release artifact)**:
 EXOTIC cannot live inside the app (ADR-004): it needs a Python of its own (3.10 to
 3.12) and a heavy stack with its own pins (numpy 1.26, astropy 6.1, numba 0.59) that
@@ -475,3 +486,13 @@ hand), because rebuilding it for no reason would be wasted work and, worse, a
 reproducibility hole: two observers downloading the same app version months apart
 would get a different numpy inside. CI builds the zip from that lock and **tests** it
 (`import exotic`) on both platforms, so a zip that does not work never gets published.
+
+**Reproducible here means the same VERSIONS, which is what decides the physics,
+not the same bytes.** Three of EXOTIC's dependencies arrive as source and are
+built on the runner (`imreg_dft`, `pylightcurve`, `ultranest`), and neither
+setuptools nor the compiler produces the same thing twice: measured 2026-10-20,
+two builds of the same lock gave different wheel hashes for all three
+(ultranest's even differs in size, because its compiled extension keeps the build
+directory in its debug info). The sha256 a release publishes is therefore the
+fingerprint of that concrete artifact, not a promise that a rebuild gives the
+same file; what is always identical is the list of versions.

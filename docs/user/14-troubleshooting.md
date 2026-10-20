@@ -64,11 +64,26 @@ chapter (07) walks the whole path.
 
 ## EXOTIC is not configured
 
-The transit reduction runs in **EXOTIC**, an external program that needs
-Python 3.10 or older. The transit block of the editor tells you whether it
-found one; without it you can still export the handoff (`inits.json`) and run
-EXOTIC yourself, then import its output back. Nothing is lost: the handoff is
-always yours.
+The transit reduction runs in **EXOTIC**, an external program that needs a
+Python of its own (3.10 to 3.12). The transit block of the editor tells you
+whether it found one; without it you can still export the handoff
+(`inits.json`) and run EXOTIC yourself, then import its output back. Nothing
+is lost: the handoff is always yours.
+
+The shortest way out is the environment **ready to unzip** that the project
+publishes in its own release, [`exotic-env`](https://github.com/irydeo/nightscribe/releases/tag/exotic-env)
+(chapter 06): download the zip for your platform, unzip it anywhere and point
+**Settings → Measurement → Advanced → EXOTIC** at the interpreter inside it.
+
+Two things that save time when something goes wrong:
+
+- If the app says the interpreter you pointed at **is not there any more**,
+  that field was holding a path to something that was deleted or that sits on
+  a drive that is not mounted. Clear it: the app then looks for another one
+  and tells you what it found.
+- The interpreter must live **outside** the environment folder. Pointing at a
+  Python that sits inside it is refused, with the reason: rebuilding the
+  environment would delete the interpreter halfway through the build.
 
 ## The app does not start
 

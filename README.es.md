@@ -67,7 +67,7 @@ y cómo se mide.
 |---|---|
 | **Obligatorio** | Linux o Windows · Python 3.11+ (recomendado 3.12) *o* el instalador autónomo (sin Python) · ~500 MB de disco · conexión a internet para los datos en vivo (todo lo demás funciona offline) |
 | **Recomendado** | Tu **código de observatorio MPC** (tres caracteres, los que tenga asignados tu estación): el asistente inicial resuelve tus coordenadas automáticamente y desbloquea la lista de NEOs específica de tu sitio · tu **fichero de horizonte local** (`.hrz` de TheSkyX o simples pares «az alt») · la apertura de tu telescopio y el píxel/focal de tu cámara |
-| **Opcional** | **CCDciel o NINA/PINS** en ejecución local, si quieres que la app maneje montura y cámara (la integración con el observatorio; un backend a la vez) · cinco claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, atlas de contaminación lumínica, bot de TNS, token AAVSO) · el **asistente** opcional (un modelo que configures) · **EXOTIC** (la reducción de tránsitos), la única herramienta externa que instalas a mano: **Find_Orb** viaja dentro de los instaladores y de los paquetes Linux; ver *Integraciones opcionales* |
+| **Opcional** | **CCDciel o NINA/PINS** en ejecución local, si quieres que la app maneje montura y cámara (la integración con el observatorio; un backend a la vez) · cinco claves API gratuitas, cada una desbloquea un extra (reporte NEOfixer, resolución ciega Astrometry.net, atlas de contaminación lumínica, bot de TNS, token AAVSO) · el **asistente** opcional (un modelo que configures) · **EXOTIC** (la reducción de tránsitos), la única herramienta externa que instalas a mano, y el proyecto la publica lista para descomprimir: **Find_Orb** viaja dentro de los instaladores y de los paquetes Linux; ver *Integraciones opcionales* |
 
 Sin cuentas, sin registros, sin telemetría: NightScribe corre en tu ordenador
 y solo habla con los servicios públicos de datos listados más abajo.
@@ -184,7 +184,7 @@ lo dice. Se configuran en **Herramientas → Configuración → Integraciones**.
 | **Clave de contaminación lumínica** (gratuita, lightpollutionmap.info) | El atlas de brillo del cielo de tu sitio: el contexto Bortle que usan las notas de calidad del cielo |
 | **Asistente** (opcional, apagado por defecto) | Un panel de chat que responde desde la propia guía y las notas de diseño de la app, offline y sin embeddings. Necesita un modelo que configures; sin él la app no cambia |
 | **Find_Orb** (viaja en los instaladores y los paquetes Linux) | El chequeo de tu medida astrométrica contra las observaciones que publicaron otras estaciones, antes del informe MPC. Viaja dentro de NightScribe, así que funciona de serie; desde un árbol de fuentes lo instalas tú, y la app lo dice en vez de fingirlo |
-| **EXOTIC** (Python 3.10 o anterior, externo) | La reducción de tránsitos: la app escribe el handoff, ejecuta EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto. Sin él el handoff sigue siendo tuyo para lanzarlo a mano |
+| **EXOTIC** (Python 3.10 a 3.12 externo, o el entorno ya preparado que publica el proyecto) | La reducción de tránsitos: la app escribe el handoff, ejecuta EXOTIC por ti e importa su curva de luz y sus parámetros al proyecto. El entorno ya preparado es un zip que trae su propio Python, así que no hay nada que instalar: lo descomprimes y apuntas Ajustes a su intérprete. Sin él el handoff sigue siendo tuyo para lanzarlo a mano |
 
 ## Tus datos son tuyos
 

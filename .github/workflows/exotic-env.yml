@@ -1,0 +1,261 @@
+# NightScribe - The EXOTIC environment, published ready to unzip
+#
+# EXOTIC cannot live inside the app (ADR-004): it needs a Python of its own
+# (3.10 to 3.12) and it pins its own versions of numpy, astropy and numba, which
+# cannot be shared with NightScribe's. Until now the observer built that
+# environment by hand or with the app's "Prepare environment" button, and that
+# was the step where most people fell over. This workflow publishes it already
+# built, as a zip per platform.
+#
+# WHY IT IS NOT PART OF THE APP'S RELEASE (release.yml):
+#
+# The environment only changes when EXOTIC or the Python version changes, which
+# is rare, and rebuilding 1.2 GB of wheels on every patch release would be
+# wasted work AND a reproducibility hole: two observers downloading the same app
+# version months apart would get different numpy builds. So it has its own
+# release, with a FIXED tag (`exotic-env`) that is the stable URL the
+# documentation links to, and it is rebuilt only when the pin changes (this
+# workflow watches those files) or when a maintainer runs it by hand. The app's
+# releases keep their four artifacts; nothing here touches them.
+#
+# WHY TWO ARTIFACTS AND NOT ONE:
+#
+# A Python environment carries compiled binaries (numpy, numba, scipy) built for
+# one operating system and one ABI. The same two platforms the app already
+# builds for are the same two here, and a zip from one is useless on the other.
+#
+# THE TWO PINS THAT DECIDE EVERYTHING:
+#
+#   PBS_RELEASE / PBS_PYTHON  which portable CPython travels inside
+#   requirements.in           which EXOTIC, and the locks it resolves to
+#
+# Bump any of them, push, and the release is rebuilt and republished. The lock
+# files carry their own regeneration recipe in their header.
+
+name: EXOTIC environment
+
+on:
+  # By hand, from the Actions tab (a rebuild with no change is legitimate when a
+  # wheel is yanked from PyPI and the published zip has to be replaced).
+  workflow_dispatch:
+
+  # Or by itself, when the thing that decides the contents changes. The README
+  # and this workflow's own comments are NOT in the list: editing prose should
+  # not rebuild a gigabyte. And it is limited to the two branches a published
+  # artifact may come from: publishing a release out of an unmerged branch
+  # would put something nobody reviewed behind a stable URL.
+  push:
+    branches:
+      - main
+      - "release/v0.1.x"
+    paths:
+      - "tools/exotic-env/requirements.in"
+      - "tools/exotic-env/linux.lock"
+      - "tools/exotic-env/windows.lock"
+      - "tools/exotic-env/smoke_test.py"
+      - "tools/exotic-env/pack.py"
+      - ".github/workflows/exotic-env.yml"
+
+permissions:
+  contents: write   # needed to publish the release
+
+concurrency:
+  group: exotic-env
+  # Two runs writing the same release would race over its assets; the newer one
+  # wins, and the older is pointless anyway.
+  cancel-in-progress: true
+
+env:
+  # python-build-standalone (astral-sh), pinned by release tag. The tag decides
+  # the exact CPython patch version too, which is why both are written down: a
+  # URL that says "latest" would make the published zip unreproducible.
+  PBS_RELEASE: "20261009"
+  PBS_PYTHON: "3.11.17"
+
+jobs:
+  # ------------------------------------------------------------- build
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing must not hide the other's log; both are needed to
+      # publish anyway.
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+            triple: x86_64-unknown-linux-gnu
+            lock: linux.lock
+            py: exotic-env/bin/python
+            cc: gcc
+          - os: windows-latest
+            label: windows-x64
+            triple: x86_64-pc-windows-msvc
+            lock: windows.lock
+            py: exotic-env/python.exe
+            # Empty on purpose: on Windows setuptools finds the MSVC toolchain
+            # by itself, and forcing a compiler name here would only get in its
+            # way.
+            cc: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python (only to run the packer)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # `shell: bash` on both runners on purpose: the portable CPython tarball,
+      # the extraction and the interpreter path are the same on both, and
+      # PowerShell would only add a second dialect of the same three commands.
+      # Git Bash ships with the Windows runners, tar and curl included.
+      - name: Fetch the portable CPython
+        shell: bash
+        run: |
+          asset="cpython-${PBS_PYTHON}+${PBS_RELEASE}-${{ matrix.triple }}-install_only.tar.gz"
+          url="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_RELEASE}/${asset}"
+          echo "fetching ${asset}"
+          curl -fsSL -o pbs.tar.gz "$url"
+          # The tarball carries everything under python/; stripping that one
+          # component is what leaves the interpreter at the root of the folder
+          # the observer unzips.
+          mkdir -p exotic-env
+          tar -xzf pbs.tar.gz -C exotic-env --strip-components=1
+          rm -f pbs.tar.gz
+          "./${{ matrix.py }}" -c "import sys; print('portable CPython', sys.version.split()[0])"
+
+      - name: Install the pinned environment
+        shell: bash
+        run: |
+          # The lock is the whole point: the same one always installs the same
+          # stack, and it is committed next to this workflow so the artifact is
+          # tied to a revision anyone can read.
+          #
+          # The compiler line is not decoration, and it cost a failed build to
+          # find: a portable CPython REMEMBERS the compiler it was built with
+          # (clang, on the machine python-build-standalone uses), and one of
+          # EXOTIC's dependencies ships as source only with Cython extensions
+          # and no wheel for 3.11 (ultranest). So something has to compile it
+          # here, and pointing at the compiler the runner actually has is what
+          # makes that a fact instead of a bet on which toolchain happens to be
+          # installed.
+          if [ -n "${{ matrix.cc }}" ]; then export CC="${{ matrix.cc }}"; fi
+          "./${{ matrix.py }}" -m pip install --no-cache-dir --disable-pip-version-check \
+            -r "tools/exotic-env/${{ matrix.lock }}"
+
+      - name: Smoke test
+        shell: bash
+        run: |
+          # Imports the compiled half of the stack, which is what a
+          # wrong-platform wheel breaks. A zip that does not import is worse
+          # than no zip: the observer has already downloaded a few hundred
+          # megabytes.
+          "./${{ matrix.py }}" tools/exotic-env/smoke_test.py
+
+      - name: Prune and pack
+        shell: bash
+        run: |
+          # The packer is run by the RUNNER's Python, never by the environment's
+          # own: importing the standard library from inside the tree being
+          # packed would rewrite the caches the packer has just removed.
+          python tools/exotic-env/pack.py exotic-env \
+            "dist/nightscribe-exotic-${{ matrix.label }}.zip" exotic-env
+          cat "dist/nightscribe-exotic-${{ matrix.label }}.zip.sha256"
+
+      - name: Upload the zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.label }}
+          path: dist/*
+
+  # ----------------------------------------------------------- publish
+  publish:
+    name: Publish the exotic-env release
+    needs: build
+    # Both platforms, or nothing: a release carrying only the Linux zip would
+    # send every Windows observer down a dead end. And only from a branch whose
+    # content is meant to be published: a manual run from a feature branch is
+    # for testing the build, not for moving the stable URL.
+    if: >-
+      always() && needs.build.result == 'success' &&
+      (github.ref == 'refs/heads/main' ||
+       startsWith(github.ref, 'refs/heads/release/'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect the artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la dist
+          tag="exotic-env"
+          exotic=$(grep -oE '^exotic==[0-9.]+' tools/exotic-env/requirements.in \
+                   | head -1 | cut -d= -f3)
+
+          # The notes are assembled with QUOTED heredocs on purpose: the text
+          # carries backticks and a Windows path, and a double-quoted string
+          # would eat one and substitute the other.
+          {
+            sed -e "s/@PY@/${PBS_PYTHON}/g" -e "s/@EXOTIC@/${exotic}/g" <<'EOF'
+          The **EXOTIC environment, ready to unzip**, for the transit reduction.
+          Nothing to install: unzip it anywhere and point **Settings, Measurement,
+          Advanced, EXOTIC** at the interpreter it carries.
+
+          EXOTIC cannot run inside NightScribe: it needs a Python of its own and
+          pins its own versions of numpy, astropy and numba, which cannot be
+          shared with the app's. This release carries one environment per
+          platform, with a portable CPython **@PY@** and EXOTIC **@EXOTIC@**
+          already installed.
+
+          | Download | Platform | Interpreter after unzipping |
+          |---|---|---|
+          | nightscribe-exotic-linux-x86_64.zip | Linux x86_64 | `exotic-env/bin/python` |
+          | nightscribe-exotic-windows-x64.zip | Windows x64 | `exotic-env\python.exe` |
+
+          **Checksums**, of the zips and of the lock files they were built from
+          (the lock is committed in the repository, so this release is tied to a
+          revision anyone can read):
+
+          ```
+          EOF
+            cat dist/*.sha256
+            sha256sum tools/exotic-env/linux.lock tools/exotic-env/windows.lock
+            cat <<'EOF'
+          ```
+
+          The environment is about 1.2 GB once unzipped. It is optional: without
+          it, the transit handoff (`inits.json`) is still yours to run by hand,
+          and the rest of the app is unchanged.
+
+          The portable Python inside is unsigned, like the rest of this
+          project's binaries, so the note about Windows warnings in the user
+          guide (chapter 01) applies to it as well.
+
+          Report issues at https://github.com/irydeo/nightscribe/issues
+          EOF
+          } > release-notes.md
+
+          # Re-running must replace the assets, not fail on the release the
+          # first run created. The tag is NOT deleted with the release: it is
+          # the stable URL the documentation links to, so it has to survive.
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release delete "$tag" --yes
+          fi
+
+          # --latest=false is not cosmetic: the app's own release is the latest,
+          # and an environment zip taking that badge would greet every visitor
+          # to the Releases page with the wrong download.
+          gh release create "$tag" --latest=false \
+            --title "EXOTIC environment (ready to unzip)" \
+            --notes-file release-notes.md \
+            dist/*

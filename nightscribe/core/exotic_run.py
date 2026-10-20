@@ -99,7 +99,8 @@ def _drop_exotic_log(work_dir):
 
 def run(python, work_dir, inits_path, mode="red", override=True,
         progress=None, cancel=None, timeout_s=DEFAULT_TIMEOUT_S):
-    # @args: python - the Python <=3.10 interpreter that has EXOTIC installed,
+    # @args: python - the Python 3.10 to 3.12 interpreter that has EXOTIC
+    #        installed,
     #        work_dir - cwd (its plots land here per the inits),
     #        inits_path - the inits.json, mode - red|phot|pre|rt,
     #        override - pass -ov (adopt our params, skips the interactive

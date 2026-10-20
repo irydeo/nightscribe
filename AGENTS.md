@@ -322,6 +322,11 @@ tools/i18n.py        # recompila los catálogos de traducción: lupdate + lrelea
 tools/fetch_findorb.sh # prepara el Find_Orb que se empaqueta (micromamba,
                      #   sin la efeméride DE430t); lo usan el CI y build_deb
 tools/build_deb.py   # construye el .deb (Python del sistema, ADR-087)
+tools/exotic-env/    # el entorno de EXOTIC que se publica listo para
+                     #   descomprimir: requirements.in y los dos locks (Linux y
+                     #   Windows), smoke_test.py (importa EXOTIC y su pila
+                     #   compilada) y pack.py (poda y empaqueta); lo construye
+                     #   y lo publica exotic-env.yml (ADR-087 rev)
 website/             # la web (ADR-070): GENERADA, no escrita. La landing es el
                      #   README y el manual es docs/user, los mismos ficheros
                      #   que pinta la app; website/tools/build_site.py los convierte y
@@ -343,6 +348,9 @@ installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno
                      # windows-tests.yml: la suite unitaria en Windows, en cada PR
                      # pages.yml: construye la web y la publica en GitHub Pages
                      #   (push a main o release/v0.1, y manual)
+                     # exotic-env.yml: el entorno de EXOTIC ya construido, una
+                     #   release propia con tag fijo `exotic-env` (no se
+                     #   reconstruye en cada release; ADR-087 rev)
 ```
 
 ### Cómo trabajar

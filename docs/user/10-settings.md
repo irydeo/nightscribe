@@ -133,10 +133,12 @@ one click away behind the **Advanced** door.
   **backend**: on by default,
   with **OpenCL**; chapter 12 says what it accelerates, how to install CUDA
   and why it changes nothing about the result), **Find_Orb** (the orbit
-  check) and **EXOTIC** (the transit reduction: path to a **Python ≤ 3.10**
-  and to the environment; **Prepare environment** builds a private one and
-  installs EXOTIC into it, and **Test** checks that it imports). They all
-  have sensible defaults; touch them only if you know why.
+  check) and **EXOTIC** (the transit reduction: path to a **Python 3.10 to
+  3.12** and to the environment; **Prepare environment** builds a private one
+  and installs EXOTIC into it, and **Test** checks that it imports). The
+  project also publishes the environment **ready to unzip** in its own
+  release, which needs no Python of your own: chapter 06 tells both ways.
+  They all have sensible defaults; touch them only if you know why.
 
 ## Integrations
 

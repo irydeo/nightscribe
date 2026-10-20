@@ -141,10 +141,12 @@ resto está a un clic tras la puerta **Advanced**.
   **backend**: encendida por defecto, con **OpenCL**; el capítulo 12 cuenta
   qué acelera, cómo instalar CUDA y por qué no cambia el resultado),
   **Find_Orb** (el chequeo de la órbita) y **EXOTIC** (la reducción de
-  tránsitos: ruta a un **Python ≤ 3.10** y al entorno; **Preparar entorno**
-  crea uno privado e instala EXOTIC dentro, y **Test** comprueba que
-  importa). Todos tienen valores por defecto sensatos; tócalos solo si
-  sabes por qué.
+  tránsitos: ruta a un **Python 3.10 a 3.12** y al entorno; **Preparar
+  entorno** crea uno privado e instala EXOTIC dentro, y **Test** comprueba
+  que importa). Además, el proyecto publica el entorno **ya preparado para
+  descomprimir** en su propia release, que no necesita ningún Python tuyo: el
+  capítulo 06 cuenta las dos vías. Todos tienen valores por defecto sensatos;
+  tócalos solo si sabes por qué.
 
 ## Integraciones
 

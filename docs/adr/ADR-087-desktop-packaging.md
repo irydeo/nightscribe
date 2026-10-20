@@ -416,3 +416,62 @@ with the notes taken from that version's section of `CHANGELOG.md`. The version 
 comes from the tag (setuptools-scm), so the `METADATA`, the `.deb`, the `.rpm` and
 `--version` all say `0.1.0`; the `metainfo.xml` date is aligned with the tag's. The
 rolling preview stays as it is, for everyday work.
+
+**Revisión (2026-10-20, el entorno de EXOTIC viaja como artefacto del release)**:
+EXOTIC no puede vivir dentro de la app (ADR-004): necesita su propio Python (3.10 a
+3.12) y una pila pesada con pines propios (numpy 1.26, astropy 6.1, numba 0.59) que
+no se pueden compartir con las de NightScribe. Hasta aquí el observador lo instalaba
+a mano y la app ofrecía «Preparar entorno» para construirle un venv, y ese era el
+punto donde más gente se caía. Ahora el proyecto **publica un entorno ya construido
+en una release propia**, con el tag fijo **`exotic-env`** como URL estable, y **un
+artefacto por plataforma** (`nightscribe-exotic-linux-x86_64.zip` y
+`nightscribe-exotic-windows-x64.zip`): un CPython portátil con EXOTIC ya instalado
+dentro, que se descomprime donde se quiera y se apunta Ajustes a su intérprete, sin
+instalar nada. Son **dos** artefactos y no uno porque un entorno Python lleva
+binarios compilados y no se puede compartir entre sistemas; son los mismos dos que
+ya usa la matriz de la app. **La app no descarga nada**: no hay descargador, ni URL,
+ni suma de comprobación en el código; el zip se coge de la página de esa release como
+los demás. «Preparar entorno» se queda como alternativa para quien prefiera
+construirlo con su Python, y ahora construye **al lado y cambia al final**, de modo
+que un fallo o una cancelación no se llevan por delante el entorno que ya había
+(ver el plan de orquestación, fase H).
+
+**Consecuencias**: el instalador no engorda (el zip es un artefacto suelto de unos
+375 MB comprimidos y solo lo baja quien reduce tránsitos), el flujo de tránsito deja
+de depender de que el observador acierte con la versión de Python, y **la release de
+la app se queda con sus cuatro artefactos de siempre**: el entorno no se reconstruye
+en cada release, sino solo cuando cambia su fichero de versiones fijadas (o cuando un
+mantenedor lo lanza a mano), porque reconstruirlo sin motivo sería trabajo tirado y,
+peor, un agujero de reproducibilidad: dos observadores que descargaran la misma
+versión de la app con meses de diferencia tendrían dentro numpy distinto. El CI
+construye el zip desde ese lock y lo **prueba** (`import exotic`) en las dos
+plataformas, así que un zip que no funciona no llega a publicarse.
+
+**Review (2026-10-20, the EXOTIC environment ships as a release artifact)**:
+EXOTIC cannot live inside the app (ADR-004): it needs a Python of its own (3.10 to
+3.12) and a heavy stack with its own pins (numpy 1.26, astropy 6.1, numba 0.59) that
+cannot be shared with NightScribe's. Until now the observer installed it by hand and
+the app offered "Prepare environment" to build a venv, and that was where most people
+fell over. The project now **publishes a prebuilt environment in its own release**,
+with the fixed tag **`exotic-env`** as the stable URL, and **one artifact per
+platform** (`nightscribe-exotic-linux-x86_64.zip` and
+`nightscribe-exotic-windows-x64.zip`): a portable CPython with EXOTIC already
+installed, which is unzipped anywhere and pointed at from Settings, with nothing to
+install. There are **two** artifacts and not one because a Python environment carries
+compiled binaries and cannot be shared across systems; they are the same two the
+app's own matrix already uses. **The app downloads nothing**: there is no downloader,
+no URL and no checksum in the code; the zip is taken from that release's page like the
+rest. "Prepare environment" stays as the alternative for whoever prefers to build it
+with their own Python, and it now builds **aside and swaps at the end**, so a failure
+or a cancel does not take away the environment that was already there (see the
+orchestration plan, phase H).
+
+**Consequences**: the installer does not grow (the zip is a loose artifact of about
+375 MB compressed and only whoever reduces transits downloads it), the transit flow
+stops depending on the observer getting the Python version right, and **the app's
+release keeps its four artifacts as always**: the environment is not rebuilt on every
+release, only when its lock file changes (or when a maintainer runs the workflow by
+hand), because rebuilding it for no reason would be wasted work and, worse, a
+reproducibility hole: two observers downloading the same app version months apart
+would get a different numpy inside. CI builds the zip from that lock and **tests** it
+(`import exotic`) on both platforms, so a zip that does not work never gets published.

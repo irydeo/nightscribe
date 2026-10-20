@@ -13,7 +13,8 @@
 
 """EXOTIC (rzellem/EXOTIC, NASA/JPL) integration by file handoff.
 
-NightScribe never runs EXOTIC (it needs Python <=3.10 + astropy — ADR-004):
+NightScribe never runs EXOTIC (it needs a Python of its own, 3.10 to 3.12,
+plus astropy: ADR-004):
 it writes a pre-filled ``inits.json`` and the observer reduces apart. The
 structure here is fixed against the real sample in the EXOTIC repository
 (``inits.json`` at the repository root, re-verified 2026-09-10): exact key
@@ -266,7 +267,7 @@ def make_inits(ctx, d, cfg, plan=None, out_dir=None, plate_solution=False,
             "Title": "EXOTIC's Initialization File",
             "Comment": "Pre-filled by NightScribe (transit project handoff)."
                        " Check the FITS directory and run EXOTIC in your own"
-                       " Python <=3.10 environment.",
+                       " Python 3.10 to 3.12 environment.",
         },
         "user_info": {
             "Directory with FITS files": str(out_dir) if out_dir else None,

@@ -65,7 +65,7 @@ it is measured.
 |---|---|
 | **Required** | Linux or Windows · Python 3.11+ (3.12 recommended) *or* the standalone installer (no Python needed) · ~500 MB of disk · an internet connection for the live data (everything else works offline) |
 | **Recommended** | Your **MPC observatory code** (three characters, the ones assigned to your station): the first-run wizard resolves your coordinates automatically and it unlocks the site-specific NEO list · your **local horizon file** (TheSkyX `.hrz` or simple `az alt` pairs) · your telescope aperture and camera pixel/focal length |
-| **Optional** | **CCDciel or NINA/PINS** running locally, if you want the app to drive the mount and camera (the observatory integration; one backend at a time) · five free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, light-pollution atlas, TNS bot, AAVSO token) · the optional **assistant** (a model you configure) · **EXOTIC** (the transit reduction), the one external tool you install by hand: **Find_Orb** travels inside the installers and the Linux packages; see *Optional integrations* |
+| **Optional** | **CCDciel or NINA/PINS** running locally, if you want the app to drive the mount and camera (the observatory integration; one backend at a time) · five free API keys that each unlock one extra (NEOfixer report, Astrometry.net blind solve, light-pollution atlas, TNS bot, AAVSO token) · the optional **assistant** (a model you configure) · **EXOTIC** (the transit reduction), the one external tool you install by hand, and the project publishes it ready to unzip: **Find_Orb** travels inside the installers and the Linux packages; see *Optional integrations* |
 
 No account, no registration, no telemetry: NightScribe runs on your computer
 and talks only to the public data services listed below.
@@ -181,7 +181,7 @@ you so. Configure them in **Tools → Settings → Integrations**.
 | **Light-pollution key** (free, lightpollutionmap.info) | The sky-brightness atlas at your site: the Bortle context the sky-quality notes use |
 | **Assistant** (optional, off by default) | A chat panel that answers from the app's own guide and design notes, offline and without embeddings. It needs a model you configure; without it the app is unchanged |
 | **Find_Orb** (ships with the installers and the Linux packages) | The check of your astrometric measurement against the observations other stations published, before the MPC report. It travels inside NightScribe, so it works out of the box; from a source checkout you install it yourself, and the app says so instead of pretending |
-| **EXOTIC** (external Python 3.10 or older) | The transit reduction: the app writes the handoff, runs EXOTIC for you and imports its light curve and parameters into the project. Without it the handoff is still yours to run by hand |
+| **EXOTIC** (external Python 3.10 to 3.12, or the ready-made environment the project publishes) | The transit reduction: the app writes the handoff, runs EXOTIC for you and imports its light curve and parameters into the project. The ready-made environment is a zip that brings its own Python, so there is nothing to install: unzip it and point Settings at its interpreter. Without it the handoff is still yours to run by hand |
 
 ## Your data stays with you
 

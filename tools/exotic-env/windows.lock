@@ -1,0 +1,325 @@
+# NightScribe: the EXOTIC environment, pinned.
+#
+# This file is the ONLY thing that decides what the published environment
+# contains, so the same tag always unpacks the same stack. It is resolved with
+# uv from one line, `exotic==4.3.1`, for CPython 3.11 on Windows x64.
+#
+# Regenerate it (both files, from the repository root) with:
+#
+#   uv pip compile tools/exotic-env/requirements.in \
+#       --python-platform x86_64-pc-windows-msvc --python-version 3.11 \
+#       --no-header -o tools/exotic-env/windows.lock
+#
+# Why 3.11 and not the newest: EXOTIC pins numpy 1.26, and numpy 1.26 has no
+# wheels for 3.13. 3.11 is the version a full `pip install exotic` was verified
+# on (EXOTIC 4.3.1, 2026-10-20), and it is supported until October 2027.
+#
+# Why two files: the only platform-conditional dependency of EXOTIC is the
+# sampler (dynesty on Windows, ultranest everywhere else), and the rest of the
+# tree differs too (colorama, pywin32-ctypes). A Python environment carries
+# compiled binaries, so it cannot be shared between systems.
+#
+# The `# via` comments are uv's own record of what pulled each pin in; they are
+# the reason a dependency bump is reviewable.
+
+
+asteval==1.0.10
+    # via lmfit
+astroalign==2.6.2
+    # via exotic
+astropy==6.1.7
+    # via
+    #   astroquery
+    #   barycorrpy
+    #   exotic
+    #   ldtk
+    #   photutils
+    #   pylightcurve
+    #   pyvo
+astropy-iers-data==0.2026.10.19.0.52.1
+    # via astropy
+astroquery==0.4.11
+    # via
+    #   barycorrpy
+    #   exotic
+backports-tarfile==1.2.0
+    # via jaraco-context
+barycorrpy==0.4.4
+    # via exotic
+beautifulsoup4==4.15.0
+    # via astroquery
+bleach==6.4.0
+    # via panel
+bokeh==3.6.3
+    # via
+    #   holoviews
+    #   panel
+certifi==2026.10.19
+    # via requests
+charset-normalizer==3.5.2
+    # via requests
+colorama==0.4.6
+    # via tqdm
+colorcet==3.2.1
+    # via holoviews
+colour-demosaicing==0.2.6
+    # via exotic
+colour-science==0.4.6
+    # via colour-demosaicing
+contourpy==1.3.3
+    # via
+    #   bokeh
+    #   matplotlib
+cycler==0.12.1
+    # via matplotlib
+dill==0.4.1
+    # via lmfit
+dynesty==1.2.3
+    # via exotic
+emcee==3.1.6
+    # via pylightcurve
+exotic==4.3.1
+    # via -r in.txt
+fonttools==4.67.0
+    # via matplotlib
+holoviews==1.19.1
+    # via exotic
+html5lib==1.1
+    # via astroquery
+idna==3.20
+    # via requests
+imageio==2.38.1
+    # via
+    #   colour-demosaicing
+    #   colour-science
+    #   scikit-image
+importlib-metadata==9.0.1
+    # via keyring
+imreg-dft==2.0.0
+    # via exotic
+jaraco-classes==3.4.0
+    # via keyring
+jaraco-context==6.1.2
+    # via keyring
+jaraco-functools==4.6.0
+    # via keyring
+jinja2==3.1.6
+    # via bokeh
+jplephem==2.24
+    # via barycorrpy
+keyring==25.7.0
+    # via astroquery
+kiwisolver==1.5.1
+    # via matplotlib
+lazy-loader==0.6
+    # via scikit-image
+ldtk==1.8.6
+    # via exotic
+linkify-it-py==2.2.0
+    # via panel
+llvmlite==0.42.0
+    # via numba
+lmfit==1.3.4
+    # via exotic
+markdown==3.11.2
+    # via panel
+markdown-it-py==4.2.0
+    # via
+    #   mdit-py-plugins
+    #   panel
+markupsafe==3.0.4
+    # via jinja2
+matplotlib==3.9.4
+    # via
+    #   exotic
+    #   ldtk
+    #   pylightcurve
+mdit-py-plugins==0.6.1
+    # via panel
+mdurl==0.1.2
+    # via markdown-it-py
+more-itertools==11.2.1
+    # via
+    #   jaraco-classes
+    #   jaraco-functools
+networkx==3.6.1
+    # via scikit-image
+numba==0.59.1
+    # via
+    #   exotic
+    #   ldtk
+numpy==1.26.4
+    # via
+    #   astroalign
+    #   astropy
+    #   astroquery
+    #   barycorrpy
+    #   bokeh
+    #   colour-demosaicing
+    #   colour-science
+    #   contourpy
+    #   emcee
+    #   exotic
+    #   holoviews
+    #   imageio
+    #   imreg-dft
+    #   jplephem
+    #   ldtk
+    #   lmfit
+    #   matplotlib
+    #   numba
+    #   pandas
+    #   patsy
+    #   photutils
+    #   pyerfa
+    #   pylightcurve
+    #   scikit-image
+    #   scipy
+    #   sep
+    #   statsmodels
+    #   tifffile
+packaging==26.3
+    # via
+    #   astropy
+    #   bokeh
+    #   holoviews
+    #   lazy-loader
+    #   matplotlib
+    #   panel
+    #   patsy
+    #   scikit-image
+    #   statsmodels
+pandas==2.2.3
+    # via
+    #   bokeh
+    #   exotic
+    #   holoviews
+    #   ldtk
+    #   panel
+    #   statsmodels
+panel==1.5.5
+    # via
+    #   exotic
+    #   holoviews
+param==2.4.2
+    # via
+    #   holoviews
+    #   panel
+    #   pyviz-comms
+patsy==1.0.3
+    # via statsmodels
+photutils==2.0.2
+    # via exotic
+pillow==13.0.0
+    # via
+    #   bokeh
+    #   imageio
+    #   imreg-dft
+    #   matplotlib
+    #   scikit-image
+pyerfa==2.0.1.5
+    # via
+    #   astropy
+    #   barycorrpy
+pylightcurve==4.0.4
+    # via exotic
+pyparsing==3.3.3
+    # via matplotlib
+python-dateutil==2.9.0.post0
+    # via
+    #   exotic
+    #   matplotlib
+    #   pandas
+python-version==0.0.2
+    # via exotic
+pytz==2026.5
+    # via pandas
+pyviz-comms==3.0.6
+    # via
+    #   holoviews
+    #   panel
+pyvo==1.5.3
+    # via
+    #   astroquery
+    #   exotic
+pywin32-ctypes==0.2.3
+    # via keyring
+pyyaml==6.0.3
+    # via
+    #   astropy
+    #   bokeh
+    #   pylightcurve
+rebound==4.4.11
+    # via exotic
+requests==2.32.5
+    # via
+    #   astroquery
+    #   exotic
+    #   panel
+    #   pyvo
+scikit-image==0.24.0
+    # via
+    #   astroalign
+    #   exotic
+scipy==1.14.1
+    # via
+    #   astroalign
+    #   barycorrpy
+    #   colour-demosaicing
+    #   colour-science
+    #   exotic
+    #   imreg-dft
+    #   ldtk
+    #   lmfit
+    #   photutils
+    #   pylightcurve
+    #   scikit-image
+    #   statsmodels
+semantic-version==2.10.0
+    # via ldtk
+sep==1.4.1
+    # via astroalign
+setuptools==84.2.0
+    # via imreg-dft
+six==1.17.0
+    # via
+    #   html5lib
+    #   python-dateutil
+soupsieve==2.10
+    # via beautifulsoup4
+statsmodels==0.14.6
+    # via exotic
+tenacity==9.2.1
+    # via
+    #   exotic
+    #   ldtk
+tifffile==2026.3.3
+    # via scikit-image
+tornado==6.5.10
+    # via bokeh
+tqdm==4.70.1
+    # via
+    #   ldtk
+    #   panel
+traitlets==5.16.1
+    # via ldtk
+typing-extensions==4.16.0
+    # via
+    #   beautifulsoup4
+    #   colour-demosaicing
+    #   colour-science
+    #   panel
+tzdata==2026.5
+    # via pandas
+uncertainties==3.2.3
+    # via lmfit
+urllib3==2.8.0
+    # via requests
+webencodings==0.6.1
+    # via
+    #   bleach
+    #   html5lib
+xyzservices==2026.9.1
+    # via bokeh
+zipp==4.1.1
+    # via importlib-metadata

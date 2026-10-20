@@ -1,0 +1,3 @@
+# The one line this whole environment exists for. Bump it when EXOTIC
+# releases, then regenerate both locks (see linux.lock's header).
+exotic==4.3.1

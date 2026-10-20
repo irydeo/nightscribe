@@ -152,7 +152,7 @@ jobs:
           # wrong-platform wheel breaks. A zip that does not import is worse
           # than no zip: the observer has already downloaded a few hundred
           # megabytes.
-          "./${{ matrix.py }}" tools/exotic-env/smoke_test.py"
+          "./${{ matrix.py }}" tools/exotic-env/smoke_test.py
 
       - name: Prune and pack
         shell: bash

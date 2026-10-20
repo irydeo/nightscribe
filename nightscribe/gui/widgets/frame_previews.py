@@ -33,6 +33,14 @@ Three decisions worth writing down:
   out of every N, ~2 MB per 2048² frame instead of 16 MB, so a whole visit is
   a second of disk and not gigabytes.
 
+The marks a row can wear are the three an observer can act on: the frame could
+not be read, the last run could not register it, or the series threw its
+measurement away. The last one arrived on 2026-10-20, when the curve marked a
+frame and the list said nothing: the strip knew only about the first two, so an
+empty chart next to a spotless list read as bad data. The classification is the
+engine's (`core/series_measure`), the same one the curve paints, because the
+list and the chart have to tell the same story.
+
 The widget knows nothing about the project or the database: it lists paths,
 says what it sees, and asks its window (the editor) to act. The editor asks
 the host, which is the only piece allowed to touch the registry.
@@ -48,6 +56,8 @@ from PySide6.QtWidgets import (QListWidget, QListWidgetItem, QMenu,
                                QStyle, QStyledItemDelegate)
 
 from ...core import stretch
+from ...core.series_measure import split_flags
+from ...viz import palette
 from .. import theme
 
 logger = logging.getLogger("nightscribe.gui.widgets.frame_previews")
@@ -86,6 +96,12 @@ class _PreviewDelegate(QStyledItemDelegate):
     # register) wears a red border around the image: the caption is red for
     # every frame, so the flag needs its own channel.
     #
+    # Since 2026-10-20 the border is not always red: it wears the colour the
+    # measurement's own quality deserves, which is the grammar the curve and
+    # the measurement panel already share (see _quality_colour). A frame whose
+    # measurement the series threw away is red, one that is usable but not
+    # clean is orange, and a hard failure stays red.
+    #
     # @args: parent - the list
 
     def __init__(self, parent):
@@ -118,8 +134,9 @@ class _PreviewDelegate(QStyledItemDelegate):
             pen.setWidth(FLAG_PX)
             painter.setPen(pen)
             painter.drawRect(rect.adjusted(1, 1, -1, -1))
-        if index.data(Qt.UserRole + 2):          # a problem: red border
-            pen = QPen(QColor(FLAG_RED))
+        colour = index.data(Qt.UserRole + 2)     # the measurement's own colour
+        if colour is not None:
+            pen = QPen(QColor(colour))
             pen.setWidth(FLAG_PX)
             painter.setPen(pen)
             painter.drawRect(rect.adjusted(1, 1, -1, -1))
@@ -204,6 +221,7 @@ class FramePreviews(QListWidget):
         self._facts = []          # one dict per frame (or None until read)
         self._images = []         # one STRETCHED image per frame (unscaled)
         self._problems_only = False
+        self._flag_words_cache = None   # the flags in words, built on demand
         self._thumb = 140         # the side, until the list is laid out
         self._hue = theme.C_ACCENT   # the caption's colour: the object's own
         self._placeholder = self._make_placeholder()
@@ -265,9 +283,14 @@ class FramePreviews(QListWidget):
         self._images = [None] * len(self._paths)
         for index, path in enumerate(self._paths):
             item = QListWidgetItem(self._placeholder, self._caption(index))
-            item.setToolTip(Path(path).name)
+            item.setToolTip(self._tooltip(index))
             item.setData(Qt.UserRole, index)
             item.setData(Qt.UserRole + 1, QSize(self._thumb, self._thumb))
+            # a fact that arrives WITH the list (a restored run already knows
+            # which frames it could not register, and the visit knows what the
+            # series said about each one) marks the row here; a fact that
+            # arrives later does it in set_fact
+            item.setData(Qt.UserRole + 2, self._quality_colour(index))
             item.setSizeHint(QSize(self._thumb + 2 * GAP,
                                    self._thumb + 2 * GAP))
             self.addItem(item)
@@ -299,9 +322,11 @@ class FramePreviews(QListWidget):
         # image; Qt is not asked to lay it out)
         item.setText(self._caption(index))
         item.setToolTip(self._tooltip(index))
-        # the flag the delegate paints as a red border: the caption is red
-        # for every frame, so the problem needs its own channel
-        item.setData(Qt.UserRole + 2, bool(self._is_problem(index)))
+        # the flag the delegate paints around the image, in the colour the
+        # measurement's own quality deserves (see _quality_colour): a hard
+        # failure, a measurement the series threw away, or one that is usable
+        # but not clean
+        item.setData(Qt.UserRole + 2, self._quality_colour(index))
         if self._problems_only and not self._is_problem(index):
             item.setHidden(True)
 
@@ -343,16 +368,123 @@ class FramePreviews(QListWidget):
             self.item(i).setHidden(self._problems_only
                                    and not self._is_problem(i))
 
+    def _flag_words(self):
+        # @return: {flag: (short, why)} in the observer's language, cached.
+        #
+        # THE SERIES' FLAGS, IN WORDS AND WITH THEIR WHY. A frame the series
+        # measured carries the engine's flags (core/series_measure.DATA_FLAGS
+        # and CAVEAT_FLAGS) and this is the only place that shows them to a
+        # person, so the words live here and not in the engine; the chart keeps
+        # painting the same classification as colours.
+        #
+        # That split is not cosmetic. Until 2026-10-20 this list knew only
+        # about unreadable and unregistered frames, so a frame whose
+        # measurement the series had thrown away was marked in the curve and
+        # looked perfect here: the observer was left with an empty chart and a
+        # clean list of frames, and reasonably blamed the data. On the night
+        # that was reported the camera profile refused 338 of 379 frames and
+        # the strip said nothing at all.
+        #
+        # The words are built with LITERAL tr() calls on purpose: lupdate only
+        # extracts literals, and a table of pre-built strings would never reach
+        # the catalogue (see CONTRIBUTING).
+        if getattr(self, "_flag_words_cache", None) is None:
+            self._flag_words_cache = {
+                "unusable": (
+                    self.tr("unusable"),
+                    self.tr("the plate's recipe refused the measurement")),
+                "saturated": (
+                    self.tr("saturated"),
+                    self.tr("the star's core is clipped, so its flux is a "
+                            "floor and not a value")),
+                "nonlinear": (
+                    self.tr("nonlinear"),
+                    self.tr("the peak is above the camera profile's linearity "
+                            "limit: the flux is no longer proportional")),
+                "cosmic": (
+                    self.tr("cosmic ray"),
+                    self.tr("an isolated spike sits in the aperture")),
+                "cloud": (
+                    self.tr("cloud"),
+                    self.tr("the frame is dimmer than its neighbours by more "
+                            "than the night's scatter")),
+                "seeing": (
+                    self.tr("seeing"),
+                    self.tr("the FWHM left the night's range: defocus, a trail "
+                            "or a satellite through the core")),
+                "align_failed": (
+                    self.tr("not aligned"),
+                    self.tr("the frame could not be registered on the "
+                            "reference plate")),
+                "align_edge": (
+                    self.tr("edge"),
+                    self.tr("the frame only overlaps the reference plate at "
+                            "its edge")),
+                "guide_jump": (
+                    self.tr("guiding"),
+                    self.tr("the target moved off the position it had on the "
+                            "reference plate")),
+                "few_comps": (
+                    self.tr("few comparisons"),
+                    self.tr("the zero point rests on fewer comparisons than "
+                            "the recipe asks for")),
+                "no_zp": (
+                    self.tr("no zero point"),
+                    self.tr("no comparison star could hold a zero point, so "
+                            "this frame has no magnitude")),
+                "neighbour_zp": (
+                    self.tr("neighbour zero point"),
+                    self.tr("the zero point came from a neighbouring frame")),
+            }
+        return self._flag_words_cache
+
+    def _quality(self, index):
+        # @args: index - the frame
+        # @return: (data_flags, caveat_flags) of the series point measured on
+        #          this frame, or ([], []) when the visit has no measurement
+        #          for it. split_flags is the ENGINE's own split, the one the
+        #          chart reads: the list and the curve have to classify a frame
+        #          the same way, or one of them is lying.
+        facts = self._facts[index] if index < len(self._facts) else {}
+        return split_flags(list(facts.get("quality") or ()))
+
+    def _quality_colour(self, index):
+        # @args: index - the frame
+        # @return: the colour the row's border wears, or None when there is
+        #          nothing to say. It is the grammar the curve and the
+        #          measurement panel already share
+        #          (core/chart_annotate.magnitude_role through
+        #          viz/palette.MEASURE_COLOURS): red when the measurement is
+        #          not worth reporting, orange when it is usable but not clean.
+        facts = self._facts[index] if index < len(self._facts) else {}
+        if facts.get("broken") or facts.get("failed_register"):
+            return FLAG_RED
+        data, caveat = self._quality(index)
+        if data:
+            return palette.DANGER
+        if caveat:
+            return palette.FAIR
+        return None
+
     def _is_problem(self, index):
         # @args: index - the frame
         # @return: True when the frame has something an observer should look
-        #          at: it could NOT be read, or the last astrometry run could
-        #          not register it. A frame without a solution is NOT one:
-        #          a whole visit can be unsolved before "Solve the visit…"
-        #          runs, and flagging all of them would make the filter
-        #          useless (it says so in the tooltip instead).
+        #          at: it could NOT be read, the last astrometry run could not
+        #          register it, or the series threw its measurement away (a
+        #          DATA flag: saturated, nonlinear, a cosmic ray, a cloud, the
+        #          seeing, a frame that could not be aligned).
+        #
+        #          A frame without a solution is NOT one: a whole visit can be
+        #          unsolved before "Solve the visit…" runs, and flagging all of
+        #          them would make the filter useless (it says so in the
+        #          tooltip instead). A CAVEAT flag (a thin comparison set) is
+        #          not one either: that point is usable, and the chart draws it
+        #          with a faint edge for exactly that reason.
         facts = self._facts[index] if index < len(self._facts) else {}
-        return bool(facts.get("broken") or facts.get("failed_register"))
+        if facts.get("broken") or facts.get("failed_register"):
+            return True
+        data, _caveat = self._quality(index)
+        return bool(data)
 
     def _flag_text(self, index):
         # @args: index - the frame
@@ -362,7 +494,9 @@ class FramePreviews(QListWidget):
             return self.tr("unreadable")
         if facts.get("failed_register"):
             return self.tr("not registered")
-        return ""
+        data, caveat = self._quality(index)
+        words = self._flag_words()
+        return ", ".join(words.get(f, (f, ""))[0] for f in data + caveat)
 
     def _caption(self, index):
         # @args: index - the frame
@@ -407,6 +541,19 @@ class FramePreviews(QListWidget):
             bits.append(self.tr("No astrometric solution"))
         if facts.get("failed_register"):
             bits.append(self.tr("The last run could not register it"))
+        # the series' own verdict on this frame, with its why: the curve marks
+        # the same thing as a colour, and a mark nobody can explain is a mark
+        # that gets ignored
+        data, caveat = self._quality(index)
+        if data or caveat:
+            words = self._flag_words()
+            bits.append(self.tr("The series threw this frame's measurement "
+                                "away:") if data else
+                        self.tr("The series measured this frame, but its "
+                                "calibration leans on little:"))
+            for flag in data + caveat:
+                short, why = words.get(flag, (flag, ""))
+                bits.append(f"    · {short}: {why}" if why else f"    · {short}")
         return "\n".join(bits)
 
     def _gray(self, sample):

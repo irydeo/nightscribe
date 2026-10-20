@@ -132,6 +132,7 @@ class UfeDialog(QWidget):
         self._series_hook = None
         self._points_hook = None
         self._run_undo_hook = None
+        self._visit_flags_hook = None   # fn(session_id) -> {path: [flags]}
         self._exoclock_hook = None
         # the period search works on the PROJECT's curve, so its door needs
         # the project id: the host arms this when the editor came from a
@@ -1670,6 +1671,9 @@ class UfeDialog(QWidget):
             if path in getattr(self, "_unregistered", set()):
                 self.frames_list.set_fact(index, None, {"path": path,
                                                         "failed_register": True})
+        # and what the series said about each frame: the same verdict the
+        # curve draws, so the list and the chart cannot tell different stories
+        self._apply_frame_marks()
         if paths == previous:
             return              # same visit: the marks above are enough
         from .workers import FrameThumbWorker, hold
@@ -1813,6 +1817,41 @@ class UfeDialog(QWidget):
                                            "failed_register": True})
         self._sync_frames_count()
 
+
+    def _visit_quality(self):
+        # @return: {frame path: [flags]} - what the series said about each
+        #          frame of the visit on screen - or {} when the host armed no
+        #          hook (the editor opened from the project, not a visit) or
+        #          the visit has not been measured.
+        if self._visit_flags_hook is None:
+            return {}
+        ctx = self.series_context() or {}
+        session_id = ctx.get("session_id")
+        if session_id is None:
+            return {}
+        try:
+            return dict(self._visit_flags_hook(session_id) or {})
+        except Exception as err:        # never break the list for a mark
+            logger.warning("visit flags hook failed: %s", err)
+            return {}
+
+    def _apply_frame_marks(self):
+        # @return: None. Marks each row with the series' verdict on its frame.
+        #          Called when the list is built, right after a series is
+        #          saved, and when the host arms or clears the hook, so the
+        #          strip is right the moment it is looked at.
+        #
+        #          Every row is written, INCLUDING the frames with nothing to
+        #          say: the facts of a row accumulate (a preview, a failed
+        #          registration, a verdict) and setting only the flagged ones
+        #          would leave the mark of a series that has since been undone
+        #          on screen for ever.
+        if not hasattr(self, "frames_list"):
+            return
+        marks = self._visit_quality()
+        for index, path in enumerate(self.frames_list.paths()):
+            self.frames_list.set_fact(index, None,
+                                      {"quality": marks.get(path) or []})
 
     def _visit_paths(self):
         # @return: the visit's sorted frame paths, or [] (no visit armed)
@@ -2302,16 +2341,32 @@ class UfeDialog(QWidget):
         #        the tab's "Undo this run" (D6).
         self._run_undo_hook = fn if callable(fn) else None
 
+    def set_visit_flags_hook(self, fn):
+        # @args: fn - callable(session_id) -> {frame path: [flags]} or None.
+        #        The SERIES' verdict on each frame of the visit, which the
+        #        frame browser shows: a frame whose measurement the series
+        #        threw away is a problem, and the observer has to be able to
+        #        see which one and why (see widgets/frame_previews).
+        # @return: None
+        self._visit_flags_hook = fn if callable(fn) else None
+        self._apply_frame_marks()
+
     def notify_points(self, rows, cfg):
         # @args: rows - point dicts of one run, cfg - JSON-safe run echo
         # @return: the new run id, or None when there is no hook / it failed
         if self._points_hook is None:
             return None
         try:
-            return self._points_hook(rows or [], cfg or {})
+            run_id = self._points_hook(rows or [], cfg or {})
         except Exception as err:
             logger.warning("points hook failed: %s", err)
             return None
+        # THE STRIP ANSWERS AT ONCE: the series has just said which frames it
+        # threw away, and the list in front of the observer has to show it
+        # without closing and reopening the visit (2026-10-20: the marks
+        # existed only in the curve, and the list looked spotless)
+        self._apply_frame_marks()
+        return run_id
 
     def undo_run(self, run_id):
         # @args: run_id - the run to undo

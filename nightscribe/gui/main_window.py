@@ -13470,6 +13470,15 @@ class MainWindow(QMainWindow):
                     lambda scope="visit":
                     self._ufe_visit_curve(hook_pid, session_id, scope),
                     lambda: self._ufe_discard_curve(hook_pid, session_id))
+            # what the SERIES said about each frame, so the frame browser
+            # marks the ones it threw away: the chart and the list have to
+            # read the same verdict (2026-10-20)
+            flags_hook = getattr(dlg, "set_visit_flags_hook", None)
+            if callable(flags_hook):
+                from ..core import followup as _fu_flags
+                flags_hook(
+                    lambda sid: _fu_flags.curve_quality_by_frame(
+                        db, hook_pid, sid))
             # G: the project, in the list's OWN language: the badge is fed
             # by the same builder the project rows use, so the two cannot
             # drift (a badge with its own words would be a second truth).
@@ -13535,6 +13544,9 @@ class MainWindow(QMainWindow):
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(None, None)
+            flags_hook = getattr(dlg, "set_visit_flags_hook", None)
+            if callable(flags_hook):
+                flags_hook(None)         # ad-hoc: no series to answer for
             badge = getattr(dlg, "set_project_badge", None)
             if callable(badge):
                 badge(None)              # ad-hoc: no project behind it

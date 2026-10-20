@@ -321,6 +321,37 @@ def curve_point_ids(db, project_id=None, session_id=None, use_choice=False):
     return set(keep.values())
 
 
+def curve_quality_by_frame(db, project_id, session_id=None):
+    # THE SERIES' VERDICT ON EACH FRAME, keyed by the frame's path.
+    #
+    # The editor's frame browser marks every row with what the series said
+    # about that frame, and it has to say the SAME thing the curve says: the
+    # chart draws a flagged point as a hollow diamond and the list draws the
+    # same frame with a coloured border. Reading it here, from the very rows
+    # the curve is made of, is what keeps the two from disagreeing.
+    #
+    # Reported 2026-10-20: a frame the series had thrown away was marked in
+    # the curve and looked perfect in the list, so the observer, with an
+    # empty chart and a clean strip of frames in front of him, reasonably
+    # concluded that his data were bad. They were not: 338 of the 379 frames
+    # of that visit carried a flag, and the strip said nothing.
+    # @args: db - the database, project_id - the project, session_id - the
+    #        visit whose chart is on screen (None for the whole project)
+    # @return: {frame path: [flags]}, only the frames that carry flags
+    ids = curve_point_ids(db, project_id, session_id, use_choice=True)
+    if not ids:
+        return {}
+    marks = {}
+    sql = ("SELECT f.path, p.flags FROM photometry_points p"
+           " LEFT JOIN project_files f ON f.id = p.file_id"
+           " WHERE p.id IN (" + ",".join("?" * len(ids)) + ")")
+    for path, raw in db.execute(sql, tuple(sorted(ids))):
+        flags = _flags_in(raw)
+        if path and flags:
+            marks[str(path)] = flags
+    return marks
+
+
 def _chosen_runs(db, project_id=None, session_id=None):
     # @return: {session_id: run_id} of the visits that said which of
     #          their runs the chart shows

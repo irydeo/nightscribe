@@ -480,7 +480,15 @@ La release de la app se queda con sus cuatro artefactos de siempre.
   importa EXOTIC 4.3.1** sobre 3.11.17. Descomprimido ocupa 1,1 GB.
 - `pack.py` fija la fecha de todas las entradas del zip: dos pasadas sobre el mismo
   árbol dan **el mismo sha256** (comprobado), así que el número que publica la
-  release significa algo.
+  release es una huella fiel de ese artefacto.
+- **Pero el zip no es reproducible byte a byte entre builds, y conviene decirlo**:
+  tres dependencias llegan como fuente y se compilan en el runner (`imreg_dft`,
+  `pylightcurve`, `ultranest`), y ni setuptools ni el compilador producen lo mismo
+  dos veces. Medido el 2026-10-20, dos builds del mismo lock dieron hashes de rueda
+  distintos para las tres (la de `ultranest` incluso cambia de tamaño: su extensión
+  compilada guarda el directorio de compilación en la información de depuración), y
+  el sha256 del zip de Linux pasó de `a2c5a2a6…` a `ad5115d6…`. Lo que el lock fija
+  son las **versiones**, que es lo que decide la física, y esas son idénticas.
 - El lock de Linux, instalado desde cero en un venv limpio, da EXOTIC 4.3.1 con
   **exactamente** las versiones fijadas, sin nada de más ni de menos.
 

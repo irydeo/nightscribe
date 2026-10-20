@@ -37,9 +37,18 @@ TWO THINGS IT DOES THAT ARE NOT OBVIOUS:
   standard library fails months later, in the dark, and costs far more than the
   megabytes saved.
 * **It writes every entry with the SAME timestamp.** Zip stores modification
-  times, so with a fixed date the sha256 printed here means something: if it
-  changes between two builds of the same lock, something in the environment
-  really changed.
+  times, so with a fixed date the sha256 printed here is a faithful fingerprint
+  of THIS artifact: packing the same tree twice gives the same number, and the
+  sidecar can be checked by whoever downloaded the zip.
+
+  It does NOT promise that two builds of the same lock produce the same bytes,
+  and they do not. Three of EXOTIC's dependencies ship as source only and are
+  built on the runner (`imreg_dft`, `pylightcurve`, `ultranest`), and setuptools
+  and the C compiler record build-time data in what they produce: measured
+  2026-10-20, two builds of the same lock gave different wheel hashes for all
+  three (ultranest's even differs in size, because its compiled extension keeps
+  the build directory in its debug info). What the lock pins is the **versions**,
+  which is what decides the physics, and that part is identical every time.
 """
 
 import hashlib

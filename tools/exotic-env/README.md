@@ -28,7 +28,7 @@ Nothing else is installed, and nothing outside that folder is touched.
 | File | What it is |
 |---|---|
 | `requirements.in` | The one line this whole environment exists for: `exotic==4.3.1`. Bump it when EXOTIC releases. |
-| `linux.lock`, `windows.lock` | The full pinned dependency tree per platform, resolved with `uv`. This is what makes the published zip reproducible. |
+| `linux.lock`, `windows.lock` | The full pinned dependency tree per platform, resolved with `uv`. This is what decides **which versions** go inside, and it is identical every time. |
 | `smoke_test.py` | Imports EXOTIC and the compiled half of its stack. Run by the workflow with the environment's own interpreter; a non-zero exit publishes nothing. |
 | `pack.py` | Prunes (caches, the standard library's test suite) and packs the tree into the zip, with fixed timestamps so the same tree gives the same sha256. |
 

@@ -1402,11 +1402,29 @@ class UfeDialog(QWidget):
         #        like the series block does with set_series_hook.
         # @return: None
         self._astrometry_hook = fn if callable(fn) else None
+        self._sync_astrometry_tabs()
+
+    def _sync_astrometry_tabs(self):
+        # Every astrometry tab ON SCREEN is brought up to date; the hidden
+        # ones arm themselves when they take the stage (set_active ->
+        # _sync_context, which is why they do not need this). Refreshing a
+        # hidden tab is not free: arming the context reads the header of
+        # every frame of the visit (measured 2026-10-21: 1.85 s for the 379
+        # frames of a real visit in the Track & Stack tab), and the observer
+        # who opened the workbench for the SERIES paid it for a tab they
+        # never looked at.
+        # @return: None
         for name in ("tab_calibration", "tab_trackstack"):
             tab = getattr(self, name, None)
+            if tab is None or not tab.isVisible():
+                continue
             refresh = getattr(tab, "refresh_context", None)
             if callable(refresh):
-                refresh()
+                try:
+                    refresh()
+                except Exception as err:      # never kills the dialog
+                    logger.warning("the astrometry context could not "
+                                   "refresh: %s", err)
 
     def astrometry_context(self):
         # @return: the visit context the host hooked, or None (ad-hoc
@@ -1530,12 +1548,9 @@ class UfeDialog(QWidget):
         self._astrometry_result_hook = fn if callable(fn) else None
         # The host may set the context hook BEFORE this one: refreshing here
         # means the tab can show the saved run as soon as it is armed,
-        # whatever order the hooks arrive in.
-        for name in ("tab_calibration", "tab_trackstack"):
-            tab = getattr(self, name, None)
-            refresh = getattr(tab, "refresh_context", None)
-            if callable(refresh):
-                refresh()
+        # whatever order the hooks arrive in (and only the tab on screen:
+        # see _sync_astrometry_tabs).
+        self._sync_astrometry_tabs()
 
     def astrometry_result(self):
         # @return: the saved run of the current visit, or None
@@ -1793,14 +1808,7 @@ class UfeDialog(QWidget):
         self._previews_paths = list(self._visit_paths())
         self._sync_frame_nav()
         self._sync_frame_list(self._previews_paths)
-        astro = getattr(self, "tab_trackstack", None)
-        sync = getattr(astro, "refresh_context", None)
-        if callable(sync):
-            try:
-                sync()
-            except Exception as err:
-                logger.warning("the astrometry context could not refresh: %s",
-                               err)
+        self._sync_astrometry_tabs()
         self.tab_measure.refresh_bands()
 
     def mark_unregistered_frames(self, paths):

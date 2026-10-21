@@ -212,6 +212,68 @@ def test_saving_a_series_does_not_leave_the_workbench(window):
     assert win.lst_results.count() == 1
 
 
+def test_opening_from_a_visit_wears_the_wait_notice_whole(window):
+    # The open is not instant (measured 2026-10-21: 2.5 s on a 379-frame
+    # visit, 0.74 s once the hidden astrometry tab stopped being armed) and
+    # it runs on the GUI thread, so the window does not repaint: with no
+    # notice, a desktop paints that as an application that went away. The
+    # WHOLE open is wrapped, the navigation included, not only the build.
+    from nightscribe.gui.main_window import VIEW_UFE
+    _p, _panel, win, _sid = _visit_of_a_measured_kind(window)
+    seen = []
+    real = window._with_busy
+
+    def spy(label, fn):
+        # only the outermost notice is recorded: the build inside the open
+        # asks for its own, and the real one collapses the two
+        outer = not seen
+        if outer:
+            seen.append(label)
+        dlg = real(label, fn)
+        if outer:
+            seen.append(("inside", window._shell_stack().currentIndex()))
+        return dlg
+
+    window._with_busy = spy
+    win.btn_analyze.click()
+    assert seen == ["Opening the image workbench…",
+                    ("inside", VIEW_UFE)]
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+
+
+def test_only_one_wait_notice_at_a_time(window, monkeypatch):
+    # The open paths nest: the workbench wraps the whole open and the build
+    # inside it wraps itself. A second dialog would stack on the first and
+    # make the wait look twice as long as it is.
+    from PySide6 import QtWidgets
+    shown = []
+
+    class FakeProgress:
+        def __init__(self, label, *args, **kwargs):
+            self.label = label
+            shown.append(label)
+
+        def __getattr__(self, name):
+            return lambda *args, **kwargs: None
+
+    monkeypatch.setattr(QtWidgets, "QProgressDialog", FakeProgress)
+    window._with_busy(
+        "outer", lambda: window._with_busy("inner", lambda: 42))
+    assert shown == ["outer"]
+
+
+def test_the_window_is_handed_back_after_the_wait(window, monkeypatch):
+    # A modal dialog takes the focus, and on a real desktop a window that
+    # does not answer and does not come back to the front reads as an
+    # application that went to the background (reported 2026-10-21).
+    calls = []
+    monkeypatch.setattr(window, "raise_", lambda: calls.append("raise"))
+    monkeypatch.setattr(window, "activateWindow",
+                        lambda: calls.append("activate"))
+    window._with_busy("wait", lambda: None)
+    assert calls == ["raise", "activate"]
+
+
 def test_the_night_panel_fills_the_empty_pane(window):
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_night

@@ -208,8 +208,11 @@ def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
                             seen.append((tab, hook_pid, obj, session_id))
                             or _Dlg()))
     import nightscribe.gui.main_window as _mw
-    monkeypatch.setattr(_mw.project, "get",
-                        lambda db_, pid: dict(window._current_project))
+    # the row is captured once: the open turns the event loop (the wait
+    # notice paints before the work), and a lambda reading the live
+    # _current_project would hand back None after that turn
+    project_row = dict(window._current_project)
+    monkeypatch.setattr(_mw.project, "get", lambda db_, pid: project_row)
     window._visit_open_in_editor(1, "/tmp/plate.fits", 42)
     assert seen[0][:2] == ("measure", 1)
     assert seen[0][2] == {"name": "SN 2026zji", "ra": 10.0, "dec": 20.0,

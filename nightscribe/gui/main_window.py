@@ -454,6 +454,10 @@ class MainWindow(QMainWindow):
         # The visit window the workbench made step aside, so leaving the
         # workbench brings it back (the same visit, filled again).
         self._visit_win_hidden = None
+        # True while a "Please wait" dialog is on screen: one at a time
+        # (the open paths nest: the workbench wraps the open and the build
+        # wraps itself).
+        self._busy_active = False
         # the visit the observer clicked in Analysis: the astrometry runs
         # filter to it (ADR-086 rev); None = the whole project
         self._analysis_visit_filter = None
@@ -1230,12 +1234,12 @@ class MainWindow(QMainWindow):
     def _visit_window_step_aside(self):
         # The visit window gets out of the way, and the main window comes
         # to the front. An open path calls this BEFORE the workbench's own
-        # work, which is not instant: the editor is built on its first use
-        # (measured 2026-10-21: about 3 s on a 379-frame visit). With the
-        # visit window still on top, that pause read as a dead button, so
-        # the observer pressed "Measure…" a second time and credited it
-        # with opening the workbench. What opened it was the first press,
-        # and now the "Please wait" the build already shows can be seen.
+        # work, which is not instant (measured 2026-10-21 on a 379-frame
+        # visit: the editor itself is built in 0.37 s, but the whole open
+        # was 2.5 s). With the visit window still on top, that pause read
+        # as a dead button, so the observer pressed "Measure…" a second
+        # time and credited it with opening the workbench. What opened it
+        # was the first press, and now the wait notice can be seen.
         # Hidden, not closed: it is the same visit when you come back, and
         # the workbench has its own frame navigator for measuring.
         # @return: None
@@ -8694,6 +8698,7 @@ class MainWindow(QMainWindow):
                 "The newest ticked observation has no visit to open the "
                 "editor on."), 8000)
             return
+        self._visit_window_step_aside()      # out of the way of the notice
         dlg = self._with_busy(
             self.tr("Opening the combined set in the editor…"),
             lambda: self._visit_astrometry(pid, sess, run_id=run.get("id")))
@@ -8957,7 +8962,9 @@ class MainWindow(QMainWindow):
         # The run the observer PICKED is the one the editor must show, not
         # the visit's newest (a visit holds many passes). Opening it loads the
         # UFE, the visit's frames and the saved run, so a busy dialog is shown
-        # while it happens.
+        # while it happens (the visit window first: the notice must be seen,
+        # not covered by it).
+        self._visit_window_step_aside()
         self._with_busy(
             self.tr("Opening the run in the editor…"),
             lambda: self._visit_astrometry(run["project_id"],
@@ -8971,6 +8978,21 @@ class MainWindow(QMainWindow):
         #          fire while the loop is blocked. It is static (the bar cannot
         #          animate without yielding), which is what opening a run
         #          needs: the observer sees that something is happening.
+        #
+        #          ONE dialog at a time: the paths that open the workbench
+        #          wrap the whole open, and the build inside it wraps itself
+        #          too. A second dialog would only stack on the first one and
+        #          make the wait look twice as long as it is.
+        #
+        #          The window is handed back at the end (raise_ and
+        #          activateWindow): a modal dialog takes the focus, and on a
+        #          real desktop a window that does not answer and does not
+        #          come back to the front reads as an application that went
+        #          away (reported 2026-10-21). Measured on a 379-frame visit:
+        #          the whole open is about 2.5 s, and without this the last
+        #          second and a half was a grey, unresponsive window.
+        if getattr(self, "_busy_active", False):
+            return fn()
         from PySide6.QtWidgets import QProgressDialog
         prog = QProgressDialog(label, "", 0, 0, self)
         prog.setWindowTitle(self.tr("Please wait"))
@@ -8981,11 +9003,17 @@ class MainWindow(QMainWindow):
         prog.setAutoReset(False)
         prog.show()
         QApplication.processEvents()          # paint it before the work
+        self._busy_active = True
         try:
             return fn()
         finally:
+            self._busy_active = False
             prog.close()
             prog.deleteLater()
+            # the dialog had the focus: give it back, or the desktop leaves
+            # the app behind and the wait reads as a hang
+            self.raise_()
+            self.activateWindow()
 
     def _analysis_astrometry_undo(self, tbl):
         # @args: tbl - the runs table
@@ -9416,23 +9444,32 @@ class MainWindow(QMainWindow):
     def _visit_open_in_editor(self, pid, path, sid):
         # A visit's plate opens in the UFE with everything attached: the
         # object context, and both hooks land on THIS visit (ADR-045:
-        # nothing attaches without one).
+        # nothing attaches without one). The whole open wears the wait
+        # notice: the visit window steps aside first, and the editor, the
+        # visit's frames and the plate's saved state are read behind it.
         # @args: pid - project id, path - the FITS to open, sid - visit id
+        # @return: the editor, or None when the plate could not be read
         p = project.get(db, pid)
         if not p:
-            return
+            return None
         obj = self._ufe_object_from_project(p)
-        self._visit_window_step_aside()   # the open is not instant
-        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
-                             session_id=sid)
-        if not dlg.open_plate(path):
-            return
-        dlg.set_object(obj)
-        # ADR-047: the plate's saved working state comes back with it:
-        # stretch, the measure recipe, the sequence field, when there
-        # is one; without it, the project's saved sequence fills the
-        # Compare tab (ADR-048 follow-up: EXOTIC finds the comps)
-        self._load_editor_sequence(dlg, pid, path)
+
+        def work():
+            dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                                 session_id=sid)
+            if not dlg.open_plate(path):
+                return None
+            dlg.set_object(obj)
+            # ADR-047: the plate's saved working state comes back with it:
+            # stretch, the measure recipe, the sequence field, when there
+            # is one; without it, the project's saved sequence fills the
+            # Compare tab (ADR-048 follow-up: EXOTIC finds the comps)
+            self._load_editor_sequence(dlg, pid, path)
+            return dlg
+
+        self._visit_window_step_aside()      # out of the way of the notice
+        return self._with_busy(
+            self.tr("Opening the image workbench…"), work)
 
     def _open_phase_dialog(self, pid):
         # The period + phase window (quality plan, C): it takes the
@@ -9461,27 +9498,35 @@ class MainWindow(QMainWindow):
     def _visit_measure_series(self, pid, session_id):
         # ADR-048 (D8/D36): the visit's frames become a series. The
         # editor opens on the visit's first plate (the reference WCS) with
-        # the series block armed; a visit with no FITS says so.
+        # the series block armed; a visit with no FITS says so. The whole
+        # open wears the wait notice (see _visit_open_in_editor).
         # @args: pid - project id, session_id - the visit
+        # @return: the editor, or None when there was nothing to open
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
         if not paths:
             self.statusBar().showMessage(
                 self.tr("This visit has no FITS frames to measure."), 8000)
-            return
+            return None
         p = project.get(db, pid)
         if not p:
-            return
+            return None
         obj = self._ufe_object_from_project(p)
-        self._visit_window_step_aside()   # the open is not instant
-        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
-                             session_id=session_id)
-        dlg.open_plate(paths[0])
-        dlg.set_object(obj)
-        # ADR-048 follow-up: the series/EXOTIC flow starts from the
-        # sequence already built (plate state first, project second)
-        self._load_editor_sequence(dlg, pid, paths[0])
+
+        def work():
+            dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                                 session_id=session_id)
+            dlg.open_plate(paths[0])
+            dlg.set_object(obj)
+            # ADR-048 follow-up: the series/EXOTIC flow starts from the
+            # sequence already built (plate state first, project second)
+            self._load_editor_sequence(dlg, pid, paths[0])
+            return dlg
+
+        self._visit_window_step_aside()      # out of the way of the notice
+        return self._with_busy(
+            self.tr("Opening the image workbench…"), work)
 
     def _visit_astrometry(self, pid, session_id, run_id=None):
         # ADR-062, phase 7 (D15): the visit's frames become a track & stack
@@ -9503,37 +9548,44 @@ class MainWindow(QMainWindow):
         if not paths:
             self.statusBar().showMessage(
                 self.tr("This visit has no FITS frames to stack."), 8000)
-            return
+            return None
         p = project.get(db, pid)
         if not p:
-            return
+            return None
         obj = self._ufe_object_from_project(p)
-        self._visit_window_step_aside()   # the open is not instant
-        dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
-                             session_id=session_id)
-        # The editor may already be on THIS visit holding ANOTHER run: the
-        # session key is (project, visit), so picking a different run of the
-        # same visit reset nothing and the tab kept the run it had, while the
-        # one the observer picked never loaded (measured 2026-10-16). The run
-        # is not the session, so it is asked for by name; with the right run
-        # already on stage the tab does nothing.
-        tab = getattr(dlg, "tab_trackstack", None)
-        forget = getattr(tab, "forget_run", None)
-        if run_id is not None and callable(forget):
-            forget(run_id)
-        dlg.open_plate(paths[0])
-        # ... and the run's own observation goes back on stage: the plate is
-        # what arms the navigator and the rest of the workbench, and loading
-        # it used to throw the run's stack away (measured 2026-10-16). With no
-        # run held, the plate is what the observer opened the editor for.
-        put_back = getattr(tab, "show_run_on_stage", None)
-        if callable(put_back):
-            put_back()
-        dlg.set_object(obj)
-        show = getattr(dlg, "show_tab", None)
-        if callable(show):
-            show("trackstack")
-        return dlg
+
+        def work():
+            dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
+                                 session_id=session_id)
+            # The editor may already be on THIS visit holding ANOTHER run:
+            # the session key is (project, visit), so picking a different
+            # run of the same visit reset nothing and the tab kept the run
+            # it had, while the one the observer picked never loaded
+            # (measured 2026-10-16). The run is not the session, so it is
+            # asked for by name; with the right run already on stage the
+            # tab does nothing.
+            tab = getattr(dlg, "tab_trackstack", None)
+            forget = getattr(tab, "forget_run", None)
+            if run_id is not None and callable(forget):
+                forget(run_id)
+            dlg.open_plate(paths[0])
+            # ... and the run's own observation goes back on stage: the
+            # plate is what arms the navigator and the rest of the
+            # workbench, and loading it used to throw the run's stack away
+            # (measured 2026-10-16). With no run held, the plate is what
+            # the observer opened the editor for.
+            put_back = getattr(tab, "show_run_on_stage", None)
+            if callable(put_back):
+                put_back()
+            dlg.set_object(obj)
+            show = getattr(dlg, "show_tab", None)
+            if callable(show):
+                show("trackstack")
+            return dlg
+
+        self._visit_window_step_aside()      # out of the way of the notice
+        return self._with_busy(
+            self.tr("Opening the image workbench…"), work)
 
     def _visit_mpc_report(self, pid, session_id, fmt="ades", submission=None):
         # The report the visit's own astrometry run produced, rebuilt the same
@@ -9613,17 +9665,23 @@ class MainWindow(QMainWindow):
         pid = row["project_id"]
         p = project.get(db, pid)
         if not p:
-            return
+            return None
         obj = self._ufe_object_from_project(p)
-        self._visit_window_step_aside()   # the open is not instant
-        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
-                             session_id=pt.get("session_id"))
-        if not dlg.open_plate(row["path"]):
-            return
-        dlg.set_object(obj)
-        # the same restore as "restore in the editor" (and, without a
-        # saved plate state, the project's sequence: ADR-048 follow-up)
-        self._load_editor_sequence(dlg, pid, row["path"])
+
+        def work():
+            dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                                 session_id=pt.get("session_id"))
+            if not dlg.open_plate(row["path"]):
+                return None
+            dlg.set_object(obj)
+            # the same restore as "restore in the editor" (and, without a
+            # saved plate state, the project's sequence: ADR-048 follow-up)
+            self._load_editor_sequence(dlg, pid, row["path"])
+            return dlg
+
+        self._visit_window_step_aside()      # out of the way of the notice
+        return self._with_busy(
+            self.tr("Opening the image workbench…"), work)
 
     def _visit_data_changed(self, pid):
         # A visit or its contents changed (the panel owns the edit): the

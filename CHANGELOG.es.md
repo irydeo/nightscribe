@@ -39,13 +39,17 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
   la línea de cadencia, las pasadas y la cabecera) se refrescan donde están, y la
   ventana de la visita vuelve rellena cuando el observador sale del banco.
 
-- **«Medir la serie…» responde al primer clic.** El banco se construye en su
-  primer uso, y en una visita real eso son unos **3 segundos** durante los que la
-  ventana no se repinta: con la ventana de la visita todavía encima, la pausa se
-  leía como un botón muerto, así que el observador volvía a pulsar y el mérito se
-  lo llevaba el segundo clic. La ventana de la visita se aparta ANTES de ese
-  trabajo, así que el aviso de espera que la construcción ya muestra se puede
-  ver.
+- **«Medir la serie…» responde al primer clic.** Abrir el banco no es
+  instantáneo, y en una visita real de 379 tomas tardaba **2,5 segundos** durante
+  los que la ventana no se repintaba: con la ventana de la visita todavía
+  encima, la pausa se leía como un botón muerto, así que el observador volvía a
+  pulsar y el mérito se lo llevaba el segundo clic. La ventana de la visita se
+  aparta ANTES de ese trabajo, y toda la apertura lleva ahora el aviso de
+  espera, así que la pulsación queda contestada en el sitio. Y la apertura se ha
+  acortado **1,8 segundos**: armar el contexto de la pestaña Track & Stack lee
+  la cabecera de cada toma de la visita (1,85 s para 379), y eso se pagaba
+  aunque el editor se abriera para la serie. Ahora una pestaña se arma cuando
+  recibe el escenario, que es cuando se la mira.
 
 - **La masa de aire y el sitio se toman de la placa, no de tus Ajustes.** El
   motor calculaba la altitud del objetivo desde el sitio configurado en Ajustes,

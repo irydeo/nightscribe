@@ -1355,3 +1355,22 @@ def test_a_hand_measurement_wins_over_the_visit_s_curve(dlg):
     assert "12.34" in _band_mag(dlg)["text"]      # the hand one wins
     tab._curve_from_visit = False                 # the series just ran here
     assert "11.11" in _band_mag(dlg)["text"]
+
+
+def test_arming_the_astrometry_context_does_not_read_a_hidden_tab(dlg):
+    # Arming the visit context reads the header of EVERY frame of the visit
+    # (measured 2026-10-21: 1.85 s for the 379 frames of a real visit in the
+    # Track & Stack tab), and the observer who opened the workbench for the
+    # SERIES was paying it for a tab they never looked at. Only the tab on
+    # screen is refreshed; the others arm themselves when they take the
+    # stage, so the laziness is not a lost arming.
+    calls = []
+    for name in ("tab_calibration", "tab_trackstack"):
+        tab = getattr(dlg, name)
+        tab._sync_context = lambda name=name: calls.append(name)
+    assert not dlg.tab_trackstack.isVisible()      # not on screen
+    dlg.set_astrometry_hook(lambda: {"paths": [str(MONO)]})
+    assert calls == []                             # nothing was read
+    dlg.show_tab("trackstack")                     # it takes the stage
+    assert "tab_trackstack" in calls               # it armed itself
+    assert "tab_calibration" not in calls

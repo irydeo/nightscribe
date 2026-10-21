@@ -39,12 +39,17 @@ All notable changes to NightScribe are documented here. The format follows
   cadence line, the runs and the header) refresh where they are now, and the
   visit window comes back filled when the observer leaves the workbench.
 
-- **"Measure the series…" answers the first click.** The workbench is built on
-  its first use, and on a real visit that is about **3 seconds** during which
-  the window does not repaint: with the visit window still on top, the pause
-  read as a dead button, so the observer pressed again and the second press got
-  the credit for opening it. The visit window steps aside BEFORE that work, so
-  the wait notice the build already shows can be seen.
+- **"Measure the series…" answers the first click.** The workbench is not
+  instant to open, and on a real 379-frame visit it took **2.5 seconds** during
+  which the window did not repaint: with the visit window still on top, the
+  pause read as a dead button, so the observer pressed again and the second
+  press got the credit for opening it. The visit window steps aside BEFORE that
+  work, and the whole open now wears the wait notice, so the press is answered
+  on the spot. And the open got **1.8 seconds shorter**: arming the Track &
+  Stack tab's context reads the header of every frame of the visit (1.85 s for
+  379 of them), and that was being paid even when the editor was opened for the
+  series. A tab now arms itself when it takes the stage, which is when it is
+  looked at.
 
 - **The airmass and the site are taken from the plate, not from your
   Settings.** The engine computed the target's altitude from the site

@@ -1588,3 +1588,18 @@ def test_the_plates_own_site_beats_the_observer_settings():
     assert own.plate_site == (40.0, -3.0)
     # and a config with nothing at all answers (None, None), never a guess
     assert phot.PlateConfig(header={}).plate_site == (None, None)
+
+
+def test_the_plates_own_telescope_size_beats_the_observer_settings():
+    # The scintillation goes with the diameter, so on a 1 m plate measured
+    # with the observer's 10" that term comes out 2.5 times too big. Only a
+    # plate that really says the size is trusted: a name is not a size.
+    from nightscribe.core import photometry as phot
+    foreign = phot.PlateConfig(header={"TELID": "1m0a"}, site_aperture_m=0.25)
+    assert foreign.plate_aperture_m == 1.0
+    own = phot.PlateConfig(header={"TELESCOP": "CDK17"},
+                           site_aperture_m=0.43)
+    assert own.plate_aperture_m == 0.43
+    # nobody says anything: the observer's own, which is right for them
+    assert phot.PlateConfig(header={}, site_aperture_m=0.25) \
+        .plate_aperture_m == 0.25

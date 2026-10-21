@@ -157,3 +157,32 @@ def test_meta_carries_the_site_and_the_airmass():
     m2 = meta_from_header({"DATE-OBS": "2026-09-09T22:30:00"})
     assert m2["site_lat"] is None and m2["site_lon"] is None
     assert m2["airmass"] is None
+
+
+def test_the_plate_says_how_big_its_telescope_is_when_it_says_it():
+    # Las Cumbres writes the aperture into the telescope's own name, and that
+    # number feeds the scintillation term: a 1 m plate measured with the
+    # observer's 10" gets that term 2.5 times too big (0.032 mag against the
+    # honest 0.013), and it is the term that dominates a quiet night.
+    from nightscribe.core.fits_meta import aperture_from_header
+    assert aperture_from_header({"TELID": "0m4c"}) == 0.4
+    assert aperture_from_header({"TELID": "1m0a"}) == 1.0
+    assert aperture_from_header({"TELESCOP": "2m0a"}) == 2.0
+    assert aperture_from_header({"TELESCOP": "0m4-63"}) == 0.4
+    assert aperture_from_header({"TELID": "1m0-06"}) == 1.0
+    assert meta_from_header({"TELID": "1m0a"})["aperture_m"] == 1.0
+
+
+def test_a_name_that_says_nothing_is_not_a_number():
+    # 'Cecilia' (MicroObservatory) and 'CDK17' (a model) say nothing about
+    # the size: inventing one would be worse than falling back to the
+    # observer's Settings, which for the observer's OWN telescope is the
+    # right answer anyway.
+    from nightscribe.core.fits_meta import aperture_from_header
+    assert aperture_from_header(
+        {"TELESCOP": "Cecilia", "INSTRUME": "Main"}) is None
+    assert aperture_from_header({"TELESCOP": "CDK17"}) is None
+    assert aperture_from_header({"TELESCOP": "CFF300"}) is None
+    assert aperture_from_header({}) is None
+    # a degenerate id is not a size either
+    assert aperture_from_header({"TELID": "0m0a"}) is None

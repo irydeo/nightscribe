@@ -439,6 +439,23 @@ def _plate_site(group, cfg):
     return cfg.site_lat, cfg.site_lon
 
 
+def _plate_aperture(group, cfg):
+    # @args: group - the frames of one point, cfg - the run's config
+    # @return: the telescope's diameter in metres as the PLATE declares it,
+    #          else the observer's Settings.
+    #
+    # The scintillation term of the error goes with the diameter, and on a
+    # plate from a bigger telescope the observer's own understates the night:
+    # a Las Cumbres 1 m measured with a 10" gets that term 2.5 times too big
+    # (0.032 mag against the honest 0.013). Only a plate that really says the
+    # size is trusted (fits_meta refuses to read it out of a name).
+    for f in group:
+        meta = f.get("meta") or {}
+        if meta.get("aperture_m"):
+            return float(meta["aperture_m"])
+    return cfg.site_aperture_m
+
+
 def _target_altaz(cfg, mjd, site=None):
     # The target's alt-az from the reference WCS and the point's instant.
     # @args: site - (lat, lon) to use instead of the config's, which is what
@@ -489,19 +506,22 @@ def _plate_airmass(group, cfg, mjd, site=None):
     return _airmass(cfg, mjd, site=site)
 
 
-def _scintillation(cfg, mjd, span_s, site=None):
+def _scintillation(cfg, mjd, span_s, site=None, aperture_m=None):
     # T4/H5: Young's scintillation with the site the PLATE was taken from
-    # (the observer's Settings when the plate does not say) and the target's
-    # altitude from the reference WCS and the point's instant.
-    # @args: site - (lat, lon) to use instead of the config's
+    # (the observer's Settings when the plate does not say), the diameter the
+    # plate declares (idem) and the target's altitude from the reference WCS
+    # and the point's instant.
+    # @args: site - (lat, lon) to use instead of the config's,
+    #        aperture_m - the diameter in metres to use instead of the
+    #        config's
     # @return: sigma in mag, or None
     if not span_s or mjd is None:
         return None
     alt, _az = _target_altaz(cfg, mjd, site=site)
     if alt is None:
         return None
-    return photometry.scintillation_mag(alt, span_s, cfg.site_aperture_m,
-                                        cfg.site_height_m)
+    return photometry.scintillation_mag(
+        alt, span_s, aperture_m or cfg.site_aperture_m, cfg.site_height_m)
 
 
 def _sky_sigma(data, x, y, r_ap):
@@ -1032,9 +1052,11 @@ def _build_point(group, cfg):
     weights = [1.0 / (e ** 2) if (e and e > 0) else 1.0 for e in errs]
     pt.mjd = _weighted_mean([f["mjd"] for f in group], weights)
     pt.hjd = _hjd_of(pt.mjd, cfg.wcs, cfg.target_xy)
-    # the plate's own site and airmass, when it declares them (see
-    # _plate_airmass): the observer's Settings are for the observer's plates
+    # the plate's own site, airmass and diameter, when it declares them (see
+    # _plate_airmass and _plate_aperture): the observer's Settings are for
+    # the observer's own plates
     site = _plate_site(group, cfg)
+    aperture = _plate_aperture(group, cfg)
     pt.airmass = _plate_airmass(group, cfg, pt.mjd, site=site)
     _flag_gates(pt, group, cfg)
     if comb is None:
@@ -1047,7 +1069,8 @@ def _build_point(group, cfg):
     else:
         _catalog_point(pt, group, cfg)
     span = _group_span(group)
-    scint = _scintillation(cfg, pt.mjd, span, site=site)
+    scint = _scintillation(cfg, pt.mjd, span, site=site,
+                           aperture_m=aperture)
     pt.err = photometry.combine_errors(pt.err_internal, pt.zp_err, scint,
                                        cfg.site_flat)
     return pt

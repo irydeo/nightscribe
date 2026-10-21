@@ -1306,3 +1306,12 @@ def test_the_point_takes_the_airmass_and_the_site_the_plate_declares():
     # there is no geometry to fall back to: None, not a made-up number
     assert sm._plate_site([{"meta": {}}], cfg) == (40.0, -3.0)
     assert sm._plate_airmass([{"meta": {}}], cfg, 60000.0) is None
+
+
+def test_the_point_takes_the_telescope_size_the_plate_declares():
+    # The scintillation goes with the diameter: a 1 m plate measured with the
+    # observer's 10" gets that term 2.5 times too big (measured 2026-10-21:
+    # 0.030 mag against the honest 0.016 on a Las Cumbres series).
+    cfg = sm.SeriesConfig(site_aperture_m=0.25)
+    assert sm._plate_aperture([{"meta": {"aperture_m": 1.0}}], cfg) == 1.0
+    assert sm._plate_aperture([{"meta": {}}], cfg) == 0.25

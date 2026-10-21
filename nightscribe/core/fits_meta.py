@@ -21,6 +21,7 @@ pulls the relevant cards and computes MJD.
 
 import datetime
 import logging
+import re
 
 from . import coords, fits_io
 
@@ -52,6 +53,20 @@ _SITE_KEYS = (("SITELAT", "SITELONG"), ("LATITUDE", "LONGITUD"),
               ("LATITUDE", "LONGITUDE"))
 _AIRMASS_KEYS = ("AIRMASS", "SECZ")     # SECZ is sec(z), the same number
 
+# The telescope's diameter, when the plate's own name says it.
+#
+# Las Cumbres writes the aperture into the telescope's id: 0m4a is a 0.4 m,
+# 1m0a is a 1 m, 2m0a is a 2 m, and TELESCOP carries the same prefix
+# ('0m4-63'). It is the ONE convention in these headers that states the
+# diameter instead of leaving it to be guessed, and guessing is exactly what
+# this module refuses to do: 'Cecilia' (MicroObservatory) and 'CDK17' (a
+# model) say nothing about the size, and inventing a number from them would
+# be worse than falling back to the observer's Settings, which for the
+# observer's OWN telescope is the right answer anyway.
+_APERTURE_RE = re.compile(r"^(\d)m(\d)(?!\d)")
+_APERTURE_KEYS = ("TELID", "TELESCOP")
+_APERTURE_RANGE_M = (0.05, 30.0)        # a finder to a large amateur
+
 
 def _parse_fits_date(raw):
     # @args: raw - string from a FITS DATE-OBS card
@@ -71,6 +86,30 @@ def _parse_fits_date(raw):
         except ValueError:
             continue
     logger.debug("unparseable FITS date: %s", raw)
+    return None
+
+
+def aperture_from_header(header):
+    # The telescope's diameter, in METRES, as the plate itself declares it.
+    #
+    # It feeds the scintillation term of the error (Young), which goes with
+    # the diameter: on a Las Cumbres 1 m measured with the observer's 10"
+    # that term comes out 2.5 times too big (0.032 mag against the honest
+    # 0.013), and it is the term that dominates an otherwise quiet night.
+    # @args: header - dict from fits_io.read_header / read_fits
+    # @return: the diameter in metres, or None when the plate does not say.
+    #          None is a real answer here (see _APERTURE_RE): a name that
+    #          says nothing must not become a number.
+    for key in _APERTURE_KEYS:
+        raw = header.get(key)
+        if raw is None:
+            continue
+        m = _APERTURE_RE.match(str(raw).strip())
+        if not m:
+            continue
+        metres = int(m.group(1)) + int(m.group(2)) / 10.0
+        if _APERTURE_RANGE_M[0] <= metres <= _APERTURE_RANGE_M[1]:
+            return metres
     return None
 
 
@@ -172,4 +211,5 @@ def meta_from_header(header):
             "exptime_s": exptime,
             "object": str(obj).strip() if obj else None,
             "site_lat": lat, "site_lon": lon,
-            "airmass": airmass_from_header(header)}
+            "airmass": airmass_from_header(header),
+            "aperture_m": aperture_from_header(header)}

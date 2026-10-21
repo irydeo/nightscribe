@@ -25,6 +25,17 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
   puntos ya guardados conservan los números viejos, que son el registro de lo
   que se midió).
 
+- **El tamaño del telescopio también se lee de la placa.** Es la entrada de ese
+  mismo término de centellea, y un 1 m de Las Cumbres medido con los 10" del
+  observador lo dejaba 2,5 veces demasiado grande. Solo se hace caso a una placa
+  que diga de verdad el tamaño, porque es la única forma de leerlo sin
+  inventarlo: Las Cumbres lo escribe en el propio identificador del telescopio
+  (`1m0a`, `0m4c`, `2m0a`), mientras que un nombre como `Cecilia` o `CDK17` no
+  dice nada del tamaño, y ahí se quedan los Ajustes del observador: para su
+  propio telescopio son la respuesta correcta. Con las dos tarjetas leídas, los
+  errores de la serie que se reportó pasaron de 0,05 a 0,39 mag a lo largo de la
+  noche (el degradado verde-naranja-rojo) a un **0,016 plano**.
+
 ## [0.1.3] - 2026-10-21
 
 ### Corregido

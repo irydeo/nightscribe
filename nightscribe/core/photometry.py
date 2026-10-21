@@ -2301,6 +2301,20 @@ class PlateConfig:
         lat, lon = fits_meta.site_from_header(self.header or {})
         return (lat if lat is not None else self.site_lat,
                 lon if lon is not None else self.site_lon)
+
+    @property
+    def plate_aperture_m(self):
+        # The telescope's diameter, in metres: what the PLATE declares when
+        # its own name says it (Las Cumbres writes 1m0a for a 1 m, see
+        # fits_meta.aperture_from_header), else the observer's Settings.
+        #
+        # It is the input of the scintillation term, which goes with the
+        # diameter: a 1 m plate measured with the observer's 10" gets that
+        # term 2.5 times too big, and it is the term that dominates a quiet
+        # night (0.032 mag against the honest 0.013).
+        # @return: the diameter in metres, or None when nobody says
+        return (fits_meta.aperture_from_header(self.header or {})
+                or self.site_aperture_m)
     # host subtraction (H2b): the comps read on another frame, in the
     # plate orientation, at comp_scale plate px per comp-image px
     comp_image: object = None
@@ -2404,7 +2418,7 @@ def _plate_scintillation(cfg, col, row, exptime):
             return None
         lst = coords.lst_degrees(jd, float(lon))
         alt, _az = coords.altaz(ra, dec, float(lat), lst)
-        return scintillation_mag(alt, exptime, cfg.site_aperture_m,
+        return scintillation_mag(alt, exptime, cfg.plate_aperture_m,
                                  cfg.site_height_m)
     except Exception:
         return None

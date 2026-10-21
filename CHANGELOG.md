@@ -24,6 +24,17 @@ All notable changes to NightScribe are documented here. The format follows
   and the corrected trend (the points already stored keep the old numbers, they
   are the record of what was measured).
 
+- **The telescope's size is read from the plate as well.** It is the input of
+  that same scintillation term, and a Las Cumbres 1 m measured with the
+  observer's 10" got it 2.5 times too big. Only a plate that really states the
+  size is trusted, because that is the only way to read it without inventing it:
+  Las Cumbres writes it into the telescope's own id (`1m0a`, `0m4c`, `2m0a`),
+  while a name like `Cecilia` or `CDK17` says nothing about the size, and there
+  the observer's Settings stay: for their own telescope that is the right answer
+  anyway. With both cards read, the errors of the series that was reported went
+  from 0.05 to 0.39 mag across the night (the green-orange-red ramp) to a **flat
+  0.016**.
+
 ## [0.1.3] - 2026-10-21
 
 ### Fixed

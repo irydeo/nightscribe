@@ -451,6 +451,9 @@ class MainWindow(QMainWindow):
         # Analysis tab's list (the observer picked one), None when it was
         # opened from the visit (the newest run wins, as always).
         self._astrometry_run_pref = None
+        # The visit window the workbench made step aside, so leaving the
+        # workbench brings it back (the same visit, filled again).
+        self._visit_win_hidden = None
         # the visit the observer clicked in Analysis: the astrometry runs
         # filter to it (ADR-086 rev); None = the whole project
         self._analysis_visit_filter = None
@@ -1224,19 +1227,42 @@ class MainWindow(QMainWindow):
             return None
         return win
 
-    def _ufe_enter(self):
-        # The workbench took the screen: get the visit window out of the
-        # way. Hidden, not closed: it is the same visit when you come back,
-        # and the workbench has its own frame navigator for measuring.
+    def _visit_window_step_aside(self):
+        # The visit window gets out of the way, and the main window comes
+        # to the front. An open path calls this BEFORE the workbench's own
+        # work, which is not instant: the editor is built on its first use
+        # (measured 2026-10-21: about 3 s on a 379-frame visit). With the
+        # visit window still on top, that pause read as a dead button, so
+        # the observer pressed "Measure…" a second time and credited it
+        # with opening the workbench. What opened it was the first press,
+        # and now the "Please wait" the build already shows can be seen.
+        # Hidden, not closed: it is the same visit when you come back, and
+        # the workbench has its own frame navigator for measuring.
         # @return: None
         win = self._visit_window()
-        self._visit_win_hidden = None
         if win is not None and win.isVisible():
             self._visit_win_hidden = win
             win.hide()
+        self.raise_()
+        self.activateWindow()
+
+    def _ufe_enter(self):
+        # The workbench took the screen: get the visit window out of the
+        # way (see _visit_window_step_aside). An open path has already
+        # done it, and stepping aside twice must not FORGET the window:
+        # dropping the record here would leave it hidden forever, because
+        # _ufe_leave is what brings it back.
+        # @return: None
+        if getattr(self, "_visit_win_hidden", None) is not None:
+            return
+        self._visit_window_step_aside()
 
     def _ufe_leave(self):
-        # Leaving the workbench: the visit window comes back, in front.
+        # Leaving the workbench: the visit window comes back, in front,
+        # and filled again. The workbench can save a series, undo a run or
+        # import an EXOTIC reduction while the window is stepped aside, so
+        # its Results list must not come back with the runs and the points
+        # of before the measurement (measured 2026-10-21).
         # @return: None
         win = getattr(self, "_visit_win_hidden", None)
         self._visit_win_hidden = None
@@ -1246,6 +1272,9 @@ class MainWindow(QMainWindow):
         # a stale reference must not resurrect it
         if win is not self._visit_window():
             return
+        refresh = getattr(win, "refresh_content", None)
+        if callable(refresh):
+            refresh()
         win.show()
         win.raise_()
         win.activateWindow()
@@ -5252,6 +5281,39 @@ class MainWindow(QMainWindow):
             return
         # a user pick is a navigation (Interfaz 1.1)
         self.navigate(VIEW_DETAIL, pid=pid)
+
+    def _project_refresh(self, pid):
+        # A workbench hook changed a project's data (a series saved, a run
+        # undone, a curve discarded, an ExoClock submission reported): the
+        # project's own view has to follow, but the observer must NOT be
+        # moved. Re-opening the project switches the shell to the project
+        # view, so a series that finished threw the observer out of the
+        # editor it was measured in, and the page rebuild took the visits
+        # panel (and with it the visit window the workbench had stepped
+        # aside) down with it (reported 2026-10-21).
+        #
+        # The refresh is therefore IN PLACE, and it is the same targeted
+        # one the visits panel asks for after an edit: the visits list (its
+        # counts), the curve, the cadence line, the runs, the header and
+        # the Next card. The rest of the page is untouched, and the hub's
+        # rows refresh themselves when the observer comes back to the
+        # projects view (the tab change does it).
+        # @args: pid - the project whose data changed
+        # @return: None
+        if (self._current_project or {}).get("id") != pid:
+            # the workbench keeps running when the observer walks to
+            # another project: that project's page must not be painted
+            # with this one's data
+            return
+        p = project.get(db, pid)
+        if p is None:
+            return
+        panel = self._project_widgets.get("visits_panel")
+        if panel is not None:
+            panel.refresh()
+        self._visit_data_changed(pid)
+        self._render_project_header(p)
+        self._refresh_next_card(p)
 
     def _open_project(self, pid, land="details"):
         # Opens one project full screen: header, page and object panel. No
@@ -9360,6 +9422,7 @@ class MainWindow(QMainWindow):
         if not p:
             return
         obj = self._ufe_object_from_project(p)
+        self._visit_window_step_aside()   # the open is not instant
         dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
                              session_id=sid)
         if not dlg.open_plate(path):
@@ -9411,6 +9474,7 @@ class MainWindow(QMainWindow):
         if not p:
             return
         obj = self._ufe_object_from_project(p)
+        self._visit_window_step_aside()   # the open is not instant
         dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
                              session_id=session_id)
         dlg.open_plate(paths[0])
@@ -9444,6 +9508,7 @@ class MainWindow(QMainWindow):
         if not p:
             return
         obj = self._ufe_object_from_project(p)
+        self._visit_window_step_aside()   # the open is not instant
         dlg = self._ufe_open("trackstack", hook_pid=pid, obj=obj,
                              session_id=session_id)
         # The editor may already be on THIS visit holding ANOTHER run: the
@@ -9550,6 +9615,7 @@ class MainWindow(QMainWindow):
         if not p:
             return
         obj = self._ufe_object_from_project(p)
+        self._visit_window_step_aside()   # the open is not instant
         dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
                              session_id=pt.get("session_id"))
         if not dlg.open_plate(row["path"]):
@@ -10811,7 +10877,7 @@ class MainWindow(QMainWindow):
                 f"{par.get('rprs'):.4f} ± {par.get('rprs_err'):.4f}"
                 if par.get("rprs") else "?")
         QMessageBox.information(self, self.tr("EXOTIC"), msg)
-        self._project_selected()
+        self._project_refresh(pid)
         # ... and the result itself lands on screen: the numbers, the light
         # curve EXOTIC drew and every file it wrote, instead of a box that
         # says them once and a folder nobody knows about
@@ -13691,7 +13757,7 @@ class MainWindow(QMainWindow):
                     payload.get("filter") or "Clear",
                     float(payload["mag"])), 6000)
         # refresh the panel: light curve, visits and campaign summary update
-        self._project_selected()
+        self._project_refresh(pid)
 
     # ---------------- E5c: the campaign pass ----------------
 
@@ -14425,7 +14491,7 @@ class MainWindow(QMainWindow):
                 fu.add_points(db, rows)
             self.statusBar().showMessage(
                 self.tr("Series saved: {} points").format(len(rows)), 8000)
-            self._project_selected()
+            self._project_refresh(pid)
             return run_id
         # ONE PASS, ONE RUN PER VISIT. A multi-night pass measures the
         # frames of several visits in one go, and each frame's points are
@@ -14465,7 +14531,7 @@ class MainWindow(QMainWindow):
         else:
             self.statusBar().showMessage(
                 self.tr("Series saved: {} points").format(len(rows)), 8000)
-        self._project_selected()
+        self._project_refresh(pid)
         return run_id
 
     def _ufe_exoclock_hook(self, pid, payload):
@@ -14479,7 +14545,7 @@ class MainWindow(QMainWindow):
             return False
         self.statusBar().showMessage(
             self.tr("ExoClock submission prepared; outcome recorded."), 8000)
-        self._project_selected()
+        self._project_refresh(pid)
         return True
 
     def _ufe_run_undo(self, run_id):
@@ -14492,6 +14558,10 @@ class MainWindow(QMainWindow):
         # @args: run_id - the run to undo
         # @return: the number of points deleted
         from ..core import followup as fu
+        # What has to refresh is the project the RUN belongs to, and a
+        # workbench session outlives a walk to another project: the run
+        # carries it (through its visit), the screen does not.
+        pid = fu.run_project_id(db, run_id)
         group = fu.run_pass_group(db, run_id)
         if group:
             runs = fu.runs_in_pass(db, group)
@@ -14502,13 +14572,13 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("Pass undone: {} points over {} nights").format(
                     count, len(runs)), 8000)
-            self._project_selected()
+            self._project_refresh(pid)
             return count
         count = fu.delete_points_for_run(db, run_id)
         fu.set_run_status(db, run_id, "undone")
         self.statusBar().showMessage(
             self.tr("Run undone: {} points removed").format(count), 8000)
-        self._project_selected()
+        self._project_refresh(pid)
         return count
 
     def _curve_payload(self, points):
@@ -14667,7 +14737,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             self.tr("Curve discarded: {0} run(s) undone, {1} points removed"
                     ).format(runs, points), 8000)
-        self._project_selected()
+        self._project_refresh(pid)
         return runs, points
 
     def _ufe_reset_state(self, dlg, pid):
@@ -14693,7 +14763,7 @@ class MainWindow(QMainWindow):
         row = project.find_file(db, pid, dlg.state.path)
         if row is not None:
             fu.delete_points_for_file(db, row["id"])
-        self._project_selected()
+        self._project_refresh(pid)
 
     # ---------------- Observing journal (ADR-036) ----------------
 

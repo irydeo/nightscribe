@@ -833,6 +833,16 @@ class VisitWindow(QDialog):
         self._ui.vp_btn_files.setArrowType(
             Qt.DownArrow if open_ else Qt.RightArrow)
 
+    def refresh_content(self):
+        # The visit's content, filled again. The window steps aside while the
+        # workbench is on screen, and the workbench can save a series, undo a
+        # run or import an EXOTIC reduction in that time: coming back with
+        # the runs and the points of before the measurement would be a lie
+        # the observer has no way to notice (measured 2026-10-21).
+        # @return: None
+        self._populate_content()
+        self._paint_confirmation()
+
     # --------------------------------------------------- the row gestures
 
     def _row_data(self, lst, pos):

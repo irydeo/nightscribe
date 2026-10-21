@@ -140,6 +140,78 @@ def test_a_visit_closed_while_hidden_is_not_resurrected(window):
     assert panel._win is None              # nothing came back
 
 
+def _visit_of_a_measured_kind(window):
+    # @return: (project, panel, visit window, visit id) for a project whose
+    #          analysis action is the series ("Measure the series…"), with
+    #          one readable plate registered in its visit
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    plate = Path(__file__).parents[1] / "fixtures" / "sn2026zji_new_image.fits"
+    p = next(pr for pr in project.list_projects(coredb.db)
+             if pr["kind"] == "sn")
+    window.navigate(VIEW_DETAIL, pid=p["id"], tab="analysis")
+    panel = window._project_widgets["visits_panel"]
+    panel.btn_new.click()                  # creates the visit and opens it
+    sid = panel.current_session_id()
+    project.add_file(coredb.db, p["id"], str(plate), "fits", session_id=sid)
+    win = panel._win
+    win.refresh_content()
+    return p, panel, win, sid
+
+
+def test_the_visit_window_steps_aside_before_the_workbench_is_built(
+        window, monkeypatch):
+    # The open is not instant (the editor is built on its first use:
+    # measured 2026-10-21, about 3 s on a 379-frame visit). With the visit
+    # window still on top, that pause read as a dead button, so the
+    # observer pressed "Measure…" a second time and credited the second
+    # press with opening the workbench. The window steps aside FIRST, so
+    # the press is answered on the spot.
+    from nightscribe.gui.main_window import VIEW_UFE
+    _p, _panel, win, _sid = _visit_of_a_measured_kind(window)
+    seen = {}
+    build = window._ufe_build
+
+    def spy():
+        seen["visible"] = win.isVisible()
+        return build()
+
+    monkeypatch.setattr(window, "_ufe_build", spy)
+    win.btn_analyze.click()
+    assert seen["visible"] is False          # already out of the way
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    assert win.isHidden()
+
+
+def test_saving_a_series_does_not_leave_the_workbench(window):
+    # Refreshing the project after a series used to RE-OPEN it, and opening
+    # it switches the shell to the project view: the editor the series was
+    # measured in closed itself, and the page rebuild took the visits panel
+    # (and with it the visit window the workbench had stepped aside) down
+    # with it (reported 2026-10-21). The refresh is in place now.
+    from nightscribe.gui.main_window import VIEW_DETAIL, VIEW_UFE
+    p, panel, win, sid = _visit_of_a_measured_kind(window)
+    win.btn_analyze.click()
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    plate = str(Path(__file__).parents[1] / "fixtures"
+                / "sn2026zji_new_image.fits")
+    window._ufe_points_hook(p["id"], sid,
+                            [{"path": plate, "mjd": 61000.5, "mag": 12.0,
+                              "err": 0.01, "session_id": sid}],
+                            {"band": "V", "status": "complete"})
+    # the observer is still in the editor, with its visit window in hand
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    assert window._visit_win_hidden is win
+    assert panel._win is win
+    # ... and the visit window comes back when the observer leaves, filled
+    # again: the run just saved is in its Results (it was empty before)
+    window._ufe_back()
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
+    assert not win.isHidden()
+    assert win.lst_results.count() == 1
+
+
 def test_the_night_panel_fills_the_empty_pane(window):
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_night

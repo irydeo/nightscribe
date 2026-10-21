@@ -31,17 +31,21 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
   una lista de tomas impoluta al lado: el panel cuenta las marcas, nombra la que
   dominó y dice qué hacer.
 
-### Cambiado
+- **Una serie que termina ya no cierra el banco de trabajo.** Guardar la medida
+  refrescaba el proyecto REABRIÉNDOLO, y abrir un proyecto cambia la pantalla a
+  él: el editor en el que se acababa de medir la serie se cerraba solo, y la
+  página que reconstruía se llevaba por delante la ventana de la visita. Ahora
+  los bloques del propio proyecto (la lista de visitas con sus cuentas, la curva,
+  la línea de cadencia, las pasadas y la cabecera) se refrescan donde están, y la
+  ventana de la visita vuelve rellena cuando el observador sale del banco.
 
-- **El detrend arranca en «auto» para todos los tipos de proyecto menos el
-  tránsito.** La extinción es un sistemático que está siempre, y una rotación,
-  un estallido o una pulsación no comparten su escala de tiempo, que es lo que
-  hace separable la tendencia. Es la política autolimitada: aplica siempre la
-  masa de aire y solo añade los términos extra cuando la dispersión baja de
-  verdad. Un tránsito conserva la curva cruda a propósito, porque su tendencia
-  se resuelve junto al modelo (el propio término de masa de aire de EXOTIC).
-
-### Corregido
+- **«Medir la serie…» responde al primer clic.** El banco se construye en su
+  primer uso, y en una visita real eso son unos **3 segundos** durante los que la
+  ventana no se repinta: con la ventana de la visita todavía encima, la pausa se
+  leía como un botón muerto, así que el observador volvía a pulsar y el mérito se
+  lo llevaba el segundo clic. La ventana de la visita se aparta ANTES de ese
+  trabajo, así que el aviso de espera que la construcción ya muestra se puede
+  ver.
 
 - **La masa de aire y el sitio se toman de la placa, no de tus Ajustes.** El
   motor calculaba la altitud del objetivo desde el sitio configurado en Ajustes,
@@ -70,6 +74,16 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
   propio telescopio son la respuesta correcta. Con las dos tarjetas leídas, los
   errores de la serie que se reportó pasaron de 0,05 a 0,39 mag a lo largo de la
   noche (el degradado verde-naranja-rojo) a un **0,016 plano**.
+
+### Cambiado
+
+- **El detrend arranca en «auto» para todos los tipos de proyecto menos el
+  tránsito.** La extinción es un sistemático que está siempre, y una rotación,
+  un estallido o una pulsación no comparten su escala de tiempo, que es lo que
+  hace separable la tendencia. Es la política autolimitada: aplica siempre la
+  masa de aire y solo añade los términos extra cuando la dispersión baja de
+  verdad. Un tránsito conserva la curva cruda a propósito, porque su tendencia
+  se resuelve junto al modelo (el propio término de masa de aire de EXOTIC).
 
 ## [0.1.3] - 2026-10-21
 

@@ -31,17 +31,20 @@ All notable changes to NightScribe are documented here. The format follows
   list of frames next to it: the panel counts the flags, names the one that
   dominated and says what to do about it.
 
-### Changed
+- **A series that finishes no longer closes the workbench.** Saving the
+  measurement refreshed the project by RE-OPENING it, and opening a project
+  switches the screen to it: the editor the series had just been measured in
+  closed itself, and the page it rebuilt took the visit window down with it.
+  The project's own blocks (the visits list with its counts, the curve, the
+  cadence line, the runs and the header) refresh where they are now, and the
+  visit window comes back filled when the observer leaves the workbench.
 
-- **The detrend starts from "auto" for every kind of project except a transit.**
-  The extinction is a systematic that is always there, and a rotation, an
-  outburst or a pulsation do not share its timescale, which is what makes the
-  trend separable. It is the self-limiting policy: it always applies the
-  airmass and only adds the extra terms when the scatter really drops. A
-  transit keeps the raw curve on purpose, because its trend is solved together
-  with the model (EXOTIC's own airmass term).
-
-### Fixed
+- **"Measure the series…" answers the first click.** The workbench is built on
+  its first use, and on a real visit that is about **3 seconds** during which
+  the window does not repaint: with the visit window still on top, the pause
+  read as a dead button, so the observer pressed again and the second press got
+  the credit for opening it. The visit window steps aside BEFORE that work, so
+  the wait notice the build already shows can be seen.
 
 - **The airmass and the site are taken from the plate, not from your
   Settings.** The engine computed the target's altitude from the site
@@ -69,6 +72,16 @@ All notable changes to NightScribe are documented here. The format follows
   anyway. With both cards read, the errors of the series that was reported went
   from 0.05 to 0.39 mag across the night (the green-orange-red ramp) to a **flat
   0.016**.
+
+### Changed
+
+- **The detrend starts from "auto" for every kind of project except a transit.**
+  The extinction is a systematic that is always there, and a rotation, an
+  outburst or a pulsation do not share its timescale, which is what makes the
+  trend separable. It is the self-limiting policy: it always applies the
+  airmass and only adds the extra terms when the scatter really drops. A
+  transit keeps the raw curve on purpose, because its trend is solved together
+  with the model (EXOTIC's own airmass term).
 
 ## [0.1.3] - 2026-10-21
 

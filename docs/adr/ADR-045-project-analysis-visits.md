@@ -150,6 +150,18 @@ noches» y puntos suficientes). Las acciones de recurso («Adjuntar ficheros…�
 textos y tooltips en el Designer (ADR-005) y el mecanismo de puertas del UFE
 (`build_door`). La cabecera (fecha, pin, borrar, guardar y cerrar) no cambia.
 
+**Enmendado (2026-10-21, apartarse antes, y la serie guardada no cierra el
+taller).** Dos cosas medidas sobre una visita real. La ventana de visita se
+apartaba **al entrar** en el taller, es decir después de construirlo: esa
+construcción tarda unos segundos en su primer uso y, con la ventana todavía
+encima, la pausa se leía como un botón muerto, así que el observador volvía a
+pulsar «Medir la serie…» y el mérito se lo llevaba el segundo clic. Ahora se
+aparta **antes** del trabajo. Y guardar una serie refrescaba el proyecto
+**reabriéndolo**, que cambia la pantalla al proyecto: el editor se cerraba solo y
+la página reconstruida se llevaba por delante la ventana de visita. El refresco
+es **en el sitio** (la lista de visitas con sus cuentas, la curva, la línea de
+cadencia, las pasadas y la cabecera), y la ventana vuelve **rellena** al salir.
+
 ## English
 
 **Context.** The project flow carried three real frictions, all
@@ -348,3 +360,15 @@ plates and the rest of the raw material) in a **folded** block with its count. T
 live in the row's menu. The quick magnitude entry is folded behind "Add a
 measurement by hand" (measurements are rows in Results now, they were listed
 twice). Deleting the visit lives in the ⋯ menu.
+
+**Amendment (2026-10-21, step aside first, and a saved series does not close the
+workbench).** Two things measured on a real visit. The visit window stepped
+aside **on entering** the workbench, that is, after building it: that build
+takes a few seconds on its first use and, with the window still on top, the
+pause read as a dead button, so the observer pressed "Measure the series…" again
+and the second press got the credit for opening it. It steps aside **before**
+the work now. And saving a series refreshed the project by **re-opening** it,
+which switches the screen to the project: the editor closed itself and the
+rebuilt page took the visit window down with it. The refresh is **in place**
+(the visits list with its counts, the curve, the cadence line, the passes and
+the header), and the window comes back **filled** on the way out.

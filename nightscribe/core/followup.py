@@ -379,6 +379,22 @@ def curve_run_ids(db, project_id=None, session_id=None):
     return {r[2] for r in rows if r[0] in keep}
 
 
+def run_project_id(db, run_id):
+    # The project a run belongs to. A run only knows its visit, and the
+    # workbench hooks (undo a run, discard a curve) need the project whose
+    # view has to follow: a workbench session outlives a walk to another
+    # project, so the project on screen is not a safe answer.
+    # @args: db - Database, run_id - the run
+    # @return: the project id, or None (a run whose visit is gone)
+    if run_id is None:
+        return None
+    row = db.execute(
+        "SELECT s.project_id FROM measurement_runs r"
+        " LEFT JOIN project_sessions s ON s.id = r.session_id"
+        " WHERE r.id=?", (run_id,)).fetchone()
+    return row[0] if row and row[0] is not None else None
+
+
 def run_pass_group(db, run_id):
     # A multi-night pass writes ONE run per visit (each night's points belong
     # to the visit that night is) and every one of them carries the same

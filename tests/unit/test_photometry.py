@@ -1603,3 +1603,52 @@ def test_the_plates_own_telescope_size_beats_the_observer_settings():
     # nobody says anything: the observer's own, which is right for them
     assert phot.PlateConfig(header={}, site_aperture_m=0.25) \
         .plate_aperture_m == 0.25
+
+
+def test_a_plate_from_another_camera_is_not_gated_by_the_profile():
+    # Reported 2026-10-20: a Las Cumbres plate (SATURATE 248800, GAIN 1) on a
+    # profile with a 53000 e- well was refused frame after frame as
+    # "nonlinear", and the observer's chart came out empty with no
+    # explanation. The profile's linearity is written in the observer's ADU,
+    # and ADU are a property of ONE instrument: the full well in electrons,
+    # which does not depend on the gain, is what tells the two apart.
+    from nightscribe.core import photometry as phot
+    profile = {"cam_linearity_adu": 53000.0, "cam_full_well_e": 53000.0,
+               "ccd_saturate": None}
+    foreign = {"SATURATE": 248800.0, "GAIN": 1.0}
+    sat, lin = phot.star_ceilings(foreign, profile)
+    assert lin is None                      # the profile does not describe it
+    assert sat == 248800.0                  # its own card does
+    # the observer's OWN camera keeps both limits, exactly as before
+    own = {"SATURATE": 59550.0, "GAIN": 0.89}
+    sat, lin = phot.star_ceilings(own, profile)
+    assert lin == 53000.0 and sat == 59550.0
+    # a plate that declares nothing is measured with the profile
+    assert phot.star_ceilings({}, profile)[1] == 53000.0
+    # and the warning says WHICH of the two situations it is, because "I do
+    # not know your linearity, set it in Settings" would be a lie here
+    assert "not from the camera" in phot.ceiling_warning(foreign, profile)["en"]
+    assert phot.ceiling_warning(own, profile) is None
+
+
+def test_the_plate_filter_becomes_a_band_only_when_it_really_is_one():
+    # A plate whose FILTER card says "R" against a sequence that carries "Rc"
+    # used to fall to the first band of the list, which is a silent wrong
+    # choice: the zero point then hangs from another band's magnitudes.
+    from nightscribe.core import photometry as phot
+    bands = ["V", "Rc", "Ic", "G"]
+    assert phot.band_for_filter("R", bands) == "Rc"
+    assert phot.band_for_filter("r", bands) == "Rc"
+    assert phot.band_for_filter("Rc", bands) == "Rc"
+    assert phot.band_for_filter("I", bands) == "Ic"
+    assert phot.band_for_filter("V", bands) == "V"
+    # ...but a Pan-STARRS rp is NOT a Cousins R: a different passband over a
+    # different response, and pretending otherwise would be inventing a
+    # calibration. The honest answer is None.
+    assert phot.band_for_filter("rp", bands) is None
+    assert phot.band_for_filter("ip", bands) is None
+    assert phot.band_for_filter("w", bands) is None
+    assert phot.band_for_filter("Clear", bands) is None
+    assert phot.band_for_filter("", bands) is None
+    # and a band the catalogue does not carry is not offered either
+    assert phot.band_for_filter("R", ["V", "G"]) is None

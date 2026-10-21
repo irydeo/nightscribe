@@ -1093,6 +1093,16 @@ class UfeMeasureTab(QWidget):
         if not bands:
             return
         current = self.cmb_band.currentText()
+        if current not in bands:
+            # THE PLATE'S OWN FILTER, TRANSLATED. A plate whose FILTER card
+            # says "R" against a sequence that carries "Rc" used to fall to
+            # the first band of the list, which is a silent wrong choice: the
+            # zero point then hangs from another band's magnitudes
+            # (reported 2026-10-21). Only true equivalences are used.
+            from ..core import fits_meta
+            meta = fits_meta.meta_from_header(self._state.header or {})
+            current = (photometry.band_for_filter(meta.get("filter"), bands)
+                       or current)
         self.cmb_band.blockSignals(True)
         self.cmb_band.clear()
         self.cmb_band.addItems(bands)
@@ -1815,18 +1825,78 @@ class UfeMeasureTab(QWidget):
                 "target_xy": list(cfg.target_xy)}
 
     def _apply_kind_defaults(self):
-        # D11: the type picks the parameters. A variable or a HADS star
-        # gains from the honest airmass minimum; a transit must NOT be
-        # detrended (the model and the trend are solved together in the
-        # fit). Applied once, and only when the observer has not chosen.
+        # D11: the type picks the parameters, once and only when the
+        # observer has not chosen.
+        #
+        # A TRANSIT keeps the raw curve, and that is deliberate: its trend is
+        # solved TOGETHER with the model (EXOTIC's a2*airmass, and the app's
+        # own joint fit in core/transit_fit), so detrending here first would
+        # fit the trend on the in-transit points too and tilt the baseline.
+        #
+        # Everything else gains from the honest airmass minimum: the
+        # extinction is a systematic that is always there, and the signals
+        # those objects show (a rotation, an outburst, a pulsation) do not
+        # share its timescale, which is what makes the trend separable. The
+        # policy is "auto" because it is the self-limiting one: it always
+        # applies the airmass and only adds the extra terms (FWHM, sky, x-y)
+        # when the scatter really drops (series_measure._AUTO_IMPROVE). The
+        # raw curve is kept beside the detrended one, so nothing is lost.
         if self._kind_defaults_done:
             return
         self._kind_defaults_done = True
         if self._advanced.cmb_detrend.currentData() != "off":
             return
         kind = ((self._series_context() or {}).get("kind") or "").lower()
-        if kind in ("variable", "hads"):
-            self._advanced.cmb_detrend.setCurrentIndex(1)
+        if kind and kind != "transit":
+            self._advanced.cmb_detrend.setCurrentIndex(2)     # auto
+
+    def _series_why_empty(self, points):
+        # @args: points - the run's points
+        # @return: why a whole series came out with nothing to draw, with the
+        #          flags counted and the honest hint.
+        #
+        # Reported 2026-10-20: the observer got an empty chart and a clean
+        # list of frames, and reasonably concluded that his data were bad.
+        # They were not: 338 of the 379 frames carried a flag and nothing
+        # said so. The panel already explains a SINGLE plate this way (see
+        # the "Why:" lines of a measure); this is the same sentence for a
+        # series, with the same vocabulary the frame list uses.
+        from . import flag_words
+        counts = {}
+        for p in points:
+            for flag in (getattr(p, "flags", None) or ()):
+                counts[flag] = counts.get(flag, 0) + 1
+        if not counts:
+            return self.tr("Nothing could be measured in this series: no "
+                           "point has a magnitude, and no flag says why.")
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:3]
+        parts = [self.tr("{0} {1}").format(n, flag_words.short(flag))
+                 for flag, n in top]
+        line = self.tr("Nothing could be measured: {0} (of {1} frames).") \
+            .format(", ".join(parts), len(points))
+        hint = self._series_hint(top[0][0])
+        return f"⚠ {line} {hint}".rstrip() if hint else f"⚠ {line}"
+
+    def _series_hint(self, flag):
+        # @args: flag - the flag that dominated the run
+        # @return: what to do about it, in one line, or ""
+        if flag == "nonlinear":
+            return self.tr("The plate is above the camera profile's "
+                           "linearity limit: if it is not from your own "
+                           "camera, clear that limit in Settings.")
+        if flag == "saturated":
+            return self.tr("The stars are clipped: re-propose the sequence "
+                           "with a fainter target magnitude, or check the "
+                           "saturation ceiling.")
+        if flag in ("no_zp", "few_comps"):
+            return self.tr("No comparison star could hold a zero point: "
+                           "check the band of the sequence and the "
+                           "comparison stars.")
+        if flag in ("align_failed", "align_edge"):
+            return self.tr("The frames could not be registered on the "
+                           "reference plate: check that they are the same "
+                           "field.")
+        return ""
 
     def _update_series_counter(self, context, points=None):
         n = len((context or {}).get("paths", []))
@@ -2622,6 +2692,12 @@ class UfeMeasureTab(QWidget):
                 "measured so far are kept."))
         else:
             self._say("")
+        # a run that produced no magnitude AT ALL says why, instead of
+        # leaving an empty chart and a spotless list of frames in front of
+        # the observer (reported 2026-10-20)
+        if result.points and not any(p.mag is not None
+                                     for p in result.points):
+            self._say(self._series_why_empty(result.points))
         rows = self._series_rows(result.points)
         dlg = host_of(self)
         notify = getattr(dlg, "notify_points", None)

@@ -1315,3 +1315,19 @@ def test_the_point_takes_the_telescope_size_the_plate_declares():
     cfg = sm.SeriesConfig(site_aperture_m=0.25)
     assert sm._plate_aperture([{"meta": {"aperture_m": 1.0}}], cfg) == 1.0
     assert sm._plate_aperture([{"meta": {}}], cfg) == 0.25
+
+
+def test_the_series_measures_in_the_band_the_plate_really_used():
+    # A Las Cumbres plate says FILTER 'R' and the sequence carries 'Rc': the
+    # series has to measure in Rc, not in whatever band came first, or the
+    # zero point hangs from another band's magnitudes (reported 2026-10-21).
+    comps = ({"star": {"bands": [{"label": "Rc", "value": 12.0},
+                                 {"label": "V", "value": 12.4}]}},)
+    cfg = sm.SeriesConfig(band=None, fallback_band="G", comp_set=comps)
+    assert sm._point_band({"filter": "R"}, cfg) == "Rc"
+    # a band the observer picked by hand always wins
+    cfg_hand = sm.SeriesConfig(band="V", comp_set=comps)
+    assert sm._point_band({"filter": "R"}, cfg_hand) == "V"
+    # a Pan-STARRS rp is NOT a Cousins R: it is left as it is, the panel
+    # says there is no magnitude in that band, and nothing is invented
+    assert sm._point_band({"filter": "rp"}, cfg) == "rp"

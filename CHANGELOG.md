@@ -8,6 +8,41 @@ All notable changes to NightScribe are documented here. The format follows
 
 ### Fixed
 
+- **The "Saved" line no longer moves the buttons.** It appeared on the first
+  save and stayed, pushing the Analyse button **77 px** down under the
+  observer's own cursor, once, for good. It keeps its room now and goes away by
+  itself after a couple of seconds, which is what a confirmation is for.
+
+- **The plate's own ceiling gates the measurement when the plate is not from
+  your camera.** The camera profile's linearity limit is written in your ADU,
+  and ADU are a property of one instrument: a Las Cumbres plate (a 248 800 ADU
+  ceiling) was refused frame after frame as "nonlinear" and the chart came out
+  empty with no explanation. The full well in electrons is what tells the two
+  detectors apart, and the panel now says which of the two cases it is.
+
+- **The plate's filter becomes a band only when it really is one.** A plate
+  whose `FILTER` card says `R` against a sequence that carries `Rc` used to
+  fall to the first band of the list, which is a silent wrong calibration (the
+  zero point then hangs from another band's magnitudes). A Cousins `R` is the
+  catalogue's `Rc`; a Pan-STARRS `rp` is **not**, and pretending otherwise
+  would be inventing one.
+
+- **A series that measured nothing says why.** No more empty chart with a clean
+  list of frames next to it: the panel counts the flags, names the one that
+  dominated and says what to do about it.
+
+### Changed
+
+- **The detrend starts from "auto" for every kind of project except a transit.**
+  The extinction is a systematic that is always there, and a rotation, an
+  outburst or a pulsation do not share its timescale, which is what makes the
+  trend separable. It is the self-limiting policy: it always applies the
+  airmass and only adds the extra terms when the scatter really drops. A
+  transit keeps the raw curve on purpose, because its trend is solved together
+  with the model (EXOTIC's own airmass term).
+
+### Fixed
+
 - **The airmass and the site are taken from the plate, not from your
   Settings.** The engine computed the target's altitude from the site
   configured in Settings, which is right for your own observatory and wrong

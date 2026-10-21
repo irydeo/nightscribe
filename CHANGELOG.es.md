@@ -8,6 +8,41 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ### Corregido
 
+- **La línea «Saved» ya no mueve los botones.** Aparecía en el primer guardado y
+  se quedaba, empujando el botón de análisis **77 px** hacia abajo bajo el propio
+  cursor del observador, una vez, para siempre. Ahora conserva su sitio y se va
+  sola a los dos segundos, que es para lo que sirve una confirmación.
+
+- **El techo de la propia placa es el que manda cuando la placa no es de tu
+  cámara.** El límite de linealidad del perfil está escrito en tus ADU, y las ADU
+  son propiedad de un instrumento: una placa de Las Cumbres (techo de 248 800
+  ADU) caía toma tras toma como «no lineal» y la gráfica salía vacía sin
+  explicación. El pozo lleno en electrones es lo que distingue a los dos
+  detectores, y el panel ahora dice cuál de los dos casos es.
+
+- **El filtro de la placa se convierte en banda solo cuando de verdad lo es.**
+  Una placa cuya tarjeta `FILTER` dice `R` contra una secuencia que lleva `Rc`
+  caía a la primera banda de la lista, que es una calibración silenciosamente
+  equivocada (el punto cero cuelga entonces de las magnitudes de otra banda). Un
+  `R` de Cousins **es** el `Rc` del catálogo; un `rp` de Pan-STARRS **no**, y
+  fingir que sí sería inventarla.
+
+- **Una serie que no ha medido nada dice por qué.** Se acabó la gráfica vacía con
+  una lista de tomas impoluta al lado: el panel cuenta las marcas, nombra la que
+  dominó y dice qué hacer.
+
+### Cambiado
+
+- **El detrend arranca en «auto» para todos los tipos de proyecto menos el
+  tránsito.** La extinción es un sistemático que está siempre, y una rotación,
+  un estallido o una pulsación no comparten su escala de tiempo, que es lo que
+  hace separable la tendencia. Es la política autolimitada: aplica siempre la
+  masa de aire y solo añade los términos extra cuando la dispersión baja de
+  verdad. Un tránsito conserva la curva cruda a propósito, porque su tendencia
+  se resuelve junto al modelo (el propio término de masa de aire de EXOTIC).
+
+### Corregido
+
 - **La masa de aire y el sitio se toman de la placa, no de tus Ajustes.** El
   motor calculaba la altitud del objetivo desde el sitio configurado en Ajustes,
   que es lo correcto para tu observatorio y equivocado para la placa de

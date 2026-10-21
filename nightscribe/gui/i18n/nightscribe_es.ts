@@ -988,217 +988,193 @@
 <context>
     <name>FramePreviews</name>
     <message>
-        <location filename="../widgets/frame_previews.py" line="385"/>
         <source>unusable</source>
-        <translation>no utilizable</translation>
+        <translation type="vanished">no utilizable</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="386"/>
         <source>the plate&apos;s recipe refused the measurement</source>
-        <translation>la receta de la placa rechazó la medida</translation>
+        <translation type="vanished">la receta de la placa rechazó la medida</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="388"/>
         <source>saturated</source>
-        <translation>saturada</translation>
+        <translation type="vanished">saturada</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="389"/>
         <source>the star&apos;s core is clipped, so its flux is a floor and not a value</source>
-        <translation>el núcleo de la estrella está recortado, así que su flujo es un suelo y no un valor</translation>
+        <translation type="vanished">el núcleo de la estrella está recortado, así que su flujo es un suelo y no un valor</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="392"/>
         <source>nonlinear</source>
-        <translation>no lineal</translation>
+        <translation type="vanished">no lineal</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="393"/>
         <source>the peak is above the camera profile&apos;s linearity limit: the flux is no longer proportional</source>
-        <translation>el pico supera el límite de linealidad del perfil de tu cámara: el flujo ya no es proporcional</translation>
+        <translation type="vanished">el pico supera el límite de linealidad del perfil de tu cámara: el flujo ya no es proporcional</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="396"/>
         <source>cosmic ray</source>
-        <translation>rayo cósmico</translation>
+        <translation type="vanished">rayo cósmico</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="397"/>
         <source>an isolated spike sits in the aperture</source>
-        <translation>hay un pico aislado dentro de la apertura</translation>
+        <translation type="vanished">hay un pico aislado dentro de la apertura</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="399"/>
         <source>cloud</source>
-        <translation>nube</translation>
+        <translation type="vanished">nube</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="400"/>
         <source>the frame is dimmer than its neighbours by more than the night&apos;s scatter</source>
-        <translation>la toma es más débil que sus vecinas por más que la dispersión de la noche</translation>
+        <translation type="vanished">la toma es más débil que sus vecinas por más que la dispersión de la noche</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="403"/>
         <source>seeing</source>
-        <translation>seeing</translation>
+        <translation type="vanished">seeing</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="404"/>
         <source>the FWHM left the night&apos;s range: defocus, a trail or a satellite through the core</source>
-        <translation>la FWHM se salió del rango de la noche: desenfoque, un rastro o un satélite por el núcleo</translation>
+        <translation type="vanished">la FWHM se salió del rango de la noche: desenfoque, un rastro o un satélite por el núcleo</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="407"/>
         <source>not aligned</source>
-        <translation>sin alinear</translation>
+        <translation type="vanished">sin alinear</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="408"/>
         <source>the frame could not be registered on the reference plate</source>
-        <translation>la toma no se pudo registrar sobre la placa de referencia</translation>
+        <translation type="vanished">la toma no se pudo registrar sobre la placa de referencia</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="411"/>
         <source>edge</source>
-        <translation>borde</translation>
+        <translation type="vanished">borde</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="412"/>
         <source>the frame only overlaps the reference plate at its edge</source>
-        <translation>la toma solo solapa con la placa de referencia por su borde</translation>
+        <translation type="vanished">la toma solo solapa con la placa de referencia por su borde</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="415"/>
         <source>guiding</source>
-        <translation>guiado</translation>
+        <translation type="vanished">guiado</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="416"/>
         <source>the target moved off the position it had on the reference plate</source>
-        <translation>el objetivo se movió de la posición que tenía en la placa de referencia</translation>
+        <translation type="vanished">el objetivo se movió de la posición que tenía en la placa de referencia</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="419"/>
         <source>few comparisons</source>
-        <translation>pocas comparadas</translation>
+        <translation type="vanished">pocas comparadas</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="420"/>
         <source>the zero point rests on fewer comparisons than the recipe asks for</source>
-        <translation>el punto cero se apoya en menos comparadas de las que pide la receta</translation>
+        <translation type="vanished">el punto cero se apoya en menos comparadas de las que pide la receta</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="423"/>
         <source>no zero point</source>
-        <translation>sin punto cero</translation>
+        <translation type="vanished">sin punto cero</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="424"/>
         <source>no comparison star could hold a zero point, so this frame has no magnitude</source>
-        <translation>ninguna comparada pudo sostener un punto cero, así que esta toma no tiene magnitud</translation>
+        <translation type="vanished">ninguna comparada pudo sostener un punto cero, así que esta toma no tiene magnitud</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="427"/>
         <source>neighbour zero point</source>
-        <translation>punto cero del vecino</translation>
+        <translation type="vanished">punto cero del vecino</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="428"/>
         <source>the zero point came from a neighbouring frame</source>
-        <translation>el punto cero vino de una toma vecina</translation>
+        <translation type="vanished">el punto cero vino de una toma vecina</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="485"/>
+        <location filename="../widgets/frame_previews.py" line="432"/>
         <source>unreadable</source>
         <translation>ilegible</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="487"/>
+        <location filename="../widgets/frame_previews.py" line="434"/>
         <source>not registered</source>
         <translation>sin registrar</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="496"/>
+        <location filename="../widgets/frame_previews.py" line="443"/>
         <source>Frame %1</source>
         <translation>Toma %1</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="509"/>
+        <location filename="../widgets/frame_previews.py" line="456"/>
         <source>Could not be read:</source>
         <translation>No se pudo leer:</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="513"/>
+        <location filename="../widgets/frame_previews.py" line="460"/>
         <source>%1 × %2 px</source>
         <translation>%1 × %2 px</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="517"/>
+        <location filename="../widgets/frame_previews.py" line="464"/>
         <source>%1 MB on disk</source>
         <translation>%1 MB en disco</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="521"/>
+        <location filename="../widgets/frame_previews.py" line="468"/>
         <source>sky %1 ADU</source>
         <translation>cielo %1 ADU</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="532"/>
+        <location filename="../widgets/frame_previews.py" line="479"/>
         <source>No astrometric solution</source>
         <translation>Sin solución astrométrica</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="534"/>
+        <location filename="../widgets/frame_previews.py" line="481"/>
         <source>The last run could not register it</source>
         <translation>El último run no pudo registrarla</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="541"/>
+        <location filename="../widgets/frame_previews.py" line="488"/>
         <source>The series threw this frame&apos;s measurement away:</source>
         <translation>La serie descartó la medida de esta toma:</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="543"/>
+        <location filename="../widgets/frame_previews.py" line="490"/>
         <source>The series measured this frame, but its calibration leans on little:</source>
         <translation>La serie midió esta toma, pero su calibración se apoya en poco:</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="634"/>
+        <location filename="../widgets/frame_previews.py" line="581"/>
         <source>Open in the editor</source>
         <translation>Abrir en el editor</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="638"/>
+        <location filename="../widgets/frame_previews.py" line="585"/>
         <source>Open the folder</source>
         <translation>Abrir la carpeta</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="644"/>
+        <location filename="../widgets/frame_previews.py" line="591"/>
         <source>Take %1 frames out of the visit</source>
         <translation>Quitar %1 tomas de la visita</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="646"/>
+        <location filename="../widgets/frame_previews.py" line="593"/>
         <source>Take it out of the visit</source>
         <translation>Quitarla de la visita</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="648"/>
+        <location filename="../widgets/frame_previews.py" line="595"/>
         <source>The visit stops measuring them. The files are NOT touched: they stay where they are and can be attached again</source>
         <translation>La visita deja de medirlas. Los ficheros NO se tocan: se quedan donde están y se pueden volver a adjuntar</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="653"/>
+        <location filename="../widgets/frame_previews.py" line="600"/>
         <source>Move %1 frames to discarded/…</source>
         <translation>Mover %1 tomas a descartados/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="655"/>
+        <location filename="../widgets/frame_previews.py" line="602"/>
         <source>Move it to discarded/…</source>
         <translation>Moverla a descartados/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="657"/>
+        <location filename="../widgets/frame_previews.py" line="604"/>
         <source>The files move into the project&apos;s discarded/ folder and the registry follows them: nothing is deleted and they can be brought back</source>
         <translation>Los ficheros se mueven a la carpeta descartados/ del proyecto y el registro los sigue: no se borra nada y se pueden recuperar</translation>
     </message>
@@ -14322,102 +14298,102 @@ LOS RIESGOS, dichos claros: mueve la magnitud que se publica, así que una curva
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="1033"/>
-        <location filename="../ufe_measure_tab.py" line="1873"/>
+        <location filename="../ufe_measure_tab.py" line="1943"/>
         <source>No comparison sequence yet: build one above with «Build the sequence…».</source>
         <translation>Aún no hay secuencia de comparación: constrúyela arriba con «Construir la secuencia…».</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1225"/>
+        <location filename="../ufe_measure_tab.py" line="1235"/>
         <source>Measure the target first (a click on it).</source>
         <translation>Mide primero el objetivo (un clic sobre él).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3204"/>
+        <location filename="../ufe_measure_tab.py" line="3280"/>
         <source>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</source>
         <translation>Píxel ({0:.1f}, {1:.1f}) · flujo neto {2:,.0f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3206"/>
+        <location filename="../ufe_measure_tab.py" line="3282"/>
         <source>Instrumental mag: {0:.3f}</source>
         <translation>Mag instrumental: {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3210"/>
+        <location filename="../ufe_measure_tab.py" line="3286"/>
         <source>No comparison star could be used: no calibration.</source>
         <translation>Ninguna comparación pudo usarse: no hay calibración.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3213"/>
+        <location filename="../ufe_measure_tab.py" line="3289"/>
         <source>Why: {0} (of {1} sequence stars).</source>
         <translation>Por qué: {0} (de {1} estrellas de la secuencia).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3217"/>
+        <location filename="../ufe_measure_tab.py" line="3293"/>
         <source>The proposed comps are too bright for this plate: re-propose with a fainter target magnitude, or check the saturation ceiling.</source>
         <translation>Las comps propuestas son demasiado brillantes para esta placa: vuelve a proponer con una magnitud de objetivo más débil, o revisa el techo de saturación.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3222"/>
+        <location filename="../ufe_measure_tab.py" line="3298"/>
         <source>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</source>
         <translation>Punto cero: {0:.3f} ± {1:.3f}, pendiente de color {2:+.3f} ({3} comps, banda {4})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3227"/>
+        <location filename="../ufe_measure_tab.py" line="3303"/>
         <source>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</source>
         <translation>Punto cero: {0:.3f} ± {1:.3f} ({2} comps, banda {3})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3238"/>
+        <location filename="../ufe_measure_tab.py" line="3314"/>
         <source>± {0:.3f}</source>
         <translation>± {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3240"/>
+        <location filename="../ufe_measure_tab.py" line="3316"/>
         <source>Magnitude: {0:.3f} {1} ({2})</source>
         <translation>Magnitud: {0:.3f} {1} ({2})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3259"/>
+        <location filename="../ufe_measure_tab.py" line="3335"/>
         <source>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</source>
         <translation>Campo: {0} {1} a {2:.1f}″ · {3} = {4:.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3262"/>
+        <location filename="../ufe_measure_tab.py" line="3338"/>
         <source> · Δ {0:+.2f}</source>
         <translation> · Δ {0:+.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3269"/>
+        <location filename="../ufe_measure_tab.py" line="3345"/>
         <source>No catalogued source within 8″ of the target (a new object?)</source>
         <translation>Sin fuente de catálogo a ≤8″ del objetivo (¿objeto nuevo?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3283"/>
+        <location filename="../ufe_measure_tab.py" line="3359"/>
         <source>the centroid landed {0:.1f} px from the click</source>
         <translation>el centroide quedó a {0:.1f} px del clic</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3287"/>
+        <location filename="../ufe_measure_tab.py" line="3363"/>
         <source>no source could be locked: measured where you clicked</source>
         <translation>sin fuente que centrar: medida donde pulsaste</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3290"/>
+        <location filename="../ufe_measure_tab.py" line="3366"/>
         <source>The sequence carries no Johnson V: calibrating in catalog {0} (for red stars it can differ from V by more than 1 mag)</source>
         <translation>La secuencia no aporta V de Johnson: se calibra en {0} de catálogo (en estrellas rojas puede diferir de V en más de 1 mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3296"/>
+        <location filename="../ufe_measure_tab.py" line="3372"/>
         <source>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</source>
         <translation>FWHM de seeing {0:.1f} px → aperturas {1:.1f}/{2:.1f}/{3:.1f} px</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3300"/>
+        <location filename="../ufe_measure_tab.py" line="3376"/>
         <source>apertures set by hand (the seeing auto-scale is paused)</source>
         <translation>aperturas ajustadas a mano (el auto-seeing está en pausa)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3189"/>
+        <location filename="../ufe_measure_tab.py" line="3265"/>
         <source>{0} saturated/clipped</source>
         <translation>{0} saturadas/comprimidas</translation>
     </message>
@@ -14489,27 +14465,27 @@ tocan.</translation>
         <translation>La placa no tiene WCS: resolviéndola para localizar las estrellas de comparación…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1382"/>
+        <location filename="../ufe_measure_tab.py" line="1392"/>
         <source>override: {0} ADU</source>
         <translation>override: {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1387"/>
+        <location filename="../ufe_measure_tab.py" line="1397"/>
         <source>SATURATE/ccd_saturate {0} ADU</source>
         <translation>SATURATE/ccd_saturate {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1391"/>
+        <location filename="../ufe_measure_tab.py" line="1401"/>
         <source>camera linearity {0} ADU</source>
         <translation>linealidad de cámara {0} ADU</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1392"/>
+        <location filename="../ufe_measure_tab.py" line="1402"/>
         <source>auto: {0}</source>
         <translation>auto: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1393"/>
+        <location filename="../ufe_measure_tab.py" line="1403"/>
         <source>auto: no ceiling known (plateau only)</source>
         <translation>auto: sin techo conocido (solo meseta)</translation>
     </message>
@@ -14542,293 +14518,328 @@ tocan.</translation>
         <translation type="vanished">Medida en tus propias tomas: {0}. Se recuerda para esta cámara, así que una sola imagen la reutiliza.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1508"/>
+        <location filename="../ufe_measure_tab.py" line="1518"/>
         <source>The comparison stars are read on the star stack of these same frames: on this plate they are trails.</source>
         <translation>Las estrellas de comparación se leen en el apilado de estrellas de estas mismas tomas: en esta placa son trazos.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1688"/>
+        <location filename="../ufe_measure_tab.py" line="1698"/>
         <source>This project has one visit with frames, so there is nothing to choose yet: measure the next night and this becomes a choice between this visit and every visit of the project.</source>
         <translation>Este proyecto tiene una sola visita con tomas, así que aún no hay nada que elegir: mide la próxima noche y esto pasará a ser una elección entre esta visita y todas las visitas del proyecto.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1711"/>
+        <location filename="../ufe_measure_tab.py" line="1721"/>
         <source>All the visits: {0} night(s), {1} frames. One pass, one run per night; the chart shows the project&apos;s curve.</source>
         <translation>Todas las visitas: {0} noche(s), {1} tomas. Una pasada, una ejecución por noche; la gráfica muestra la curva del proyecto.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1716"/>
+        <location filename="../ufe_measure_tab.py" line="1726"/>
         <source>This visit: {0} frame(s).</source>
         <translation>Esta visita: {0} toma(s).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1735"/>
+        <location filename="../ufe_measure_tab.py" line="1745"/>
         <source>Live mode watches the folder of ONE visit (tonight&apos;s). With «all the visits» the frames come from every night, so live mode is off: choose «this visit» to watch tonight.</source>
         <translation>El modo en vivo vigila la carpeta de UNA visita (la de esta noche). Con «todas las visitas» las tomas vienen de todas las noches, así que el modo en vivo se apaga: elige «esta visita» para vigilar esta noche.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1745"/>
+        <location filename="../ufe_measure_tab.py" line="1755"/>
         <source>Discarding is per visit: open the visit whose curve you want to undo. With «all the visits» in scope there is no single night to undo.</source>
         <translation>Descartar es por visita: abre la visita cuya curva quieras deshacer. Con «todas las visitas» no hay una sola noche que deshacer.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1833"/>
+        <location filename="../ufe_measure_tab.py" line="1870"/>
+        <source>Nothing could be measured in this series: no point has a magnitude, and no flag says why.</source>
+        <translation>No se ha podido medir nada en esta serie: ningún punto tiene magnitud, y ninguna marca dice por qué.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1873"/>
+        <source>{0} {1}</source>
+        <translation>{0} {1}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1875"/>
+        <source>Nothing could be measured: {0} (of {1} frames).</source>
+        <translation>No se ha podido medir nada: {0} (de {1} tomas).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1884"/>
+        <source>The plate is above the camera profile&apos;s linearity limit: if it is not from your own camera, clear that limit in Settings.</source>
+        <translation>La placa supera el límite de linealidad del perfil de tu cámara: si no es de tu cámara, borra ese límite en Ajustes.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1888"/>
+        <source>The stars are clipped: re-propose the sequence with a fainter target magnitude, or check the saturation ceiling.</source>
+        <translation>Las estrellas están recortadas: vuelve a proponer la secuencia con una magnitud de objetivo más débil, o revisa el techo de saturación.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1892"/>
+        <source>No comparison star could hold a zero point: check the band of the sequence and the comparison stars.</source>
+        <translation>Ninguna comparada pudo sostener un punto cero: revisa la banda de la secuencia y las comparadas.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1896"/>
+        <source>The frames could not be registered on the reference plate: check that they are the same field.</source>
+        <translation>Las tomas no se pudieron registrar sobre la placa de referencia: comprueba que son el mismo campo.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1903"/>
         <source>Frames: {0}</source>
         <translation>Tomas: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1835"/>
+        <location filename="../ufe_measure_tab.py" line="1905"/>
         <source>Frames: {0} · points: {1}</source>
         <translation>Tomas: {0} · puntos: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1840"/>
+        <location filename="../ufe_measure_tab.py" line="1910"/>
         <source>group {0} · cadence from the frames</source>
         <translation>grupo {0} · cadencia según las tomas</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1847"/>
+        <location filename="../ufe_measure_tab.py" line="1917"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1861"/>
+        <location filename="../ufe_measure_tab.py" line="1931"/>
         <source>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</source>
         <translation>Cancelando la serie: se detiene tras la toma que está midiendo; los puntos ya medidos se conservan.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1867"/>
+        <location filename="../ufe_measure_tab.py" line="1937"/>
         <source>No visit with frames: open the editor from a visit to measure a series.</source>
         <translation>No hay visita con tomas: abre el editor desde una visita para medir una serie.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1879"/>
+        <location filename="../ufe_measure_tab.py" line="1949"/>
         <source>The plate has no WCS: solving it to place the series…</source>
         <translation>La placa no tiene WCS: resolviéndola para situar la serie…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1885"/>
-        <location filename="../ufe_measure_tab.py" line="1889"/>
+        <location filename="../ufe_measure_tab.py" line="1955"/>
+        <location filename="../ufe_measure_tab.py" line="1959"/>
         <source>The plate has no WCS and it could not be solved: the series cannot be placed.</source>
         <translation>La placa no tiene WCS y no se pudo resolver: no se puede situar la serie.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1895"/>
+        <location filename="../ufe_measure_tab.py" line="1965"/>
         <source>Measure the target once (a click on it) so the series knows where to measure.</source>
         <translation>Mide el objetivo una vez (un clic sobre él) para que la serie sepa dónde medir.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1912"/>
+        <location filename="../ufe_measure_tab.py" line="1982"/>
         <source>Measuring the series…</source>
         <translation>Midiendo la serie…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2083"/>
+        <location filename="../ufe_measure_tab.py" line="2153"/>
         <source>These points carry neither the airmass nor the measured position (they were measured before the app stored them): measure the series again to have the night figures.</source>
         <translation>Estos puntos no traen ni la masa de aire ni la posición medida (se midieron antes de que la app las guardara): vuelve a medir la serie para tener las figuras de la noche.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2123"/>
+        <location filename="../ufe_measure_tab.py" line="2193"/>
         <source>The airmass figure is missing: these points do not carry it.</source>
         <translation>Falta la figura de la masa de aire: estos puntos no la traen.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2127"/>
+        <location filename="../ufe_measure_tab.py" line="2197"/>
         <source>The drift figure is missing: these points do not carry the measured position.</source>
         <translation>Falta la figura de la deriva: estos puntos no traen la posición medida.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2348"/>
+        <location filename="../ufe_measure_tab.py" line="2418"/>
         <source>This chart does not belong to a visit: there are no passes to choose from.</source>
         <translation>Esta gráfica no pertenece a una visita: no hay pasadas entre las que elegir.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2366"/>
+        <location filename="../ufe_measure_tab.py" line="2436"/>
         <source>Could not show that pass: {0}</source>
         <translation>No se pudo mostrar esa pasada: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2381"/>
+        <location filename="../ufe_measure_tab.py" line="2451"/>
         <source>Pass undone: {0} points removed.</source>
         <translation>Pasada deshecha: {0} puntos eliminados.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2424"/>
+        <location filename="../ufe_measure_tab.py" line="2494"/>
         <source>This chart is the WHOLE PROJECT: {0} points of every night (one pass per night). Choose «this visit» above to see the night you have open.</source>
         <translation>Esta gráfica es TODO EL PROYECTO: {0} puntos de todas las noches (una pasada por noche). Elige «esta visita» arriba para ver la noche que tienes abierta.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2435"/>
+        <location filename="../ufe_measure_tab.py" line="2505"/>
         <source>This visit&apos;s curve: {0} points, the pass the visit shows (nothing was read from the frames). The visit also holds {1} earlier pass(es) ({2} points) that are not drawn: choose another one in Series ▾ → Passes of this visit…</source>
         <translation>Curva de esta visita: {0} puntos, la pasada que muestra la visita (no se leyó nada de las tomas). La visita guarda además {1} pasada(s) anterior(es) ({2} puntos) que no se dibujan: elige otra en Serie ▾ → Pasadas de esta visita…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2621"/>
+        <location filename="../ufe_measure_tab.py" line="2691"/>
         <source>Series cancelled: it stays “incomplete”; the points measured so far are kept.</source>
         <translation>Serie cancelada: queda «incompleta»; los puntos ya medidos se conservan.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2683"/>
+        <location filename="../ufe_measure_tab.py" line="2759"/>
         <source>Series: {0} points from {1} frames</source>
         <translation>Serie: {0} puntos de {1} tomas</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2691"/>
+        <location filename="../ufe_measure_tab.py" line="2767"/>
         <source>Flagged points: {0} ({1})</source>
         <translation>Puntos marcados: {0} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2716"/>
+        <location filename="../ufe_measure_tab.py" line="2792"/>
         <source>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</source>
         <translation>Noche {0}: sin rango de masa de aire, solo escala ({1} puntos); su nivel frente a las demás noches se pierde</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2722"/>
+        <location filename="../ufe_measure_tab.py" line="2798"/>
         <source>Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</source>
         <translation>Noche {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} (rms {4:.4f} → {5:.4f})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2750"/>
+        <location filename="../ufe_measure_tab.py" line="2826"/>
         <source>Cadence too short for the transit ingress</source>
         <translation>Cadencia demasiado corta para el ingress del tránsito</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2925"/>
+        <location filename="../ufe_measure_tab.py" line="3001"/>
         <source>Measure the series first.</source>
         <translation>Mide primero la serie.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2946"/>
+        <location filename="../ufe_measure_tab.py" line="3022"/>
         <source>ExoClock submission</source>
         <translation>Envío a ExoClock</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2954"/>
+        <location filename="../ufe_measure_tab.py" line="3030"/>
         <source>NightScribe series: {0} points, group {1}, detrend {2}</source>
         <translation>Serie NightScribe: {0} puntos, grupo {1}, detrend {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2983"/>
+        <location filename="../ufe_measure_tab.py" line="3059"/>
         <source>ExoClock files written. Upload them at exoclock.space</source>
         <translation>Archivos de ExoClock escritos. Súbelos en exoclock.space</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3008"/>
+        <location filename="../ufe_measure_tab.py" line="3084"/>
         <source>Run undone: {0} points removed.</source>
         <translation>Corrida deshecha: {0} puntos eliminados.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3030"/>
+        <location filename="../ufe_measure_tab.py" line="3106"/>
         <source>Live mode off.</source>
         <translation>Modo en vivo apagado.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3037"/>
+        <location filename="../ufe_measure_tab.py" line="3113"/>
         <source>Live mode needs a visit with frames, a sequence and a measured target.</source>
         <translation>El modo en vivo necesita una visita con tomas, una secuencia y un objetivo medido.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3073"/>
+        <location filename="../ufe_measure_tab.py" line="3149"/>
         <source>Live mode on: watching the visit folder…</source>
         <translation>Modo en vivo activado: vigilando la carpeta de la visita…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3171"/>
+        <location filename="../ufe_measure_tab.py" line="3247"/>
         <source>Advanced defaults restored.</source>
         <translation>Valores avanzados restaurados.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3192"/>
+        <location filename="../ufe_measure_tab.py" line="3268"/>
         <source>{0} above your camera&apos;s linearity limit</source>
         <translation>{0} por encima del límite de linealidad de tu cámara</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3195"/>
+        <location filename="../ufe_measure_tab.py" line="3271"/>
         <source>{0} off the plate</source>
         <translation>{0} fuera de la placa</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3198"/>
+        <location filename="../ufe_measure_tab.py" line="3274"/>
         <source>{0} without the {1} band</source>
         <translation>{0} sin la banda {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3201"/>
+        <location filename="../ufe_measure_tab.py" line="3277"/>
         <source>{0} not measurable</source>
         <translation>{0} no medibles</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3276"/>
+        <location filename="../ufe_measure_tab.py" line="3352"/>
         <source>manual centre: measured exactly where you placed it (no centroid)</source>
         <translation>centro manual: medido exactamente donde lo pusiste (sin centroide)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3305"/>
+        <location filename="../ufe_measure_tab.py" line="3381"/>
         <source>{0} of {1} sequence stars not usable: {2}</source>
         <translation>{0} de {1} estrellas de la secuencia no utilizables: {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3309"/>
+        <location filename="../ufe_measure_tab.py" line="3385"/>
         <source>⚠ comps at the plate&apos;s clipping level: a zero point built on compressed cores lies LOW (faint targets read too bright). Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps junto al recorte de la placa: un punto cero con núcleos comprimidos miente a la baja (los objetivos débiles salen demasiado brillantes). Propón comps más débiles o acorta la exposición</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3317"/>
+        <location filename="../ufe_measure_tab.py" line="3393"/>
         <source>⚠ comps above your camera&apos;s linearity limit (≈{0:.0f} ADU, per gain): their flux is not proportional, so they calibrate nothing. Propose fainter comps or shorten the exposure</source>
         <translation>⚠ comps por encima del límite de linealidad de tu cámara (≈{0:.0f} ADU, por ganancia): su flujo no es proporcional, no calibran nada. Propón comps más débiles o acorta la exposición</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3331"/>
+        <location filename="../ufe_measure_tab.py" line="3407"/>
         <source>Colour term not fitted (too few comps or too little colour spread): plain zero point</source>
         <translation>Término de color no ajustado (pocas comps o poca dispersión de color): punto cero plano</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3334"/>
+        <location filename="../ufe_measure_tab.py" line="3410"/>
         <source>assumed</source>
         <translation>asumido</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3335"/>
+        <location filename="../ufe_measure_tab.py" line="3411"/>
         <source>from the field star</source>
         <translation>de la estrella del campo</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3336"/>
+        <location filename="../ufe_measure_tab.py" line="3412"/>
         <source>from the project</source>
         <translation>del proyecto</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3337"/>
+        <location filename="../ufe_measure_tab.py" line="3413"/>
         <source>by hand</source>
         <translation>manual</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3340"/>
+        <location filename="../ufe_measure_tab.py" line="3416"/>
         <source>Colour term applied with target B−V = {0:.2f} ({1})</source>
         <translation>Término de color aplicado con B−V del objetivo = {0:.2f} ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3346"/>
+        <location filename="../ufe_measure_tab.py" line="3422"/>
         <source>⚠ B−V assumed: with k = {0:+.2f}, a red star (B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; enter its real B−V</source>
         <translation>⚠ B−V asumido: con k = {0:+.2f}, una estrella roja (B−V ≈ 1.5) saldría ≈{1:.2f} mag demasiado brillante; introduce su B−V real</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3351"/>
+        <location filename="../ufe_measure_tab.py" line="3427"/>
         <source>No gain anywhere (settings, your own frames or the header): the photon noise is not in the error</source>
         <translation>No hay ganancia en ningún sitio (Ajustes, tus propias tomas ni la cabecera): el ruido de fotones no está en el error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3357"/>
+        <location filename="../ufe_measure_tab.py" line="3433"/>
         <source>Gain {0} e-/ADU ({1})</source>
         <translation>Ganancia {0} e-/ADU ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3421"/>
+        <location filename="../ufe_measure_tab.py" line="3497"/>
         <source>new</source>
         <translation>nuevo</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3483"/>
+        <location filename="../ufe_measure_tab.py" line="3559"/>
         <source>The plate has no WCS: solving it for the aligned reference…</source>
         <translation>La placa no tiene WCS: resolviéndola para la referencia alineada…</translation>
     </message>
@@ -14837,82 +14848,82 @@ tocan.</translation>
         <translation type="vanished">Sin ganancia en cabecera ni ajustes: el ruido de fotones no entra en el error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3367"/>
+        <location filename="../ufe_measure_tab.py" line="3443"/>
         <source>Scintillation included ({0:.3f} mag)</source>
         <translation>Centelleo incluido ({0:.3f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3371"/>
+        <location filename="../ufe_measure_tab.py" line="3447"/>
         <source>Host galaxy subtracted (PS1 reference aligned on the frame&apos;s stars and scaled by the comps)</source>
         <translation>Galaxia huésped restada (referencia PS1 registrada sobre las estrellas del frame y escalada por las comps)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3379"/>
+        <location filename="../ufe_measure_tab.py" line="3455"/>
         <source>⚠ Reference alignment uncertain ({0} stars, {1:.1f} px): the subtraction may leave star residuals</source>
         <translation>⚠ Registro de la referencia dudoso ({0} estrellas, {1:.1f} px): la resta puede dejar residuos de estrellas</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3384"/>
+        <location filename="../ufe_measure_tab.py" line="3460"/>
         <source>⚠ Reference alignment uncertain: the subtraction may leave star residuals</source>
         <translation>⚠ Registro de la referencia dudoso: la resta puede dejar residuos de estrellas</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3388"/>
+        <location filename="../ufe_measure_tab.py" line="3464"/>
         <source>Error: {0:.3f} internal · {1:.3f} total</source>
         <translation>Error: {0:.3f} interno · {1:.3f} total</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3394"/>
+        <location filename="../ufe_measure_tab.py" line="3470"/>
         <source>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</source>
         <translation>Estrella check {0}: medida {1:.2f} frente a catálogo {2:.2f} (Δ {3:+.2f}, OK)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3400"/>
+        <location filename="../ufe_measure_tab.py" line="3476"/>
         <source>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</source>
         <translation>La estrella check {0} se desvía {1:+.2f} mag: esta medida NO es fiable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3496"/>
+        <location filename="../ufe_measure_tab.py" line="3572"/>
         <source>Fetching the reference and subtracting…</source>
         <translation>Descargando la referencia y restando…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3523"/>
+        <location filename="../ufe_measure_tab.py" line="3599"/>
         <source>The subtraction found no usable comparison star to scale the reference.</source>
         <translation>La sustracción no encontró comparaciones utilizables para escalar la referencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3539"/>
+        <location filename="../ufe_measure_tab.py" line="3615"/>
         <source>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</source>
         <translation>Huésped restada. El objetivo se mide ahora en la imagen diferencia; las comps calibran en la placa original.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3324"/>
+        <location filename="../ufe_measure_tab.py" line="3400"/>
         <source>Few comparisons: the scatter dominates the error</source>
         <translation>Pocas comparaciones: la dispersión domina el error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3327"/>
+        <location filename="../ufe_measure_tab.py" line="3403"/>
         <source>Band {0} estimated from Gaia (Riello 2021)</source>
         <translation>Banda {0} estimada desde Gaia (Riello 2021)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3658"/>
+        <location filename="../ufe_measure_tab.py" line="3734"/>
         <source>Export measurement</source>
         <translation>Exportar medida</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3668"/>
+        <location filename="../ufe_measure_tab.py" line="3744"/>
         <source>Export measurement (AAVSO EFF)</source>
         <translation>Exportar medida (AAVSO EFF)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3692"/>
+        <location filename="../ufe_measure_tab.py" line="3768"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2701"/>
+        <location filename="../ufe_measure_tab.py" line="2777"/>
         <source>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</source>
         <translation>Noche {0}: apertura k = {1:.1f} (dispersión de la estrella check {2:.4f} mag)</translation>
     </message>
@@ -14982,67 +14993,67 @@ tocan.</translation>
         <translation>Esta placa es el apilado de ESTRELLAS de un track &amp; stack: aquí las comparsas son puntuales, pero el OBJETO es un trazo, así que no se puede medir en esta placa. Abre el apilado del objeto y mide allí. Aquí sí puedes ajustar la RECETA que usa la pestaña Astrometría.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2707"/>
+        <location filename="../ufe_measure_tab.py" line="2783"/>
         <source>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</source>
         <translation>Noche {0}: apertura k = {1:.1f} (seeing {2:.1f} px, dispersión de la estrella check {3:.4f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2759"/>
+        <location filename="../ufe_measure_tab.py" line="2835"/>
         <source>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</source>
         <translation>{0} toma(s) sin DATE-OBS y sin hora: no están en la curva</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2764"/>
+        <location filename="../ufe_measure_tab.py" line="2840"/>
         <source>{0} frame(s) could not be read: they are not on the curve</source>
         <translation>{0} toma(s) no se pudieron leer: no están en la curva</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2768"/>
+        <location filename="../ufe_measure_tab.py" line="2844"/>
         <source>Frame {0} could not be read: {1}</source>
         <translation>La toma {0} no se pudo leer: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2785"/>
+        <location filename="../ufe_measure_tab.py" line="2861"/>
         <source>the file is empty</source>
         <translation>el archivo está vacío</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2787"/>
+        <location filename="../ufe_measure_tab.py" line="2863"/>
         <source>the file is truncated (was it still being written?)</source>
         <translation>el archivo está truncado (¿se estaba escribiendo todavía?)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2790"/>
+        <location filename="../ufe_measure_tab.py" line="2866"/>
         <source>the file has no image</source>
         <translation>el archivo no tiene imagen</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2792"/>
+        <location filename="../ufe_measure_tab.py" line="2868"/>
         <source>the pixel format is not supported</source>
         <translation>el formato de píxel no está admitido</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2794"/>
+        <location filename="../ufe_measure_tab.py" line="2870"/>
         <source>the file could not be read</source>
         <translation>el archivo no se pudo leer</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2980"/>
+        <location filename="../ufe_measure_tab.py" line="3056"/>
         <source>The ExoClock files could not be written: {0}</source>
         <translation>Los archivos de ExoClock no se pudieron escribir: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3118"/>
+        <location filename="../ufe_measure_tab.py" line="3194"/>
         <source>Live: {0} new frame(s) in the folder</source>
         <translation>En vivo: {0} toma(s) nuevas en la carpeta</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3120"/>
+        <location filename="../ufe_measure_tab.py" line="3196"/>
         <source>Live mode stopped.</source>
         <translation>Modo en vivo detenido.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3129"/>
+        <location filename="../ufe_measure_tab.py" line="3205"/>
         <source>Live batch lost: {0} frame(s) were not measured ({1})</source>
         <translation>Lote en vivo perdido: {0} toma(s) no se midieron ({1})</translation>
     </message>
@@ -15057,7 +15068,7 @@ tocan.</translation>
         <translation>Busca el período de la curva del proyecto (Lomb-Scargle y PDM) y lo plega en el informe de dos paneles, con lo que la línea base puede y no puede decir</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2147"/>
+        <location filename="../ufe_measure_tab.py" line="2217"/>
         <source>The period search works on a project&apos;s curve: open the editor from a project to reach it.</source>
         <translation>La búsqueda de período trabaja sobre la curva de un proyecto: abre el editor desde un proyecto para llegar a ella.</translation>
     </message>
@@ -15077,52 +15088,52 @@ tocan.</translation>
         <translation>Cada N minutos</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2164"/>
+        <location filename="../ufe_measure_tab.py" line="2234"/>
         <source>The fixed range is empty or inverted: the faintest magnitude must be larger than the brightest.</source>
         <translation>El rango fijo está vacío o invertido: la magnitud más débil tiene que ser mayor que la más brillante.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2216"/>
+        <location filename="../ufe_measure_tab.py" line="2286"/>
         <source>No outlier is marked: switch the detector on first.</source>
         <translation>No hay ningún anómalo marcado: enciende antes el detector.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2226"/>
+        <location filename="../ufe_measure_tab.py" line="2296"/>
         <source>No point selected: click one on the chart first.</source>
         <translation>No hay ningún punto seleccionado: haz clic en uno de la gráfica primero.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2607"/>
+        <location filename="../ufe_measure_tab.py" line="2677"/>
         <source>{0} selected · {1} excluded · {2} marked</source>
         <translation>{0} seleccionados · {1} excluidos · {2} marcados</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1949"/>
+        <location filename="../ufe_measure_tab.py" line="2019"/>
         <source>PNG image (*.png)</source>
         <translation>Imagen PNG (*.png)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1937"/>
+        <location filename="../ufe_measure_tab.py" line="2007"/>
         <source>Measure the series first: the figure is the curve.</source>
         <translation>Mide la serie primero: la figura es la curva.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1987"/>
+        <location filename="../ufe_measure_tab.py" line="2057"/>
         <source>{0} frames</source>
         <translation>{0} tomas</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1989"/>
+        <location filename="../ufe_measure_tab.py" line="2059"/>
         <source>{0:g} s</source>
         <translation>{0:g} s</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1992"/>
+        <location filename="../ufe_measure_tab.py" line="2062"/>
         <source>band {0}</source>
         <translation>banda {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1993"/>
+        <location filename="../ufe_measure_tab.py" line="2063"/>
         <source>NightScribe</source>
         <translation>NightScribe</translation>
     </message>
@@ -15137,22 +15148,22 @@ tocan.</translation>
         <translation>Escribe las dos figuras que explican la noche: la masa de aire de cada punto (una curva que baja y vuelve suele ser el cielo) y la posición del objetivo (con la alineación activa es el residuo de guiado: la toma que saltó se ve como un pico). Las dos son figuras científicas, listas para el informe</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2068"/>
+        <location filename="../ufe_measure_tab.py" line="2138"/>
         <source>Measure the series first: the figures are its night.</source>
         <translation>Mide la serie primero: las figuras son su noche.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2116"/>
+        <location filename="../ufe_measure_tab.py" line="2186"/>
         <source>Could not write the night figures: {0}</source>
         <translation>No se pudieron escribir las figuras de la noche: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2119"/>
+        <location filename="../ufe_measure_tab.py" line="2189"/>
         <source>Night figures written: {0}</source>
         <translation>Figuras de la noche escritas: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2132"/>
+        <location filename="../ufe_measure_tab.py" line="2202"/>
         <source>Night conditions</source>
         <translation>Condiciones de la noche</translation>
     </message>
@@ -15167,32 +15178,32 @@ tocan.</translation>
         <translation>Δ magnitud (diferencial)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2878"/>
+        <location filename="../ufe_measure_tab.py" line="2954"/>
         <source>Fixed magnitude range cleared: the axis changed what it measures.</source>
         <translation>Rango de magnitud fijo borrado: el eje ha cambiado lo que mide.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1946"/>
+        <location filename="../ufe_measure_tab.py" line="2016"/>
         <source>Save the chart</source>
         <translation>Guardar el gráfico</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1960"/>
+        <location filename="../ufe_measure_tab.py" line="2030"/>
         <source>Chart written as you see it: {0}</source>
         <translation>Gráfico guardado tal como lo ves: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="1957"/>
+        <location filename="../ufe_measure_tab.py" line="2027"/>
         <source>Could not write the chart: {0}</source>
         <translation>No se pudo escribir el gráfico: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2811"/>
+        <location filename="../ufe_measure_tab.py" line="2887"/>
         <source>The series failed and stopped: {0}</source>
         <translation>La serie falló y se detuvo: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="3146"/>
+        <location filename="../ufe_measure_tab.py" line="3222"/>
         <source>Live mode failed and stopped: {0}</source>
         <translation>El modo en vivo falló y se detuvo: {0}</translation>
     </message>
@@ -15243,37 +15254,37 @@ LOS RIESGOS, dichos claros: mueve la magnitud que se publica, así que una curva
         <translation>Las acciones ocasionales de la serie: deshacer la última pasada, ExoClock, las figuras de la noche, guardar el gráfico, período y fase, la guía</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2429"/>
+        <location filename="../ufe_measure_tab.py" line="2499"/>
         <source>This visit&apos;s curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</source>
         <translation>Curva de esta visita: {0} puntos ya medidos con la secuencia guardada en el proyecto (no se ha leído ningún frame). Mide la serie otra vez para construirla desde cero, o descártala abajo.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2315"/>
+        <location filename="../ufe_measure_tab.py" line="2385"/>
         <source>Curve loaded from the visit: {0} points.</source>
         <translation>Curva cargada de la visita: {0} puntos.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2449"/>
+        <location filename="../ufe_measure_tab.py" line="2519"/>
         <source>This curve does not belong to a visit: there is nothing to discard.</source>
         <translation>Esta curva no pertenece a ninguna visita: no hay nada que descartar.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2454"/>
+        <location filename="../ufe_measure_tab.py" line="2524"/>
         <source>Discard the visit&apos;s curve</source>
         <translation>Descartar la curva de la visita</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2455"/>
+        <location filename="../ufe_measure_tab.py" line="2525"/>
         <source>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</source>
         <translation>Esto deshace todas las pasadas de serie de esta visita: sus puntos se van y las pasadas quedan marcadas como deshechas. Las tomas no se tocan y puedes volver a medir.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2465"/>
+        <location filename="../ufe_measure_tab.py" line="2535"/>
         <source>Could not discard the curve: {0}</source>
         <translation>No se pudo descartar la curva: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="2478"/>
+        <location filename="../ufe_measure_tab.py" line="2548"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</source>
         <translation>Curva descartada: {0} pasada(s) deshecha(s), {1} puntos eliminados. Las tomas no se han tocado.</translation>
     </message>
@@ -17927,7 +17938,7 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Medir la secuencia…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="519"/>
+        <location filename="../widgets/visits_panel.py" line="536"/>
         <source>Open the editor on this visit&apos;s frames to measure the whole series (per-frame zero point, quality flags, undo by run)</source>
         <translation>Abre el editor en las tomas de esta visita para medir la serie completa (punto cero por toma, marcas de calidad, deshacer por ejecución)</translation>
     </message>
@@ -17940,7 +17951,7 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Abre el editor sobre las tomas de esta visita para apilarlas siguiendo el movimiento del objeto, medir su posición y contrastarla con la de otros observadores (track &amp; stack, ADR-062)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="859"/>
+        <location filename="../widgets/visits_panel.py" line="884"/>
         <source>Open</source>
         <translation>Abrir</translation>
     </message>
@@ -17989,7 +18000,7 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Devuelve las tomas de esta visita desde procesados/ a donde estaban. Un nombre ya ocupado no se pisa: la toma cae al lado</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="847"/>
+        <location filename="../widgets/visits_panel.py" line="872"/>
         <source>Free space…</source>
         <translation>Liberar espacio…</translation>
     </message>
@@ -18040,7 +18051,7 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation>&lt;a href=&quot;%1&quot;&gt;ver el objeto en el MPC&lt;/a&gt;</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="511"/>
+        <location filename="../widgets/visits_panel.py" line="528"/>
         <source>Measure the position…</source>
         <translation>Medir la posición…</translation>
     </message>
@@ -18049,138 +18060,138 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Apila las tomas de esta visita siguiendo el movimiento del objeto y mide su posición, contrastada con la de los otros observadores (track &amp; stack, ADR-062)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="513"/>
+        <location filename="../widgets/visits_panel.py" line="530"/>
         <source>Stack this visit&apos;s frames along the object&apos;s motion and measure its position, checked against the other observers (track &amp; stack)</source>
         <translation>Apila los fotogramas de esta visita a lo largo del movimiento del objeto y mide su posición, contrastada con la de los demás observadores (track &amp; stack)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="517"/>
+        <location filename="../widgets/visits_panel.py" line="534"/>
         <source>Measure the series…</source>
         <translation>Medir la serie…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="573"/>
+        <location filename="../widgets/visits_panel.py" line="590"/>
         <source>Change the date…</source>
         <translation>Cambiar la fecha…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="575"/>
+        <location filename="../widgets/visits_panel.py" line="592"/>
         <source>Delete the visit…</source>
         <translation>Borrar la visita…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="609"/>
+        <location filename="../widgets/visits_panel.py" line="634"/>
         <source>Saved</source>
         <translation>Guardado</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="647"/>
+        <location filename="../widgets/visits_panel.py" line="672"/>
         <source>Delete visit</source>
         <translation>Eliminar visita</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="648"/>
+        <location filename="../widgets/visits_panel.py" line="673"/>
         <source>Delete this visit? Its measurements and files are kept, unlinked from it.</source>
         <translation>¿Eliminar esta visita? Sus medidas y archivos se conservan, desvinculados de ella.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="667"/>
+        <location filename="../widgets/visits_panel.py" line="692"/>
         <source>plate</source>
         <translation>placa</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="668"/>
+        <location filename="../widgets/visits_panel.py" line="693"/>
         <source>image</source>
         <translation>imagen</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="669"/>
+        <location filename="../widgets/visits_panel.py" line="694"/>
         <source>chart</source>
         <translation>gráfica</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="670"/>
+        <location filename="../widgets/visits_panel.py" line="695"/>
         <source>report</source>
         <translation>reporte</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="671"/>
+        <location filename="../widgets/visits_panel.py" line="696"/>
         <source>sequence</source>
         <translation>secuencia</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="672"/>
+        <location filename="../widgets/visits_panel.py" line="697"/>
         <source>animation</source>
         <translation>animación</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="673"/>
+        <location filename="../widgets/visits_panel.py" line="698"/>
         <source>ephemeris</source>
         <translation>efemérides</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="674"/>
+        <location filename="../widgets/visits_panel.py" line="699"/>
         <source>stack</source>
         <translation>apilado</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="675"/>
+        <location filename="../widgets/visits_panel.py" line="700"/>
         <source>motion (GIF)</source>
         <translation>movimiento (GIF)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="676"/>
+        <location filename="../widgets/visits_panel.py" line="701"/>
         <source>motion (MP4)</source>
         <translation>movimiento (MP4)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="677"/>
+        <location filename="../widgets/visits_panel.py" line="702"/>
         <source>evolution (GIF)</source>
         <translation>evolución (GIF)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="678"/>
+        <location filename="../widgets/visits_panel.py" line="703"/>
         <source>evolution (MP4)</source>
         <translation>evolución (MP4)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="679"/>
+        <location filename="../widgets/visits_panel.py" line="704"/>
         <source>EXOTIC handoff</source>
         <translation>handoff EXOTIC</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="680"/>
+        <location filename="../widgets/visits_panel.py" line="705"/>
         <source>EXOTIC figure</source>
         <translation>figura EXOTIC</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="681"/>
+        <location filename="../widgets/visits_panel.py" line="706"/>
         <source>AAVSO report</source>
         <translation>reporte AAVSO</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="682"/>
+        <location filename="../widgets/visits_panel.py" line="707"/>
         <source>EXOTIC parameters</source>
         <translation>parámetros EXOTIC</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="713"/>
+        <location filename="../widgets/visits_panel.py" line="738"/>
         <source>undone</source>
         <translation>deshecho</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="714"/>
+        <location filename="../widgets/visits_panel.py" line="739"/>
         <source>%1 obs · complete</source>
         <translation>%1 obs · completa</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="715"/>
+        <location filename="../widgets/visits_panel.py" line="740"/>
         <source>The visit&apos;s astrometry run: open it in the editor</source>
         <translation>El run de astrometría de la visita: ábrelo en el editor</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="990"/>
-        <location filename="../widgets/visits_panel.py" line="1001"/>
+        <location filename="../widgets/visits_panel.py" line="1015"/>
+        <location filename="../widgets/visits_panel.py" line="1026"/>
         <source>Bring back</source>
         <translation>Devolver</translation>
     </message>
@@ -18197,78 +18208,78 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Esta visita aún no tiene runs.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="719"/>
+        <location filename="../widgets/visits_panel.py" line="744"/>
         <source>%1 original frames can be moved to prcd/.</source>
         <translation>Se pueden mover %1 fotogramas originales a prcd/.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="722"/>
+        <location filename="../widgets/visits_panel.py" line="747"/>
         <source>Astrometry run</source>
         <translation>Run de astrometría</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="754"/>
+        <location filename="../widgets/visits_panel.py" line="779"/>
         <source>measured</source>
         <translation>medido</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="755"/>
+        <location filename="../widgets/visits_panel.py" line="780"/>
         <source>by hand</source>
         <translation>a mano</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="757"/>
+        <location filename="../widgets/visits_panel.py" line="782"/>
         <source>A measurement of this visit</source>
         <translation>Una medida de esta visita</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="784"/>
+        <location filename="../widgets/visits_panel.py" line="809"/>
         <source>Nothing yet: attach the night&apos;s frames or measure.</source>
         <translation>Nada todavía: añade los ficheros de la noche o mide.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="787"/>
+        <location filename="../widgets/visits_panel.py" line="812"/>
         <source>Files of the night (%1)</source>
         <translation>Ficheros de la noche (%1)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="842"/>
+        <location filename="../widgets/visits_panel.py" line="867"/>
         <source>Open in the editor</source>
         <translation>Abrir en el editor</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="846"/>
+        <location filename="../widgets/visits_panel.py" line="871"/>
         <source>Free space (%1 frames)…</source>
         <translation>Liberar espacio (%1 fotogramas)…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="850"/>
+        <location filename="../widgets/visits_panel.py" line="875"/>
         <source>Bring back the frames…</source>
         <translation>Devolver los fotogramas…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="853"/>
+        <location filename="../widgets/visits_panel.py" line="878"/>
         <source>Open its plate</source>
         <translation>Abrir su placa</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="856"/>
-        <location filename="../widgets/visits_panel.py" line="908"/>
+        <location filename="../widgets/visits_panel.py" line="881"/>
+        <location filename="../widgets/visits_panel.py" line="933"/>
         <source>Remove the measurement</source>
         <translation>Eliminar la medida</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="862"/>
+        <location filename="../widgets/visits_panel.py" line="887"/>
         <source>Remove from the visit</source>
         <translation>Quitar de la visita</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="909"/>
+        <location filename="../widgets/visits_panel.py" line="934"/>
         <source>Remove this measurement from the visit? The file it came from is not touched.</source>
         <translation>¿Eliminar esta medida de la visita? El fichero del que salió no se toca.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="940"/>
+        <location filename="../widgets/visits_panel.py" line="965"/>
         <source>Nothing to free: the frames are already in prcd/.</source>
         <translation>No hay nada que liberar: los fotogramas ya están en prcd/.</translation>
     </message>
@@ -18277,27 +18288,27 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">%1 fotogramas movidos a prcd/.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1269"/>
+        <location filename="../widgets/visits_panel.py" line="1294"/>
         <source>This visit has no astrometry to report.</source>
         <translation>Esta visita no tiene astrometría que reportar.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1276"/>
+        <location filename="../widgets/visits_panel.py" line="1301"/>
         <source>The visit&apos;s astrometry could not be rebuilt.</source>
         <translation>No se pudo reconstruir la astrometría de la visita.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1280"/>
+        <location filename="../widgets/visits_panel.py" line="1305"/>
         <source>This visit has no astrometry run to report yet.</source>
         <translation>Esta visita aún no tiene una pasada de astrometría que reportar.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1288"/>
+        <location filename="../widgets/visits_panel.py" line="1313"/>
         <source>%1 observation(s) ready to report. Open the report window to review, save or send it.</source>
         <translation>%1 observación(es) listas para reportar. Abre la ventana del reporte para revisarlo, guardarlo o enviarlo.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1309"/>
+        <location filename="../widgets/visits_panel.py" line="1334"/>
         <source>Saved: %1</source>
         <translation>Guardado: %1</translation>
     </message>
@@ -18310,14 +18321,14 @@ QUÉ CUESTA: mueve la magnitud que se publica (un escalón de unas centésimas, 
         <translation type="vanished">Nada que liberar: las tomas ya están en procesados/.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="939"/>
-        <location filename="../widgets/visits_panel.py" line="945"/>
         <location filename="../widgets/visits_panel.py" line="964"/>
+        <location filename="../widgets/visits_panel.py" line="970"/>
+        <location filename="../widgets/visits_panel.py" line="989"/>
         <source>Free space</source>
         <translation>Liberar espacio</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="946"/>
+        <location filename="../widgets/visits_panel.py" line="971"/>
         <source>Move %1 original frames (%2 MB) to %3?
 
 Nothing is deleted: Bring back undoes it.</source>
@@ -18326,7 +18337,7 @@ Nothing is deleted: Bring back undoes it.</source>
 No se borra nada: Traer de vuelta lo deshace.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="965"/>
+        <location filename="../widgets/visits_panel.py" line="990"/>
         <source>%1 frames moved, %2 could not be moved.</source>
         <translation>%1 tomas movidas, %2 no se pudieron mover.</translation>
     </message>
@@ -18335,38 +18346,38 @@ No se borra nada: Traer de vuelta lo deshace.</translation>
         <translation type="vanished">%1 tomas movidas a procesados/.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="991"/>
+        <location filename="../widgets/visits_panel.py" line="1016"/>
         <source>Nothing to bring back.</source>
         <translation>Nada que traer de vuelta.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="993"/>
+        <location filename="../widgets/visits_panel.py" line="1018"/>
         <source>%1 frames brought back.</source>
         <translation>%1 tomas devueltas.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="996"/>
+        <location filename="../widgets/visits_panel.py" line="1021"/>
         <source>%1 landed next to a file with the same name.</source>
         <translation>%1 cayeron al lado de un fichero con el mismo nombre.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="999"/>
+        <location filename="../widgets/visits_panel.py" line="1024"/>
         <source>%1 could not be moved.</source>
         <translation>%1 no se pudieron mover.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1023"/>
+        <location filename="../widgets/visits_panel.py" line="1048"/>
         <source>Attach files to the visit</source>
         <translation>Adjuntar archivos a la visita</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1024"/>
+        <location filename="../widgets/visits_panel.py" line="1049"/>
         <source>All files (*)</source>
         <translation>Todos los archivos (*)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1064"/>
-        <location filename="../widgets/visits_panel.py" line="1122"/>
+        <location filename="../widgets/visits_panel.py" line="1089"/>
+        <location filename="../widgets/visits_panel.py" line="1147"/>
         <source>FITS details</source>
         <translation>Detalles del FITS</translation>
     </message>
@@ -18465,13 +18476,13 @@ No se borra nada: Traer de vuelta lo deshace.</translation>
         <translation type="vanished">Guardar reporte…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1066"/>
+        <location filename="../widgets/visits_panel.py" line="1091"/>
         <source>FITS files: {0}</source>
         <translation>Ficheros FITS: {0}</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1076"/>
-        <location filename="../widgets/visits_panel.py" line="1107"/>
+        <location filename="../widgets/visits_panel.py" line="1101"/>
+        <location filename="../widgets/visits_panel.py" line="1132"/>
         <source>{0}  ·  {1} · {2} · {3}s</source>
         <translation>{0}  ·  {1} · {2} · {3}s</translation>
     </message>
@@ -18492,7 +18503,7 @@ No se borra nada: Traer de vuelta lo deshace.</translation>
         <translation type="vanished">Guardar reporte MPC</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="1306"/>
+        <location filename="../widgets/visits_panel.py" line="1331"/>
         <source>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</source>
         <translation>⚠ la primera medida del reporte es del %1, no de la fecha de esta visita</translation>
     </message>

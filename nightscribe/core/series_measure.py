@@ -1016,7 +1016,14 @@ def _point_band(frame, cfg):
     # @return: the band, or None when nothing says anything
     res = frame.get("res")
     picked = getattr(res, "band", None) if res is not None else None
-    return picked or cfg.band or frame.get("filter") or cfg.fallback_band
+    # the plate's own FILTER card, translated to a band the catalogue really
+    # has (a Cousins "R" is the catalogue's "Rc"): without it the measurement
+    # hangs from whatever band was picked first, which is a silent wrong
+    # calibration (see photometry.band_for_filter)
+    alias = photometry.band_for_filter(
+        frame.get("filter"), photometry.available_bands(cfg.comp_set or ()))
+    return (picked or cfg.band or alias or frame.get("filter")
+            or cfg.fallback_band)
 
 
 def _build_point(group, cfg):

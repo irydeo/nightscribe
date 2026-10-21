@@ -1345,6 +1345,47 @@ def linearity_ceiling(cfg):
     return None
 
 
+def _number(raw):
+    # @args: raw - a header or config value
+    # @return: it as a float, or None when it is not a number
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _plate_is_another_camera(header, cfg):
+    # @args: header - the plate's header dict, cfg - a config-like object
+    #        with .get (or None)
+    # @return: True when the plate declares a detector that the observer's
+    #          camera profile cannot describe.
+    #
+    # The profile's linearity limit (and the ccd_saturate setting) are in the
+    # observer's OWN ADU, and ADU are a property of one instrument: on another
+    # one they describe a scale that does not exist there. The physical way to
+    # tell the two apart is the FULL WELL IN ELECTRONS, which does not depend
+    # on the gain: a plate whose SATURATE * GAIN is more than twice (or less
+    # than half) the profile's full well is another detector, and then its own
+    # cards are what counts.
+    #
+    # Measured 2026-10-20: a Las Cumbres plate (SATURATE 248800, GAIN 1) on a
+    # profile with a 53000 e- well was refused frame after frame as
+    # "nonlinear", and the observer's chart came out empty with no explanation.
+    if not header or cfg is None:
+        return False
+    try:
+        well = float(cfg.get("cam_full_well_e") or 0.0)
+    except (TypeError, ValueError):
+        return False
+    sat = _number(header.get("SATURATE")) \
+        or _number(header.get("SATLEVEL"))
+    if well <= 0.0 or not sat:
+        return False
+    gain = _number(header.get("GAIN")) or 1.0
+    plate_well = sat * gain
+    return plate_well > 2.0 * well or plate_well < 0.5 * well
+
+
 def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
     # THE TWO CEILINGS EVERY STAR MUST CLEAR, from ONE place (ADR-066).
     #
@@ -1358,6 +1399,11 @@ def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
     # Each caller used to pass these two numbers by hand, and one path (the
     # series' aperture tuning) forgot: one home means no path can forget.
     #
+    # A PLATE FROM ANOTHER INSTRUMENT IS NOT GATED BY THE OBSERVER'S PROFILE
+    # (see _plate_is_another_camera): its own SATURATE card is the ceiling,
+    # and the profile's linearity, which is written in the observer's ADU, is
+    # left out of the question.
+    #
     # @args: header - the plate's header dict, cfg - a config-like object
     #        with .get (or None), linear_adu - an explicit linearity limit
     #        (a per-run recipe wins over the camera profile), saturate - an
@@ -1365,6 +1411,8 @@ def star_ceilings(header, cfg=None, linear_adu=None, saturate=None):
     # @return: (saturation, linearity) in ADU, either of them None when
     #          nobody knows. The header's own SATURATE card still wins over
     #          the setting, exactly as before.
+    if _plate_is_another_camera(header, cfg):
+        return saturation_ceiling(header, None), None
     cfg_like = {"ccd_saturate": saturate} if saturate is not None else cfg
     sat = saturation_ceiling(header, cfg_like)
     lin = linear_adu if linear_adu is not None else linearity_ceiling(cfg)
@@ -1417,11 +1465,23 @@ def ceiling_warning(header, cfg=None, linear_adu=None, saturate=None):
     # @args: as star_ceilings
     # @return: a bilingual warning when the camera's LINEARITY limit is not
     #          known (so the app is measuring with the best ceiling it has,
-    #          which is not the same thing), or None when it is.
+    #          which is not the same thing), or None when it is. A plate from
+    #          ANOTHER instrument gets its own warning instead: there the
+    #          profile's limit does not apply at all (see
+    #          _plate_is_another_camera).
     # Asked for 2026-10-06: with the linearity unset the app used to fall back
     # to the SATURATE card or to the plate's own clip in SILENCE, and a star
     # that is over the (unknown) linearity but under the clip slips through.
     # The observer has to know which limit is being enforced.
+    if _plate_is_another_camera(header, cfg):
+        return {"es": "Esta placa no es de la cámara de tu perfil: uso su "
+                      "propia tarjeta SATURATE como techo, no el límite de "
+                      "linealidad de tu cámara, que está escrito en tus ADU "
+                      "y aquí no significan lo mismo.",
+                "en": "This plate is not from the camera in your profile: I "
+                      "am using its own SATURATE card as the ceiling, not "
+                      "your camera's linearity limit, which is written in "
+                      "your ADU and means something else here."}
     _sat, lin = star_ceilings(header, cfg, linear_adu=linear_adu,
                               saturate=saturate)
     if lin is not None:
@@ -1446,15 +1506,8 @@ def effective_ceiling(header, cfg=None, linear_adu=None):
     # @args: header - the plate's header, cfg - config-like or None,
     #        linear_adu - an explicit linearity limit (overrides cfg)
     # @return: the effective ceiling in ADU, or None
-    limits = []
-    lin = linear_adu
-    if lin is None:
-        lin = linearity_ceiling(cfg)
-    if lin is not None:
-        limits.append(float(lin))
-    sat = saturation_ceiling(header, cfg)
-    if sat is not None:
-        limits.append(float(sat))
+    sat, lin = star_ceilings(header, cfg, linear_adu=linear_adu)
+    limits = [float(v) for v in (lin, sat) if v is not None]
     return min(limits) if limits else None
 
 
@@ -2169,6 +2222,40 @@ def band_of(star, band):
         if item.get("label") == band and item.get("value") is not None:
             return item["value"], bool(item.get("derived"))
     return None, False
+
+
+# The FITS filter names that ARE one of the catalogue's bands.
+#
+# The band the observer picks has to exist in the catalogue, or no comparison
+# star has a magnitude to hang a zero point from: the series then measures
+# nothing and says nothing (reported 2026-10-21: a Las Cumbres plate whose
+# FILTER card says "R" against a sequence that carries "Rc" fell to the first
+# band of the list, which is a silent wrong choice, and the calibration then
+# hangs from another band's magnitudes).
+#
+# ONLY THE EQUIVALENCES THAT ARE TRUE. A Cousins R IS the catalogue's Rc, but
+# a Pan-STARRS rp is NOT (a different passband over a different response), and
+# pretending it is would be inventing a calibration. When the filter is one of
+# those, the honest answer is None and the panel says that no comparison star
+# carries that band.
+_FILTER_ALIASES = {
+    "R": "Rc", "RC": "Rc", "RCO": "Rc", "COUSINS R": "Rc", "COUSINSR": "Rc",
+    "I": "Ic", "IC": "Ic", "ICO": "Ic", "COUSINS I": "Ic", "COUSINSI": "Ic",
+    "V": "V", "B": "B",
+}
+
+
+def band_for_filter(name, available=()):
+    # @args: name - the plate's FILTER card, available - the bands the
+    #        sequence's catalogue really has
+    # @return: the band to use, or None when the filter is not one of them
+    if not name:
+        return None
+    key = " ".join(str(name).strip().upper().replace("_", " ").split())
+    for alias, band in _FILTER_ALIASES.items():
+        if key == alias and band in available:
+            return band
+    return None
 
 
 def available_bands(entries):

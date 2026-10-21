@@ -6,6 +6,8 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+## [0.1.3] - 2026-10-21
+
 ### Corregido
 
 - **La lista de tomas del editor enseña ahora lo que la serie dijo de cada

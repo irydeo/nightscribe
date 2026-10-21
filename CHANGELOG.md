@@ -6,6 +6,8 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-21
+
 ### Fixed
 
 - **The editor's list of frames now shows what the series said about each

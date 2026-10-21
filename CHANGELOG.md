@@ -6,6 +6,24 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The airmass and the site are taken from the plate, not from your
+  Settings.** The engine computed the target's altitude from the site
+  configured in Settings, which is right for your own observatory and wrong
+  for anybody else's plate: on a Las Cumbres plate (a 1 m at McDonald) reduced
+  from a site in Spain the airmass came out **rising to 5.2 through the night**
+  where the plate's own header said 1.16 to 1.03. That number feeds the
+  scintillation term of the error, so the error grew from 0.05 to **0.39 mag**
+  over the night, which the chart reads as green, then orange, then red. With
+  the plate's own cards the same errors are flat at 0.03. The same rule the
+  plate scale already followed applies now to the time: **what the plate says
+  about itself wins over the observer's Settings**, and the Settings are the
+  fallback for a rig that declares nothing. The detrend benefits too, since the
+  airmass is its regressor: **re-measure a series** to get the corrected errors
+  and the corrected trend (the points already stored keep the old numbers, they
+  are the record of what was measured).
+
 ## [0.1.3] - 2026-10-21
 
 ### Fixed

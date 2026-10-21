@@ -6,6 +6,25 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+### Corregido
+
+- **La masa de aire y el sitio se toman de la placa, no de tus Ajustes.** El
+  motor calculaba la altitud del objetivo desde el sitio configurado en Ajustes,
+  que es lo correcto para tu observatorio y equivocado para la placa de
+  cualquier otro: en una placa de Las Cumbres (un 1 m en McDonald) reducida
+  desde un sitio en España, la masa de aire salía **subiendo hasta 5,2 a lo
+  largo de la noche** cuando la propia cabecera decía 1,16 a 1,03. Ese número
+  alimenta el término de centellea del error, así que el error crecía de 0,05 a
+  **0,39 mag** en la noche, y la gráfica lo lee como verde, luego naranja y
+  luego rojo. Con las tarjetas de la propia placa esos mismos errores quedan
+  planos en 0,03. La misma regla que ya seguía la escala de placa se aplica
+  ahora al tiempo: **lo que la placa dice de sí misma manda sobre los Ajustes**,
+  y los Ajustes son el respaldo para un equipo que no declara nada. El detrend
+  también se beneficia, porque la masa de aire es su regresor: **vuelve a medir
+  la serie** para tener los errores corregidos y la tendencia corregida (los
+  puntos ya guardados conservan los números viejos, que son el registro de lo
+  que se midió).
+
 ## [0.1.3] - 2026-10-21
 
 ### Corregido

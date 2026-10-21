@@ -1571,3 +1571,20 @@ def test_a_comparison_with_a_non_positive_flux_is_skipped(monkeypatch):
     res = phot.measure_plate(img, cfg)         # must not raise
     assert res.used == []
     assert res.skipped.get("other") == 1
+
+
+def test_the_plates_own_site_beats_the_observer_settings():
+    # The Settings describe the observer's own observatory. On a plate from
+    # another one they are wrong, and the altitude computed from them is
+    # wrong with them, which lands in the scintillation term of the error
+    # (measured 2026-10-21: the airmass came out rising to 5.2 against the
+    # plate's own 1.03, and the error grew from 0.05 to 0.39 mag).
+    from nightscribe.core import photometry as phot
+    foreign = phot.PlateConfig(header={"LATITUDE": 30.68, "LONGITUD": -104.02},
+                               site_lat=40.0, site_lon=-3.0)
+    assert foreign.plate_site == (30.68, -104.02)
+    # the observer's own plate, which declares nothing, keeps the Settings
+    own = phot.PlateConfig(header={"FILTER": "V"}, site_lat=40.0, site_lon=-3.0)
+    assert own.plate_site == (40.0, -3.0)
+    # and a config with nothing at all answers (None, None), never a guess
+    assert phot.PlateConfig(header={}).plate_site == (None, None)

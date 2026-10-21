@@ -2282,6 +2282,25 @@ class PlateConfig:
     site_aperture_m: float = 0.254
     site_height_m: float = 0.0
     site_dark: float = None         # dark current e-/pixel/s (profile)
+
+    @property
+    def plate_site(self):
+        # (lat, lon) the PLATE was taken from: what it declares in its own
+        # header when it declares anything, else the observer's Settings.
+        #
+        # The Settings describe the observer's own observatory. On a plate
+        # from another one they are wrong, and the altitude computed from
+        # them is wrong with them, which lands in the scintillation term of
+        # the error (Young). Measured 2026-10-21 on a Las Cumbres plate
+        # measured from a site in Spain: the airmass came out rising to 5.2
+        # against the plate's own 1.16 -> 1.03, and the error grew from 0.05
+        # to 0.39 mag through the night (green -> orange -> red on the
+        # chart). It is the rule astap.py already applies to the plate scale:
+        # the plate's own card beats the observer's Settings.
+        # @return: (lat_deg, lon_deg)
+        lat, lon = fits_meta.site_from_header(self.header or {})
+        return (lat if lat is not None else self.site_lat,
+                lon if lon is not None else self.site_lon)
     # host subtraction (H2b): the comps read on another frame, in the
     # plate orientation, at comp_scale plate px per comp-image px
     comp_image: object = None
@@ -2370,17 +2389,21 @@ def _check_verdict(entries, used_entries, band, zp, err_total):
 
 
 def _plate_scintillation(cfg, col, row, exptime):
-    # H5: Young's formula with the site from Ajustes and the target's
-    # altitude from the plate's WCS + DATE-OBS. None when it cannot be
-    # computed (the combiner skips it).
+    # H5: Young's formula with the site the PLATE was taken from (its own
+    # header when it says, else Ajustes) and the target's altitude from the
+    # plate's WCS + DATE-OBS. None when it cannot be computed (the combiner
+    # skips it).
     meta = fits_meta.meta_from_header(cfg.header or {})
     if meta["mjd"] is None or cfg.wcs is None:
         return None
     try:
         ra, dec = cfg.wcs.pixel_to_sky(col, row)
         jd = meta["mjd"] + 2400000.5
-        lst = coords.lst_degrees(jd, float(cfg.site_lon))
-        alt, _az = coords.altaz(ra, dec, float(cfg.site_lat), lst)
+        lat, lon = cfg.plate_site
+        if lat is None or lon is None:
+            return None
+        lst = coords.lst_degrees(jd, float(lon))
+        alt, _az = coords.altaz(ra, dec, float(lat), lst)
         return scintillation_mag(alt, exptime, cfg.site_aperture_m,
                                  cfg.site_height_m)
     except Exception:

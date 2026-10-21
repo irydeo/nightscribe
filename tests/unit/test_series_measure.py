@@ -1288,3 +1288,21 @@ def test_local_offset_days_matches_the_machine_clock():
     off = sm._local_offset_days(61300.0)
     assert isinstance(off, float)
     assert -1.0 <= off <= 1.0
+
+
+def test_the_point_takes_the_airmass_and_the_site_the_plate_declares():
+    # The plate's own cards win over the observer's Settings (see
+    # fits_meta): the airmass is the detrend's regressor and the site is what
+    # the scintillation is computed from, so getting them from the wrong
+    # observatory spoils both (measured 2026-10-21: the error went from 0.05
+    # to 0.39 mag through the night on a Las Cumbres plate).
+    cfg = sm.SeriesConfig(site_lat=40.0, site_lon=-3.0)
+    group = [{"meta": {"airmass": 1.16}}, {"meta": {"airmass": 1.18}}]
+    assert abs(sm._plate_airmass(group, cfg, 60000.0) - 1.17) < 1e-9
+    assert sm._plate_site(
+        [{"meta": {"site_lat": 30.68, "site_lon": -104.02}}], cfg) \
+        == (30.68, -104.02)
+    # a plate that says nothing keeps the observer's own, and with no WCS
+    # there is no geometry to fall back to: None, not a made-up number
+    assert sm._plate_site([{"meta": {}}], cfg) == (40.0, -3.0)
+    assert sm._plate_airmass([{"meta": {}}], cfg, 60000.0) is None

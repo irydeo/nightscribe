@@ -6,6 +6,23 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+## [0.1.3] - 2026-10-21
+
+### Corregido
+
+- **La lista de tomas del editor enseña ahora lo que la serie dijo de cada
+  una.** La curva marcaba una toma cuya medida la serie había descartado y la
+  lista de tomas no decía nada, así que un observador con la gráfica vacía y la
+  tira de tomas impoluta solo podía concluir que sus datos eran malos: la noche
+  en que se reportó, **338 de 379 tomas llevaban marca y la tira no decía
+  nada**. Ahora las marca con la misma clasificación que lee la curva
+  (`core/series_measure`): una marca de datos (no lineal, nube, seeing, un rayo
+  cósmico, una toma que no se pudo alinear) convierte la toma en un problema y
+  el filtro «solo problemas» la conserva; una de matiz (pocas comparadas) es una
+  nota y nunca esconde una toma. La marca nombra el flag y lo explica en el
+  tooltip, y el borde lleva el color que merece la medida: la misma gramática
+  que ya comparten la curva y el panel de medida.
+
 ## [0.1.2] - 2026-10-20
 
 Arregla lo único que podía llevarse por delante un entorno EXOTIC que funcionaba,

@@ -960,87 +960,217 @@
 <context>
     <name>FramePreviews</name>
     <message>
-        <location filename="../widgets/frame_previews.py" line="362"/>
+        <location filename="../widgets/frame_previews.py" line="385"/>
+        <source>unusable</source>
+        <translation>unusable</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="386"/>
+        <source>the plate&apos;s recipe refused the measurement</source>
+        <translation>the plate&apos;s recipe refused the measurement</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="388"/>
+        <source>saturated</source>
+        <translation>saturated</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="389"/>
+        <source>the star&apos;s core is clipped, so its flux is a floor and not a value</source>
+        <translation>the star&apos;s core is clipped, so its flux is a floor and not a value</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="392"/>
+        <source>nonlinear</source>
+        <translation>nonlinear</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="393"/>
+        <source>the peak is above the camera profile&apos;s linearity limit: the flux is no longer proportional</source>
+        <translation>the peak is above the camera profile&apos;s linearity limit: the flux is no longer proportional</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="396"/>
+        <source>cosmic ray</source>
+        <translation>cosmic ray</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="397"/>
+        <source>an isolated spike sits in the aperture</source>
+        <translation>an isolated spike sits in the aperture</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="399"/>
+        <source>cloud</source>
+        <translation>cloud</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="400"/>
+        <source>the frame is dimmer than its neighbours by more than the night&apos;s scatter</source>
+        <translation>the frame is dimmer than its neighbours by more than the night&apos;s scatter</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="403"/>
+        <source>seeing</source>
+        <translation>seeing</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="404"/>
+        <source>the FWHM left the night&apos;s range: defocus, a trail or a satellite through the core</source>
+        <translation>the FWHM left the night&apos;s range: defocus, a trail or a satellite through the core</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="407"/>
+        <source>not aligned</source>
+        <translation>not aligned</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="408"/>
+        <source>the frame could not be registered on the reference plate</source>
+        <translation>the frame could not be registered on the reference plate</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="411"/>
+        <source>edge</source>
+        <translation>edge</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="412"/>
+        <source>the frame only overlaps the reference plate at its edge</source>
+        <translation>the frame only overlaps the reference plate at its edge</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="415"/>
+        <source>guiding</source>
+        <translation>guiding</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="416"/>
+        <source>the target moved off the position it had on the reference plate</source>
+        <translation>the target moved off the position it had on the reference plate</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="419"/>
+        <source>few comparisons</source>
+        <translation>few comparisons</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="420"/>
+        <source>the zero point rests on fewer comparisons than the recipe asks for</source>
+        <translation>the zero point rests on fewer comparisons than the recipe asks for</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="423"/>
+        <source>no zero point</source>
+        <translation>no zero point</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="424"/>
+        <source>no comparison star could hold a zero point, so this frame has no magnitude</source>
+        <translation>no comparison star could hold a zero point, so this frame has no magnitude</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="427"/>
+        <source>neighbour zero point</source>
+        <translation>neighbour zero point</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="428"/>
+        <source>the zero point came from a neighbouring frame</source>
+        <translation>the zero point came from a neighbouring frame</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="485"/>
         <source>unreadable</source>
         <translation>unreadable</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="364"/>
+        <location filename="../widgets/frame_previews.py" line="487"/>
         <source>not registered</source>
         <translation>not registered</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="371"/>
+        <location filename="../widgets/frame_previews.py" line="496"/>
         <source>Frame %1</source>
         <translation>Frame %1</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="384"/>
+        <location filename="../widgets/frame_previews.py" line="509"/>
         <source>Could not be read:</source>
         <translation>Could not be read:</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="388"/>
+        <location filename="../widgets/frame_previews.py" line="513"/>
         <source>%1 × %2 px</source>
         <translation>%1 × %2 px</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="392"/>
+        <location filename="../widgets/frame_previews.py" line="517"/>
         <source>%1 MB on disk</source>
         <translation>%1 MB on disk</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="396"/>
+        <location filename="../widgets/frame_previews.py" line="521"/>
         <source>sky %1 ADU</source>
         <translation>sky %1 ADU</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="407"/>
+        <location filename="../widgets/frame_previews.py" line="532"/>
         <source>No astrometric solution</source>
         <translation>No astrometric solution</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="409"/>
+        <location filename="../widgets/frame_previews.py" line="534"/>
         <source>The last run could not register it</source>
         <translation>The last run could not register it</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="496"/>
+        <location filename="../widgets/frame_previews.py" line="541"/>
+        <source>The series threw this frame&apos;s measurement away:</source>
+        <translation>The series threw this frame&apos;s measurement away:</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="543"/>
+        <source>The series measured this frame, but its calibration leans on little:</source>
+        <translation>The series measured this frame, but its calibration leans on little:</translation>
+    </message>
+    <message>
+        <location filename="../widgets/frame_previews.py" line="634"/>
         <source>Open in the editor</source>
         <translation>Open in the editor</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="500"/>
+        <location filename="../widgets/frame_previews.py" line="638"/>
         <source>Open the folder</source>
         <translation>Open the folder</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="506"/>
+        <location filename="../widgets/frame_previews.py" line="644"/>
         <source>Take %1 frames out of the visit</source>
         <translation>Take %1 frames out of the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="508"/>
+        <location filename="../widgets/frame_previews.py" line="646"/>
         <source>Take it out of the visit</source>
         <translation>Take it out of the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="510"/>
+        <location filename="../widgets/frame_previews.py" line="648"/>
         <source>The visit stops measuring them. The files are NOT touched: they stay where they are and can be attached again</source>
         <translation>The visit stops measuring them. The files are NOT touched: they stay where they are and can be attached again</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="515"/>
+        <location filename="../widgets/frame_previews.py" line="653"/>
         <source>Move %1 frames to discarded/…</source>
         <translation>Move %1 frames to discarded/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="517"/>
+        <location filename="../widgets/frame_previews.py" line="655"/>
         <source>Move it to discarded/…</source>
         <translation>Move it to discarded/…</translation>
     </message>
     <message>
-        <location filename="../widgets/frame_previews.py" line="519"/>
+        <location filename="../widgets/frame_previews.py" line="657"/>
         <source>The files move into the project&apos;s discarded/ folder and the registry follows them: nothing is deleted and they can be brought back</source>
         <translation>The files move into the project&apos;s discarded/ folder and the registry follows them: nothing is deleted and they can be brought back</translation>
     </message>
@@ -2216,27 +2346,27 @@
         <translation>Opening the image workbench…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13642"/>
+        <location filename="../main_window.py" line="13654"/>
         <source>Point not saved: no magnitude to record</source>
         <translation>Point not saved: no magnitude to record</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13646"/>
+        <location filename="../main_window.py" line="13658"/>
         <source>Point not saved: the plate has no observation date</source>
         <translation>Point not saved: the plate has no observation date</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13660"/>
+        <location filename="../main_window.py" line="13672"/>
         <source>Point not saved: %1</source>
         <translation>Point not saved: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13674"/>
+        <location filename="../main_window.py" line="13686"/>
         <source>Point saved without plate state: this plate is not registered in the project.</source>
         <translation>Point saved without plate state: this plate is not registered in the project.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13678"/>
+        <location filename="../main_window.py" line="13690"/>
         <source>Point saved: {} band, {:.3f} mag</source>
         <translation>Point saved: {} band, {:.3f} mag</translation>
     </message>
@@ -4565,7 +4695,7 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <location filename="../main_window.py" line="10350"/>
         <location filename="../main_window.py" line="10532"/>
         <location filename="../main_window.py" line="10685"/>
-        <location filename="../main_window.py" line="13734"/>
+        <location filename="../main_window.py" line="13746"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
@@ -4610,28 +4740,28 @@ Rp/Rs = {2}</translation>
         <translation>multiperiodic stars want consecutive nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13899"/>
+        <location filename="../main_window.py" line="13911"/>
         <source>%1 frames moved to dscrd/.</source>
         <translation>%1 frames moved to dscrd/.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14415"/>
-        <location filename="../main_window.py" line="14455"/>
+        <location filename="../main_window.py" line="14427"/>
+        <location filename="../main_window.py" line="14467"/>
         <source>Series saved: {} points</source>
         <translation>Series saved: {} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14469"/>
+        <location filename="../main_window.py" line="14481"/>
         <source>ExoClock submission prepared; outcome recorded.</source>
         <translation>ExoClock submission prepared; outcome recorded.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14498"/>
+        <location filename="../main_window.py" line="14510"/>
         <source>Run undone: {} points removed</source>
         <translation>Run undone: {} points removed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14672"/>
+        <location filename="../main_window.py" line="14684"/>
         <source>The plate&apos;s saved state was cleared.</source>
         <translation>The plate&apos;s saved state was cleared.</translation>
     </message>
@@ -6261,73 +6391,73 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Leave the workbench and return</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13702"/>
+        <location filename="../main_window.py" line="13714"/>
         <source>A pass is already running.</source>
         <translation>A pass is already running.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13733"/>
+        <location filename="../main_window.py" line="13745"/>
         <source>Measuring the pass: {0} objects</source>
         <translation>Measuring the pass: {0} objects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13735"/>
-        <location filename="../main_window.py" line="13800"/>
+        <location filename="../main_window.py" line="13747"/>
+        <location filename="../main_window.py" line="13812"/>
         <source>Campaign pass</source>
         <translation>Campaign pass</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13743"/>
+        <location filename="../main_window.py" line="13755"/>
         <source>Pass over {0} frames with the {1}</source>
         <translation>Pass over {0} frames with the {1}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13745"/>
+        <location filename="../main_window.py" line="13757"/>
         <source>campaign&apos;s shared sequence</source>
         <translation>campaign&apos;s shared sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13747"/>
+        <location filename="../main_window.py" line="13759"/>
         <source>project&apos;s own sequence</source>
         <translation>project&apos;s own sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13793"/>
+        <location filename="../main_window.py" line="13805"/>
         <source>Cancelling the pass… the frames already measured are kept.</source>
         <translation>Cancelling the pass… the frames already measured are kept.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13801"/>
+        <location filename="../main_window.py" line="13813"/>
         <source>The pass failed: {0}</source>
         <translation>The pass failed: {0}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13827"/>
+        <location filename="../main_window.py" line="13839"/>
         <source>Campaign pass: shared frames</source>
         <translation>Campaign pass: shared frames</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13847"/>
+        <location filename="../main_window.py" line="13859"/>
         <source>Pass saved: {0} objects, {1} frames, {2} points</source>
         <translation>Pass saved: {0} objects, {1} frames, {2} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13853"/>
+        <location filename="../main_window.py" line="13865"/>
         <source>Pass saved. {0} project(s) stayed out of it: see the dialog.</source>
         <translation>Pass saved. {0} project(s) stayed out of it: see the dialog.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13878"/>
+        <location filename="../main_window.py" line="13890"/>
         <source>%1 frames are no longer part of the visit (the files stay where they are).</source>
         <translation>%1 frames are no longer part of the visit (the files stay where they are).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13881"/>
+        <location filename="../main_window.py" line="13893"/>
         <source>Nothing was taken out: those frames are not part of this visit any more.</source>
         <translation>Nothing was taken out: those frames are not part of this visit any more.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13895"/>
+        <location filename="../main_window.py" line="13907"/>
         <source>This project has no folder to move them into.</source>
         <translation>This project has no folder to move them into.</translation>
     </message>
@@ -6336,27 +6466,27 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">%1 frames moved to discarded/.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="13902"/>
+        <location filename="../main_window.py" line="13914"/>
         <source>%1 were not there any more.</source>
         <translation>%1 were not there any more.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14451"/>
+        <location filename="../main_window.py" line="14463"/>
         <source>Series saved: {} points over {} nights, one run each</source>
         <translation>Series saved: {} points over {} nights, one run each</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14491"/>
+        <location filename="../main_window.py" line="14503"/>
         <source>Pass undone: {} points over {} nights</source>
         <translation>Pass undone: {} points over {} nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14643"/>
+        <location filename="../main_window.py" line="14655"/>
         <source>The chart will show that pass of the visit.</source>
         <translation>The chart will show that pass of the visit.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="14656"/>
+        <location filename="../main_window.py" line="14668"/>
         <source>Curve discarded: {0} run(s) undone, {1} points removed</source>
         <translation>Curve discarded: {0} run(s) undone, {1} points removed</translation>
     </message>
@@ -13047,8 +13177,8 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>The calibration of this visit: which master each piece uses (dark, flat), why one was left out, and the vignetting model policy the library is read with. The frames are calibrated when they are read (the Astrometry run); from here you can also export calibrated copies. Opens in its own window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2925"/>
-        <location filename="../ufe_dialog.py" line="3022"/>
+        <location filename="../ufe_dialog.py" line="2980"/>
+        <location filename="../ufe_dialog.py" line="3077"/>
         <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
@@ -13069,22 +13199,22 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="593"/>
+        <location filename="../ufe_dialog.py" line="594"/>
         <source>Fit</source>
         <translation>Fit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="594"/>
+        <location filename="../ufe_dialog.py" line="595"/>
         <source>Fit the plate to the window</source>
         <translation>Fit the plate to the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="596"/>
+        <location filename="../ufe_dialog.py" line="597"/>
         <source>Zoom {0} % (1:1 at 100)</source>
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="749"/>
+        <location filename="../ufe_dialog.py" line="750"/>
         <source>Calibration</source>
         <translation>Calibration</translation>
     </message>
@@ -13093,75 +13223,75 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Track &amp;&amp; Stack</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1839"/>
+        <location filename="../ufe_dialog.py" line="1878"/>
         <source>Frame {0}/{1}</source>
         <translation>Frame {0}/{1}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1840"/>
+        <location filename="../ufe_dialog.py" line="1879"/>
         <location filename="../ui/ufe_visit_panel.ui" line="23"/>
         <source>Frame</source>
         <translation>Frame</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1841"/>
+        <location filename="../ufe_dialog.py" line="1880"/>
         <source>No visit frames</source>
         <translation>No visit frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1889"/>
-        <location filename="../ufe_dialog.py" line="2002"/>
+        <location filename="../ufe_dialog.py" line="1928"/>
+        <location filename="../ufe_dialog.py" line="2041"/>
         <source>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</source>
         <translation>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1994"/>
+        <location filename="../ufe_dialog.py" line="2033"/>
         <source>This editor was not opened from a visit: there are no frames to solve.</source>
         <translation>This editor was not opened from a visit: there are no frames to solve.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2009"/>
+        <location filename="../ufe_dialog.py" line="2048"/>
         <source>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</source>
         <translation>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2013"/>
+        <location filename="../ufe_dialog.py" line="2052"/>
         <source>Solving the visit&apos;s {0} frames…</source>
         <translation>Solving the visit&apos;s {0} frames…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2030"/>
         <location filename="../ufe_dialog.py" line="2069"/>
+        <location filename="../ufe_dialog.py" line="2108"/>
         <source>Solving the visit…</source>
         <translation>Solving the visit…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2066"/>
+        <location filename="../ufe_dialog.py" line="2105"/>
         <source>Solving frame {0} of {1}: {2}</source>
         <translation>Solving frame {0} of {1}: {2}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2083"/>
+        <location filename="../ufe_dialog.py" line="2122"/>
         <source>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</source>
         <translation>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2088"/>
+        <location filename="../ufe_dialog.py" line="2127"/>
         <source>Visit solved: {0} frames solved, {1} already had a WCS</source>
         <translation>Visit solved: {0} frames solved, {1} already had a WCS</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2092"/>
+        <location filename="../ufe_dialog.py" line="2131"/>
         <source>, {0} failed ({1})</source>
         <translation>, {0} failed ({1})</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2095"/>
+        <location filename="../ufe_dialog.py" line="2134"/>
         <source>, {0} could not be written into the file</source>
         <translation>, {0} could not be written into the file</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2109"/>
+        <location filename="../ufe_dialog.py" line="2148"/>
         <source>The visit could not be solved: {0}</source>
         <translation>The visit could not be solved: {0}</translation>
     </message>
@@ -13170,64 +13300,64 @@ THE RISKS, said plainly: it moves the magnitude that gets published, so a curve 
         <translation type="vanished">Uses the open frame and the sequence above.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2210"/>
+        <location filename="../ufe_dialog.py" line="2249"/>
         <source>Build the comparison sequence first (Photometry, «Build the sequence…»).</source>
         <translation>Build the comparison sequence first (Photometry, «Build the sequence…»).</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2889"/>
-        <location filename="../ufe_dialog.py" line="2989"/>
+        <location filename="../ufe_dialog.py" line="2944"/>
+        <location filename="../ufe_dialog.py" line="3044"/>
         <source>Solving the plate…</source>
         <translation>Solving the plate…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2031"/>
-        <location filename="../ufe_dialog.py" line="2890"/>
+        <location filename="../ufe_dialog.py" line="2070"/>
+        <location filename="../ufe_dialog.py" line="2945"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="732"/>
+        <location filename="../ufe_dialog.py" line="733"/>
         <source>Astrometry</source>
         <translation>Astrometry</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="779"/>
+        <location filename="../ufe_dialog.py" line="780"/>
         <source>Photometric series</source>
         <translation>Photometric series</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1352"/>
+        <location filename="../ufe_dialog.py" line="1353"/>
         <source>The photometric series needs a visit with frames: open the editor from a visit and this measures its frames as one series</source>
         <translation>The photometric series needs a visit with frames: open the editor from a visit and this measures its frames as one series</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1712"/>
+        <location filename="../ufe_dialog.py" line="1716"/>
         <source>No frames</source>
         <translation>No frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1714"/>
+        <location filename="../ufe_dialog.py" line="1718"/>
         <source>%1 frames</source>
         <translation>%1 frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1716"/>
+        <location filename="../ufe_dialog.py" line="1720"/>
         <source>%1 with problems</source>
         <translation>%1 with problems</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1732"/>
+        <location filename="../ufe_dialog.py" line="1736"/>
         <source>Taken out of the visit</source>
         <translation>Taken out of the visit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1742"/>
+        <location filename="../ufe_dialog.py" line="1746"/>
         <source>Move the frames aside</source>
         <translation>Move the frames aside</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1743"/>
+        <location filename="../ufe_dialog.py" line="1747"/>
         <source>Move %1 frame(s) into the project&apos;s discarded/ folder?
 
 Nothing is deleted: the files move, the registry follows them, and they can be brought back.</source>
@@ -13236,80 +13366,80 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
 Nothing is deleted: the files move, the registry follows them, and they can be brought back.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1751"/>
+        <location filename="../ufe_dialog.py" line="1755"/>
         <source>Moved aside</source>
         <translation>Moved aside</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1763"/>
+        <location filename="../ufe_dialog.py" line="1767"/>
         <source>This window has no project to change.</source>
         <translation>This window has no project to change.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1948"/>
+        <location filename="../ufe_dialog.py" line="1987"/>
         <source>The AI is off: turn it on in Settings → Integrations.</source>
         <translation>The AI is off: turn it on in Settings → Integrations.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2208"/>
+        <location filename="../ufe_dialog.py" line="2247"/>
         <source>Uses the open frame and the comparison sequence of this series.</source>
         <translation>Uses the open frame and the comparison sequence of this series.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2680"/>
-        <location filename="../ufe_dialog.py" line="2719"/>
+        <location filename="../ufe_dialog.py" line="2735"/>
+        <location filename="../ufe_dialog.py" line="2774"/>
         <source>Export</source>
         <translation>Export</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2682"/>
+        <location filename="../ufe_dialog.py" line="2737"/>
         <source>PNG image (*.png);;FITS image (*.fits *.fit)</source>
         <translation>PNG image (*.png);;FITS image (*.fits *.fit)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2720"/>
+        <location filename="../ufe_dialog.py" line="2775"/>
         <source>Could not write the FITS copy to {0}.
 {1}</source>
         <translation>Could not write the FITS copy to {0}.
 {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3006"/>
+        <location filename="../ufe_dialog.py" line="3061"/>
         <source>signing in to Astrometry.net</source>
         <translation>signing in to Astrometry.net</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3007"/>
+        <location filename="../ufe_dialog.py" line="3062"/>
         <source>uploading the plate</source>
         <translation>uploading the plate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3008"/>
+        <location filename="../ufe_dialog.py" line="3063"/>
         <source>Astrometry.net is solving</source>
         <translation>Astrometry.net is solving</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3009"/>
+        <location filename="../ufe_dialog.py" line="3064"/>
         <source>ASTAP is solving at the project&apos;s field</source>
         <translation>ASTAP is solving at the project&apos;s field</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3011"/>
+        <location filename="../ufe_dialog.py" line="3066"/>
         <source>ASTAP is solving</source>
         <translation>ASTAP is solving</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3012"/>
+        <location filename="../ufe_dialog.py" line="3067"/>
         <source>this plate carries no position, so ASTAP is sweeping the sky (this can take a minute)</source>
         <translation>this plate carries no position, so ASTAP is sweeping the sky (this can take a minute)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3039"/>
+        <location filename="../ufe_dialog.py" line="3094"/>
         <source>This plate carries no position of its own and the editor was not opened from a project, so the solver had to search the whole sky. Opening it from its project tells it where the field is, and the solve takes a moment.</source>
         <translation>This plate carries no position of its own and the editor was not opened from a project, so the solver had to search the whole sky. Opening it from its project tells it where the field is, and the solve takes a moment.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3069"/>
+        <location filename="../ufe_dialog.py" line="3124"/>
         <source>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</source>
         <translation>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</translation>
     </message>
@@ -13319,74 +13449,74 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2869"/>
+        <location filename="../ufe_dialog.py" line="2924"/>
         <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
         <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2991"/>
+        <location filename="../ufe_dialog.py" line="3046"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3031"/>
+        <location filename="../ufe_dialog.py" line="3086"/>
         <source>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</source>
         <translation>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2976"/>
+        <location filename="../ufe_dialog.py" line="3031"/>
         <source>ASTAP and Astrometry.net</source>
         <translation>ASTAP and Astrometry.net</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="3055"/>
+        <location filename="../ufe_dialog.py" line="3110"/>
         <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="746"/>
+        <location filename="../ufe_dialog.py" line="747"/>
         <location filename="../ui/ufe_dialog.ui" line="51"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="753"/>
+        <location filename="../ufe_dialog.py" line="754"/>
         <location filename="../ui/ufe_dialog.ui" line="53"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2652"/>
+        <location filename="../ufe_dialog.py" line="2707"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="2653"/>
+        <location filename="../ufe_dialog.py" line="2708"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="988"/>
-        <location filename="../ufe_dialog.py" line="2663"/>
+        <location filename="../ufe_dialog.py" line="989"/>
+        <location filename="../ufe_dialog.py" line="2718"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="185"/>
-        <location filename="../ufe_dialog.py" line="987"/>
-        <location filename="../ufe_dialog.py" line="2032"/>
-        <location filename="../ufe_dialog.py" line="2640"/>
-        <location filename="../ufe_dialog.py" line="2662"/>
-        <location filename="../ufe_dialog.py" line="2868"/>
-        <location filename="../ufe_dialog.py" line="2891"/>
-        <location filename="../ufe_dialog.py" line="3044"/>
-        <location filename="../ufe_dialog.py" line="3054"/>
-        <location filename="../ufe_dialog.py" line="3068"/>
+        <location filename="../ufe_dialog.py" line="186"/>
+        <location filename="../ufe_dialog.py" line="988"/>
+        <location filename="../ufe_dialog.py" line="2071"/>
+        <location filename="../ufe_dialog.py" line="2695"/>
+        <location filename="../ufe_dialog.py" line="2717"/>
+        <location filename="../ufe_dialog.py" line="2923"/>
+        <location filename="../ufe_dialog.py" line="2946"/>
+        <location filename="../ufe_dialog.py" line="3099"/>
+        <location filename="../ufe_dialog.py" line="3109"/>
+        <location filename="../ufe_dialog.py" line="3123"/>
         <source>NightScribe Image Workbench</source>
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="717"/>
+        <location filename="../ufe_dialog.py" line="718"/>
         <source>Photometry</source>
         <translation>Photometry</translation>
     </message>
@@ -13529,7 +13659,7 @@ Nothing is deleted: the files move, the registry follows them, and they can be b
         <translation>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="273"/>
+        <location filename="../ufe_dialog.py" line="274"/>
         <source>Histogram</source>
         <translation>Histogram</translation>
     </message>

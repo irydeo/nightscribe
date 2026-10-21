@@ -6,6 +6,24 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-10-21
+
+### Fixed
+
+- **The editor's list of frames now shows what the series said about each
+  one.** The light curve marked a frame whose measurement the series had thrown
+  away while the list of frames showed nothing wrong, so an observer looking at
+  an empty chart and a spotless strip of frames could only conclude that his
+  data were bad: on the night this was reported **338 of 379 frames carried a
+  flag and the strip said nothing at all**. The list marks them now with the
+  same classification the curve reads (`core/series_measure`): a data flag
+  (nonlinear, cloud, seeing, a cosmic ray, a frame that could not be aligned)
+  makes the frame a problem and the "only problems" filter keeps it; a caveat
+  (a thin comparison set) is a note and never hides a frame. The mark names the
+  flag and explains it in the tooltip, and the border wears the colour the
+  measurement deserves: the same grammar the curve and the measurement panel
+  already share.
+
 ## [0.1.2] - 2026-10-20
 
 Fixes the one thing that could take a working EXOTIC environment away, and stops

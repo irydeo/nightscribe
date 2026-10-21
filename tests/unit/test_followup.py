@@ -423,6 +423,35 @@ def test_the_visit_knows_the_curve_it_holds(tmp_path):
     assert len(fu.runs_for_session(db, sid)) == 1
 
 
+def test_the_series_verdict_reaches_the_frame_browser(tmp_path):
+    # REPORTED 2026-10-20: the curve marked a frame and the list of frames of
+    # the visit said nothing was wrong, so the observer blamed his data. The
+    # editor's frame browser asks for this map to mark the SAME frames the
+    # curve draws as flagged (see gui/widgets/frame_previews).
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu, project as proj
+    db = Database(str(tmp_path / "t.db"))
+    pid = proj.create(db, "transit", "WASP-44 b")["id"]
+    sid = fu.create_session(db, pid, obs_date="2026-10-08")
+    run = fu.create_run(db, session_id=sid, cfg={"series": {"band": "Rc"}})
+    paths = [f"/tmp/f{k}.fits" for k in range(3)]
+    fids = [proj.add_file(db, pid, p, "fits", session_id=sid) for p in paths]
+    fu.add_points(db, [
+        {"project_id": pid, "session_id": sid, "mjd": 60000.10 + k / 1000.0,
+         "filter": "Rc", "mag": 12.0, "err": 0.01, "source": "measure",
+         "flags": flags, "run_id": run, "file_id": fid}
+        for k, (fid, flags) in enumerate(zip(
+            fids, (["nonlinear", "unusable"], [], ["few_comps"])))])
+    marks = fu.curve_quality_by_frame(db, pid, sid)
+    # only the frames that carry a flag come back, and the key is the frame's
+    # PATH: the list shows frames, not registry ids
+    assert marks == {paths[0]: ["nonlinear", "unusable"],
+                     paths[2]: ["few_comps"]}
+    # a visit nobody measured answers with nothing, not with an error
+    other = fu.create_session(db, pid, obs_date="2026-10-09")
+    assert fu.curve_quality_by_frame(db, pid, other) == {}
+
+
 def test_discarding_the_curve_undoes_its_runs_and_leaves_the_trail(tmp_path):
     from nightscribe.core.db import Database
     from nightscribe.core import followup as fu, project as proj

@@ -278,7 +278,10 @@ def test_the_preview_takes_the_column_and_the_caption_rides_on_it(
     from PySide6.QtGui import QPainter, QPixmap
     from PySide6.QtWidgets import QStyleOptionViewItem
     widget.set_fact(1, None, {"path": paths[1], "failed_register": True})
-    assert widget.item(1).data(258) is True          # the flag role
+    # the flag role carries the COLOUR the measurement deserves, not a bool:
+    # a frame that could not be registered is a hard failure and stays red
+    # (see _quality_colour)
+    assert widget.item(1).data(258) == FLAG_RED
     pix = QPixmap(thumb, thumb)
     painter = QPainter(pix)
     try:
@@ -353,5 +356,76 @@ def test_the_list_fills_the_panel_s_height(qapp, tmp_path):
         for i in range(panel.layout().count()))
     assert d.frames_list.height() >= panel.height() - 130   # it owns the room
     assert abs(spare) <= 40                                 # no dead strip
+    d.shutdown()
+    d.deleteLater()
+
+
+def test_a_frame_the_series_threw_away_is_marked_in_the_list(qapp, tmp_path):
+    # REPORTED 2026-10-20: the curve drew a flagged point and the strip of
+    # frames showed nothing wrong, so the observer, with an empty chart and a
+    # clean list in front of him, concluded that his data were bad. They were
+    # not: 338 of the 379 frames of that visit carried a flag and the strip
+    # said nothing. The series' verdict now reaches the list, with the SAME
+    # classification the chart reads (core/series_measure), so the two cannot
+    # tell different stories.
+    from nightscribe.gui.widgets.frame_previews import FramePreviews
+    from nightscribe.viz import palette
+    paths = [_frame(tmp_path / f"f{i}.fits") for i in range(3)]
+    widget = FramePreviews()
+    widget.set_frames(paths)
+    # the series threw the second frame away; the third is usable but its
+    # calibration leans on little
+    widget.set_fact(1, None, {"quality": ["nonlinear", "unusable"]})
+    widget.set_fact(2, None, {"quality": ["few_comps"]})
+    assert widget.problems() == 1                   # a caveat is NOT a problem
+    assert "nonlinear" in widget.item(1).text()
+    # and the border wears the colour the measurement deserves, the same
+    # grammar the curve and the measurement panel already share
+    assert widget.item(1).data(258) == palette.DANGER
+    assert widget.item(2).data(258) == palette.FAIR
+    widget.set_problems_only(True)
+    assert [widget.item(i).isHidden() for i in range(3)] == [True, False, True]
+    # the frames are all still there: the filter is a view
+    assert widget.paths() == paths
+    widget.deleteLater()
+
+
+def test_the_mark_explains_itself(qapp, tmp_path):
+    # The house rule: no classification without its why. The tooltip carries
+    # the flag in words AND what it means, because a mark nobody can explain
+    # is a mark that gets ignored.
+    from nightscribe.gui.widgets.frame_previews import FramePreviews
+    paths = [_frame(tmp_path / f"f{i}.fits") for i in range(2)]
+    widget = FramePreviews()
+    widget.set_frames(paths)
+    widget.set_fact(0, None, {"quality": ["seeing"]})
+    tip = widget.item(0).toolTip()
+    assert "seeing" in tip
+    assert "FWHM" in tip                    # what it means, not only its name
+    # a frame nobody measured is NOT marked: not measured is not the same as
+    # measured and thrown away
+    assert widget.problems() == 1
+    assert "series" not in widget.item(1).toolTip()
+    widget.deleteLater()
+
+
+def test_the_visit_hands_the_series_verdict_to_the_strip(qapp, tmp_path):
+    # End to end through the editor: the hook the host arms answers with the
+    # series' verdict per frame, and the list shows it as soon as the visit
+    # is on screen.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    paths = [_frame(tmp_path / f"f{i}.fits") for i in range(3)]
+    d = UfeDialog()
+    d.set_series_hook(lambda scope="visit": {
+        "pid": 1, "session_id": 7, "paths": paths, "kind": "transit",
+        "context": {}, "scope": "visit"})
+    d.set_visit_flags_hook(lambda sid: {paths[0]: ["nonlinear"]})
+    qapp.processEvents()
+    assert d.frames_list.problems() == 1
+    assert "nonlinear" in d.frames_list.item(0).text()
+    # and clearing the hook clears the marks (the ad-hoc editor)
+    d.set_visit_flags_hook(None)
+    qapp.processEvents()
+    assert d.frames_list.problems() == 0
     d.shutdown()
     d.deleteLater()

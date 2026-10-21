@@ -105,6 +105,33 @@ def test_reopen_after_the_user_closed_the_window(panel, qapp):
     assert vp._win is not None and vp._win is not first
 
 
+def test_the_saved_line_does_not_move_the_buttons(panel, qapp):
+    # Reported 2026-10-21: the first time the window saved anything, the
+    # "Saved" line appeared above the buttons and pushed them down, so the
+    # Analyse button jumped under the observer's own cursor and stayed there
+    # (measured: 77 px). The line keeps its room now, so showing it moves
+    # nothing, and it goes away by itself.
+    vp, _pid, _o = panel
+    vp.btn_new.click()
+    win = vp._win
+    win.show()
+    qapp.processEvents()
+    lbl = win._saved_lbl
+    before = win.btn_analyze.y()
+    assert lbl.text() == ""              # nothing to say yet...
+    assert lbl.height() > 0              # ...but its room is already taken
+    win._flash_saved()
+    qapp.processEvents()
+    assert lbl.text() == "Saved"
+    assert win.btn_analyze.y() == before        # nothing moved
+    assert win._saved_timer.isActive()          # and it will go away alone
+    win._clear_saved()
+    qapp.processEvents()
+    assert lbl.text() == ""
+    assert win.btn_analyze.y() == before
+    assert not win._saved_timer.isActive()
+
+
 def test_attach_fits_with_editable_meta(panel, monkeypatch, tmp_path):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
@@ -485,12 +512,13 @@ def test_visit_name_editable_from_the_window(panel):
     vp.refresh()
     w = vp.open_visit(sid)
     assert w._label_ed is not None
-    assert not w._saved_lbl.isVisible()      # nothing saved yet
+    assert w._saved_lbl.text() == ""         # nothing saved yet
+    assert w._saved_lbl.height() > 0         # but its room is already taken
     w._label_ed.setText("first pass")
-    assert not w._saved_lbl.isVisible()      # typing hides the line
+    assert w._saved_lbl.text() == ""         # typing quiets the line
     w._save_head()                           # Enter / leaving the field
     assert fu.get_session(vp._db, sid)["label"] == "first pass"
-    assert w._saved_lbl.isVisible()
+    assert w._saved_lbl.text() == "Saved"
     vp.refresh()
     row = next(vp.lst.item(i) for i in range(vp.lst.count())
                if vp.lst.item(i).data(Qt.UserRole) == sid)

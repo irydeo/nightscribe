@@ -6,6 +6,8 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-27
+
 ### Fixed
 
 - **The "Saved" line no longer moves the buttons.** It appeared on the first

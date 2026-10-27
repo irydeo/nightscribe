@@ -38,7 +38,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QDate, QSize, Qt
+from PySide6.QtCore import QDate, QSize, Qt, QTimer
 from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
                                QMenu, QMessageBox, QWidget)
 
@@ -497,6 +497,23 @@ class VisitWindow(QDialog):
         self._label_ed.textChanged.connect(self._on_label_dirty)
         self._label_ed.editingFinished.connect(self._save_head)
         self._saved_lbl = self._ui.vp_lbl_saved
+        # THE "Saved" LINE KEEPS ITS ROOM, ALWAYS.
+        #
+        # It used to be hidden and appear on the first save, and appearing
+        # pushed everything below it down: measured, the Analyse button
+        # jumped 77 px under the observer's own cursor and stayed there
+        # (reported 2026-10-21: "el botón se desplaza al aparecer siempre
+        # Saved por encima de él"). A fixed height of one line and an empty
+        # text say the same thing without moving anything.
+        self._saved_lbl.setFixedHeight(self._saved_lbl.fontMetrics().height())
+        # ...and it really flashes: it says "Saved" and goes away by itself,
+        # which is what its name has promised since it replaced the old Save
+        # button. A confirmation that stays is not a confirmation, it is a
+        # second label.
+        self._saved_timer = QTimer(self)
+        self._saved_timer.setSingleShot(True)
+        self._saved_timer.setInterval(2000)
+        self._saved_timer.timeout.connect(self._clear_saved)
         self.btn_pin = self._ui.vp_btn_pin
         self.btn_pin.setChecked(bool(s.get("pinned")))
         self.btn_pin.toggled.connect(self._on_pin_toggled)
@@ -591,7 +608,13 @@ class VisitWindow(QDialog):
 
     def _on_label_dirty(self, _text=None):
         # Any edit puts the "Saved" line away; it comes back on the commit.
-        self._saved_lbl.setVisible(False)
+        self._clear_saved()
+
+    def _clear_saved(self):
+        # @return: None. The line goes quiet, and the room it occupies stays
+        #          (see __init__): emptying the text is all it takes.
+        self._saved_lbl.setText("")
+        self._saved_timer.stop()
 
     def _save_head(self):
         # Enter, or leaving the name field, saves it. Nothing to validate:
@@ -605,9 +628,11 @@ class VisitWindow(QDialog):
 
     def _flash_saved(self):
         # @return: None. The one line that says the edit took (the reason the
-        #          old Save button existed).
+        #          old Save button existed), and it goes away on its own: the
+        #          room it occupies never changes, so nothing moves under the
+        #          observer's cursor.
         self._saved_lbl.setText(self.tr("Saved"))
-        self._saved_lbl.setVisible(True)
+        self._saved_timer.start()
 
     def _on_change_date(self):
         # A calendar, not a text field: the date is a folder name and a sort
@@ -807,6 +832,16 @@ class VisitWindow(QDialog):
         self._ui.ph_files.setVisible(open_)
         self._ui.vp_btn_files.setArrowType(
             Qt.DownArrow if open_ else Qt.RightArrow)
+
+    def refresh_content(self):
+        # The visit's content, filled again. The window steps aside while the
+        # workbench is on screen, and the workbench can save a series, undo a
+        # run or import an EXOTIC reduction in that time: coming back with
+        # the runs and the points of before the measurement would be a lie
+        # the observer has no way to notice (measured 2026-10-21).
+        # @return: None
+        self._populate_content()
+        self._paint_confirmation()
 
     # --------------------------------------------------- the row gestures
 

@@ -57,6 +57,7 @@ from PySide6.QtWidgets import (QListWidget, QListWidgetItem, QMenu,
 
 from ...core import stretch
 from ...core.series_measure import split_flags
+from .. import flag_words
 from ...viz import palette
 from .. import theme
 
@@ -221,7 +222,6 @@ class FramePreviews(QListWidget):
         self._facts = []          # one dict per frame (or None until read)
         self._images = []         # one STRETCHED image per frame (unscaled)
         self._problems_only = False
-        self._flag_words_cache = None   # the flags in words, built on demand
         self._thumb = 140         # the side, until the list is laid out
         self._hue = theme.C_ACCENT   # the caption's colour: the object's own
         self._placeholder = self._make_placeholder()
@@ -369,74 +369,12 @@ class FramePreviews(QListWidget):
                                    and not self._is_problem(i))
 
     def _flag_words(self):
-        # @return: {flag: (short, why)} in the observer's language, cached.
+        # @return: {flag: (short, why)} in the observer's language.
         #
-        # THE SERIES' FLAGS, IN WORDS AND WITH THEIR WHY. A frame the series
-        # measured carries the engine's flags (core/series_measure.DATA_FLAGS
-        # and CAVEAT_FLAGS) and this is the only place that shows them to a
-        # person, so the words live here and not in the engine; the chart keeps
-        # painting the same classification as colours.
-        #
-        # That split is not cosmetic. Until 2026-10-20 this list knew only
-        # about unreadable and unregistered frames, so a frame whose
-        # measurement the series had thrown away was marked in the curve and
-        # looked perfect here: the observer was left with an empty chart and a
-        # clean list of frames, and reasonably blamed the data. On the night
-        # that was reported the camera profile refused 338 of 379 frames and
-        # the strip said nothing at all.
-        #
-        # The words are built with LITERAL tr() calls on purpose: lupdate only
-        # extracts literals, and a table of pre-built strings would never reach
-        # the catalogue (see CONTRIBUTING).
-        if getattr(self, "_flag_words_cache", None) is None:
-            self._flag_words_cache = {
-                "unusable": (
-                    self.tr("unusable"),
-                    self.tr("the plate's recipe refused the measurement")),
-                "saturated": (
-                    self.tr("saturated"),
-                    self.tr("the star's core is clipped, so its flux is a "
-                            "floor and not a value")),
-                "nonlinear": (
-                    self.tr("nonlinear"),
-                    self.tr("the peak is above the camera profile's linearity "
-                            "limit: the flux is no longer proportional")),
-                "cosmic": (
-                    self.tr("cosmic ray"),
-                    self.tr("an isolated spike sits in the aperture")),
-                "cloud": (
-                    self.tr("cloud"),
-                    self.tr("the frame is dimmer than its neighbours by more "
-                            "than the night's scatter")),
-                "seeing": (
-                    self.tr("seeing"),
-                    self.tr("the FWHM left the night's range: defocus, a trail "
-                            "or a satellite through the core")),
-                "align_failed": (
-                    self.tr("not aligned"),
-                    self.tr("the frame could not be registered on the "
-                            "reference plate")),
-                "align_edge": (
-                    self.tr("edge"),
-                    self.tr("the frame only overlaps the reference plate at "
-                            "its edge")),
-                "guide_jump": (
-                    self.tr("guiding"),
-                    self.tr("the target moved off the position it had on the "
-                            "reference plate")),
-                "few_comps": (
-                    self.tr("few comparisons"),
-                    self.tr("the zero point rests on fewer comparisons than "
-                            "the recipe asks for")),
-                "no_zp": (
-                    self.tr("no zero point"),
-                    self.tr("no comparison star could hold a zero point, so "
-                            "this frame has no magnitude")),
-                "neighbour_zp": (
-                    self.tr("neighbour zero point"),
-                    self.tr("the zero point came from a neighbouring frame")),
-            }
-        return self._flag_words_cache
+        # The words live in gui/flag_words.py because the measurement panel
+        # says the same thing about a whole series and the two must read the
+        # same (see that module for why).
+        return flag_words.words()
 
     def _quality(self, index):
         # @args: index - the frame

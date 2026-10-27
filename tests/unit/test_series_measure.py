@@ -1288,3 +1288,46 @@ def test_local_offset_days_matches_the_machine_clock():
     off = sm._local_offset_days(61300.0)
     assert isinstance(off, float)
     assert -1.0 <= off <= 1.0
+
+
+def test_the_point_takes_the_airmass_and_the_site_the_plate_declares():
+    # The plate's own cards win over the observer's Settings (see
+    # fits_meta): the airmass is the detrend's regressor and the site is what
+    # the scintillation is computed from, so getting them from the wrong
+    # observatory spoils both (measured 2026-10-21: the error went from 0.05
+    # to 0.39 mag through the night on a Las Cumbres plate).
+    cfg = sm.SeriesConfig(site_lat=40.0, site_lon=-3.0)
+    group = [{"meta": {"airmass": 1.16}}, {"meta": {"airmass": 1.18}}]
+    assert abs(sm._plate_airmass(group, cfg, 60000.0) - 1.17) < 1e-9
+    assert sm._plate_site(
+        [{"meta": {"site_lat": 30.68, "site_lon": -104.02}}], cfg) \
+        == (30.68, -104.02)
+    # a plate that says nothing keeps the observer's own, and with no WCS
+    # there is no geometry to fall back to: None, not a made-up number
+    assert sm._plate_site([{"meta": {}}], cfg) == (40.0, -3.0)
+    assert sm._plate_airmass([{"meta": {}}], cfg, 60000.0) is None
+
+
+def test_the_point_takes_the_telescope_size_the_plate_declares():
+    # The scintillation goes with the diameter: a 1 m plate measured with the
+    # observer's 10" gets that term 2.5 times too big (measured 2026-10-21:
+    # 0.030 mag against the honest 0.016 on a Las Cumbres series).
+    cfg = sm.SeriesConfig(site_aperture_m=0.25)
+    assert sm._plate_aperture([{"meta": {"aperture_m": 1.0}}], cfg) == 1.0
+    assert sm._plate_aperture([{"meta": {}}], cfg) == 0.25
+
+
+def test_the_series_measures_in_the_band_the_plate_really_used():
+    # A Las Cumbres plate says FILTER 'R' and the sequence carries 'Rc': the
+    # series has to measure in Rc, not in whatever band came first, or the
+    # zero point hangs from another band's magnitudes (reported 2026-10-21).
+    comps = ({"star": {"bands": [{"label": "Rc", "value": 12.0},
+                                 {"label": "V", "value": 12.4}]}},)
+    cfg = sm.SeriesConfig(band=None, fallback_band="G", comp_set=comps)
+    assert sm._point_band({"filter": "R"}, cfg) == "Rc"
+    # a band the observer picked by hand always wins
+    cfg_hand = sm.SeriesConfig(band="V", comp_set=comps)
+    assert sm._point_band({"filter": "R"}, cfg_hand) == "V"
+    # a Pan-STARRS rp is NOT a Cousins R: it is left as it is, the panel
+    # says there is no magnitude in that band, and nothing is invented
+    assert sm._point_band({"filter": "rp"}, cfg) == "rp"

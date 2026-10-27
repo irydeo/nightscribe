@@ -6,6 +6,90 @@ All notable changes to NightScribe are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-27
+
+### Fixed
+
+- **The "Saved" line no longer moves the buttons.** It appeared on the first
+  save and stayed, pushing the Analyse button **77 px** down under the
+  observer's own cursor, once, for good. It keeps its room now and goes away by
+  itself after a couple of seconds, which is what a confirmation is for.
+
+- **The plate's own ceiling gates the measurement when the plate is not from
+  your camera.** The camera profile's linearity limit is written in your ADU,
+  and ADU are a property of one instrument: a Las Cumbres plate (a 248 800 ADU
+  ceiling) was refused frame after frame as "nonlinear" and the chart came out
+  empty with no explanation. The full well in electrons is what tells the two
+  detectors apart, and the panel now says which of the two cases it is.
+
+- **The plate's filter becomes a band only when it really is one.** A plate
+  whose `FILTER` card says `R` against a sequence that carries `Rc` used to
+  fall to the first band of the list, which is a silent wrong calibration (the
+  zero point then hangs from another band's magnitudes). A Cousins `R` is the
+  catalogue's `Rc`; a Pan-STARRS `rp` is **not**, and pretending otherwise
+  would be inventing one.
+
+- **A series that measured nothing says why.** No more empty chart with a clean
+  list of frames next to it: the panel counts the flags, names the one that
+  dominated and says what to do about it.
+
+- **A series that finishes no longer closes the workbench.** Saving the
+  measurement refreshed the project by RE-OPENING it, and opening a project
+  switches the screen to it: the editor the series had just been measured in
+  closed itself, and the page it rebuilt took the visit window down with it.
+  The project's own blocks (the visits list with its counts, the curve, the
+  cadence line, the runs and the header) refresh where they are now, and the
+  visit window comes back filled when the observer leaves the workbench.
+
+- **"Measure the series…" answers the first click.** The workbench is not
+  instant to open, and on a real 379-frame visit it took **2.5 seconds** during
+  which the window did not repaint: with the visit window still on top, the
+  pause read as a dead button, so the observer pressed again and the second
+  press got the credit for opening it. The visit window steps aside BEFORE that
+  work, and the whole open now wears the wait notice, so the press is answered
+  on the spot. And the open got **1.8 seconds shorter**: arming the Track &
+  Stack tab's context reads the header of every frame of the visit (1.85 s for
+  379 of them), and that was being paid even when the editor was opened for the
+  series. A tab now arms itself when it takes the stage, which is when it is
+  looked at.
+
+- **The airmass and the site are taken from the plate, not from your
+  Settings.** The engine computed the target's altitude from the site
+  configured in Settings, which is right for your own observatory and wrong
+  for anybody else's plate: on a Las Cumbres plate (a 1 m at McDonald) reduced
+  from a site in Spain the airmass came out **rising to 5.2 through the night**
+  where the plate's own header said 1.16 to 1.03. That number feeds the
+  scintillation term of the error, so the error grew from 0.05 to **0.39 mag**
+  over the night, which the chart reads as green, then orange, then red. With
+  the plate's own cards the same errors are flat at 0.03. The same rule the
+  plate scale already followed applies now to the time: **what the plate says
+  about itself wins over the observer's Settings**, and the Settings are the
+  fallback for a rig that declares nothing. The detrend benefits too, since the
+  airmass is its regressor: **re-measure a series** to get the corrected errors
+  and the corrected trend (the points already stored keep the old numbers, they
+  are the record of what was measured).
+
+- **The telescope's size is read from the plate as well.** It is the input of
+  that same scintillation term, and a Las Cumbres 1 m measured with the
+  observer's 10" got it 2.5 times too big. Only a plate that really states the
+  size is trusted, because that is the only way to read it without inventing it:
+  Las Cumbres writes it into the telescope's own id (`1m0a`, `0m4c`, `2m0a`),
+  while a name like `Cecilia` or `CDK17` says nothing about the size, and there
+  the observer's Settings stay: for their own telescope that is the right answer
+  anyway. With both cards read, the errors of the series that was reported went
+  from 0.05 to 0.39 mag across the night (the green-orange-red ramp) to a **flat
+  0.016**.
+
+### Changed
+
+- **The detrend starts from "auto" for every kind of project except a transit.**
+  The extinction is a systematic that is always there, and a rotation, an
+  outburst or a pulsation do not share its timescale, which is what makes the
+  trend separable. It is the self-limiting policy: it always applies the
+  airmass and only adds the extra terms when the scatter really drops. A
+  transit keeps the raw curve on purpose, because its trend is solved together
+  with the model (EXOTIC's own airmass term).
+
 ## [0.1.3] - 2026-10-21
 
 ### Fixed

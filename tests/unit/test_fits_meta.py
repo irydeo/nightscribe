@@ -112,3 +112,77 @@ def test_meta_mjd_card_wins_over_unparseable_date():
     h = {"DATE-OBS": "garbage", "MJD": "58107.5"}
     m = meta_from_header(h)
     assert m["mjd"] == 58107.5
+
+
+def test_the_plate_declares_its_own_site_and_airmass():
+    # Measured 2026-10-21 on a Las Cumbres plate (a 1 m at McDonald) reduced
+    # from a site in Spain: the engine computed the airmass from the
+    # OBSERVER's Settings, so it came out rising to 5.2 through the night
+    # while the plate's own header said 1.16 -> 1.03. That number feeds the
+    # scintillation term of the error, which grew from 0.05 to 0.39 mag with
+    # it. The plate knows where it was taken.
+    from nightscribe.core.fits_meta import (airmass_from_header,
+                                            site_from_header)
+    h = {"LATITUDE": 30.679833, "LONGITUD": -104.015173,
+         "AIRMASS": 1.1570632}
+    assert site_from_header(h) == (30.679833, -104.015173)
+    assert abs(airmass_from_header(h) - 1.1570632) < 1e-9
+    # the other spelling of the same two cards, and SECZ as the airmass
+    h2 = {"SITELAT": "31.68", "SITELONG": "-110.88", "SECZ": "1.4645"}
+    assert site_from_header(h2) == (31.68, -110.88)
+    assert abs(airmass_from_header(h2) - 1.4645) < 1e-9
+
+
+def test_a_plate_that_says_nothing_keeps_the_observer_settings():
+    # The fallback has to be there: an amateur rig that writes no site is
+    # measured with the observer's own, which IS the right one.
+    from nightscribe.core.fits_meta import (airmass_from_header,
+                                            site_from_header)
+    assert site_from_header({"FILTER": "V"}) == (None, None)
+    assert airmass_from_header({"FILTER": "V"}) is None
+    # 1.0 is the zenith: anything below it is not an airmass
+    assert airmass_from_header({"AIRMASS": 0.4}) is None
+    # a half-declared or impossible site is not a site
+    assert site_from_header({"LATITUDE": 30.68}) == (None, None)
+    assert site_from_header({"LATITUDE": 200.0, "LONGITUD": 0.0}) == (None, None)
+
+
+def test_meta_carries_the_site_and_the_airmass():
+    h = {"DATE-OBS": "2026-09-09T22:30:00", "LATITUDE": 30.68,
+         "LONGITUD": -104.02, "AIRMASS": 1.16}
+    m = meta_from_header(h)
+    assert m["site_lat"] == 30.68 and m["site_lon"] == -104.02
+    assert abs(m["airmass"] - 1.16) < 1e-9
+    # and they are None when the plate does not say, never a made-up value
+    m2 = meta_from_header({"DATE-OBS": "2026-09-09T22:30:00"})
+    assert m2["site_lat"] is None and m2["site_lon"] is None
+    assert m2["airmass"] is None
+
+
+def test_the_plate_says_how_big_its_telescope_is_when_it_says_it():
+    # Las Cumbres writes the aperture into the telescope's own name, and that
+    # number feeds the scintillation term: a 1 m plate measured with the
+    # observer's 10" gets that term 2.5 times too big (0.032 mag against the
+    # honest 0.013), and it is the term that dominates a quiet night.
+    from nightscribe.core.fits_meta import aperture_from_header
+    assert aperture_from_header({"TELID": "0m4c"}) == 0.4
+    assert aperture_from_header({"TELID": "1m0a"}) == 1.0
+    assert aperture_from_header({"TELESCOP": "2m0a"}) == 2.0
+    assert aperture_from_header({"TELESCOP": "0m4-63"}) == 0.4
+    assert aperture_from_header({"TELID": "1m0-06"}) == 1.0
+    assert meta_from_header({"TELID": "1m0a"})["aperture_m"] == 1.0
+
+
+def test_a_name_that_says_nothing_is_not_a_number():
+    # 'Cecilia' (MicroObservatory) and 'CDK17' (a model) say nothing about
+    # the size: inventing one would be worse than falling back to the
+    # observer's Settings, which for the observer's OWN telescope is the
+    # right answer anyway.
+    from nightscribe.core.fits_meta import aperture_from_header
+    assert aperture_from_header(
+        {"TELESCOP": "Cecilia", "INSTRUME": "Main"}) is None
+    assert aperture_from_header({"TELESCOP": "CDK17"}) is None
+    assert aperture_from_header({"TELESCOP": "CFF300"}) is None
+    assert aperture_from_header({}) is None
+    # a degenerate id is not a size either
+    assert aperture_from_header({"TELID": "0m0a"}) is None

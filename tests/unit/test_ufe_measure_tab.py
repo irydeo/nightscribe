@@ -2840,3 +2840,51 @@ def test_a_recipe_that_does_not_mention_a_knob_does_not_move_it(dlg):
     # and when the recipe DOES mention it, the recipe wins
     tab.apply_state({"band": "G", "matched": False})
     assert tab.chk_matched.isChecked() is False
+
+
+def test_the_detrend_default_follows_the_kind(dlg, monkeypatch):
+    # D11: a TRANSIT keeps the raw curve, because its trend is solved
+    # TOGETHER with the model (EXOTIC's a2*airmass, and the app's own joint
+    # fit in core/transit_fit), so detrending here first would fit the trend
+    # on the in-transit points too. Everything else starts from the
+    # self-limiting "auto": the extinction is a systematic that is always
+    # there, and a rotation, an outburst or a pulsation do not share its
+    # timescale, which is what makes the trend separable.
+    tab = dlg.tab_measure
+    combo = tab._advanced.cmb_detrend
+    for kind, expected in (("transit", "off"), ("variable", "auto"),
+                           ("hads", "auto"), ("neo", "auto"), ("sn", "auto"),
+                           ("comet", "auto"), ("pccp", "auto")):
+        combo.setCurrentIndex(0)             # back to "off"...
+        tab._kind_defaults_done = False      # ...and let it choose again
+        monkeypatch.setattr(dlg, "series_context",
+                            lambda scope, k=kind: {"kind": k})
+        tab._apply_kind_defaults()
+        assert combo.currentData() == expected, kind
+    # a choice the observer made is never touched
+    combo.setCurrentIndex(1)                 # airmass, by hand
+    tab._kind_defaults_done = False
+    tab._apply_kind_defaults()
+    assert combo.currentData() == "airmass"
+
+
+def test_a_series_that_measured_nothing_says_why(dlg):
+    # Reported 2026-10-20: the observer got an empty chart and a clean list
+    # of frames, and reasonably concluded that his data were bad. They were
+    # not: 338 of 379 frames carried a flag and nothing said so. The panel
+    # now counts the flags, names the one that dominated and says what to do.
+    from nightscribe.core.series_measure import SeriesPoint
+    tab = dlg.tab_measure
+    pts = [SeriesPoint(index=i, mjd=60000.0 + i, mag=None,
+                       flags=["nonlinear", "unusable"]) for i in range(5)]
+    pts.append(SeriesPoint(index=5, mjd=60001.0, mag=None, flags=["seeing"]))
+    msg = tab._series_why_empty(pts)
+    assert "nonlinear" in msg
+    assert "5" in msg                        # how many carried it
+    assert "linearity" in msg                # and what to do about it
+    # a run with nothing at all to say still says something
+    bare = tab._series_why_empty([SeriesPoint(index=0, mag=None)])
+    assert "no flag" in bare
+    # and a series that DID measure is not touched by any of this
+    assert tab._series_why_empty(
+        [SeriesPoint(index=0, mjd=60000.0, mag=12.0)]) is not None

@@ -27,7 +27,7 @@
      <item><widget class="QToolButton" name="vp_btn_more"><property name="text"><string notr="true">⋯</string></property><property name="toolTip"><string>More: change the visit's date, delete the visit</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
     </layout>
    </item>
-   <item><widget class="QLabel" name="vp_lbl_saved"><property name="visible"><bool>false</bool></property><property name="text"><string/></property><property name="styleSheet"><string notr="true">color: #46a758;</string></property></widget></item>
+   <item><widget class="QLabel" name="vp_lbl_saved"><property name="text"><string/></property><property name="styleSheet"><string notr="true">color: #46a758;</string></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_actions">
      <item><widget class="QPushButton" name="vp_btn_analyze"><property name="text"><string>Analyse…</string></property><property name="toolTip"><string>The visit's own analysis, chosen by the object's kind: the track &amp; stack for the objects that move, the series for the ones that vary. The blink and the rest of the reduction live in the editor, which this opens</string></property></widget></item>

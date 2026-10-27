@@ -150,6 +150,23 @@ noches» y puntos suficientes). Las acciones de recurso («Adjuntar ficheros…�
 textos y tooltips en el Designer (ADR-005) y el mecanismo de puertas del UFE
 (`build_door`). La cabecera (fecha, pin, borrar, guardar y cerrar) no cambia.
 
+**Enmendado (2026-10-21, apartarse antes, y la serie guardada no cierra el
+taller).** Dos cosas medidas sobre una visita real de 379 tomas. La ventana de
+visita se apartaba **al entrar** en el taller, es decir después del trabajo, y
+toda la apertura tardaba 2,5 s sin que nada en pantalla lo dijera: con la
+ventana todavía encima, la pausa se leía como un botón muerto, así que el
+observador volvía a pulsar «Medir la serie…» y el mérito se lo llevaba el
+segundo clic. Ahora se aparta **antes** del trabajo, y toda la apertura lleva el
+aviso de espera. Esos 2,5 s no eran el editor (se construye en 0,37 s) sino armar
+el contexto de astrometría de la pestaña Track & Stack, que lee la cabecera de
+cada toma de la visita: **1,85 s** para 379 tomas, y se pagaban aunque el editor
+se abriera para la SERIE. Ahora una pestaña se arma cuando recibe el escenario,
+así que la apertura baja a **0,74 s**. Y guardar una serie refrescaba el proyecto
+**reabriéndolo**, que cambia la pantalla al proyecto: el editor se cerraba solo y
+la página reconstruida se llevaba por delante la ventana de visita. El refresco
+es **en el sitio** (la lista de visitas con sus cuentas, la curva, la línea de
+cadencia, las pasadas y la cabecera), y la ventana vuelve **rellena** al salir.
+
 ## English
 
 **Context.** The project flow carried three real frictions, all
@@ -348,3 +365,20 @@ plates and the rest of the raw material) in a **folded** block with its count. T
 live in the row's menu. The quick magnitude entry is folded behind "Add a
 measurement by hand" (measurements are rows in Results now, they were listed
 twice). Deleting the visit lives in the ⋯ menu.
+
+**Amendment (2026-10-21, step aside first, and a saved series does not close the
+workbench).** Two things measured on a real visit of 379 frames. The visit
+window stepped aside **on entering** the workbench, that is, after the work, and
+the whole open took 2.5 s with nothing on screen saying so: with the window still
+on top, the pause read as a dead button, so the observer pressed "Measure the
+series…" again and the second press got the credit for opening it. It steps
+aside **before** the work now, and the whole open wears the wait notice. What
+took those 2.5 s was not the editor (built in 0.37 s) but arming the astrometry
+context of the Track & Stack tab, which reads the header of every frame of the
+visit: **1.85 s** for 379 frames, paid even when the editor was opened for the
+SERIES. A tab arms itself when it takes the stage now, so the open is down to
+**0.74 s**. And saving a series refreshed the project by **re-opening** it,
+which switches the screen to the project: the editor closed itself and the
+rebuilt page took the visit window down with it. The refresh is **in place**
+(the visits list with its counts, the curve, the cadence line, the passes and
+the header), and the window comes back **filled** on the way out.

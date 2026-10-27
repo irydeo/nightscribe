@@ -6,6 +6,91 @@ Aquí se documentan los cambios notables de NightScribe. El formato sigue
 
 ## [Sin publicar]
 
+## [0.1.4] - 2026-10-27
+
+### Corregido
+
+- **La línea «Saved» ya no mueve los botones.** Aparecía en el primer guardado y
+  se quedaba, empujando el botón de análisis **77 px** hacia abajo bajo el propio
+  cursor del observador, una vez, para siempre. Ahora conserva su sitio y se va
+  sola a los dos segundos, que es para lo que sirve una confirmación.
+
+- **El techo de la propia placa es el que manda cuando la placa no es de tu
+  cámara.** El límite de linealidad del perfil está escrito en tus ADU, y las ADU
+  son propiedad de un instrumento: una placa de Las Cumbres (techo de 248 800
+  ADU) caía toma tras toma como «no lineal» y la gráfica salía vacía sin
+  explicación. El pozo lleno en electrones es lo que distingue a los dos
+  detectores, y el panel ahora dice cuál de los dos casos es.
+
+- **El filtro de la placa se convierte en banda solo cuando de verdad lo es.**
+  Una placa cuya tarjeta `FILTER` dice `R` contra una secuencia que lleva `Rc`
+  caía a la primera banda de la lista, que es una calibración silenciosamente
+  equivocada (el punto cero cuelga entonces de las magnitudes de otra banda). Un
+  `R` de Cousins **es** el `Rc` del catálogo; un `rp` de Pan-STARRS **no**, y
+  fingir que sí sería inventarla.
+
+- **Una serie que no ha medido nada dice por qué.** Se acabó la gráfica vacía con
+  una lista de tomas impoluta al lado: el panel cuenta las marcas, nombra la que
+  dominó y dice qué hacer.
+
+- **Una serie que termina ya no cierra el banco de trabajo.** Guardar la medida
+  refrescaba el proyecto REABRIÉNDOLO, y abrir un proyecto cambia la pantalla a
+  él: el editor en el que se acababa de medir la serie se cerraba solo, y la
+  página que reconstruía se llevaba por delante la ventana de la visita. Ahora
+  los bloques del propio proyecto (la lista de visitas con sus cuentas, la curva,
+  la línea de cadencia, las pasadas y la cabecera) se refrescan donde están, y la
+  ventana de la visita vuelve rellena cuando el observador sale del banco.
+
+- **«Medir la serie…» responde al primer clic.** Abrir el banco no es
+  instantáneo, y en una visita real de 379 tomas tardaba **2,5 segundos** durante
+  los que la ventana no se repintaba: con la ventana de la visita todavía
+  encima, la pausa se leía como un botón muerto, así que el observador volvía a
+  pulsar y el mérito se lo llevaba el segundo clic. La ventana de la visita se
+  aparta ANTES de ese trabajo, y toda la apertura lleva ahora el aviso de
+  espera, así que la pulsación queda contestada en el sitio. Y la apertura se ha
+  acortado **1,8 segundos**: armar el contexto de la pestaña Track & Stack lee
+  la cabecera de cada toma de la visita (1,85 s para 379), y eso se pagaba
+  aunque el editor se abriera para la serie. Ahora una pestaña se arma cuando
+  recibe el escenario, que es cuando se la mira.
+
+- **La masa de aire y el sitio se toman de la placa, no de tus Ajustes.** El
+  motor calculaba la altitud del objetivo desde el sitio configurado en Ajustes,
+  que es lo correcto para tu observatorio y equivocado para la placa de
+  cualquier otro: en una placa de Las Cumbres (un 1 m en McDonald) reducida
+  desde un sitio en España, la masa de aire salía **subiendo hasta 5,2 a lo
+  largo de la noche** cuando la propia cabecera decía 1,16 a 1,03. Ese número
+  alimenta el término de centellea del error, así que el error crecía de 0,05 a
+  **0,39 mag** en la noche, y la gráfica lo lee como verde, luego naranja y
+  luego rojo. Con las tarjetas de la propia placa esos mismos errores quedan
+  planos en 0,03. La misma regla que ya seguía la escala de placa se aplica
+  ahora al tiempo: **lo que la placa dice de sí misma manda sobre los Ajustes**,
+  y los Ajustes son el respaldo para un equipo que no declara nada. El detrend
+  también se beneficia, porque la masa de aire es su regresor: **vuelve a medir
+  la serie** para tener los errores corregidos y la tendencia corregida (los
+  puntos ya guardados conservan los números viejos, que son el registro de lo
+  que se midió).
+
+- **El tamaño del telescopio también se lee de la placa.** Es la entrada de ese
+  mismo término de centellea, y un 1 m de Las Cumbres medido con los 10" del
+  observador lo dejaba 2,5 veces demasiado grande. Solo se hace caso a una placa
+  que diga de verdad el tamaño, porque es la única forma de leerlo sin
+  inventarlo: Las Cumbres lo escribe en el propio identificador del telescopio
+  (`1m0a`, `0m4c`, `2m0a`), mientras que un nombre como `Cecilia` o `CDK17` no
+  dice nada del tamaño, y ahí se quedan los Ajustes del observador: para su
+  propio telescopio son la respuesta correcta. Con las dos tarjetas leídas, los
+  errores de la serie que se reportó pasaron de 0,05 a 0,39 mag a lo largo de la
+  noche (el degradado verde-naranja-rojo) a un **0,016 plano**.
+
+### Cambiado
+
+- **El detrend arranca en «auto» para todos los tipos de proyecto menos el
+  tránsito.** La extinción es un sistemático que está siempre, y una rotación,
+  un estallido o una pulsación no comparten su escala de tiempo, que es lo que
+  hace separable la tendencia. Es la política autolimitada: aplica siempre la
+  masa de aire y solo añade los términos extra cuando la dispersión baja de
+  verdad. Un tránsito conserva la curva cruda a propósito, porque su tendencia
+  se resuelve junto al modelo (el propio término de masa de aire de EXOTIC).
+
 ## [0.1.3] - 2026-10-21
 
 ### Corregido

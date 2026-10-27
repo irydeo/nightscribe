@@ -140,6 +140,140 @@ def test_a_visit_closed_while_hidden_is_not_resurrected(window):
     assert panel._win is None              # nothing came back
 
 
+def _visit_of_a_measured_kind(window):
+    # @return: (project, panel, visit window, visit id) for a project whose
+    #          analysis action is the series ("Measure the series…"), with
+    #          one readable plate registered in its visit
+    from nightscribe.core import db as coredb
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    plate = Path(__file__).parents[1] / "fixtures" / "sn2026zji_new_image.fits"
+    p = next(pr for pr in project.list_projects(coredb.db)
+             if pr["kind"] == "sn")
+    window.navigate(VIEW_DETAIL, pid=p["id"], tab="analysis")
+    panel = window._project_widgets["visits_panel"]
+    panel.btn_new.click()                  # creates the visit and opens it
+    sid = panel.current_session_id()
+    project.add_file(coredb.db, p["id"], str(plate), "fits", session_id=sid)
+    win = panel._win
+    win.refresh_content()
+    return p, panel, win, sid
+
+
+def test_the_visit_window_steps_aside_before_the_workbench_is_built(
+        window, monkeypatch):
+    # The open is not instant (the editor is built on its first use:
+    # measured 2026-10-21, about 3 s on a 379-frame visit). With the visit
+    # window still on top, that pause read as a dead button, so the
+    # observer pressed "Measure…" a second time and credited the second
+    # press with opening the workbench. The window steps aside FIRST, so
+    # the press is answered on the spot.
+    from nightscribe.gui.main_window import VIEW_UFE
+    _p, _panel, win, _sid = _visit_of_a_measured_kind(window)
+    seen = {}
+    build = window._ufe_build
+
+    def spy():
+        seen["visible"] = win.isVisible()
+        return build()
+
+    monkeypatch.setattr(window, "_ufe_build", spy)
+    win.btn_analyze.click()
+    assert seen["visible"] is False          # already out of the way
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    assert win.isHidden()
+
+
+def test_saving_a_series_does_not_leave_the_workbench(window):
+    # Refreshing the project after a series used to RE-OPEN it, and opening
+    # it switches the shell to the project view: the editor the series was
+    # measured in closed itself, and the page rebuild took the visits panel
+    # (and with it the visit window the workbench had stepped aside) down
+    # with it (reported 2026-10-21). The refresh is in place now.
+    from nightscribe.gui.main_window import VIEW_DETAIL, VIEW_UFE
+    p, panel, win, sid = _visit_of_a_measured_kind(window)
+    win.btn_analyze.click()
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    plate = str(Path(__file__).parents[1] / "fixtures"
+                / "sn2026zji_new_image.fits")
+    window._ufe_points_hook(p["id"], sid,
+                            [{"path": plate, "mjd": 61000.5, "mag": 12.0,
+                              "err": 0.01, "session_id": sid}],
+                            {"band": "V", "status": "complete"})
+    # the observer is still in the editor, with its visit window in hand
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    assert window._visit_win_hidden is win
+    assert panel._win is win
+    # ... and the visit window comes back when the observer leaves, filled
+    # again: the run just saved is in its Results (it was empty before)
+    window._ufe_back()
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
+    assert not win.isHidden()
+    assert win.lst_results.count() == 1
+
+
+def test_opening_from_a_visit_wears_the_wait_notice_whole(window):
+    # The open is not instant (measured 2026-10-21: 2.5 s on a 379-frame
+    # visit, 0.74 s once the hidden astrometry tab stopped being armed) and
+    # it runs on the GUI thread, so the window does not repaint: with no
+    # notice, a desktop paints that as an application that went away. The
+    # WHOLE open is wrapped, the navigation included, not only the build.
+    from nightscribe.gui.main_window import VIEW_UFE
+    _p, _panel, win, _sid = _visit_of_a_measured_kind(window)
+    seen = []
+    real = window._with_busy
+
+    def spy(label, fn):
+        # only the outermost notice is recorded: the build inside the open
+        # asks for its own, and the real one collapses the two
+        outer = not seen
+        if outer:
+            seen.append(label)
+        dlg = real(label, fn)
+        if outer:
+            seen.append(("inside", window._shell_stack().currentIndex()))
+        return dlg
+
+    window._with_busy = spy
+    win.btn_analyze.click()
+    assert seen == ["Opening the image workbench…",
+                    ("inside", VIEW_UFE)]
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+
+
+def test_only_one_wait_notice_at_a_time(window, monkeypatch):
+    # The open paths nest: the workbench wraps the whole open and the build
+    # inside it wraps itself. A second dialog would stack on the first and
+    # make the wait look twice as long as it is.
+    from PySide6 import QtWidgets
+    shown = []
+
+    class FakeProgress:
+        def __init__(self, label, *args, **kwargs):
+            self.label = label
+            shown.append(label)
+
+        def __getattr__(self, name):
+            return lambda *args, **kwargs: None
+
+    monkeypatch.setattr(QtWidgets, "QProgressDialog", FakeProgress)
+    window._with_busy(
+        "outer", lambda: window._with_busy("inner", lambda: 42))
+    assert shown == ["outer"]
+
+
+def test_the_window_is_handed_back_after_the_wait(window, monkeypatch):
+    # A modal dialog takes the focus, and on a real desktop a window that
+    # does not answer and does not come back to the front reads as an
+    # application that went to the background (reported 2026-10-21).
+    calls = []
+    monkeypatch.setattr(window, "raise_", lambda: calls.append("raise"))
+    monkeypatch.setattr(window, "activateWindow",
+                        lambda: calls.append("activate"))
+    window._with_busy("wait", lambda: None)
+    assert calls == ["raise", "activate"]
+
+
 def test_the_night_panel_fills_the_empty_pane(window):
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_night
